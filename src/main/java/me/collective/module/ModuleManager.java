@@ -69,7 +69,6 @@ public class ModuleManager {
         register(new Jesus());
         register(new ElytraBounce());
         register(new RocketBoost());
-        register(new NoFall());
         register(new NoJumpDelay());
         register(new GrimGlide());
         register(new NoWeb());

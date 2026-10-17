@@ -78,41 +78,47 @@ public class Surround extends Module {
             return;
         }
 
+        // Ярусные цели: сначала полностью закрываем первый ярус (у ног),
+        // только потом тратим обсидиан на второй — иначе над дыркой
+        // появится крыша, а стенки так и останутся с дырой.
         BlockPos playerPos = mc.player.getBlockPos();
-        List<BlockPos> targetPositions = new ArrayList<>();
+        List<BlockPos> tier0 = new ArrayList<>();
+        List<BlockPos> tier1 = new ArrayList<>();
 
-        // Кардинальные стороны (N, S, E, W)
-        targetPositions.add(playerPos.north());
-        targetPositions.add(playerPos.south());
-        targetPositions.add(playerPos.east());
-        targetPositions.add(playerPos.west());
+        tier0.add(playerPos.north());
+        tier0.add(playerPos.south());
+        tier0.add(playerPos.east());
+        tier0.add(playerPos.west());
 
-        // Диагональные позиции
         if (diagonal.getValue()) {
-            targetPositions.add(playerPos.north().east());
-            targetPositions.add(playerPos.north().west());
-            targetPositions.add(playerPos.south().east());
-            targetPositions.add(playerPos.south().west());
+            tier0.add(playerPos.north().east());
+            tier0.add(playerPos.north().west());
+            tier0.add(playerPos.south().east());
+            tier0.add(playerPos.south().west());
         }
 
-        // Второй ярус (на уровне тела)
         if (doubleHeight.getValue()) {
-            targetPositions.add(playerPos.north().up());
-            targetPositions.add(playerPos.south().up());
-            targetPositions.add(playerPos.east().up());
-            targetPositions.add(playerPos.west().up());
+            tier1.add(playerPos.north().up());
+            tier1.add(playerPos.south().up());
+            tier1.add(playerPos.east().up());
+            tier1.add(playerPos.west().up());
 
             if (diagonal.getValue()) {
-                targetPositions.add(playerPos.north().east().up());
-                targetPositions.add(playerPos.north().west().up());
-                targetPositions.add(playerPos.south().east().up());
-                targetPositions.add(playerPos.south().west().up());
+                tier1.add(playerPos.north().east().up());
+                tier1.add(playerPos.north().west().up());
+                tier1.add(playerPos.south().east().up());
+                tier1.add(playerPos.south().west().up());
             }
         }
 
-        // Сортируем: сначала те позиции, которые ближе к врагам или центру игрока
         Vec3d eyePos = mc.player.getEyePos();
-        targetPositions.sort(Comparator.comparingDouble(p -> eyePos.squaredDistanceTo(p.toCenterPos())));
+        Comparator<BlockPos> byDistance
+            = Comparator.comparingDouble(p -> eyePos.squaredDistanceTo(p.toCenterPos()));
+        tier0.sort(byDistance);
+        tier1.sort(byDistance);
+
+        List<BlockPos> targetPositions = new ArrayList<>(tier0);
+        targetPositions.addAll(tier1);
 
         int placed = 0;
         int maxPlaced = blocksPerTick.getValue().intValue();

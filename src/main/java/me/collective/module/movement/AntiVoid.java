@@ -16,14 +16,32 @@ public class AntiVoid extends Module {
     public final NumberSetting fallDistance = add(new NumberSetting("Дистанция падения", 3.0, 1.0, 10.0, 0.5));
     public final NumberSetting height = add(new NumberSetting("Высота срабатывания", 0.0, -64.0, 64.0, 1.0));
     public final BooleanSetting jump = add(new BooleanSetting("Авто-прыжок", true));
+    /** Кулдаун спасения: после срабатывания модуль молчит N тиков,
+     *  чтобы не спамить изменениями velocity. */
+    public final NumberSetting cooldown = add(new NumberSetting("Cooldown", 10.0, 0.0, 40.0, 1.0));
+
+    private int cooldownTicks = 0;
 
     public AntiVoid() {
         super("AntiVoid", "Спасает от падения в пустоту.", Category.MOVEMENT);
     }
 
     @Override
+    public void onEnable() {
+        cooldownTicks = 0;
+    }
+
+    @Override
     public void onUpdate() {
-        if (mc.player == null || mc.world == null || mc.player.isOnGround()) return;
+        if (mc.player == null || mc.world == null) return;
+        if (cooldownTicks > 0) {
+            cooldownTicks--;
+            return;
+        }
+        if (mc.player.isOnGround()) {
+            cooldownTicks = 0;
+            return;
+        }
         if (mc.player.getY() > height.getFloatValue()) return;
         if (mc.player.fallDistance < fallDistance.getFloatValue()) return;
         if (!isOverVoid()) return;
@@ -32,10 +50,12 @@ public class AntiVoid extends Module {
         Vec3d vel = mc.player.getVelocity();
         mc.player.setVelocity(vel.x * 0.7, Math.max(vel.y, -0.15), vel.z * 0.7);
         if (jump.getValue()) mc.options.jumpKey.setPressed(true);
+        cooldownTicks = cooldown.getIntValue();
     }
 
     @Override
     public void onDisable() {
+        cooldownTicks = 0;
         if (mc.options != null) mc.options.jumpKey.setPressed(false);
     }
 
