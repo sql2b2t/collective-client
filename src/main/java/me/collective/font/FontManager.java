@@ -99,4 +99,41 @@ public class FontManager {
         }
         return mc.textRenderer.fontHeight;
     }
+
+    public void drawCustomString(DrawContext context, String text, float x, float y, Color color) {
+        drawCustomString(context, text, x, y, color.getRGB());
+    }
+
+    public void drawCustomString(DrawContext context, String text, float x, float y, int color) {
+        if (text == null || text.isEmpty()) return;
+        if (currentFont == null) reloadFont();
+        if (currentFont != null) {
+            currentFont.drawString(context, text, x, y, color);
+        } else {
+            context.drawText(mc.textRenderer, text, (int) Math.round(x), (int) Math.round(y), color, false);
+        }
+    }
+
+    public void drawCustomStringWithShadow(DrawContext context, String text, float x, float y, Color color) {
+        drawCustomStringWithShadow(context, text, x, y, color.getRGB());
+    }
+
+    public void drawCustomStringWithShadow(DrawContext context, String text, float x, float y, int color) {
+        if (text == null || text.isEmpty()) return;
+        if (currentFont == null) reloadFont();
+        if (currentFont != null) {
+            currentFont.drawStringWithShadow(context, text, x, y, color);
+        } else {
+            context.drawTextWithShadow(mc.textRenderer, text, (int) Math.round(x), (int) Math.round(y), color);
+        }
+    }
+
+    public float getCustomStringWidth(String text) {
+        if (text == null || text.isEmpty()) return 0;
+        if (currentFont == null) reloadFont();
+        if (currentFont != null) {
+            return currentFont.getStringWidth(text);
+        }
+        return mc.textRenderer.getWidth(text);
+    }
 }

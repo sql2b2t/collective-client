@@ -46,7 +46,7 @@ public abstract class MixinCamera {
         if (freecam != null && freecam.isToggled()) {
             Vec3d freecamPos = freecam.getInterpolatedPos(tickProgress);
             setPos(freecamPos);
-            setRotation(freecam.getYaw(), freecam.getPitch());
+            setRotation(freecam.getInterpolatedYaw(tickProgress), freecam.getInterpolatedPitch(tickProgress));
             return;
         }
 

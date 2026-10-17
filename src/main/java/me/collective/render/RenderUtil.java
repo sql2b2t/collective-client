@@ -40,6 +40,53 @@ public class RenderUtil {
         drawRect(context, x + width - radius, y + radius, x + width, y + height - radius, color);
     }
 
+    /** Настоящий скруглённый прямоугольник: полосы + 4 диска по углам. */
+    public static void drawSmoothRoundedRect(DrawContext context, float x, float y, float width, float height, float radius, int color) {
+        if (radius <= 0.5f) {
+            drawRect(context, x, y, x + width, y + height, color);
+            return;
+        }
+        radius = Math.min(radius, Math.min(width, height) / 2f);
+        drawRect(context, x + radius, y, x + width - radius, y + height, color);
+        drawRect(context, x, y + radius, x + radius, y + height - radius, color);
+        drawRect(context, x + width - radius, y + radius, x + width, y + height - radius, color);
+        drawCircle(context, x + radius, y + radius, radius, color);
+        drawCircle(context, x + width - radius, y + radius, radius, color);
+        drawCircle(context, x + radius, y + height - radius, radius, color);
+        drawCircle(context, x + width - radius, y + height - radius, radius, color);
+    }
+
+    /** Тонкая скруглённая рамка: укороченные полосы + четверти дуг по углам. */
+    public static void drawRoundedOutline(DrawContext context, float x, float y, float width, float height, float radius, float thickness, int color) {
+        radius = Math.min(radius, Math.min(width, height) / 2f);
+        float t = thickness;
+        drawRect(context, x + radius, y, x + width - radius, y + t, color);
+        drawRect(context, x + radius, y + height - t, x + width - radius, y + height, color);
+        drawRect(context, x, y + radius, x + t, y + height - radius, color);
+        drawRect(context, x + width - t, y + radius, x + width, y + height - radius, color);
+        cornerArc(context, x + radius, y + radius, radius, t, -1, -1, color);
+        cornerArc(context, x + width - radius, y + radius, radius, t, 1, -1, color);
+        cornerArc(context, x + radius, y + height - radius, radius, t, -1, 1, color);
+        cornerArc(context, x + width - radius, y + height - radius, radius, t, 1, 1, color);
+    }
+
+    /** Четверть кольца: sx/sy = ±1 — в какой квадрант от центра. */
+    private static void cornerArc(DrawContext context, float cx, float cy, float r, float t, int sx, int sy, int color) {
+        int y0 = (int) Math.floor(cy - r);
+        int y1 = (int) Math.ceil(cy + r);
+        for (int row = y0; row <= y1; row++) {
+            float yc = row + 0.5f;
+            float dy = (yc - cy) * sy;
+            if (dy < 0 || dy > r) continue;
+            float outer = (float) Math.sqrt(Math.max(0, r * r - dy * dy));
+            float innerR = Math.max(0, r - t);
+            float inner = (float) Math.sqrt(Math.max(0, innerR * innerR - dy * dy));
+            float x1 = sx < 0 ? cx - outer : cx + inner;
+            float x2 = sx < 0 ? cx - inner : cx + outer;
+            if (x2 > x1) drawRect(context, x1, row, x2, row + 1, color);
+        }
+    }
+
     public static void drawShadow(DrawContext context, float x, float y, float width, float height, float size, Color shadowColor) {
         if (size <= 0 || shadowColor.getAlpha() == 0) return;
         drawRect(context, x + size, y + height, x + width + size, y + height + size, shadowColor.getRGB());
@@ -85,11 +132,16 @@ public class RenderUtil {
     }
 
     public static void drawRotatedImage(DrawContext context, net.minecraft.util.Identifier texture, float x, float y, float width, float height, float angle, int color) {
+        drawRotatedImage(context, texture, x, y, width, height, angle, color, (int) width, (int) height);
+    }
+
+    /** Повёрнутая картинка; texW/texH — реальный размер текстуры (регион — весь). */
+    public static void drawRotatedImage(DrawContext context, net.minecraft.util.Identifier texture, float x, float y, float width, float height, float angle, int color, int texW, int texH) {
         context.getMatrices().pushMatrix();
         context.getMatrices().translate(x + width / 2.0f, y + height / 2.0f);
         context.getMatrices().rotate((float) Math.toRadians(angle));
         context.getMatrices().translate(-width / 2.0f, -height / 2.0f);
-        context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, texture, 0, 0, 0f, 0f, (int) width, (int) height, (int) width, (int) height, color);
+        context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, texture, 0, 0, 0f, 0f, (int) width, (int) height, texW, texH, texW, texH, color);
         context.getMatrices().popMatrix();
     }
 }

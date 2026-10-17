@@ -88,12 +88,16 @@ public class ChestSwap extends Module {
     }
 
     private void equip(int slot) {
-        if (mc.player == null || mc.interactionManager == null) return;
-        int screenSlot = slot < 9 ? 36 + slot : slot;
-
-        mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, screenSlot, 0, SlotActionType.PICKUP, mc.player);
-        mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, 6, 0, SlotActionType.PICKUP, mc.player);
-        mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, screenSlot, 0, SlotActionType.PICKUP, mc.player);
+        if (mc.player == null || mc.interactionManager == null || mc.currentScreen != null) return;
+        if (slot >= 0 && slot < 9) {
+            // Хотбар: один атомарный SWAP вместо трёх PICKUP (меньше флагов)
+            mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, 6, slot, SlotActionType.SWAP, mc.player);
+        } else {
+            int screenSlot = slot;
+            mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, screenSlot, 0, SlotActionType.PICKUP, mc.player);
+            mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, 6, 0, SlotActionType.PICKUP, mc.player);
+            mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, screenSlot, 0, SlotActionType.PICKUP, mc.player);
+        }
 
         if (closeScreen.getValue()) {
             mc.getNetworkHandler().sendPacket(new CloseHandledScreenC2SPacket(0));

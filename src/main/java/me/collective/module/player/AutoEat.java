@@ -27,6 +27,10 @@ public class AutoEat extends Module {
     private boolean eating = false;
     private int prevSlot = -1;
 
+    public boolean isEating() {
+        return isToggled() && eating;
+    }
+
     public AutoEat() {
         super("AutoEat", "Automatically eats food when hunger or health is low.", Category.PLAYER);
     }

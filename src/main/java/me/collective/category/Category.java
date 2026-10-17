@@ -5,6 +5,7 @@ public enum Category {
     MISC("Misc"),
     RENDER("Render"),
     MOVEMENT("Movement"),
+    HIGHWAY("Highway Tools"),
     PLAYER("Player"),
     EXPLOIT("Exploit"),
     CLIENT("Client"),

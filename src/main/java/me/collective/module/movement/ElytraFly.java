@@ -20,6 +20,7 @@ public class ElytraFly extends Module {
     public final NumberSetting speed = add(new NumberSetting("Скорость", 2.0, 0.5, 5.0, 0.1));
     public final NumberSetting boostPower = add(new NumberSetting("Сила буста", 1.5, 0.5, 3.0, 0.1));
     public final BooleanSetting autoBoost = add(new BooleanSetting("Авто-буст", true));
+    public final BooleanSetting fireworks = add(new BooleanSetting("Фейерверки", false));
     public final BooleanSetting hover = add(new BooleanSetting("Зависание", false));
 
     public ElytraFly() {
@@ -53,7 +54,7 @@ public class ElytraFly extends Module {
             motionY = look.y * s * 0.8;
         }
         if (sneak) motionY = -1.2;
-        if (jump && autoBoost.getValue()) {
+        if (jump && autoBoost.getValue() && fireworks.getValue()) {
             if (useFirework()) {
                 motionX = look.x * s * boostPower.getFloatValue();
                 motionZ = look.z * s * boostPower.getFloatValue();

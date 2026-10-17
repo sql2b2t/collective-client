@@ -52,6 +52,11 @@ public class CollectiveClient implements ClientModInitializer {
         // Register Client Tick Callbacks for Modules and EventBus
         net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.START_CLIENT_TICK.register(client -> {
             if (client.player != null && client.world != null) {
+                // Кэш расчёта урона от взрывов живёт ровно один тик: ключ содержит
+                // блок и id сущности, но НЕ позицию — она меняется каждый тик.
+                // Чистим здесь, до всех модулей, иначе кто-то прочитает значения,
+                // посчитанные по старым координатам.
+                me.collective.util.ExplosionDamageUtil.clearCache();
                 me.collective.event.EventBus.INSTANCE.post(new me.collective.event.events.TickEvent.Pre());
             }
         });

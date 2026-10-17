@@ -18,6 +18,7 @@ public class UI extends Module {
     public final BooleanSetting customWidths = add(new BooleanSetting("CustomWidths", false));
     public final NumberSetting combatWidth = add(new NumberSetting("CombatWidth", 92, 70, 200, 1, (v) -> customWidths.getValue()));
     public final NumberSetting movementWidth = add(new NumberSetting("MovementWidth", 92, 70, 200, 1, (v) -> customWidths.getValue()));
+    public final NumberSetting highwayWidth = add(new NumberSetting("HighwayWidth", 92, 70, 200, 1, (v) -> customWidths.getValue()));
     public final NumberSetting playerWidth = add(new NumberSetting("PlayerWidth", 92, 70, 200, 1, (v) -> customWidths.getValue()));
     public final NumberSetting renderWidth = add(new NumberSetting("RenderWidth", 92, 70, 200, 1, (v) -> customWidths.getValue()));
     public final NumberSetting exploitWidth = add(new NumberSetting("ExploitWidth", 92, 70, 200, 1, (v) -> customWidths.getValue()));
@@ -36,6 +37,7 @@ public class UI extends Module {
         return switch (category) {
             case COMBAT -> combatWidth.getIntValue();
             case MOVEMENT -> movementWidth.getIntValue();
+            case HIGHWAY -> highwayWidth.getIntValue();
             case PLAYER -> playerWidth.getIntValue();
             case RENDER -> renderWidth.getIntValue();
             case EXPLOIT -> exploitWidth.getIntValue();

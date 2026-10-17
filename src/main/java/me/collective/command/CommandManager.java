@@ -24,7 +24,7 @@ public class CommandManager {
         register(new PrefixCommand());
         register(new HelpCommand());
         register(new CoordsCommand());
-        register(new PitchCommand());
+        register(new CenterCommand());        register(new PitchCommand());
         register(new YawCommand());
         register(new DrawnCommand());
         register(new SayCommand());

@@ -125,7 +125,9 @@ public final class ChestNavigator {
             issued = goal;
             issuedPrecise = precise;
             sinceIssue = 0;
-            b.getCustomGoalProcess().setGoalAndPath(goal);
+            // setGoal, а не setGoalAndPath: расчёт пути идёт в пуле Baritone,
+            // render-тред не мёрзнет. Простой/провал ловят idle/attempts/таймауты.
+            b.getCustomGoalProcess().setGoal(goal);
         }
 
         double dist = net.minecraft.client.MinecraftClient.getInstance().player.getEntityPos().distanceTo(Vec3d.ofCenter(canonical));

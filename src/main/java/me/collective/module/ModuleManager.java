@@ -5,6 +5,7 @@ import me.collective.module.client.*;
 import me.collective.module.combat.*;
 import me.collective.module.exploit.*;
 import me.collective.module.hud.*;
+import me.collective.module.highway.*;
 import me.collective.module.movement.*;
 import me.collective.module.player.*;
 import me.collective.module.render.*;
@@ -30,11 +31,12 @@ public class ModuleManager {
         register(new AntiCheat());
         register(new Discord());
         register(new Baritone());
-        register(new ChatFonts());
         register(new McpModule());
+        register(new AutoSaveCfg());
 
         // Combat Modules
         register(new GrimAnchorAura());
+        register(new CrystalAura());
         register(new Criticals());
         register(new Offhand());
         register(new Surround());
@@ -59,6 +61,7 @@ public class ModuleManager {
         register(new GrimVelocity());
         register(new Velocity());
         register(new GrimScaffold());
+        register(new AirPlaceScaffold());
         register(new Sprint());
         register(new Speed());
         register(new Step());
@@ -81,6 +84,23 @@ public class ModuleManager {
         register(new ElytraFly());
         register(new EntityControl());
         register(new Parkour());
+
+        // Highway Modules
+        register(new HighwayBuilderHIG());
+        register(new HighwayTools());
+        register(new ScaffoldHIG());
+        register(new LiquidFillerHIG());
+        register(new HotbarManager());
+        register(new OffhandManager());
+        register(new AutoWalkHIG());
+        register(new AutoCenter());
+        register(new AxisViewer());
+        register(new AfkLogout());
+        register(new AxisBorer());
+        register(new PosPosBorer());
+        register(new PosNegBorer());
+        register(new NegPosBorer());
+        register(new NegNegBorer());
 
         // Player Modules
         register(new ChestSwap());
@@ -119,6 +139,7 @@ public class ModuleManager {
         register(new Blur());
         register(new NoHurtCam());
         register(new Fullbright());
+        register(new LightOverlay());
         register(new StorageESP());
         register(new Freecam());
         register(new BetterF5());
@@ -132,6 +153,7 @@ public class ModuleManager {
         register(new ContainerTooltips());
         register(new Tooltips());
         register(new Search());
+        register(new BlockESP());
         register(new Tracers());
 
         // Misc Modules

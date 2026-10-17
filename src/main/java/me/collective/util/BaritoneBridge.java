@@ -27,7 +27,16 @@ public final class BaritoneBridge {
 
     public static void setGoal(BlockPos pos) {
         try {
-            BaritoneAPI.getProvider().getPrimaryBaritone().getCustomGoalProcess().setGoalAndPath(new GoalBlock(pos));
+            // Асинхронно: setGoalAndPath считает A* на вызывающем треде и морозит игру
+            setGoalAsync(pos);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** Неблокирующая выдача цели (расчёт пути в пуле Baritone). */
+    public static void setGoalAsync(BlockPos pos) {
+        try {
+            BaritoneAPI.getProvider().getPrimaryBaritone().getCustomGoalProcess().setGoal(new GoalBlock(pos));
         } catch (Throwable ignored) {
         }
     }

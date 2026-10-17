@@ -43,8 +43,8 @@ public class ConfigManager {
     public static final ConfigManager INSTANCE = new ConfigManager();
     public static final String DEFAULT_NAME = "default";
 
-    /** Пауза автосейва после последнего изменения. */
-    private static final long AUTOSAVE_MS = 30_000L;
+    /** Пауза автосейва после последнего изменения (по умолчанию 3 мин). */
+    private long autosaveMs = 180_000L;
 
     private final Path configsFolder;
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -75,8 +75,22 @@ public class ConfigManager {
     /** Вызывается каждый клиентский тик: автосейв default при изменениях. */
     public void tick() {
         if (!dirty) return;
-        if (System.currentTimeMillis() - lastSave < AUTOSAVE_MS) return;
+        try {
+            me.collective.module.client.AutoSaveCfg m = me.collective.module.ModuleManager.INSTANCE
+                .getModule(me.collective.module.client.AutoSaveCfg.class);
+            if (m != null && !m.isToggled()) return;
+        } catch (Throwable ignored) {
+        }
+        if (System.currentTimeMillis() - lastSave < autosaveMs) return;
         save(DEFAULT_NAME);
+    }
+
+    public long getAutosaveMs() {
+        return autosaveMs;
+    }
+
+    public void setAutosaveMs(long autosaveMs) {
+        this.autosaveMs = Math.max(10_000L, autosaveMs);
     }
 
     public File fileOf(String name) {

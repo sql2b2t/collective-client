@@ -23,6 +23,7 @@ public class ProxyManager {
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private final List<ProxyEntry> proxies = new ArrayList<>();
     private int activeIndex = -1;
+    private boolean enabled = true;
 
     private ProxyManager() {
         this.proxiesFile = net.fabricmc.loader.api.FabricLoader.getInstance()
@@ -63,6 +64,9 @@ public class ProxyManager {
                 int idx = root.get("active").getAsInt();
                 if (idx >= 0 && idx < proxies.size()) activeIndex = idx;
             }
+            if (root.has("enabled")) {
+                enabled = root.get("enabled").getAsBoolean();
+            }
         } catch (Exception e) {
             System.err.println("[Collective-Proxy] Load failed: " + e.getMessage());
         }
@@ -73,6 +77,7 @@ public class ProxyManager {
             Files.createDirectories(proxiesFile.getParent());
             JsonObject root = new JsonObject();
             root.addProperty("active", activeIndex);
+            root.addProperty("enabled", enabled);
             JsonArray arr = new JsonArray();
             for (ProxyEntry p : proxies) {
                 JsonObject o = new JsonObject();
@@ -116,6 +121,19 @@ public class ProxyManager {
     public void setDirect() {
         activeIndex = -1;
         save();
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+        save();
+    }
+
+    public void toggle() {
+        setEnabled(!enabled);
     }
 
     /** null — прямое подключение. */

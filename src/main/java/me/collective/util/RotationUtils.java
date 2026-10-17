@@ -278,7 +278,6 @@ public class RotationUtils {
         }
 
         this.decaying = true;
-        this.syncMovement = false;
         this.decayTicks = DEFAULT_DECAY_TICKS;
         this.owner = null;
         this.ownerPriority = 0;
@@ -308,7 +307,6 @@ public class RotationUtils {
         this.ownerPriority = 0;
         if (this.finalYaw != null || this.finalPitch != null) {
             this.decaying = true;
-            this.syncMovement = false;
             this.decayTicks = DEFAULT_DECAY_TICKS;
         }
     }

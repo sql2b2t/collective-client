@@ -16,7 +16,12 @@ import org.joml.Vector2f;
 
 import java.awt.Color;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 public class NameTags extends Module {
     public static NameTags INSTANCE;
@@ -27,9 +32,21 @@ public class NameTags extends Module {
     public final BooleanSetting armor = add(new BooleanSetting("Броня", true));
     public final NumberSetting scale = add(new NumberSetting("Размер", 1.0, 0.5, 2.5, 0.1));
 
+    /** Сглаженные экранные позиции (гасят прыжки от view-bobbing и корекций сети). */
+    private final Map<UUID, Vector2f> smooth = new HashMap<>();
+    private final Set<UUID> seen = new HashSet<>();
+    private static final float SMOOTH = 0.6f;
+    private static final float SNAP_DIST_SQ = 40f * 40f;
+
     public NameTags() {
         super("NameTags", "Отображает кастомные информативные неймтеги над игроками с броней и здоровьем", Category.RENDER);
         INSTANCE = this;
+    }
+
+    @Override
+    public void onDisable() {
+        smooth.clear();
+        seen.clear();
     }
 
     @Override
@@ -39,6 +56,7 @@ public class NameTags extends Module {
         int sw = mc.getWindow().getScaledWidth();
         int sh = mc.getWindow().getScaledHeight();
 
+        seen.clear();
         for (PlayerEntity player : mc.world.getPlayers()) {
             if (player == null || !player.isAlive()) continue;
             if (player == mc.player && !self.getValue()) continue;
@@ -48,11 +66,32 @@ public class NameTags extends Module {
             double y = pos.y + player.getHeight() + 0.45;
             double z = pos.z;
 
-            Vector2f screenPos = RenderUtil3D.worldToScreen(x, y, z, sw, sh);
-            if (screenPos == null) continue;
+            Vector2f target = RenderUtil3D.worldToScreen(x, y, z, sw, sh);
+            UUID uuid = player.getUuid();
+            if (target == null) {
+                smooth.remove(uuid);
+                continue;
+            }
+            seen.add(uuid);
 
-            renderTag(context, player, screenPos.x, screenPos.y);
+            Vector2f s = smooth.get(uuid);
+            if (s == null) {
+                s = new Vector2f(target);
+                smooth.put(uuid, s);
+            } else {
+                float dx = target.x - s.x;
+                float dy = target.y - s.y;
+                if (dx * dx + dy * dy > SNAP_DIST_SQ) {
+                    s.set(target);
+                } else {
+                    s.x += dx * SMOOTH;
+                    s.y += dy * SMOOTH;
+                }
+            }
+
+            renderTag(context, player, s.x, s.y);
         }
+        smooth.keySet().retainAll(seen);
     }
 
     private void renderTag(DrawContext context, PlayerEntity player, float x, float y) {

@@ -81,6 +81,9 @@ public class KillAura extends Module {
 
     public static BooleanSetting rayTraceCheck = new BooleanSetting("Проверка на луч", true);
 
+    /** Пишет в чат, почему модуль не сработал. */
+    public static BooleanSetting debugOutput = new BooleanSetting("Отладка", false);
+
     public static ChoiceSetting animationSchedule = new ChoiceSetting(
         "Дополнительные настройки",
         new BooleanSetting("Расширенная настройки для атаки", true),
@@ -89,8 +92,8 @@ public class KillAura extends Module {
         new BooleanSetting("Приоритет ближайшей цели", false)
     );
 
-    public static NumberSetting rendererScan = new NumberSetting("Радиус атаки для мобов", 3.0F, 3.0F, 6.0F, 0.1F);
-    public static NumberSetting sourceBuild = new NumberSetting("Радиус атаки для игроков", 3.0F, 3.0F, 6.0F, 0.1F);
+    // Радиус атаки общий для всех сущностей (игроки и мобы)
+    public static NumberSetting unifiedRadius = new NumberSetting("Радиус атаки", 3.0F, 3.0F, 6.0F, 0.1F);
     public static ModeSetting outputCollapse = new ModeSetting("Режим движения", "Default", "Default", "Free", "Target", "Преследование");
 
     public static BooleanSetting profileInvoke = new BooleanSetting("Булава", false);
@@ -107,6 +110,20 @@ public class KillAura extends Module {
     private long lastAttackTime = 0L;
     private float currentYaw = 0f;
     private float currentPitch = 0f;
+
+    /**
+     * Приоритет захвата ротации.
+     *
+     * <p>Раньше поворот брался через {@code RotationUtils.setServerRotation()},
+     * а он внутри зовёт {@code setRotationSilent()} → {@code claim(null, 0)}.
+     * С владельцем {@code null} и приоритетом 0 любой другой модуль с
+     * приоритетом ≥ 0 (GrimAnchorAura — 40, CrystalAura — 40) перехватывал
+     * ротацию, и KillAura молча получал отказ: не ротай, не бей.
+     */
+    private static final int ROTATION_PRIORITY = 45;
+
+    private static final long DEBUG_COOLDOWN_MS = 2000L;
+    private long lastDebugAt;
 
     public KillAura() {
         super("AttackAura", "Автоматически бьет энтити - таргетов", Category.COMBAT);
@@ -128,9 +145,9 @@ public class KillAura extends Module {
         add(presetWrite);
         add(colorMeasure);
         add(rayTraceCheck);
+        add(debugOutput);
         add(animationSchedule);
-        add(rendererScan);
-        add(sourceBuild);
+        add(unifiedRadius);
         add(outputCollapse);
         add(profileInvoke);
         add(sourceSchedule);
@@ -152,6 +169,7 @@ public class KillAura extends Module {
     public void onDisable() {
         restoreSlot();
         textureRun = null;
+        RotationUtils.getInstance().release(this);
     }
 
     @EventHandler
@@ -164,6 +182,7 @@ public class KillAura extends Module {
         }
 
         if (textureRun == null) {
+            // Подробная причина уже отдана в findTarget()
             restoreSlot();
             return;
         }
@@ -176,11 +195,13 @@ public class KillAura extends Module {
 
         // Pre-attack checks
         if (shouldSkipAttack()) {
+            report("пропуск по предварительным проверкам");
             return;
         }
 
         // Raycast / Ray check ("Проверка на луч")
         if (isRayBlocked()) {
+            report("луч не попал в цель");
             return;
         }
 
@@ -213,66 +234,119 @@ public class KillAura extends Module {
         Vec3d eyePos = mc.player.getEyePos();
         Vec3d lookVec = mc.player.getRotationVec(1.0F).normalize();
 
-        for (Entity e : mc.world.getEntities()) {
-            if (e instanceof LivingEntity living && isValidTarget(living)) {
-                double score;
-                if (animationSchedule.process("Приоритет ближайшей цели")) {
-                    score = mc.player.squaredDistanceTo(living);
-                } else {
-                    Vec3d targetCenter = living.getBoundingBox().getCenter();
-                    Vec3d toTarget = targetCenter.subtract(eyePos).normalize();
-                    score = Math.acos(MathHelper.clamp(lookVec.dotProduct(toTarget), -1.0, 1.0));
-                }
+        // Ближайший отклонённый кандидат — чтобы отладка объясняла,
+        // почему цели нет, а не просто констатировала факт.
+        String nearestReject = null;
+        double nearestRejectDist = Double.MAX_VALUE;
 
-                if (score < bestDist) {
-                    bestDist = score;
-                    best = living;
+        for (Entity e : mc.world.getEntities()) {
+            if (!(e instanceof LivingEntity living)) continue;
+
+            String reject = rejectReason(living);
+            if (reject != null) {
+                double d = boxDistance(mc.player, living);
+                if (d < nearestRejectDist) {
+                    nearestRejectDist = d;
+                    nearestReject = reject;
                 }
+                continue;
+            }
+
+            double score;
+            if (animationSchedule.process("Приоритет ближайшей цели")) {
+                score = boxDistance(mc.player, living);
+            } else {
+                Vec3d targetCenter = living.getBoundingBox().getCenter();
+                Vec3d toTarget = targetCenter.subtract(eyePos).normalize();
+                score = Math.acos(MathHelper.clamp(lookVec.dotProduct(toTarget), -1.0, 1.0));
+            }
+
+            if (score < bestDist) {
+                bestDist = score;
+                best = living;
             }
         }
 
         textureRun = best;
+
+        if (best == null && nearestReject != null) {
+            report("цели нет: ближайшая отклонена — " + nearestReject);
+        }
     }
 
-    private boolean isValidTarget(LivingEntity entity) {
-        if (entity == null || entity == mc.player || entity instanceof ClientPlayerEntity) return false;
-        if (!entity.isAlive() || entity.isInvulnerable() || entity instanceof ArmorStandEntity) return false;
+    /**
+     * Минимальное расстояние между хитбоксами.
+     *
+     * <p>Раньше здесь стоял {@code mc.player.distanceTo(entity)}, а это
+     * расстояние между позициями — то есть нога-в-ноги. У игрока рост 1.8,
+     * поэтому удар с 3 блоков по хитбоксу превращался в 3.5–3.8 по ногам,
+     * и окно обнаружения фактически съезжало внутрь. Сервер же считает
+     * дальность удара между хитбоксами — как здесь.
+     */
+    private static double boxDistance(Entity a, Entity b) {
+        net.minecraft.util.math.Box ba = a.getBoundingBox();
+        net.minecraft.util.math.Box bb = b.getBoundingBox();
+
+        double dx = Math.max(0.0, Math.max(ba.minX - bb.maxX, bb.minX - ba.maxX));
+        double dy = Math.max(0.0, Math.max(ba.minY - bb.maxY, bb.minY - ba.maxY));
+        double dz = Math.max(0.0, Math.max(ba.minZ - bb.maxZ, bb.minZ - ba.maxZ));
+
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    /** Почему сущность не годится в цель. {@code null} — годится. */
+    private String rejectReason(LivingEntity entity) {
+        if (entity == null || entity == mc.player || entity instanceof ClientPlayerEntity) return "это мы сами";
+        if (!entity.isAlive()) return "мёртв";
+        if (entity.isInvulnerable()) return "неуязвим";
+        if (entity instanceof ArmorStandEntity) return "арморстенд";
 
         float maxDist = getAttackDistance(entity) + target.compute() + hitboxBonus();
-        if (mc.player.distanceTo(entity) > maxDist) return false;
-
-        if (!colorMeasure.process("Бить через блоки") && !mc.player.canSee(entity)) {
-            return false;
+        double dist = boxDistance(mc.player, entity);
+        if (dist > maxDist) {
+            return String.format("%s в %.1f блоках, окно %.1f (атака %.1f + обнаружение %.1f)",
+                    entity.getName().getString(), dist, maxDist,
+                    getAttackDistance(entity), target.compute());
         }
 
+        if (!colorMeasure.process("Бить через блоки") && !mc.player.canSee(entity)) {
+            return entity.getName().getString() + " не виден (нет видимости)";
+        }
         if (!providerClose.process("NPC") && isNpc(entity)) {
-            return false;
+            return entity.getName().getString() + " NPC";
         }
 
         if (entity instanceof PlayerEntity player) {
-            if (player.isCreative() || player.isSpectator()) return false;
+            if (player.isCreative()) return entity.getName().getString() + " креатив";
+            if (player.isSpectator()) return entity.getName().getString() + " спектатор";
 
             boolean isFriend = FriendManager.getInstance().isFriend(player);
-            if (isFriend && !providerClose.process("Друзья")) return false;
-            if (!isFriend && !providerClose.process("Игроки")) return false;
+            if (isFriend && !providerClose.process("Друзья")) return entity.getName().getString() + " друг";
+            if (!isFriend && !providerClose.process("Игроки")) return entity.getName().getString() + " не игрок";
 
             boolean naked = isNaked(player);
             boolean invis = player.isInvisible();
 
             if (invis) {
-                return naked ? providerClose.process("Голые невидимки") : providerClose.process("Невидимки");
-            } else {
-                return !naked || providerClose.process("Голые");
+                return naked
+                        ? (providerClose.process("Голые невидимки") ? null : "голая невидимка отключена")
+                        : (providerClose.process("Невидимки") ? null : "невидимка отключена");
             }
-        } else {
-            boolean isMob = entity instanceof Monster || entity instanceof SlimeEntity;
-            boolean isVillager = entity instanceof VillagerEntity || entity instanceof MerchantEntity;
-            boolean isAnimal = entity instanceof AnimalEntity || entity instanceof WaterCreatureEntity || entity instanceof AmbientEntity;
-
-            if (isMob && providerClose.process("Мобы")) return true;
-            if (isVillager && providerClose.process("Жители")) return true;
-            return isAnimal && providerClose.process("Животные");
+            return (!naked || providerClose.process("Голые")) ? null : "фильтр «Голые»";
         }
+
+        boolean isMob     = entity instanceof Monster || entity instanceof SlimeEntity;
+        boolean isVillager = entity instanceof VillagerEntity || entity instanceof MerchantEntity;
+        boolean isAnimal   = entity instanceof AnimalEntity || entity instanceof WaterCreatureEntity || entity instanceof AmbientEntity;
+
+        if (isMob)     return providerClose.process("Мобы")     ? null : "мобы отключены";
+        if (isVillager) return providerClose.process("Жители") ? null : "жители отключены";
+        if (isAnimal)  return providerClose.process("Животные") ? null : "животные отключены";
+        return "нецелевой тип сущности";
+    }
+
+    private boolean isValidTarget(LivingEntity entity) {
+        return rejectReason(entity) == null;
     }
 
     private boolean isNaked(PlayerEntity player) {
@@ -317,16 +391,8 @@ public class KillAura extends Module {
         return 0f;
     }
 
-    public static float getAttackDistance(LivingEntity entity) {        if (entity == null) return source.compute();
-
-        float dist = source.compute();
-        if (animationSchedule.process("Расширенная настройки для атаки")) {
-            if (entity instanceof PlayerEntity) {
-                dist = sourceBuild.compute();
-            } else {
-                dist = rendererScan.compute();
-            }
-        }
+    public static float getAttackDistance(LivingEntity entity) {
+        float dist = unifiedRadius.compute();
 
         if (animationSchedule.process("Увеличенная дистанция удара")) {
             float totalHp = entity.getHealth() + entity.getAbsorptionAmount();
@@ -381,7 +447,14 @@ public class KillAura extends Module {
                 break;
         }
 
-        RotationUtils.setServerRotation(currentYaw, currentPitch);
+        // Захватываем поворот от своего имени и с высоким приоритетом,
+        // иначе его перехватит любой боевой модуль.
+        RotationUtils rotUtils = RotationUtils.getInstance();
+        if (!rotUtils.setRotationSmooth(this, ROTATION_PRIORITY, currentYaw, currentPitch, 180.0, false)) {
+            report("ротацию перехватил другой модуль");
+            return;
+        }
+        rotUtils.keepWireFresh();
     }
 
     private void handleMovement() {
@@ -426,8 +499,22 @@ public class KillAura extends Module {
         }
 
         Vec3d eye = mc.player.getEyePos();
-        float yaw = RotationUtils.getInstance().isRotating() ? RotationUtils.getInstance().getSentYaw() : currentYaw;
-        float pitch = RotationUtils.getInstance().isRotating() ? RotationUtils.getInstance().getSentPitch() : currentPitch;
+
+        // Проверяем луч по СВОЕМУ углу и по углу, который реально ушёл
+        // серверу — оба. Раньше здесь читался безусловно getSentYaw(), а это
+        // угол того, кто последним захватил ротацию: если это был другой
+        // модуль, KillAura проверял чужой прицел, луч в цель не попадал,
+        // isRayBlocked() возвращал true и удар не проходил.
+        float sentYaw   = RotationUtils.getInstance().getSentYaw();
+        float sentPitch = RotationUtils.getInstance().getSentPitch();
+        boolean sentIsOurs = MathHelper.abs(MathHelper.wrapDegrees(sentYaw - currentYaw)) < 5.0f;
+
+        // По чужому углу смысла проверять нет — сервер всё равно применит
+        // KillAura-угол только если ротация не перехвачена. Проверяем
+        // отправленный, если он наш, иначе свой.
+        float yaw   = sentIsOurs ? sentYaw   : currentYaw;
+        float pitch = sentIsOurs ? sentPitch : currentPitch;
+
         if (yaw == 0f && pitch == 0f) {
             yaw = mc.player.getYaw();
             pitch = mc.player.getPitch();
@@ -447,7 +534,9 @@ public class KillAura extends Module {
                 mc.player, eye, end, searchBox, e -> e == textureRun, reach * reach
             );
             if (entityHit == null || entityHit.getEntity() != textureRun) {
-                return true; // Ray does not hit the entity hitbox
+                report(String.format("луч мимо: дистанция %.2f, лимит %.2f",
+                        mc.player.distanceTo(textureRun), reach));
+                return true;
             }
         }
 
@@ -461,7 +550,8 @@ public class KillAura extends Module {
                 double blockDistSq = eye.squaredDistanceTo(blockHit.getPos());
                 double targetDistSq = hit.map(eye::squaredDistanceTo).orElse(eye.squaredDistanceTo(textureRun.getEntityPos()));
                 if (blockDistSq < targetDistSq - 0.05) {
-                    return true; // Block blocks the ray
+                    report("луч перекрыт блоком");
+                    return true;
                 }
             }
         }
@@ -554,6 +644,16 @@ public class KillAura extends Module {
 
         // Restore previous weapon slot if swapped
         restoreSlot();
+    }
+
+    private void report(String reason) {
+        if (!debugOutput.getValue()) return;
+
+        long now = System.currentTimeMillis();
+        if (now - this.lastDebugAt < DEBUG_COOLDOWN_MS) return;
+
+        this.lastDebugAt = now;
+        info("AttackAura: %s", reason);
     }
 
     private void restoreSlot() {

@@ -35,8 +35,15 @@ public class ImageHUD extends HudModule {
         super("ImageHUD", "Выводит выбранную картинку или логотип на экран.", 10, 60);
     }
 
-    public Identifier getTexture() {
+    /** Реальный размер текстуры для UV-региона. */
+    private int textureSize() {
         return switch (image.getValue()) {
+            case Komod1, Komod2, Komod3 -> 1024;
+            default -> 128;
+        };
+    }
+
+    public Identifier getTexture() {        return switch (image.getValue()) {
             case Komod1 -> TEXTURE_KOMOD1;
             case Komod2 -> TEXTURE_KOMOD2;
             case Komod3 -> TEXTURE_KOMOD3;
@@ -59,19 +66,22 @@ public class ImageHUD extends HudModule {
 
         float angle = rotation.getFloatValue();
         if (angle != 0.0f) {
-            RenderUtil.drawRotatedImage(context, getTexture(), x, y, w, h, angle, 0xFFFFFFFF);
+            RenderUtil.drawRotatedImage(context, getTexture(), x, y, w, h, angle, 0xFFFFFFFF, textureSize(), textureSize());
         } else {
+            int ts = textureSize();
             context.drawTexture(
                 RenderPipelines.GUI_TEXTURED,
                 getTexture(),
                 (int) x,
                 (int) y,
-                0.0f,
-                0.0f,
+                0f,
+                0f,
                 (int) w,
                 (int) h,
-                (int) w,
-                (int) h,
+                ts,
+                ts,
+                ts,
+                ts,
                 0xFFFFFFFF
             );
         }

@@ -43,6 +43,8 @@ public class GrimScaffold extends Module {
     public final NumberSetting velocityMultiplier = add(new NumberSetting("VelocityMultiplier", 1.0, 0.5, 5.0, 0.1, (v) -> velocityPredict.getValue()));
     public final BooleanSetting adaptiveSpeed = add(new BooleanSetting("AdaptiveSpeed", true));
     public final NumberSetting maxBlocksPerTick = add(new NumberSetting("MaxBlocksPerTick", 1, 1, 5, 1, (v) -> adaptiveSpeed.getValue()));
+    public final NumberSetting radius = add(new NumberSetting("Radius", 0.0, 0.0, 3.0, 0.5));
+    public final BooleanSetting radiusPredictCenter = add(new BooleanSetting("RadiusPredictCenter", true, (v) -> radius.getValue() > 0.0));
 
     private static final double SCAFFOLD_TURN_SPEED = 120.0;
     private static final double SCAFFOLD_ALIGN_EPS = 3.0;
@@ -297,7 +299,57 @@ public class GrimScaffold extends Module {
             if (canPlace(belowTarget)) positions.add(belowTarget);
         }
 
+        double radius = this.radius.getValue();
+        if (radius > 0.0) {
+            Vec3d circleCenter = this.radiusPredictCenter.getValue() ? predictedPos : playerPos;
+            addRadiusPositions(positions, circleCenter, radius);
+        }
+
         return positions;
+    }
+
+    /**
+     * Заполняет область в круге заданного радиуса вокруг центра на уровне ног-1.
+     * Ближе к центру — приоритетнее: сначала перекрываем путь вплотную к игроку.
+     * Позиции дальше досягаемости воздушного клика отбрасываются, чтобы не ловить
+     * reach-флаги Grim.
+     */
+    private void addRadiusPositions(List<BlockPos> positions, Vec3d center, double radius) {
+        int bound = (int) Math.ceil(radius - 1e-9);
+        double radiusSq = radius * radius;
+        int centerX = (int) Math.floor(center.x);
+        int centerZ = (int) Math.floor(center.z);
+        int levelY = (int) Math.floor(mc.player.getEntityPos().y - 1.0);
+        Vec3d eye = mc.player.getEyePos();
+        double maxReachSq = (REACH - 0.3) * (REACH - 0.3);
+
+        List<BlockPos> extras = new ArrayList<>();
+
+        for (int dx = -bound; dx <= bound; dx++) {
+            for (int dz = -bound; dz <= bound; dz++) {
+                double distSq = dx * dx + dz * dz;
+                if (distSq > radiusSq) continue;
+
+                this.targetPos.set(centerX + dx, levelY, centerZ + dz);
+
+                BlockPos pos = this.targetPos.toImmutable();
+                if (positions.contains(pos)) continue;
+
+                if (!canPlace(pos)) continue;
+
+                if (eye.squaredDistanceTo(Vec3d.ofCenter(pos)) > maxReachSq) continue;
+
+                extras.add(pos);
+            }
+        }
+
+        extras.sort(Comparator.comparingDouble(p -> {
+            double ex = p.getX() + 0.5 - center.x;
+            double ez = p.getZ() + 0.5 - center.z;
+            return ex * ex + ez * ez;
+        }));
+
+        positions.addAll(extras);
     }
 
     private boolean canPlace(BlockPos pos) {

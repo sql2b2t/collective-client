@@ -37,9 +37,7 @@ public class Panel {
         float btnH = UI.INSTANCE.buttonHeight.getIntValue();
         float curY = y + HEADER_HEIGHT;
         List<Module> mods = ModuleManager.INSTANCE.getModulesByCategory(category);
-        if (category == Category.HUD) {
-            mods.sort((m1, m2) -> m1.getName().compareToIgnoreCase(m2.getName()));
-        }
+        mods.sort((m1, m2) -> m1.getName().compareToIgnoreCase(m2.getName()));
         for (Module m : mods) {
             buttons.add(new ModuleButton(m, x, curY, width, btnH));
             curY += btnH;

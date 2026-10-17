@@ -23,11 +23,16 @@ import net.minecraft.util.Hand;
  * <p>Режим Enable: при включении один раз меняет нагрудник на элитру (или
  * обратно) и самоотключается. Режим Bind: смена по кнопке, запуск фейерверка
  * по кнопке и авто-фейерверк при старте планирования.
+ *
+ * <p>Grim-обход: замена в хотбаре — одним SWAP-кликом (1 пакет, атомарно);
+ * замена из инвентаря — очередью по 1 PICKUP-клику в тик на render-треде
+ * (без пачки кликов в один тик и без потоков). Открытый экран прерывает
+ * очередь, чтобы курсор не остался с вещью.
  */
 public class ElytraSwap extends Module {
     public static ElytraSwap INSTANCE;
 
-    public final BooleanSetting delay = add(new BooleanSetting("Delay", false));
+    public final BooleanSetting delay = add(new BooleanSetting("Delay", true));
     public final ModeSetting mode = add(new ModeSetting("Mode", "Enable", "Enable", "Bind"));
     public final KeybindSetting switchButton = add(new KeybindSetting("SwitchButton", -1));
     public final KeybindSetting fireWorkButton = add(new KeybindSetting("FireWorkButton", -1));
@@ -37,6 +42,11 @@ public class ElytraSwap extends Module {
     public static boolean swapping = false;
     private long lastSwitch = 0L;
     private long lastFirework = 0L;
+
+    /** Очередь PICKUP-кликов (слоты хендлера), по одному в тик. */
+    private int[] clickQueue = null;
+    private int queueIndex = 0;
+    private boolean queueDisable = false;
 
     public ElytraSwap() {
         super("ElytraSwap", "Быстрая смена нагрудника на элитру и обратно + авто-фейерверк.", Category.MOVEMENT);
@@ -49,7 +59,18 @@ public class ElytraSwap extends Module {
     }
 
     @Override
+    public void onDisable() {
+        clickQueue = null;
+        queueIndex = 0;
+        swapping = false;
+    }
+
+    @Override
     public void onUpdate() {
+        if (clickQueue != null) {
+            processQueue();
+            return;
+        }
         if (!mode.process("Bind") || mc.player == null || mc.currentScreen != null) return;
         long now = System.currentTimeMillis();
         if (switchButton.getValue() != -1 && switchButton.isPressed() && now - lastSwitch >= 500) {
@@ -60,6 +81,30 @@ public class ElytraSwap extends Module {
             && now - lastFirework >= 500 && mc.player.isGliding()) {
             lastFirework = now;
             useFireWork();
+        }
+    }
+
+    /** Один клик в тик из очереди (render-тред). */
+    private void processQueue() {
+        if (mc.player == null || mc.interactionManager == null) {
+            clickQueue = null;
+            swapping = false;
+            return;
+        }
+        if (mc.currentScreen != null) {
+            clickQueue = null;
+            swapping = false;
+            info("Свап прерван: открыт инвентарь!");
+            if (queueDisable) setToggled(false);
+            return;
+        }
+        clickSlot(clickQueue[queueIndex++]);
+        if (queueIndex >= clickQueue.length) {
+            clickQueue = null;
+            sendClose(mc.player.currentScreenHandler.syncId);
+            swapping = false;
+            if (queueDisable) disable("Свапнул! Отключаю..");
+            else info("Свапнул!");
         }
     }
 
@@ -123,56 +168,36 @@ public class ElytraSwap extends Module {
 
     private void swapChest(boolean disable) {
         if (mc.player == null || mc.interactionManager == null) return;
+        if (mc.currentScreen != null) {
+            if (disable) disable("Закрой инвентарь и повтори!");
+            else info("Закрой инвентарь и повтори!");
+            return;
+        }
+        if (clickQueue != null) return;
         FindItemResult elytra = InventoryUtil.find(Items.ELYTRA);
 
         if (mc.player.getInventory().getStack(38).isOf(Items.ELYTRA)) {
-            int slot = getChestPlateSlot();
-            if (slot != -1) {
-                if (delay.getValue()) {
-                    new Thread(() -> {
-                        swapping = true;
-                        clickSlot(slot);
-                        sleep(200);
-                        clickSlot(6);
-                        sleep(200);
-                        clickSlot(slot);
-                        sendClose(mc.player.currentScreenHandler.syncId);
-                        swapping = false;
-                    }).start();
-                } else {
-                    clickSlot(slot);
-                    clickSlot(6);
-                    clickSlot(slot);
-                    sendClose(mc.player.currentScreenHandler.syncId);
-                }
-            } else {
+            int invSlot = getChestPlateSlot();
+            if (invSlot == -1) {
                 if (disable) disable("У тебя нет нагрудника!");
                 else info("У тебя нет нагрудника!");
                 return;
             }
-        } else if (elytra.found()) {
-            if (delay.getValue()) {
-                new Thread(() -> {
-                    swapping = true;
-                    clickSlot(elytra.slot());
-                    sleep(200);
-                    clickSlot(6);
-                    sleep(200);
-                    clickSlot(elytra.slot());
-                    sendClose(mc.player.currentScreenHandler.syncId);
-                    if (startFireWork.getValue() && mc.player.fallDistance > 0 && mc.getNetworkHandler() != null) {
-                        mc.getNetworkHandler().sendPacket(new ClientCommandC2SPacket(mc.player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
-                    }
-                    swapping = false;
-                }).start();
+            if (invSlot >= 0 && invSlot < 9) {
+                fastSwap(invSlot);
             } else {
-                clickSlot(elytra.slot());
-                clickSlot(6);
-                clickSlot(elytra.slot());
-                sendClose(mc.player.currentScreenHandler.syncId);
-                if (startFireWork.getValue() && mc.player.fallDistance > 0 && mc.getNetworkHandler() != null) {
-                    mc.getNetworkHandler().sendPacket(new ClientCommandC2SPacket(mc.player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
-                }
+                startQueue(new int[]{invSlot, 6, invSlot}, disable);
+                return;
+            }
+        } else if (elytra.found()) {
+            // На souver: glide-start отправит сама ванилла, когда полетим.
+            // Свой START_FALL_FLYING сюда слать нельзя — будет дубль и BadPacketsJ.
+            int invSlot = elytra.slot();
+            if (invSlot >= 0 && invSlot < 9) {
+                fastSwap(invSlot);
+            } else {
+                startQueue(new int[]{invSlot, 6, invSlot}, disable);
+                return;
             }
         } else {
             if (disable) disable("У тебя нет элитры!");
@@ -181,6 +206,33 @@ public class ElytraSwap extends Module {
         }
 
         if (disable) disable("Свапнул! Отключаю..");
+        else info("Свапнул!");
+    }
+
+    /** Один SWAP-клик: слот брони 6 <-> хотбар. Без курсора и задержек. */
+    private void fastSwap(int hotbarSlot) {
+        if (mc.player == null || mc.interactionManager == null) return;
+        swapping = true;
+        mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, 6, hotbarSlot, SlotActionType.SWAP, mc.player);
+        sendClose(mc.player.currentScreenHandler.syncId);
+        swapping = false;
+    }
+
+    /** Очередь PICKUP-кликов: сразу все (Delay выкл) или по одному в тик. */
+    private void startQueue(int[] slots, boolean disable) {
+        if (!delay.getValue()) {
+            swapping = true;
+            for (int slot : slots) clickSlot(slot);
+            sendClose(mc.player.currentScreenHandler.syncId);
+            swapping = false;
+            if (disable) disable("Свапнул! Отключаю..");
+            else info("Свапнул!");
+            return;
+        }
+        clickQueue = slots;
+        queueIndex = 0;
+        queueDisable = disable;
+        swapping = true;
     }
 
     private void clickSlot(int slot) {
@@ -197,13 +249,6 @@ public class ElytraSwap extends Module {
     private void sendSwing() {
         if (mc.getNetworkHandler() != null) {
             mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
-        }
-    }
-
-    private static void sleep(long ms) {
-        try {
-            Thread.sleep(ms);
-        } catch (Exception ignored) {
         }
     }
 

@@ -9,9 +9,14 @@ import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.RespawnAnchorBlock;
 import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.entity.decoration.EndCrystalEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.Items;
+import net.minecraft.registry.tag.ItemTags;
+import net.minecraft.util.math.BlockPos;
 
 public class Offhand extends Module {
     public enum Mode {
@@ -20,6 +25,9 @@ public class Offhand extends Module {
 
     public final EnumSetting<Mode> defaultItem = add(new EnumSetting<>("Default", Mode.TOTEM));
     public final NumberSetting healthThreshold = add(new NumberSetting("Health", 14.0, 1.0, 36.0, 1.0));
+    public final BooleanSetting crystalCheck = add(new BooleanSetting("CrystalCheck", true));
+    public final BooleanSetting anchorCheck = add(new BooleanSetting("AnchorCheck", true));
+    public final BooleanSetting swordGap = add(new BooleanSetting("SwordGap", true));
     public final BooleanSetting elytraCheck = add(new BooleanSetting("ElytraProtect", true));
     public final BooleanSetting fallCheck = add(new BooleanSetting("FallProtect", true));
     public final NumberSetting delay = add(new NumberSetting("Delay", 0.0, 0.0, 10.0, 1.0));
@@ -27,7 +35,7 @@ public class Offhand extends Module {
     private int timer = 0;
 
     public Offhand() {
-        super("Offhand", "Automatically manages your offhand item (Totem/Crystal/Gapple).", Category.COMBAT);
+        super("Offhand", "Smart offhand manager with Crystal/Anchor danger checks for 2b2t.", Category.COMBAT);
     }
 
     @EventHandler
@@ -40,16 +48,14 @@ public class Offhand extends Module {
         }
 
         Item target = getTargetItem();
-        if (mc.player.getOffHandStack().isOf(target)) {
-            return;
-        }
+        if (mc.player.getOffHandStack().isOf(target)) return;
 
         FindItemResult result = InventoryUtil.find(target);
         if (result.found()) {
             InventoryUtil.moveToOffhand(result.slot());
             timer = delay.getValue().intValue();
         } else if (target != Items.TOTEM_OF_UNDYING) {
-            // Fallback to totem if target item not found
+            // Fallback to totem
             FindItemResult totem = InventoryUtil.find(Items.TOTEM_OF_UNDYING);
             if (totem.found() && !mc.player.getOffHandStack().isOf(Items.TOTEM_OF_UNDYING)) {
                 InventoryUtil.moveToOffhand(totem.slot());
@@ -59,20 +65,59 @@ public class Offhand extends Module {
     }
 
     private Item getTargetItem() {
-        if (mc.player == null) return Items.TOTEM_OF_UNDYING;
+        if (mc.player == null || mc.world == null) return Items.TOTEM_OF_UNDYING;
 
         float hp = mc.player.getHealth() + mc.player.getAbsorptionAmount();
 
         boolean lowHp = hp <= healthThreshold.getValue().floatValue();
-        boolean gliding = elytraCheck.getValue() && mc.player.getEquippedStack(EquipmentSlot.CHEST).isOf(Items.ELYTRA) && mc.player.isGliding();
+        boolean gliding = elytraCheck.getValue()
+            && mc.player.getEquippedStack(EquipmentSlot.CHEST).isOf(Items.ELYTRA)
+            && mc.player.isGliding();
         boolean falling = fallCheck.getValue() && mc.player.fallDistance > 3.0f;
 
-        if (lowHp || gliding || falling) {
+        // Кристаллы поблизости — опасность
+        boolean crystalNear = false;
+        if (crystalCheck.getValue()) {
+            for (var entity : mc.world.getEntities()) {
+                if (entity instanceof EndCrystalEntity crystal && crystal.distanceTo(mc.player) <= 6.0f) {
+                    crystalNear = true;
+                    break;
+                }
+            }
+        }
+
+        // Заряженный якорь поблизости
+        boolean anchorNear = false;
+        if (anchorCheck.getValue()) {
+            BlockPos pPos = mc.player.getBlockPos();
+            outer:
+            for (int x = -5; x <= 5; x++) {
+                for (int y = -5; y <= 5; y++) {
+                    for (int z = -5; z <= 5; z++) {
+                        var state = mc.world.getBlockState(pPos.add(x, y, z));
+                        if (state.isOf(Blocks.RESPAWN_ANCHOR) && state.get(RespawnAnchorBlock.CHARGES) > 0) {
+                            anchorNear = true;
+                            break outer;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (lowHp || gliding || falling || crystalNear || anchorNear) {
             return Items.TOTEM_OF_UNDYING;
         }
 
+        // SwordGap: держим меч/топор + зажат ПКМ -> яблоко
+        if (swordGap.getValue() && mc.options.useKey.isPressed()) {
+            var mainStack = mc.player.getMainHandStack();
+            if (mainStack.isIn(ItemTags.SWORDS) || mainStack.isIn(ItemTags.AXES)) {
+                return Items.ENCHANTED_GOLDEN_APPLE;
+            }
+        }
+
         return switch (defaultItem.getValue()) {
-            case TOTEM -> Items.TOTEM_OF_UNDYING;
+            case TOTEM  -> Items.TOTEM_OF_UNDYING;
             case CRYSTAL -> Items.END_CRYSTAL;
             case GAPPLE -> Items.ENCHANTED_GOLDEN_APPLE;
         };

@@ -34,11 +34,24 @@ public abstract class MixinClientPlayerEntity {
         if (me.collective.module.render.Freecam.INSTANCE != null && me.collective.module.render.Freecam.INSTANCE.isToggled()) {
             return new PlayerInput(false, false, false, false, false, false, false);
         }
+        me.collective.module.highway.HighwayBuilderHIG hb = me.collective.module.highway.HighwayBuilderHIG.INSTANCE;
+        PlayerInput in = original;
+        if (hb != null && hb.isToggled() && hb.isDrivingInput()) {
+            in = new PlayerInput(
+                original.forward() || hb.inFwd, original.backward() || hb.inBack,
+                original.left() || hb.inLeft, original.right() || hb.inRight,
+                original.jump() || hb.inJump, original.sneak() || hb.inSneak, original.sprint());
+        }
+        me.collective.module.movement.AirPlaceScaffold scaffold = me.collective.module.movement.AirPlaceScaffold.INSTANCE;
+        if (scaffold != null && scaffold.isSafeWalking() && scaffold.isAtEdge()) {
+            in = new PlayerInput(in.forward(), in.backward(), in.left(), in.right(),
+                in.jump(), true, in.sprint());
+        }
         RotationUtils rotUtils = RotationUtils.getInstance();
         if (rotUtils.isRotating()) {
-            return rotUtils.rotateDeclaredInput(original);
+            return rotUtils.rotateDeclaredInput(in);
         }
-        return original;
+        return in;
     }
 
     @Inject(method = "shouldStopSprinting", at = @At("HEAD"), cancellable = true)

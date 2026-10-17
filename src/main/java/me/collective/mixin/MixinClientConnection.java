@@ -8,12 +8,18 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.proxy.Socks5ProxyHandler;
+import io.netty.channel.ChannelHandlerContext;
+import me.collective.event.EventBus;
+import me.collective.event.events.PacketEvent;
 import me.collective.proxy.ProxyEntry;
 import me.collective.proxy.ProxyManager;
+import net.minecraft.network.packet.Packet;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -27,23 +33,19 @@ import java.net.InetSocketAddress;
 @Mixin(targets = "net.minecraft.network.ClientConnection")
 public abstract class MixinClientConnection {
 
-    private static final String CONNECT_METHOD = "connect(Ljava/lang/String;ILnet/minecraft/network/state/NetworkState;"
-        + "Lnet/minecraft/network/state/NetworkState;"
-        + "Lnet/minecraft/network/listener/ClientPacketListener;"
-        + "Lnet/minecraft/network/packet/c2s/handshake/ConnectionIntent;)V";
+    private static final String CONNECT_METHOD = "connect(Ljava/net/InetSocketAddress;"
+        + "Lnet/minecraft/network/NetworkingBackend;"
+        + "Lnet/minecraft/network/ClientConnection;)Lio/netty/channel/ChannelFuture;";
 
-    /** Ванильный хендлер пайплайна, перехваченный перед подменой. */
+    /** Ванильный хендлер пайплайна — читаем рефлексией, второго инжекта не надо. */
     @Unique
-    private static ChannelHandler collective$capturedHandler;
-
-    @Redirect(
-        method = CONNECT_METHOD,
-        at = @At(value = "INVOKE",
-            target = "Lio/netty/bootstrap/Bootstrap;handler(Lio/netty/channel/ChannelHandler;)Lio/netty/bootstrap/AbstractBootstrap;")
-    )
-    private AbstractBootstrap<?, ?> collective$captureHandler(Bootstrap bootstrap, ChannelHandler handler) {
-        collective$capturedHandler = handler;
-        return bootstrap.handler(handler);
+    private static ChannelHandler collective$originalHandler(Bootstrap bootstrap) {        try {
+            java.lang.reflect.Field f = AbstractBootstrap.class.getDeclaredField("handler");
+            f.setAccessible(true);
+            return (ChannelHandler) f.get(bootstrap);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     @Redirect(
@@ -51,14 +53,13 @@ public abstract class MixinClientConnection {
         at = @At(value = "INVOKE",
             target = "Lio/netty/bootstrap/Bootstrap;connect(Ljava/net/InetAddress;I)Lio/netty/channel/ChannelFuture;")
     )
-    private ChannelFuture collective$proxyConnect(Bootstrap bootstrap, InetAddress address, int port) {
+    private static ChannelFuture collective$proxyConnect(Bootstrap bootstrap, InetAddress address, int port) {
         ProxyEntry proxy = ProxyManager.INSTANCE.getActive();
-        if (proxy == null) {
+        if (proxy == null || !ProxyManager.INSTANCE.isEnabled()) {
             return bootstrap.connect(address, port);
         }
 
-        ChannelHandler original = collective$capturedHandler;
-        collective$capturedHandler = null;
+        ChannelHandler original = collective$originalHandler(bootstrap);
         if (original == null) {
             return bootstrap.connect(address, port);
         }
@@ -85,5 +86,24 @@ public abstract class MixinClientConnection {
         });
         // Цель остаётся серверной — хендлер завернёт TCP на прокси сам
         return bootstrap.connect(address, port);
+    }
+
+    /** Исходящие пакеты в шину (HEAD, отмена глушит отправку). */
+    @Inject(method = "send(Lnet/minecraft/network/packet/Packet;)V", at = @At("HEAD"), cancellable = true)
+    private void collective$onSend(Packet<?> packet, CallbackInfo ci) {
+        PacketEvent.Send event = new PacketEvent.Send(packet);
+        EventBus.INSTANCE.post(event);
+        if (event.isCancelled()) ci.cancel();
+    }
+
+    /** Входящие пакеты в шину (HEAD, отмена глушит обработку). */
+    @Inject(
+        method = "channelRead0(Lio/netty/channel/ChannelHandlerContext;Lnet/minecraft/network/packet/Packet;)V",
+        at = @At("HEAD"), cancellable = true
+    )
+    private void collective$onReceive(ChannelHandlerContext context, Packet<?> packet, CallbackInfo ci) {
+        PacketEvent.Receive event = new PacketEvent.Receive(packet);
+        EventBus.INSTANCE.post(event);
+        if (event.isCancelled()) ci.cancel();
     }
 }

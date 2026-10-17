@@ -11,6 +11,7 @@ import me.collective.setting.NumberSetting;
 import me.collective.manager.FriendManager;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.ItemEntity;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.math.Vec3d;
 
@@ -26,9 +27,11 @@ public class Tracers extends Module {
     public final BooleanSetting players = add(new BooleanSetting("Игроки", true));
     public final BooleanSetting friends = add(new BooleanSetting("Друзья", true));
     public final BooleanSetting items = add(new BooleanSetting("Предметы", false));
+    public final BooleanSetting mobs = add(new BooleanSetting("Мобы", false));
     public final ColorSetting playerColor = add(new ColorSetting("Цвет игроков", new Color(255, 80, 80, 200)));
     public final ColorSetting friendColor = add(new ColorSetting("Цвет друзей", new Color(80, 255, 120, 200)));
     public final ColorSetting itemColor = add(new ColorSetting("Цвет предметов", new Color(255, 200, 80, 200)));
+    public final ColorSetting mobColor = add(new ColorSetting("Цвет мобов", new Color(200, 120, 255, 200)));
 
     public Tracers() {
         super("Tracers", "Линии до игроков и предметов.", Category.RENDER);
@@ -53,6 +56,9 @@ public class Tracers extends Module {
             } else if (e instanceof ItemEntity) {
                 if (!items.getValue()) continue;
                 c = itemColor.getValue();
+            } else if (e instanceof LivingEntity) {
+                if (!mobs.getValue()) continue;
+                c = mobColor.getValue();
             } else {
                 continue;
             }

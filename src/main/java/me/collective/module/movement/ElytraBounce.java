@@ -75,13 +75,15 @@ public class ElytraBounce extends Module {
     private double predictedSpeed = 0.0;
     private int solveCooldown = 0;
     private int setbackTicks = 0;
+    private long lastChestSwapAttempt = 0L;
+    private BlockPos lastNavGoal = null;
     private BlockPos tempPath = null;
     private boolean waitingForChunksToLoad = false;
 
     private static final int ROTATION_PRIORITY = 45;
 
     public ElytraBounce() {
-        super("ElytraBounce", "High-speed Elytra bounce flight for highways with automatic pitch, obstacle passing, and bounce timing.", Category.MOVEMENT);
+        super("ElytraBounce", "High-speed Elytra bounce flight for highways with automatic pitch, obstacle passing, and bounce timing.", Category.HIGHWAY);
         INSTANCE = this;
     }
 
@@ -147,6 +149,7 @@ public class ElytraBounce extends Module {
     public void onDisable() {
         this.restoreKillAura();
         RotationUtils.getInstance().clearRotations(this);
+        this.lastNavGoal = null;
         if (mc.player != null) {
             if (this.bounce.getValue() && !BaritoneHelper.hasElytraDestination()) {
                 BaritoneHelper.clearGoal();
@@ -178,9 +181,15 @@ public class ElytraBounce extends Module {
             if (this.toggleElytra.getValue() && !this.fakeFly.getValue() && !this.elytraToggled) {
                 ItemStack chest = mc.player.getEquippedStack(EquipmentSlot.CHEST);
                 if (!chest.isOf(Items.ELYTRA) && !chest.contains(DataComponentTypes.GLIDER)) {
-                    ChestSwap cs = ModuleManager.INSTANCE.getModule(ChestSwap.class);
-                    if (cs != null) {
-                        cs.swap();
+                    // Не чаще раза в секунду: спам свапами не применяется сервером,
+                    // а следующий glide-start палится как BadPacketsJ
+                    long now = System.currentTimeMillis();
+                    if (now - this.lastChestSwapAttempt >= 1000) {
+                        this.lastChestSwapAttempt = now;
+                        ChestSwap cs = ModuleManager.INSTANCE.getModule(ChestSwap.class);
+                        if (cs != null) {
+                            cs.swap();
+                        }
                     }
                 } else {
                     this.elytraToggled = true;
@@ -194,9 +203,13 @@ public class ElytraBounce extends Module {
             if (this.bounce.getValue()) {
                 if (this.tempPath != null && mc.player.getBlockPos().getSquaredDistance(this.tempPath) < 500.0) {
                     this.tempPath = null;
+                    this.lastNavGoal = null;
                     BaritoneHelper.clearGoal();
                 } else if (this.tempPath != null) {
-                    BaritoneHelper.setGoal(this.tempPath);
+                    if (!this.tempPath.equals(this.lastNavGoal)) {
+                        this.lastNavGoal = this.tempPath;
+                        BaritoneHelper.setGoal(this.tempPath);
+                    }
                     RotationUtils.getInstance().clearRotations(this);
                     return;
                 }
@@ -239,7 +252,10 @@ public class ElytraBounce extends Module {
                     do {
                         if (currDistance > 80.0) {
                             this.tempPath = goal;
-                            BaritoneHelper.setGoal(goal);
+                            if (!goal.equals(this.lastNavGoal)) {
+                                this.lastNavGoal = goal;
+                                BaritoneHelper.setGoal(goal);
+                            }
                             return;
                         }
 
@@ -261,7 +277,10 @@ public class ElytraBounce extends Module {
                             || !mc.world.getBlockState(goal).isAir()
                     );
 
-                    BaritoneHelper.setGoal(goal);
+                    if (!goal.equals(this.lastNavGoal)) {
+                        this.lastNavGoal = goal;
+                        BaritoneHelper.setGoal(goal);
+                    }
                 } else {
                     this.paused = false;
                     if (!this.enabled()) {

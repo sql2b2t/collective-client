@@ -17,6 +17,8 @@ public class Freecam extends Module {
     private Vec3d prevPos = Vec3d.ZERO;
     private float yaw = 0f;
     private float pitch = 0f;
+    private float prevYaw = 0f;
+    private float prevPitch = 0f;
 
     public Freecam() {
         super("Freecam", "Detaches the camera from your player allowing free noclip exploration.", Category.RENDER);
@@ -31,6 +33,8 @@ public class Freecam extends Module {
             prevPos = eyePos;
             yaw = mc.player.getYaw();
             pitch = mc.player.getPitch();
+            prevYaw = yaw;
+            prevPitch = pitch;
         }
     }
 
@@ -45,8 +49,8 @@ public class Freecam extends Module {
         if (mc.player == null) return;
 
         prevPos = pos;
-        yaw = mc.player.getYaw();
-        pitch = mc.player.getPitch();
+        prevYaw = yaw;
+        prevPitch = pitch;
 
         double s = speed.getValue();
         Vec3d forward = Vec3d.fromPolar(0, yaw).multiply(s);
@@ -79,5 +83,19 @@ public class Freecam extends Module {
 
     public float getPitch() {
         return pitch;
+    }
+
+    /** Поворот от мыши (вызывается из миксина вместо игрока). */
+    public void turn(double cursorDeltaX, double cursorDeltaY) {
+        yaw -= (float) cursorDeltaX * 0.15F;
+        pitch = MathHelper.clamp(pitch - (float) cursorDeltaY * 0.15F, -90f, 90f);
+    }
+
+    public float getInterpolatedYaw(float tickProgress) {
+        return prevYaw + MathHelper.wrapDegrees(yaw - prevYaw) * tickProgress;
+    }
+
+    public float getInterpolatedPitch(float tickProgress) {
+        return prevPitch + MathHelper.wrapDegrees(pitch - prevPitch) * tickProgress;
     }
 }
