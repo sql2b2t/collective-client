@@ -87,8 +87,10 @@ public class Freecam extends Module {
 
     /** Поворот от мыши (вызывается из миксина вместо игрока). */
     public void turn(double cursorDeltaX, double cursorDeltaY) {
-        yaw -= (float) cursorDeltaX * 0.15F;
-        pitch = MathHelper.clamp(pitch - (float) cursorDeltaY * 0.15F, -90f, 90f);
+        // Знаки как в ванильном Entity.changeLookDirection, иначе оси
+        // мыши оказываются инвертированными.
+        yaw += (float) cursorDeltaX * 0.15F;
+        pitch = MathHelper.clamp(pitch + (float) cursorDeltaY * 0.15F, -90f, 90f);
     }
 
     public float getInterpolatedYaw(float tickProgress) {
