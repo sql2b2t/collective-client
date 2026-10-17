@@ -135,6 +135,7 @@ public class ModuleManager {
         // Render Modules
         register(new Blur());
         register(new NoHurtCam());
+        register(new NoRender());
         register(new Fullbright());
         register(new LightOverlay());
         register(new StorageESP());

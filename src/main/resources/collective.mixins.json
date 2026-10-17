@@ -28,6 +28,7 @@
     "MixinGameRenderer",
     "MixinHeldItemRenderer",
     "MixinInGameOverlayRenderer",
+    "MixinInGameHud",
     "MixinHandledScreenTooltips",
     "MixinDrawContextDominant",
     "MixinEntityHitbox",
