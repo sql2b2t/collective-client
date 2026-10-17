@@ -31,7 +31,9 @@ public class ColorComponent extends Component {
 
         // Main setting bar (height 11)
         RenderUtil.drawRect(context, x, y, x + width, y + 11, UI.INSTANCE.bgColor.getValue());
-        FontManager.INSTANCE.drawStringWithShadow(context, setting.getName(), x + 4, y + (11 - FontManager.INSTANCE.getFontHeight()) / 2f + 0.5f, UI.INSTANCE.textColor.getValue());
+        float fs = FontManager.settingsScale();
+        int fh = FontManager.INSTANCE.getFontHeightScaled(fs);
+        FontManager.INSTANCE.drawStringWithShadowScaled(context, setting.getName(), x + 4, y + (11 - fh) / 2f + 0.5f, UI.INSTANCE.textColor.getValue(), fs);
 
         // Color preview box
         float boxX1 = x + width - 13;
@@ -52,13 +54,13 @@ public class ColorComponent extends Component {
             // Rainbow toggle
             String rbText = "Rainbow: " + (setting.isRainbow() ? "ON" : "OFF");
             int rbCol = setting.isRainbow() ? UI.INSTANCE.color.getValue().getRGB() : UI.INSTANCE.textColor.getValue().getRGB();
-            FontManager.INSTANCE.drawStringWithShadow(context, rbText, x + 4, rowY + (11 - FontManager.INSTANCE.getFontHeight()) / 2f + 0.5f, rbCol);
+            FontManager.INSTANCE.drawStringWithShadowScaled(context, rbText, x + 4, rowY + (11 - fh) / 2f + 0.5f, rbCol, fs);
 
             // Sync toggle
             if (Colors.INSTANCE != null && setting != Colors.INSTANCE.themeColor) {
                 String syncText = "Sync: " + (setting.isSync() ? "ON" : "OFF");
                 int syncCol = setting.isSync() ? UI.INSTANCE.color.getValue().getRGB() : UI.INSTANCE.textColor.getValue().getRGB();
-                FontManager.INSTANCE.drawStringWithShadow(context, syncText, x + 2 + halfW + 2, rowY + (11 - FontManager.INSTANCE.getFontHeight()) / 2f + 0.5f, syncCol);
+                FontManager.INSTANCE.drawStringWithShadowScaled(context, syncText, x + 2 + halfW + 2, rowY + (11 - fh) / 2f + 0.5f, syncCol, fs);
             }
             rowY += 11;
 
@@ -83,7 +85,8 @@ public class ColorComponent extends Component {
         RenderUtil.drawRect(context, x + 2, sY, x + width - 2, sY + 11, UI.INSTANCE.bgColor.getValue());
         float barW = Math.max(0, Math.min(width - 6, (width - 6) * percent));
         RenderUtil.drawRect(context, x + 3, sY + 1, x + 3 + barW, sY + 10, barColor);
-        FontManager.INSTANCE.drawStringWithShadow(context, label, x + 5, sY + (11 - FontManager.INSTANCE.getFontHeight()) / 2f + 0.5f, UI.INSTANCE.textColor.getValue());
+        float fs = FontManager.settingsScale();
+        FontManager.INSTANCE.drawStringWithShadowScaled(context, label, x + 5, sY + (11 - FontManager.INSTANCE.getFontHeightScaled(fs)) / 2f + 0.5f, UI.INSTANCE.textColor.getValue(), fs);
     }
 
     private void updateSlider(int sliderIdx, double mouseX) {

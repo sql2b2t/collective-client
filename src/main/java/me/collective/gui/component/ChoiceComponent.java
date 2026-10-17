@@ -36,7 +36,8 @@ public class ChoiceComponent extends Component {
 
         long enabled = setting.getOptions().stream().filter(s -> s.getValue()).count();
         String text = setting.getName() + " [" + enabled + "/" + setting.getOptions().size() + "]" + (open ? " -" : " +");
-        FontManager.INSTANCE.drawStringWithShadow(context, text, x + 4, y + (11 - FontManager.INSTANCE.getFontHeight()) / 2f + 0.5f, UI.INSTANCE.textColor.getValue());
+        float fs = FontManager.settingsScale();
+        FontManager.INSTANCE.drawStringWithShadowScaled(context, text, x + 4, y + (11 - FontManager.INSTANCE.getFontHeightScaled(fs)) / 2f + 0.5f, UI.INSTANCE.textColor.getValue(), fs);
 
         if (open) {
             float curY = y + 11;

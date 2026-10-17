@@ -38,7 +38,8 @@ public class BooleanComponent extends Component {
         }
 
         // Setting Name
-        FontManager.INSTANCE.drawStringWithShadow(context, setting.getName(), x + 4, y + (height - FontManager.INSTANCE.getFontHeight()) / 2f + 0.5f, UI.INSTANCE.textColor.getValue());
+        float fs = FontManager.settingsScale();
+        FontManager.INSTANCE.drawStringWithShadowScaled(context, setting.getName(), x + 4, y + (height - FontManager.INSTANCE.getFontHeightScaled(fs)) / 2f + 0.5f, UI.INSTANCE.textColor.getValue(), fs);
     }
 
     @Override

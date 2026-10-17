@@ -19,13 +19,15 @@ public class EnumComponent extends Component {
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         if (!setting.isVisible()) return;
+        float fs = FontManager.settingsScale();
+        int fh = FontManager.INSTANCE.getFontHeightScaled(fs);
 
         // Setting background
         RenderUtil.drawRect(context, x, y, x + width, y + 11, UI.INSTANCE.bgColor.getValue());
 
         // Text: Name: Mode
         String text = setting.getName() + ": " + setting.getValue().name();
-        FontManager.INSTANCE.drawStringWithShadow(context, text, x + 4, y + (11 - FontManager.INSTANCE.getFontHeight()) / 2f + 0.5f, UI.INSTANCE.textColor.getValue());
+        FontManager.INSTANCE.drawStringWithShadowScaled(context, text, x + 4, y + (11 - fh) / 2f + 0.5f, UI.INSTANCE.textColor.getValue(), fs);
 
         // If open, render list of options
         if (open) {
@@ -40,7 +42,7 @@ public class EnumComponent extends Component {
                 }
 
                 int col = selected ? UI.INSTANCE.color.getValue().getRGB() : UI.INSTANCE.textColor.getValue().getRGB();
-                FontManager.INSTANCE.drawStringWithShadow(context, val.name(), x + 8, curY + (11 - FontManager.INSTANCE.getFontHeight()) / 2f + 0.5f, col);
+                FontManager.INSTANCE.drawStringWithShadowScaled(context, val.name(), x + 8, curY + (11 - fh) / 2f + 0.5f, col, fs);
                 curY += 11;
             }
 

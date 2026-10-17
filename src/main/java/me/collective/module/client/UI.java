@@ -27,6 +27,7 @@ public class UI extends Module {
     public final NumberSetting hudWidth = add(new NumberSetting("HudWidth", 92, 70, 200, 1, (v) -> customWidths.getValue()));
 
     public final NumberSetting modulePadding = add(new NumberSetting("ModulePadding", 2, 0, 10, 1));
+    public final NumberSetting settingsFontSize = add(new NumberSetting("SettingsFontSize", 7.0, 5.0, 14.0, 0.5));
     public final NumberSetting animSpeed = add(new NumberSetting("AnimSpeed", 2.0, 0.5, 5.0, 0.1));
     public final NumberSetting guiScale = add(new NumberSetting("GuiScale", 1.0, 0.5, 2.0, 0.1));
 

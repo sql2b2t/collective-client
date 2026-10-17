@@ -100,6 +100,73 @@ public class FontManager {
         return mc.textRenderer.fontHeight;
     }
 
+    // ------------------------------------------------------------- Масштабируемый текст
+
+    /**
+     * Масштаб для текста настроек модулей: настройка задаёт высоту шрифта
+     * в экранных единицах (пикселях GUI), делим её на базовую высоту шрифта.
+     */
+    public static float settingsScale() {
+        if (me.collective.module.client.UI.INSTANCE == null) return 1f;
+        float px = me.collective.module.client.UI.INSTANCE.settingsFontSize.getFloatValue();
+        if (px <= 0.5f) return 1f;
+        return px / Math.max(1, INSTANCE.getFontHeight());
+    }
+
+    public float getStringWidthScaled(String text, float scale) {
+        if (Fonts.INSTANCE != null && Fonts.INSTANCE.isToggled() && currentFont != null) {
+            return currentFont.getStringWidth(text, scale);
+        }
+        return mc.textRenderer.getWidth(text) * scale;
+    }
+
+    public int getFontHeightScaled(float scale) {
+        if (Fonts.INSTANCE != null && Fonts.INSTANCE.isToggled() && currentFont != null) {
+            return currentFont.getFontHeight(scale);
+        }
+        return (int) Math.ceil(mc.textRenderer.fontHeight * scale);
+    }
+
+    public void drawStringScaled(DrawContext context, String text, float x, float y, Color color, float scale) {
+        drawStringScaled(context, text, x, y, color.getRGB(), scale);
+    }
+
+    public void drawStringScaled(DrawContext context, String text, float x, float y, int color, float scale) {
+        if (text == null || text.isEmpty()) return;
+        if (Fonts.INSTANCE != null && Fonts.INSTANCE.isToggled() && currentFont != null) {
+            currentFont.drawString(context, text, x, y, color, scale);
+        } else if (scale == 1.0f) {
+            context.drawText(mc.textRenderer, text, (int) Math.round(x), (int) Math.round(y), color, false);
+        } else {
+            context.getMatrices().pushMatrix();
+            context.getMatrices().scale(scale, scale);
+            context.drawText(mc.textRenderer, text, (int) Math.round(x / scale), (int) Math.round(y / scale), color, false);
+            context.getMatrices().popMatrix();
+        }
+    }
+
+    public void drawStringWithShadowScaled(DrawContext context, String text, float x, float y, Color color, float scale) {
+        drawStringWithShadowScaled(context, text, x, y, color.getRGB(), scale);
+    }
+
+    public void drawStringWithShadowScaled(DrawContext context, String text, float x, float y, int color, float scale) {
+        if (text == null || text.isEmpty()) return;
+        if (Fonts.INSTANCE != null && Fonts.INSTANCE.isToggled() && currentFont != null) {
+            if (Fonts.INSTANCE.shadow.getValue()) {
+                currentFont.drawStringWithShadow(context, text, x, y, color, scale);
+            } else {
+                currentFont.drawString(context, text, x, y, color, scale);
+            }
+        } else if (scale == 1.0f) {
+            context.drawTextWithShadow(mc.textRenderer, text, (int) Math.round(x), (int) Math.round(y), color);
+        } else {
+            context.getMatrices().pushMatrix();
+            context.getMatrices().scale(scale, scale);
+            context.drawTextWithShadow(mc.textRenderer, text, (int) Math.round(x / scale), (int) Math.round(y / scale), color);
+            context.getMatrices().popMatrix();
+        }
+    }
+
     public void drawCustomString(DrawContext context, String text, float x, float y, Color color) {
         drawCustomString(context, text, x, y, color.getRGB());
     }

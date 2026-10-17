@@ -27,7 +27,8 @@ public class KeybindComponent extends Component {
         String text = "Key: " + keyName;
 
         int col = binding ? Color.YELLOW.getRGB() : UI.INSTANCE.textColor.getValue().getRGB();
-        FontManager.INSTANCE.drawStringWithShadow(context, text, x + 4, y + (height - FontManager.INSTANCE.getFontHeight()) / 2f + 0.5f, col);
+        float fs = FontManager.settingsScale();
+        FontManager.INSTANCE.drawStringWithShadowScaled(context, text, x + 4, y + (height - FontManager.INSTANCE.getFontHeightScaled(fs)) / 2f + 0.5f, col, fs);
     }
 
     @Override

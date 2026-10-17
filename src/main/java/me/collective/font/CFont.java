@@ -167,29 +167,79 @@ public class CFont {
     }
 
     public void drawString(DrawContext context, String text, float x, float y, int color) {
+        drawString(context, text, x, y, color, 1.0f);
+    }
+
+    /** Отрисовка с произвольным масштабом (k — множитель к базовому размеру). */
+    public void drawString(DrawContext context, String text, float x, float y, int color, float scale) {
         if (text == null || text.isEmpty()) return;
-        if (!ensureTexture()) {
-            context.drawText(MinecraftClient.getInstance().textRenderer, text, (int) Math.round(x), (int) Math.round(y), color, false);
+        if (scale == 1.0f) {
+            drawStringDefault(context, text, x, y, color, false);
             return;
         }
-        drawStringInternal(context, text, x, y, color, false);
+        if (!ensureTexture()) {
+            context.getMatrices().pushMatrix();
+            context.getMatrices().scale(scale, scale);
+            context.drawText(MinecraftClient.getInstance().textRenderer, text, (int) Math.round(x / scale), (int) Math.round(y / scale), color, false);
+            context.getMatrices().popMatrix();
+            return;
+        }
+        drawStringInternal(context, text, x, y, color, false, scale);
     }
 
     public void drawStringWithShadow(DrawContext context, String text, float x, float y, int color) {
+        drawStringWithShadow(context, text, x, y, color, 1.0f);
+    }
+
+    public void drawStringWithShadow(DrawContext context, String text, float x, float y, int color, float scale) {
         if (text == null || text.isEmpty()) return;
+        if (scale == 1.0f) {
+            drawStringDefaultWithShadow(context, text, x, y, color);
+            return;
+        }
+        if (!ensureTexture()) {
+            context.getMatrices().pushMatrix();
+            context.getMatrices().scale(scale, scale);
+            context.drawTextWithShadow(MinecraftClient.getInstance().textRenderer, text, (int) Math.round(x / scale), (int) Math.round(y / scale), color);
+            context.getMatrices().popMatrix();
+            return;
+        }
+        drawStringInternal(context, text, x + 0.5f * scale, y + 0.5f * scale, color, true, scale);
+        drawStringInternal(context, text, x, y, color, false, scale);
+    }
+
+    private void drawStringDefault(DrawContext context, String text, float x, float y, int color, boolean shadow) {
+        if (!ensureTexture()) {
+            MinecraftClient mcClient = MinecraftClient.getInstance();
+            if (shadow) {
+                context.drawTextWithShadow(mcClient.textRenderer, text, (int) Math.round(x), (int) Math.round(y), color);
+            } else {
+                context.drawText(mcClient.textRenderer, text, (int) Math.round(x), (int) Math.round(y), color, false);
+            }
+            return;
+        }
+        if (shadow) {
+            drawStringInternal(context, text, x + 0.5f, y + 0.5f, color, true, 1.0f);
+            drawStringInternal(context, text, x, y, color, false, 1.0f);
+        } else {
+            drawStringInternal(context, text, x, y, color, false, 1.0f);
+        }
+    }
+
+    private void drawStringDefaultWithShadow(DrawContext context, String text, float x, float y, int color) {
         if (!ensureTexture()) {
             context.drawTextWithShadow(MinecraftClient.getInstance().textRenderer, text, (int) Math.round(x), (int) Math.round(y), color);
             return;
         }
-
-        // Shadow pass: subtle 0.5px offset, darkened color (0.25x brightness, matching client style)
-        drawStringInternal(context, text, x + 0.5f, y + 0.5f, color, true);
-
-        // Main text pass with full crisp brightness
-        drawStringInternal(context, text, x, y, color, false);
+        drawStringInternal(context, text, x + 0.5f, y + 0.5f, color, true, 1.0f);
+        drawStringInternal(context, text, x, y, color, false, 1.0f);
     }
 
     private void drawStringInternal(DrawContext context, String text, float x, float y, int color, boolean isShadow) {
+        drawStringInternal(context, text, x, y, color, isShadow, 1.0f);
+    }
+
+    private void drawStringInternal(DrawContext context, String text, float x, float y, int color, boolean isShadow, float scale) {
         if (text == null || text.isEmpty()) return;
         if (textureId == null) return;
 
@@ -197,7 +247,7 @@ public class CFont {
         float curX = x;
 
         context.getMatrices().pushMatrix();
-        context.getMatrices().scale(0.5f, 0.5f);
+        context.getMatrices().scale(0.5f * scale, 0.5f * scale);
 
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
@@ -225,8 +275,8 @@ public class CFont {
                 context.drawTexture(
                         RenderPipelines.GUI_TEXTURED,
                         textureId,
-                        (int) Math.round(curX * 2.0f),
-                        (int) Math.round(y * 2.0f),
+                        (int) Math.round(curX * 2.0f / scale),
+                        (int) Math.round(y * 2.0f / scale),
                         (float) data.x,
                         (float) data.y,
                         data.width,
@@ -235,9 +285,9 @@ public class CFont {
                         imgSize,
                         activeColor
                 );
-                curX += (data.width - 2) * 0.5f;
+                curX += (data.width - 2) * 0.5f * scale;
             } else {
-                curX += 4.0f;
+                curX += 4.0f * scale;
             }
         }
 
@@ -256,6 +306,11 @@ public class CFont {
     }
 
     public float getStringWidth(String text) {
+        return getStringWidth(text, 1.0f);
+    }
+
+    /** Ширина текста при заданном масштабе. */
+    public float getStringWidth(String text, float scale) {
         if (text == null || text.isEmpty()) return 0;
         float width = 0;
         for (int i = 0; i < text.length(); i++) {
@@ -266,16 +321,20 @@ public class CFont {
             }
             CharData data = charMap.get(c);
             if (data != null) {
-                width += (data.width - 2) * 0.5f;
+                width += (data.width - 2) * 0.5f * scale;
             } else {
-                width += 4.0f;
+                width += 4.0f * scale;
             }
         }
         return width;
     }
 
     public int getFontHeight() {
-        return (int) Math.ceil((fontHeight > 0 ? fontHeight : 18) * 0.5f);
+        return getFontHeight(1.0f);
+    }
+
+    public int getFontHeight(float scale) {
+        return (int) Math.ceil((fontHeight > 0 ? fontHeight : 18) * 0.5f * scale);
     }
 
     private static int getColorForCode(int code, int alpha) {

@@ -65,6 +65,8 @@ public abstract class RegistryListComponent<T> extends Component {
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         if (lastName.isEmpty()) lastName = setting.getName();
+        float fs = FontManager.settingsScale();
+        int fh = FontManager.INSTANCE.getFontHeightScaled(fs);
         float h = contentHeight();
         if (this.height != h) this.height = h;
 
@@ -76,13 +78,13 @@ public abstract class RegistryListComponent<T> extends Component {
         RenderUtil.drawRect(context, x, y, x + width, y + HEADER_H, bg);
         String count = String.valueOf(setting.getValue().size());
         String label = lastName + " [" + count + "]";
-        FontManager.INSTANCE.drawStringWithShadow(context, label, x + 4,
-            y + (HEADER_H - FontManager.INSTANCE.getFontHeight()) / 2f + 0.5f, text);
+        FontManager.INSTANCE.drawStringWithShadowScaled(context, label, x + 4,
+            y + (HEADER_H - fh) / 2f + 0.5f, text, fs);
         String gear = open ? "-" : "+";
-        float gw = FontManager.INSTANCE.getStringWidth(gear);
-        FontManager.INSTANCE.drawStringWithShadow(context, gear, x + width - 6 - gw,
-            y + (HEADER_H - FontManager.INSTANCE.getFontHeight()) / 2f + 0.5f,
-            open ? accent : text);
+        float gw = FontManager.INSTANCE.getStringWidthScaled(gear, fs);
+        FontManager.INSTANCE.drawStringWithShadowScaled(context, gear, x + width - 6 - gw,
+            y + (HEADER_H - fh) / 2f + 0.5f,
+            open ? accent : text, fs);
 
         if (!open) return;
 
@@ -98,7 +100,7 @@ public abstract class RegistryListComponent<T> extends Component {
 
         // Строка поиска
         String searchText = "Поиск: " + query + "_";
-        FontManager.INSTANCE.drawStringWithShadow(context, searchText, lx + 3, ly + 1, text);
+        FontManager.INSTANCE.drawStringWithShadowScaled(context, searchText, lx + 3, ly + 1, text, fs);
 
         // Скролл-клип
         List<T> filtered = filtered();
@@ -133,14 +135,14 @@ public abstract class RegistryListComponent<T> extends Component {
             // Текст (обрезаем по ширине)
             String name = displayName(entry);
             int avail = (int) (lw - 12);
-            if (FontManager.INSTANCE.getStringWidth(name) > avail) {
-                while (name.length() > 3 && FontManager.INSTANCE.getStringWidth(name + "..") > avail) {
+            if (FontManager.INSTANCE.getStringWidthScaled(name, fs) > avail) {
+                while (name.length() > 3 && FontManager.INSTANCE.getStringWidthScaled(name + "..", fs) > avail) {
                     name = name.substring(0, name.length() - 2);
                 }
                 name = name + "..";
             }
-            FontManager.INSTANCE.drawStringWithShadow(context, name, lx + 7, rowY + 1,
-                selected ? text : new Color(170, 170, 175));
+            FontManager.INSTANCE.drawStringWithShadowScaled(context, name, lx + 7, rowY + 1,
+                selected ? text : new Color(170, 170, 175), fs);
 
             rowY += ROW_H;
         }
