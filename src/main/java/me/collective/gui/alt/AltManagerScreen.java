@@ -1,8 +1,8 @@
 package me.collective.gui.alt;
 
 import me.collective.font.FontManager;
+import me.collective.gui.GuiGfx;
 import me.collective.render.BlurEngine;
-import me.collective.render.SdfShader;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.MinecraftClient;
@@ -84,8 +84,8 @@ public class AltManagerScreen extends Screen {
     // Размеры
     private static final int PW = 360;
     private static final int PH = 430;
-    private static final float R = 11.0f;
-    private static final float R2 = 7.0f;
+    private static final int R = 11;
+    private static final int R2 = 7;
     private static final int MARGIN = 14;
     private static final int HEADER_H = 52;
     private static final int FIELD_H = 24;
@@ -150,15 +150,15 @@ public class AltManagerScreen extends Screen {
         float pyF = py;
 
         // 1. Панель
-        SdfShader.INSTANCE.drawRoundedRect(px, pyF, PW, PH, R, PANEL_BG);
-        SdfShader.INSTANCE.drawRoundedOutline(px, pyF, PW, PH, R, 1f, BORDER);
+        GuiGfx.fillRounded(ctx, px, (int) pyF, PW, PH, R, PANEL_BG.getRGB());
+        GuiGfx.outlineRounded(ctx, px, (int) pyF, PW, PH, R, BORDER.getRGB());
 
         // 2. Хедер
-        SdfShader.INSTANCE.drawRoundedRect(px, pyF, PW, HEADER_H, R, R, 0, 0, HEADER_BG);
+        GuiGfx.fillRounded(ctx, px, (int) pyF, PW, HEADER_H, R, HEADER_BG.getRGB());
 
         // Акцентная полоска
-        SdfShader.INSTANCE.drawRoundedRect(px + MARGIN - 2, pyF + 16, 3, 20, 1.5f, ACCENT);
-        SdfShader.INSTANCE.drawRoundedRect(px + MARGIN - 2, pyF + 16, 1.2f, 20f, 0.6f, ACCENT_LIT);
+        GuiGfx.fillRounded(ctx, px + MARGIN - 2, (int) pyF + 16, 3, 20, 1, ACCENT.getRGB());
+        GuiGfx.fillRounded(ctx, px + MARGIN - 2, (int) pyF + 16, 1, 20, 0, ACCENT_LIT.getRGB());
 
         // Заголовок + подзаголовок
         fm.drawCustomString(ctx, "Alt Manager", px + MARGIN + 10, pyF + 15, TXT_PRI);
@@ -169,7 +169,7 @@ public class AltManagerScreen extends Screen {
         String curNick = mc.getSession().getUsername();
         float nickW = fm.getCustomStringWidth(curNick);
         float dotX = px + PW - nickW - 22;
-        SdfShader.INSTANCE.drawCircle(dotX, pyF + HEADER_H / 2f - 3, 3.2f, TXT_CUR);
+        GuiGfx.dot(ctx, dotX, pyF + HEADER_H / 2f - 3, 3.2f, TXT_CUR.getRGB());
         fm.drawCustomString(ctx, curNick, dotX + 7, pyF + HEADER_H / 2f - 8, TXT_SEC);
 
         // Разделитель
@@ -187,9 +187,8 @@ public class AltManagerScreen extends Screen {
         Color fieldBg = this.inputActive ? INPUT_ACT : INPUT_BG;
         Color fieldBd = mix(BORDER, BORDER_ACT, this.fieldAnim);
 
-        SdfShader.INSTANCE.drawRoundedRect(fieldX, fy, fieldW, FIELD_H, R2, fieldBg);
-        SdfShader.INSTANCE.drawRoundedOutline(fieldX, fy, fieldW, FIELD_H, R2,
-                this.inputActive ? 1.2f : 1f, fieldBd);
+        GuiGfx.fillRounded(ctx, fieldX, fy, fieldW, FIELD_H, R2, fieldBg.getRGB());
+        GuiGfx.outlineRounded(ctx, fieldX, fy, fieldW, FIELD_H, R2, fieldBd.getRGB());
 
         // Плейсхолдер / текст + каретка через мягкое мигание
         boolean caretOn = this.inputActive && System.currentTimeMillis() % 1000 < 560;
@@ -223,10 +222,10 @@ public class AltManagerScreen extends Screen {
         boolean btnHov = inBounds(mx, my, fieldX, by, fieldW, FIELD_H);
         this.loginAnim += ((btnHov ? 1f : 0f) - this.loginAnim) * easing(dt, 14f);
 
-        SdfShader.INSTANCE.drawRoundedRect(fieldX, by, fieldW, FIELD_H, R2, mix(BTN_BG, BTN_HOV, this.loginAnim));
+        GuiGfx.fillRounded(ctx, fieldX, by, fieldW, FIELD_H, R2, mix(BTN_BG, BTN_HOV, this.loginAnim).getRGB());
         // внутренняя верхняя подсветка
-        SdfShader.INSTANCE.drawRoundedRect(fieldX + 1.5f, by + 1.5f, fieldW - 3, 2.5f, 1.2f,
-                new Color(255, 255, 255, (int) (26 + this.loginAnim * 22)));
+        ctx.fill(fieldX + 1, by + 1, fieldX + fieldW - 1, by + 4,
+                new Color(255, 255, 255, (int) (26 + this.loginAnim * 22)).getRGB());
 
         String loginTxt = "Войти";
         float loginW = fm.getCustomStringWidth(loginTxt);
@@ -247,8 +246,8 @@ public class AltManagerScreen extends Screen {
             float w2 = fm.getCustomStringWidth(txt2);
             float cx = px + PW / 2f;
             float cy = lt + (listBottom() - listTop()) / 2f;
-            SdfShader.INSTANCE.drawCircleOutline(cx, cy - 18, 11, 1.2f, new Color(70, 70, 100, 140));
-            SdfShader.INSTANCE.drawCircle(cx, cy - 18, 4.5f, new Color(70, 70, 100, 180));
+            GuiGfx.dotRing(ctx, cx, cy - 18, 11, new Color(70, 70, 100, 140).getRGB());
+            GuiGfx.dot(ctx, cx, cy - 18, 4.5f, new Color(70, 70, 100, 180).getRGB());
             fm.drawCustomString(ctx, txt1, cx - w1 / 2f, cy + 2, TXT_SEC);
             fm.drawCustomString(ctx, txt2, cx - w2 / 2f, cy + 17, TXT_HINT);
         }
@@ -283,24 +282,24 @@ public class AltManagerScreen extends Screen {
                 int ay = Math.round(ayF);
 
                 // Карточка
-                SdfShader.INSTANCE.drawRoundedRect(cardX, ayF, altW, CARD_H, R2,
-                        isCur ? CARD_CUR : mix(CARD_BG, CARD_HOV, rowHoverT));
+                GuiGfx.fillRounded(ctx, cardX, (int) ayF, (int) altW, CARD_H, R2,
+                        (isCur ? CARD_CUR : mix(CARD_BG, CARD_HOV, rowHoverT)).getRGB());
                 if (isCur) {
-                    SdfShader.INSTANCE.drawRoundedOutline(cardX, ayF, altW, CARD_H, R2, 1f, ACCENT);
+                    GuiGfx.outlineRounded(ctx, cardX, (int) ayF, (int) altW, CARD_H, R2, ACCENT.getRGB());
                     // статусная полоска слева
-                    SdfShader.INSTANCE.drawRoundedRect(cardX + 4.5f, ayF + 8.5f, 2, CARD_H - 17, 1f, ACCENT_LIT);
+                    GuiGfx.fillRounded(ctx, cardX + 4, (int) ayF + 8, 2, CARD_H - 17, 1, ACCENT_LIT.getRGB());
                 } else if (rowHoverT > 0.02f) {
-                    SdfShader.INSTANCE.drawRoundedOutline(cardX, ayF, altW, CARD_H, R2, 1f,
-                            new Color(255, 255, 255, (int) (rowHoverT * 40)));
+                    GuiGfx.outlineRounded(ctx, cardX, (int) ayF, (int) altW, CARD_H, R2,
+                            new Color(255, 255, 255, (int) (rowHoverT * 40)).getRGB());
                 }
 
                 // Аватар: буква аккаунта в кружке
                 Color avatarCol = mix(nicknameColor(alt), Color.WHITE, rowHoverT * 0.3f);
                 float aCX = cardX + 15;
                 float aCY = ayF + CARD_H / 2f;
-                SdfShader.INSTANCE.drawCircle(aCX, aCY, 7.5f, avatarCol);
-                SdfShader.INSTANCE.drawCircleOutline(aCX, aCY, 9.5f, 1f,
-                        new Color(255, 255, 255, isCur ? 40 : (int) (rowHoverT * 30)));
+                GuiGfx.dot(ctx, aCX, aCY, 7.5f, avatarCol.getRGB());
+                GuiGfx.dotRing(ctx, aCX, aCY, 9.5f,
+                        new Color(255, 255, 255, isCur ? 40 : (int) (rowHoverT * 30)).getRGB());
 
                 String letter = String.valueOf(Character.toUpperCase(alt.charAt(0)));
                 float letterW = fm.getCustomStringWidth(letter);
@@ -327,8 +326,8 @@ public class AltManagerScreen extends Screen {
                 String xTxt = "✕";
                 float xW = fm.getCustomStringWidth(xTxt);
                 if (hovDel) {
-                    SdfShader.INSTANCE.drawRoundedRect(delX, ayF, delW, CARD_H, R2, DEL_HOV);
-                    SdfShader.INSTANCE.drawRoundedOutline(delX, ayF, delW, CARD_H, R2, 1f, TXT_RED);
+                    GuiGfx.fillRounded(ctx, (int) delX, ay, (int) delW, CARD_H, R2, DEL_HOV.getRGB());
+                    GuiGfx.outlineRounded(ctx, (int) delX, ay, (int) delW, CARD_H, R2, TXT_RED.getRGB());
                     fm.drawCustomString(ctx, xTxt, delX + (delW - xW) / 2f, ay + 9, TXT_RED);
                 } else {
                     Color dimX = new Color(150, 150, 175, 120);
@@ -346,8 +345,8 @@ public class AltManagerScreen extends Screen {
             float barH = Math.max(16, (float) visibleRows() / alts.size() * trackH);
             float travel = trackH - barH;
             float ratio = rowsMax <= 0 ? 0 : scrollF / rowsMax;
-            SdfShader.INSTANCE.drawRoundedRect(sbX, trackY0, 3, trackH, 1.5f, new Color(255, 255, 255, 10));
-            SdfShader.INSTANCE.drawRoundedRect(sbX, trackY0 + travel * ratio, 3, barH, 1.5f, SCROLL_BG);
+            GuiGfx.fillRounded(ctx, sbX, trackY0, 3, trackH, 1, new Color(255, 255, 255, 10).getRGB());
+            GuiGfx.fillRounded(ctx, sbX, (int) (trackY0 + travel * ratio), 3, (int) barH, 1, SCROLL_BG.getRGB());
         }
 
         // 6. Футер
@@ -371,9 +370,9 @@ public class AltManagerScreen extends Screen {
         boolean clrHov = inBounds(mx, my, clearX, ftrY, halfW, btnH);
         this.clearAnim += ((clrHov ? 1f : 0f) - this.clearAnim) * easing(dt, 14f);
         Color clrBase = this.clearArmed ? new Color(140, 30, 40, 255) : CLR_BG;
-        SdfShader.INSTANCE.drawRoundedRect(clearX, ftrY, halfW, btnH, R2, mix(clrBase, CLR_HOV, this.clearAnim));
-        SdfShader.INSTANCE.drawRoundedOutline(clearX, ftrY, halfW, btnH, R2, 1f,
-                this.clearArmed ? TXT_RED : mix(new Color(255, 80, 80, 40), TXT_RED, this.clearAnim));
+        GuiGfx.fillRounded(ctx, clearX, ftrY, halfW, btnH, R2, mix(clrBase, CLR_HOV, this.clearAnim).getRGB());
+        GuiGfx.outlineRounded(ctx, clearX, ftrY, halfW, btnH, R2,
+                (this.clearArmed ? TXT_RED : mix(new Color(255, 80, 80, 40), TXT_RED, this.clearAnim)).getRGB());
         String clearTxt = this.clearArmed ? "Точно стереть?" : "Очистить список";
         float clearW = fm.getCustomStringWidth(clearTxt);
         fm.drawCustomString(ctx, clearTxt, clearX + (halfW - clearW) / 2f, ftrY + 8,
@@ -381,8 +380,8 @@ public class AltManagerScreen extends Screen {
 
         boolean backHov = inBounds(mx, my, backX, ftrY, halfW, btnH);
         this.backAnim += ((backHov ? 1f : 0f) - this.backAnim) * easing(dt, 14f);
-        SdfShader.INSTANCE.drawRoundedRect(backX, ftrY, halfW, btnH, R2, mix(BACK_BG, BACK_HOV, this.backAnim));
-        SdfShader.INSTANCE.drawRoundedOutline(backX, ftrY, halfW, btnH, R2, 1f, BORDER);
+        GuiGfx.fillRounded(ctx, backX, ftrY, halfW, btnH, R2, mix(BACK_BG, BACK_HOV, this.backAnim).getRGB());
+        GuiGfx.outlineRounded(ctx, backX, ftrY, halfW, btnH, R2, BORDER.getRGB());
         String backTxt = "Назад";
         float backW = fm.getCustomStringWidth(backTxt);
         fm.drawCustomString(ctx, backTxt, backX + (halfW - backW) / 2f, ftrY + 8,
