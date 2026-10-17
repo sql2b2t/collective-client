@@ -157,8 +157,6 @@ public class ModuleManager {
         // Misc Modules
         register(new AntiBot());
         register(new FakePlayer());
-        register(new AutoEZ());
-        register(new SkinBlinker());
         register(new AutoAuth());
         register(new Spammer());
         register(new EmotesModule());
