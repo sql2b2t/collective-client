@@ -127,7 +127,6 @@ public class ModuleManager {
 
         // Exploit Modules
         register(new WorldEventCoords());
-        register(new ShulkerDupe());
         register(new ActivatedSpawnerDetector());
         register(new WaypointCoordExploit());
 

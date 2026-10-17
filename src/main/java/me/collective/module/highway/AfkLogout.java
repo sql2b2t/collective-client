@@ -28,7 +28,7 @@ public class AfkLogout extends Module {
     public final BooleanSetting autoToggle = add(new BooleanSetting("AutoToggle", true));
 
     public AfkLogout() {
-        super("AfkLogout", "Logs out when you reach certain coords. Useful for afk travelling.", Category.HIGHWAY);
+        super("AfkLogout", "Logs out when you reach certain coords. Useful for afk travelling.", Category.MISC);
     }
 
     @EventHandler
