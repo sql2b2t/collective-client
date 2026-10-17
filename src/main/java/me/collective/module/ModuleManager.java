@@ -126,7 +126,6 @@ public class ModuleManager {
         register(new NoRotate());
 
         // Exploit Modules
-        register(new NewChunks());
         register(new WorldEventCoords());
         register(new ShulkerDupe());
         register(new ActivatedSpawnerDetector());
