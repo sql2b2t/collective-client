@@ -58,8 +58,6 @@ public class ModuleManager {
         register(new TNTAura());
 
         // Movement Modules
-        register(new GrimVelocity());
-        register(new Velocity());
         register(new GrimScaffold());
         register(new AirPlaceScaffold());
         register(new Sprint());

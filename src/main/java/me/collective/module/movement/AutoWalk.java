@@ -1,28 +1,46 @@
 package me.collective.module.movement;
 
+import baritone.api.BaritoneAPI;
+import baritone.api.IBaritone;
+import baritone.api.utils.input.Input;
 import me.collective.category.Category;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.ModeSetting;
 
 /**
- * Порт AutoWalk из ThunderHack.
+ * Порт AutoWalk из ThunderHack + способ ходьбы через Baritone.
  *
- * <p>Держит ходьбу за тебя: руки свободны на хайвеях.
+ * <p>Режим Keys держит нажатыми игровые клавиши (как раньше). Режим
+ * Baritone заводит движение через InputOverrideHandler: баритон сам
+ * зацикливает ввод и обходит препятствия, а у нас руки свободны.
  */
 public class AutoWalk extends Module {
+    public final ModeSetting mode = add(new ModeSetting("Режим", "Keys", "Keys", "Baritone"));
     public final ModeSetting direction = add(new ModeSetting("Направление", "Forward", "Forward", "Back", "Left", "Right"));
     public final BooleanSetting sprint = add(new BooleanSetting("Спринт", true));
     public final BooleanSetting jump = add(new BooleanSetting("Прыжки", false));
 
     public AutoWalk() {
-        super("AutoWalk", "Автоматическая ходьба вперёд.", Category.MOVEMENT);
+        super("AutoWalk", "Автоматическая ходьба (обычно или через Baritone).", Category.MOVEMENT);
     }
 
     @Override
     public void onUpdate() {
-        if (mc.player == null || mc.options == null) return;
+        if (mc.player == null || mc.options == null) {
+            releaseAll();
+            return;
+        }
         releaseAll();
+
+        if (mode.process("Baritone")) {
+            baritoneWalk();
+        } else {
+            keyWalk();
+        }
+    }
+
+    private void keyWalk() {
         switch (direction.compute().trim()) {
             case "Back" -> mc.options.backKey.setPressed(true);
             case "Left" -> mc.options.leftKey.setPressed(true);
@@ -35,9 +53,37 @@ public class AutoWalk extends Module {
         }
     }
 
+    private void baritoneWalk() {
+        try {
+            IBaritone baritone = BaritoneAPI.getProvider().getPrimaryBaritone();
+            Input input = switch (direction.compute().trim()) {
+                case "Back" -> Input.MOVE_BACK;
+                case "Left" -> Input.MOVE_LEFT;
+                case "Right" -> Input.MOVE_RIGHT;
+                default -> Input.MOVE_FORWARD;
+            };
+            baritone.getInputOverrideHandler().setInputForceState(input, true);
+
+            if (sprint.getValue()) {
+                baritone.getInputOverrideHandler().setInputForceState(Input.SPRINT, true);
+            }
+
+            // При упоре в стену — баритонов принудительный прыжок
+            if (jump.getValue() && mc.player.isOnGround() && mc.player.horizontalCollision) {
+                baritone.getInputOverrideHandler().setInputForceState(Input.JUMP, true);
+            }
+        } catch (Throwable ignored) {
+            releaseAll();
+        }
+    }
+
     @Override
     public void onDisable() {
         releaseAll();
+        try {
+            BaritoneAPI.getProvider().getPrimaryBaritone().getInputOverrideHandler().clearAllKeys();
+        } catch (Throwable ignored) {
+        }
     }
 
     private void releaseAll() {

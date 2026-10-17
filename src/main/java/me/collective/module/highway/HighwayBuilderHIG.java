@@ -8,7 +8,6 @@ import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.module.ModuleManager;
 import me.collective.module.movement.Speed;
-import me.collective.module.movement.Velocity;
 import me.collective.module.player.AutoEat;
 import me.collective.render.Renderer3D;
 import me.collective.render.ShapeMode;
@@ -276,8 +275,7 @@ public class HighwayBuilderHIG extends Module {
 
         if (ModuleManager.INSTANCE.getModule(Speed.class).isToggled() && dir.diagonal)
             warning("It's recommended to disable the Speed module to avoid misalignment on diagonals.");
-        if (!ModuleManager.INSTANCE.getModule(Velocity.class).isToggled())
-            warning("It's recommended to enable the Velocity module to avoid misalignment (entity pushing, liquid movement).");
+
     }
 
     @Override
