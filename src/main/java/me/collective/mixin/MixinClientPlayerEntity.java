@@ -1,6 +1,7 @@
 package me.collective.mixin;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import me.collective.util.BaritoneBridge;
 import me.collective.util.RotationUtils;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.util.PlayerInput;
@@ -32,7 +33,12 @@ public abstract class MixinClientPlayerEntity {
     @ModifyExpressionValue(method = "tick", at = @At(value = "FIELD", target = "Lnet/minecraft/client/input/Input;playerInput:Lnet/minecraft/util/PlayerInput;"))
     private PlayerInput collective$modifyDeclaredInput(PlayerInput original) {
         if (me.collective.module.render.Freecam.INSTANCE != null && me.collective.module.render.Freecam.INSTANCE.isToggled()) {
-            return new PlayerInput(false, false, false, false, false, false, false);
+            // Пока баритон ведёт игрока (PlayerMovementInput), его принудительные
+            // вводы не глушим — иначе фрикам ломает путь. Глушим только живую
+            // клавиатуру, когда баритон не пиктов.
+            if (!BaritoneBridge.isPathing()) {
+                return new PlayerInput(false, false, false, false, false, false, false);
+            }
         }
         me.collective.module.highway.HighwayBuilderHIG hb = me.collective.module.highway.HighwayBuilderHIG.INSTANCE;
         PlayerInput in = original;

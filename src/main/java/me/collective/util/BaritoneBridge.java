@@ -49,6 +49,14 @@ public final class BaritoneBridge {
         }
     }
 
+    public static boolean isPathing() {
+        try {
+            return BaritoneAPI.getProvider().getPrimaryBaritone().getPathingBehavior().isPathing();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     public static boolean hasElytraDestination() {
         try {
             if (me.collective.baritone.OverworldElytraProcess.getInstance() != null && me.collective.baritone.OverworldElytraProcess.getInstance().isActive()) {
