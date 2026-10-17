@@ -27,6 +27,8 @@
     "MixinClientPlayerInteractionManager",
     "MixinGameRenderer",
     "MixinHeldItemRenderer",
+    "MixinItemRenderer",
+    "MixinModelPartCommandRenderer",
     "MixinInGameOverlayRenderer",
     "MixinInGameHud",
     "MixinHandledScreenTooltips",
