@@ -49,12 +49,15 @@ public class ClickGuiScreen extends Screen {
 
         float startX = 10;
         float startY = 10;
-        for (Category category : Category.values()) {
-            if (category != Category.HUD) {
-                float width = UI.INSTANCE != null ? UI.INSTANCE.getFrameWidth(category) : 92;
-                panels.add(new Panel(category, startX, startY, width));
-                startX += width + 3;
-            }
+        // Порядок вкладок фиксирован: Combat, Movement, Render, Player, Misc, Exploit, Client, Highway Tools
+        Category[] panelOrder = new Category[] {
+            Category.COMBAT, Category.MOVEMENT, Category.RENDER, Category.PLAYER,
+            Category.MISC, Category.EXPLOIT, Category.CLIENT, Category.HIGHWAY
+        };
+        for (Category category : panelOrder) {
+            float width = UI.INSTANCE != null ? UI.INSTANCE.getFrameWidth(category) : 92;
+            panels.add(new Panel(category, startX, startY, width));
+            startX += width + 3;
         }
 
         // Initialize snow particles
