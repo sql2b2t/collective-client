@@ -14,6 +14,8 @@ import me.collective.module.ModuleManager;
 import me.collective.module.hud.HudModule;
 import me.collective.setting.ChoiceSetting;
 import me.collective.setting.ColorSetting;
+import me.collective.setting.BlockListSetting;
+import me.collective.setting.EntityListSetting;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.Keybind;
 import me.collective.setting.KeybindSetting;
@@ -227,6 +229,20 @@ public class ConfigManager {
             if (v instanceof Color c) return new JsonPrimitive(c.getRGB());
             return null;
         }
+        if (s instanceof BlockListSetting bls) {
+            com.google.gson.JsonArray arr = new com.google.gson.JsonArray();
+            for (net.minecraft.block.Block b : bls.getValue()) {
+                arr.add(net.minecraft.registry.Registries.BLOCK.getId(b).toString());
+            }
+            return arr;
+        }
+        if (s instanceof EntityListSetting els) {
+            com.google.gson.JsonArray arr = new com.google.gson.JsonArray();
+            for (net.minecraft.entity.EntityType<?> type : els.getValue()) {
+                arr.add(net.minecraft.registry.Registries.ENTITY_TYPE.getId(type).toString());
+            }
+            return arr;
+        }
         Object v = s.getValue();
         if (v instanceof Keybind k) return new JsonPrimitive(k.getKey());
         if (v instanceof Boolean b) return new JsonPrimitive(b);
@@ -248,6 +264,32 @@ public class ConfigManager {
                     if (opts.has(opt.getName())) opt.setValue(opts.get(opt.getName()).getAsBoolean());
                 }
             }
+            return;
+        }
+        if (s instanceof BlockListSetting bls && el.isJsonArray()) {
+            java.util.List<net.minecraft.block.Block> list = new java.util.ArrayList<>();
+            for (var item : el.getAsJsonArray()) {
+                try {
+                    net.minecraft.block.Block b = net.minecraft.registry.Registries.BLOCK.get(
+                        net.minecraft.util.Identifier.of(item.getAsString()));
+                    if (b != null && b != net.minecraft.block.Blocks.AIR) list.add(b);
+                } catch (Exception ignored) {
+                }
+            }
+            ((Setting<List<?>>) s).setValue(list);
+            return;
+        }
+        if (s instanceof EntityListSetting els && el.isJsonArray()) {
+            java.util.List<net.minecraft.entity.EntityType<?>> list = new java.util.ArrayList<>();
+            for (var item : el.getAsJsonArray()) {
+                try {
+                    net.minecraft.entity.EntityType<?> type = net.minecraft.registry.Registries.ENTITY_TYPE.get(
+                        net.minecraft.util.Identifier.of(item.getAsString()));
+                    if (type != null) list.add(type);
+                } catch (Exception ignored) {
+                }
+            }
+            ((Setting<List<?>>) s).setValue(list);
             return;
         }
         if (!el.isJsonPrimitive()) return;

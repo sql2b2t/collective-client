@@ -258,6 +258,15 @@ public class Panel {
         return false;
     }
 
+    public boolean charTyped(char chr) {
+        if (open) {
+            for (ModuleButton btn : buttons) {
+                if (btn.charTyped(chr)) return true;
+            }
+        }
+        return false;
+    }
+
     public boolean isHeaderHovered(double mouseX, double mouseY) {
         return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + HEADER_HEIGHT;
     }

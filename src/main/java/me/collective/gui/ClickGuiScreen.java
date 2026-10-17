@@ -247,6 +247,12 @@ public class ClickGuiScreen extends Screen {
             searchQuery += input.asString();
             return true;
         }
+        if (input.isValidChar()) {
+            char chr = input.asString().charAt(0);
+            for (Panel panel : panels) {
+                if (panel.charTyped(chr)) return true;
+            }
+        }
         return super.charTyped(input);
     }
 

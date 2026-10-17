@@ -42,6 +42,10 @@ public class ModuleButton extends Component {
                 components.add(new ColorComponent((ColorSetting) setting, x, curY, width, settingH));
             } else if (setting instanceof KeybindSetting) {
                 components.add(new KeybindComponent((KeybindSetting) setting, x, curY, width, settingH));
+            } else if (setting instanceof BlockListSetting) {
+                components.add(new BlockListComponent((BlockListSetting) setting, x, curY, width, settingH));
+            } else if (setting instanceof EntityListSetting) {
+                components.add(new EntityListComponent((EntityListSetting) setting, x, curY, width, settingH));
             }
             curY += settingH;
         }
@@ -178,6 +182,16 @@ public class ModuleButton extends Component {
         if (open) {
             for (Component c : components) {
                 if (c.keyPressed(key)) return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean charTyped(char chr) {
+        if (open) {
+            for (Component c : components) {
+                if (c.charTyped(chr)) return true;
             }
         }
         return false;

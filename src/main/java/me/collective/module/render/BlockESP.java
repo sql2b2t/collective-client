@@ -6,40 +6,45 @@ import me.collective.event.events.Render3DEvent;
 import me.collective.module.Module;
 import me.collective.render.Renderer3D;
 import me.collective.render.ShapeMode;
+import me.collective.setting.BlockListSetting;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.ColorSetting;
 import me.collective.setting.ModeSetting;
 import me.collective.setting.NumberSetting;
-import me.collective.setting.StringSetting;
 import net.minecraft.block.Block;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
+import net.minecraft.block.Blocks;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 
 import java.awt.Color;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Порт BlockESP из Meteor Client.
  *
- * <p>Подсветка любых блоков по списку id через стены.
- * Список: "diamond_ore, chest, spawner" (префикс minecraft: необязателен).
+ * <p>Подсветка любых блоков через стены; список выбирается в GUI
+ * (меню выбора блоков с поиском и чекбоксами).
  */
 public class BlockESP extends Module {
-    public final StringSetting blocks = add(new StringSetting("Блоки",
-        "diamond_ore, deepslate_diamond_ore, ancient_debris, chest, ender_chest, spawner"));
+    public final BlockListSetting blocks = add(new BlockListSetting.Builder()
+        .name("Блоки")
+        .defaultValue(List.of(
+            Blocks.DIAMOND_ORE,
+            Blocks.DEEPSLATE_DIAMOND_ORE,
+            Blocks.ANCIENT_DEBRIS,
+            Blocks.CHEST,
+            Blocks.ENDER_CHEST,
+            Blocks.SPAWNER))
+        .build());
     public final NumberSetting range = add(new NumberSetting("Радиус", 32.0, 8.0, 64.0, 1.0));
     public final ColorSetting color = add(new ColorSetting("Цвет", new Color(255, 80, 80, 120)));
     public final ModeSetting shape = add(new ModeSetting("Форма", "Both", "Both", "Sides", "Lines"));
     public final BooleanSetting tracers = add(new BooleanSetting("Линии", false));
 
     private final List<BlockPos> found = new ArrayList<>();
-    private final Set<Block> targets = new HashSet<>();
+    private final List<Block> targets = new ArrayList<>();
     private long lastScan = 0L;
 
     public BlockESP() {
@@ -53,15 +58,7 @@ public class BlockESP extends Module {
 
     private void parseBlocks() {
         targets.clear();
-        for (String raw : blocks.getValue().split(",")) {
-            String id = raw.strip().toLowerCase();
-            if (id.isEmpty()) continue;
-            if (!id.contains(":")) id = "minecraft:" + id;
-            Identifier ident = Identifier.tryParse(id);
-            if (ident == null) continue;
-            Block block = Registries.BLOCK.get(ident);
-            if (block != null) targets.add(block);
-        }
+        targets.addAll(blocks.getValue());
     }
 
     @Override

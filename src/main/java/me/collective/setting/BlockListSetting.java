@@ -19,7 +19,7 @@ public class BlockListSetting extends Setting<List<Block>> {
         public Builder defaultValue(List<Block> defaultValue) { this.defaultValue = defaultValue; return this; }
         public Builder defaultValue(Block... blocks) { this.defaultValue = List.of(blocks); return this; }
 
-        public Setting<List<Block>> build() {
+        public BlockListSetting build() {
             return new BlockListSetting(name, defaultValue != null ? defaultValue : new ArrayList<>());
         }
     }
