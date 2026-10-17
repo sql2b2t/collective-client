@@ -50,116 +50,59 @@ public class Colors extends Module {
     private boolean applyingTheme = false;
 
     public void applyTheme() {
-        if (UI.INSTANCE == null || applyingTheme) return;
+        if (applyingTheme) return;
         applyingTheme = true;
         try {
-            Color c = themeColor.getValue();
-            switch (scheme.getValue()) {
-                case CUSTOM -> {
-                    UI.INSTANCE.color.setValue(c);
-                    UI.INSTANCE.bgEnabled.setValue(new Color(c.getRed(), c.getGreen(), c.getBlue(), 140));
-                }
-                case COLLECTIVE -> {
-                    Color collectiveColor = new Color(189, 153, 255, 180);
-                    themeColor.setValueQuietly(collectiveColor);
-                    UI.INSTANCE.color.setValue(collectiveColor);
-                    UI.INSTANCE.bgEnabled.setValue(new Color(189, 153, 255, 120));
-                }
-                case PASTEL -> {
-                    Color pastel = new Color(255, 179, 186, 180);
-                    themeColor.setValueQuietly(pastel);
-                    UI.INSTANCE.color.setValue(pastel);
-                    UI.INSTANCE.bgEnabled.setValue(new Color(255, 179, 186, 120));
-                }
-                case RED -> {
-                    Color red = new Color(230, 40, 40, 180);
-                    themeColor.setValueQuietly(red);
-                    UI.INSTANCE.color.setValue(red);
-                    UI.INSTANCE.bgEnabled.setValue(new Color(230, 40, 40, 120));
-                }
-                case BLUE -> {
-                    Color blue = new Color(40, 140, 250, 180);
-                    themeColor.setValueQuietly(blue);
-                    UI.INSTANCE.color.setValue(blue);
-                    UI.INSTANCE.bgEnabled.setValue(new Color(40, 140, 250, 120));
-                }
-                case GREEN -> {
-                    Color green = new Color(50, 220, 90, 180);
-                    themeColor.setValueQuietly(green);
-                    UI.INSTANCE.color.setValue(green);
-                    UI.INSTANCE.bgEnabled.setValue(new Color(50, 220, 90, 120));
-                }
-                case MONOCHROME -> {
-                    Color mono = new Color(200, 200, 200, 180);
-                    themeColor.setValueQuietly(mono);
-                    UI.INSTANCE.color.setValue(mono);
-                    UI.INSTANCE.bgEnabled.setValue(new Color(200, 200, 200, 100));
-                }
-                case PURPLE -> {
-                    Color purple = new Color(168, 85, 247, 180);
-                    themeColor.setValueQuietly(purple);
-                    UI.INSTANCE.color.setValue(purple);
-                    UI.INSTANCE.bgEnabled.setValue(new Color(168, 85, 247, 120));
-                }
-                case CYAN -> {
-                    Color cyan = new Color(6, 182, 212, 180);
-                    themeColor.setValueQuietly(cyan);
-                    UI.INSTANCE.color.setValue(cyan);
-                    UI.INSTANCE.bgEnabled.setValue(new Color(6, 182, 212, 120));
-                }
-                case GOLD -> {
-                    Color gold = new Color(245, 158, 11, 180);
-                    themeColor.setValueQuietly(gold);
-                    UI.INSTANCE.color.setValue(gold);
-                    UI.INSTANCE.bgEnabled.setValue(new Color(245, 158, 11, 120));
-                }
-                case SUNSET -> {
-                    Color sunset = new Color(255, 107, 53, 180);
-                    themeColor.setValueQuietly(sunset);
-                    UI.INSTANCE.color.setValue(sunset);
-                    UI.INSTANCE.bgEnabled.setValue(new Color(255, 107, 53, 120));
-                }
-                case ROSE -> {
-                    Color rose = new Color(244, 63, 94, 180);
-                    themeColor.setValueQuietly(rose);
-                    UI.INSTANCE.color.setValue(rose);
-                    UI.INSTANCE.bgEnabled.setValue(new Color(244, 63, 94, 120));
-                }
-                case EMERALD -> {
-                    Color emerald = new Color(16, 185, 129, 180);
-                    themeColor.setValueQuietly(emerald);
-                    UI.INSTANCE.color.setValue(emerald);
-                    UI.INSTANCE.bgEnabled.setValue(new Color(16, 185, 129, 120));
-                }
-                case NEON_LIME -> {
-                    Color lime = new Color(132, 204, 22, 180);
-                    themeColor.setValueQuietly(lime);
-                    UI.INSTANCE.color.setValue(lime);
-                    UI.INSTANCE.bgEnabled.setValue(new Color(132, 204, 22, 120));
-                }
-                case MIDNIGHT -> {
-                    Color midnight = new Color(99, 102, 241, 180);
-                    themeColor.setValueQuietly(midnight);
-                    UI.INSTANCE.color.setValue(midnight);
-                    UI.INSTANCE.bgEnabled.setValue(new Color(99, 102, 241, 120));
-                }
-                case CHERRY -> {
-                    Color cherry = new Color(220, 38, 38, 180);
-                    themeColor.setValueQuietly(cherry);
-                    UI.INSTANCE.color.setValue(cherry);
-                    UI.INSTANCE.bgEnabled.setValue(new Color(220, 38, 38, 120));
-                }
-                case LAVENDER -> {
-                    Color lavender = new Color(192, 132, 252, 180);
-                    themeColor.setValueQuietly(lavender);
-                    UI.INSTANCE.color.setValue(lavender);
-                    UI.INSTANCE.bgEnabled.setValue(new Color(192, 132, 252, 120));
-                }
-                default -> {}
+            Scheme scheme = this.scheme.getValue();
+            Color c;
+            int uiAccentAlpha;
+            switch (scheme) {
+                case CUSTOM -> { c = themeColor.getValue(); uiAccentAlpha = c.getAlpha(); }
+                case COLLECTIVE -> { c = new Color(189, 153, 255); uiAccentAlpha = 180; }
+                case PASTEL -> { c = new Color(255, 179, 186); uiAccentAlpha = 180; }
+                case RED -> { c = new Color(230, 40, 40); uiAccentAlpha = 180; }
+                case BLUE -> { c = new Color(40, 140, 250); uiAccentAlpha = 180; }
+                case GREEN -> { c = new Color(50, 220, 90); uiAccentAlpha = 180; }
+                case MONOCHROME -> { c = new Color(200, 200, 200); uiAccentAlpha = 180; }
+                case PURPLE -> { c = new Color(168, 85, 247); uiAccentAlpha = 180; }
+                case CYAN -> { c = new Color(6, 182, 212); uiAccentAlpha = 180; }
+                case GOLD -> { c = new Color(245, 158, 11); uiAccentAlpha = 180; }
+                case SUNSET -> { c = new Color(255, 107, 53); uiAccentAlpha = 180; }
+                case ROSE -> { c = new Color(244, 63, 94); uiAccentAlpha = 180; }
+                case EMERALD -> { c = new Color(16, 185, 129); uiAccentAlpha = 180; }
+                case NEON_LIME -> { c = new Color(132, 204, 22); uiAccentAlpha = 180; }
+                case MIDNIGHT -> { c = new Color(99, 102, 241); uiAccentAlpha = 180; }
+                case CHERRY -> { c = new Color(220, 38, 38); uiAccentAlpha = 180; }
+                case LAVENDER -> { c = new Color(192, 132, 252); uiAccentAlpha = 180; }
+                default -> { return; }
+            }
+
+            if (scheme != Scheme.CUSTOM) themeColor.setValueQuietly(c);
+
+            // ClickGUI
+            if (UI.INSTANCE != null) {
+                UI.INSTANCE.color.setValue(new Color(c.getRed(), c.getGreen(), c.getBlue(), uiAccentAlpha));
+                UI.INSTANCE.bgEnabled.setValue(new Color(c.getRed(), c.getGreen(), c.getBlue(),
+                        scheme == Scheme.CUSTOM ? 140 : 120));
+            }
+
+            // HUD: текст и градиент следуют теме
+            if (HUD.INSTANCE != null) {
+                HUD.INSTANCE.color.setValue(new Color(c.getRed(), c.getGreen(), c.getBlue(), 255));
+                HUD.INSTANCE.secondColor.setValue(darken(c, 0.55f, 255));
             }
         } finally {
             applyingTheme = false;
         }
+    }
+
+    /** Приглушённая версия цвета для второй точки градиента HUD. */
+    private static Color darken(Color c, float k, int alpha) {
+        return new Color(
+            Math.min(255, Math.round(c.getRed() * k)),
+            Math.min(255, Math.round(c.getGreen() * k)),
+            Math.min(255, Math.round(c.getBlue() * k)),
+            alpha);
     }
 
     public Color getFriendColor() {
