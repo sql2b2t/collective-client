@@ -71,7 +71,7 @@ public class AirPlaceScaffold extends Module {
         = add(new NumberSetting("ExtendDistance", 0.5, 0.0, 2.0, 0.05));
     public final BooleanSetting tower = add(new BooleanSetting("Tower", false));
     public final NumberSetting maxBlocksPerTick
-        = add(new NumberSetting("MaxBlocksPerTick", 1, 1, 5, 1));
+        = add(new NumberSetting("BlocksPerTick", 1.0, 0.1, 9.0, 0.1));
     public final BooleanSetting safeWalk = add(new BooleanSetting("SafeWalk", true));
     public final BooleanSetting autoDisable = add(new BooleanSetting("AutoDisable", true));
 
@@ -90,6 +90,10 @@ public class AirPlaceScaffold extends Module {
     private BlockPos aimPos;
     private BlockHitResult aimHit;
     private int alignTicks;
+    /** Накопитель дробного лимита BlocksPerTick (например, 0.5 → блок раз в 2 тика). */
+    private double placeAccumulator;
+    /** Бюджет постановок на текущий тик (целая часть накопителя). */
+    private int tickBudget;
 
     public AirPlaceScaffold() {
         super("AirPlaceScaffold",
@@ -103,6 +107,7 @@ public class AirPlaceScaffold extends Module {
         this.cooldown.clear();
         this.window.clear();
         this.tick = 0;
+        this.placeAccumulator = 0;
         dropAim();
     }
 
@@ -110,6 +115,7 @@ public class AirPlaceScaffold extends Module {
     public void onDisable() {
         this.cooldown.clear();
         this.window.clear();
+        this.placeAccumulator = 0;
         dropAim();
         RotationUtils.getInstance().release(this);
     }
@@ -120,6 +126,14 @@ public class AirPlaceScaffold extends Module {
 
         this.tick++;
         this.cooldown.values().removeIf(expiry -> expiry <= this.tick);
+
+        // Дробный лимит BlocksPerTick: накопитель вносит rate каждый тик,
+        // целая часть тика становится бюджетом. 0.5 → блок через тик,
+        // 0.1 → блок раз в 10 тиков; остаток переносится дальше.
+        this.placeAccumulator = Math.min(
+            this.placeAccumulator + this.maxBlocksPerTick.getValue(), 4.0);
+        this.tickBudget = Math.min((int) this.placeAccumulator, windowBudget());
+        this.placeAccumulator -= this.tickBudget;
 
         if (checkBlocksRunOut()) return;
 
@@ -232,7 +246,7 @@ public class AirPlaceScaffold extends Module {
     }
 
     private void batchPlace(List<BlockPos> candidates) {
-        int budget = Math.min(this.maxBlocksPerTick.getIntValue(), windowBudget());
+        int budget = this.tickBudget;
         int placed = 0;
 
         FindItemResult item = findBlock();
@@ -295,6 +309,8 @@ public class AirPlaceScaffold extends Module {
     }
 
     private boolean placeAt(BlockPos pos, BlockHitResult hit, FindItemResult item) {
+        if (this.tickBudget <= 0) return false;
+
         Hand hand = item.getHand();
 
         if (!item.isOffhand()
@@ -312,6 +328,7 @@ public class AirPlaceScaffold extends Module {
             AirPlaceExecutor.silentPlace(wire, pos, predicted, hand, true);
         }
 
+        this.tickBudget--;
         this.cooldown.put(pos.toImmutable(), this.tick + PLACE_COOLDOWN);
         this.window.addLast(this.tick);
         return true;
