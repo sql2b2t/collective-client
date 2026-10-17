@@ -255,6 +255,7 @@ public class VillagerRoller extends Module {
     private long failedToPlacePrevMsg = System.currentTimeMillis();
     private long currentProfessionWaitTime;
     private long waitingForTradesTicks;
+    private int retryPlaceTicks;
 
     public VillagerRoller() {
         super("VillagerRoller", "Роллер торговли жителей: ломает блок, ставит заново, ловит трейды.", Category.PLAYER);
@@ -372,10 +373,24 @@ public class VillagerRoller extends Module {
             mc.player.getInventory().setSelectedSlot(slot);
         }
 
-        mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND,
-            new net.minecraft.util.hit.BlockHitResult(
-                net.minecraft.util.math.Vec3d.ofCenter(rollingBlockPos).add(0.5, 0.5, 0.5),
-                Direction.UP, rollingBlockPos, false));
+        // Хит-пойнт — центр ВЕРХНЕЙ грани блока (ofCenter уже даёт +0.5;
+        // прошлый вариант добавлял ещё 0.5 и вылезал за хитбокс — сервер
+        // отклонял interact, потому пюпитр и «не ставился».
+        net.minecraft.util.hit.BlockHitResult hit = new net.minecraft.util.hit.BlockHitResult(
+            net.minecraft.util.math.Vec3d.ofCenter(rollingBlockPos).add(0, 0.5, 0),
+            Direction.UP, rollingBlockPos, false);
+
+        var result = mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
+        if (!result.isAccepted()) {
+            // Не переходим в ожидание профессии: сервер не принял установку.
+            retryPlaceTicks++;
+            placeFailed("Сервер отклонил установку пюпитра");
+            if (retryPlaceTicks >= 10) {
+                return; // ждём, не заспамим — статус не меняем
+            }
+            return;
+        }
+        retryPlaceTicks = 0;
 
         currentState = State.ROLLING_WAITING_FOR_PROFESSION_NEW;
         if (maxProfessionWaitTime.get() > 0) currentProfessionWaitTime = System.currentTimeMillis();
@@ -442,6 +457,27 @@ public class VillagerRoller extends Module {
 
     // ------------------------------------------------------------------ трейды
 
+    /** Убирает элемент из списка «зачарования». Возвращает true, если список ещё не пуст после удаления. */
+    private boolean removeWanted(String wanted) {
+        String current = wantedEnchants.get();
+        String trimmed = wanted.trim();
+        StringBuilder remaining = new StringBuilder();
+        boolean first = true;
+        int removedCount = 0;
+        for (String part : current.split(",")) {
+            if (part.trim().equalsIgnoreCase(trimmed) && removedCount == 0) {
+                removedCount++;
+                continue; // первый совпавший убираем
+            }
+            if (part.trim().isEmpty()) continue;
+            if (!first) remaining.append(", ");
+            remaining.append(part.trim());
+            first = false;
+        }
+        wantedEnchants.setValue(remaining.toString());
+        return !remaining.isEmpty();
+    }
+
     private void checkTrades(TradeOfferList offers) {
         for (TradeOffer offer : offers) {
             ItemStack sellItem = offer.getSellItem();
@@ -489,8 +525,6 @@ public class VillagerRoller extends Module {
                             .formatted(name, level, cost));
                     }
 
-                    toggle();
-
                     if (enablePlaySound.get()) {
                         SoundEvent sound = SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME;
                         mc.getSoundManager().play(
@@ -504,7 +538,18 @@ public class VillagerRoller extends Module {
                                 name, level > 1 ? " " + level : "", cost)));
                     }
 
-                    break;
+                    // disableIfFound: убираем найденное из списка и продолжаем
+                    // роллить остальное; если список опустел — выключаем модуль.
+                    if (disableIfFound.get()) {
+                        if (!removeWanted(wanted)) toggle();
+                    } else {
+                        toggle();
+                    }
+                    // Экран не закрываем через хвост метода: ролл остановлен
+                    // (или список изменился) — выходим немедленно.
+                    mc.player.closeHandledScreen();
+                    currentState = State.ROLLING_BREAKING_BLOCK;
+                    return;
                 }
 
                 if (!found && cfNotInList.get()) info("Найдено зачарование %s, но его нет в списке.".formatted(name));
