@@ -43,13 +43,30 @@ public class KillAura extends Module {
     public static NumberSetting source = new NumberSetting("Радиус атаки", 3.0F, 3.0F, 6.0F, 0.1F);
     public static NumberSetting target = new NumberSetting("Радиус обнаружения", 1.0F, 0.0F, 5.0F, 0.1F);
     public static ModeSetting pending = new ModeSetting("Режим ротации", "Smooth", "Matrix", "Random Smooth ", "Snap", "FOV", "Smooth ", "FunTime", "FT-New", "SpookyTime", "ST-Test", "Legit", "Custom");
+
+    /** Показывать настройку только при выбранном(ых) режиме(ах) ротации. */
+    private static java.util.function.Predicate<Boolean> onlyRotModes(String... names) {
+        return v -> {
+            String cur = pending.getValue().trim();
+            for (String n : names) {
+                if (cur.equalsIgnoreCase(n)) return true;
+            }
+            return false;
+        };
+    }
+
     public static ActionSetting previous = new ActionSetting("Конструктор ротации", 0);
-    public static NumberSetting latest = new NumberSetting("AI Jitter", 1.0F, 0.0F, 2.0F, 0.05F);
+    public static NumberSetting latest = new NumberSetting("AI Jitter", 1.0F, 0.0F, 2.0F, 0.05F,
+            onlyRotModes("FunTime"));
     public static ActionSetting vectorMatch = new ActionSetting("AI Lab", 0);
-    public static ModeSetting itemProject = new ModeSetting("Режим снапа", "Fast", "Fast", "Smooth", "Random");
-    public static NumberSetting responseCompute = new NumberSetting("FOV", 90.0F, 5.0F, 180.0F, 1.0F);
-    public static BooleanSetting providerFetch = new BooleanSetting("Отображать FOV", true);
-    public static NumberSetting profileDraw = new NumberSetting("Скорость", 0.08F, 0.02F, 0.4F, 0.01F);
+    public static ModeSetting itemProject = new ModeSetting("Режим снапа", "Fast",
+            onlyRotModes("Snap"), "Fast", "Smooth", "Random");
+    public static NumberSetting responseCompute = new NumberSetting("FOV", 90.0F, 5.0F, 180.0F, 1.0F,
+            onlyRotModes("FOV"));
+    public static BooleanSetting providerFetch = new BooleanSetting("Отображать FOV", true,
+            onlyRotModes("FOV"));
+    public static NumberSetting profileDraw = new NumberSetting("Скорость", 0.08F, 0.02F, 0.4F, 0.01F,
+            onlyRotModes("Legit"));
 
     public static ChoiceSetting providerClose = new ChoiceSetting(
         "Цели",

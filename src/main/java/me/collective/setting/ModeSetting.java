@@ -2,6 +2,7 @@ package me.collective.setting;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 public class ModeSetting extends Setting<String> {
@@ -9,6 +10,16 @@ public class ModeSetting extends Setting<String> {
 
     public ModeSetting(String name, String defaultMode, String... modes) {
         super(name, defaultMode);
+        if (modes != null && modes.length > 0) {
+            this.modes = Arrays.asList(modes);
+        } else {
+            this.modes = List.of(defaultMode);
+        }
+    }
+
+    /** Вариант с отображением только при истинном предикате (например, по выбранному режиму). */
+    public ModeSetting(String name, String defaultMode, Predicate<Boolean> visible, String... modes) {
+        super(name, defaultMode, visible);
         if (modes != null && modes.length > 0) {
             this.modes = Arrays.asList(modes);
         } else {
