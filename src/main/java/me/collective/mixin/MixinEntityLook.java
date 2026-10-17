@@ -15,6 +15,14 @@ public abstract class MixinEntityLook {
     @Inject(method = "changeLookDirection", at = @At("HEAD"), cancellable = true)
     private void collective$freecamLook(double cursorDeltaX, double cursorDeltaY, CallbackInfo ci) {
         if ((Object) this != MinecraftClient.getInstance().player) return;
+
+        me.collective.module.render.FreeLook freeLook = me.collective.module.render.FreeLook.INSTANCE;
+        if (freeLook != null && freeLook.isToggled()) {
+            freeLook.turn(cursorDeltaX, cursorDeltaY);
+            ci.cancel();
+            return;
+        }
+
         Freecam freecam = Freecam.INSTANCE;
         if (freecam != null && freecam.isToggled()) {
             freecam.turn(cursorDeltaX, cursorDeltaY);

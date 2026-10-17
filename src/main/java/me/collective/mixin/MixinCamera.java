@@ -50,6 +50,13 @@ public abstract class MixinCamera {
             return;
         }
 
+        me.collective.module.render.FreeLook freeLook = me.collective.module.render.FreeLook.INSTANCE;
+        if (freeLook != null && freeLook.isActive()) {
+            setPos(freeLook.orbitPos(tickProgress));
+            setRotation(freeLook.getOrbitYaw(), freeLook.getOrbitPitch());
+            return;
+        }
+
         BetterF5 module = BetterF5.INSTANCE;
         if (module == null || !module.isToggled()) {
             return;

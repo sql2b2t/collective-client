@@ -141,6 +141,7 @@ public class ModuleManager {
         register(new LightOverlay());
         register(new StorageESP());
         register(new Freecam());
+        register(new FreeLook());
         register(new BetterF5());
         register(new HandsShader());
         register(new TargetESP());
