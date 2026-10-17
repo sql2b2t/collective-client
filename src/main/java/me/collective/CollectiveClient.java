@@ -34,6 +34,26 @@ public class CollectiveClient implements ClientModInitializer {
                 return;
             }
 
+            // Live drag поверх чата: обновляем позицию перетаскиваемого
+            // HUD-модуля по текущему курсору и рисуем его рамку-подсветку.
+            if (mc.currentScreen instanceof net.minecraft.client.gui.screen.ChatScreen) {
+                double mx = mc.mouse.getX() * mc.getWindow().getScaledWidth()
+                    / mc.getWindow().getWidth();
+                double my = mc.mouse.getY() * mc.getWindow().getScaledHeight()
+                    / mc.getWindow().getHeight();
+                me.collective.gui.hud.ChatHudDrag.update(mx, my);
+
+                me.collective.module.hud.HudModule dragged =
+                    me.collective.gui.hud.ChatHudDrag.draggingModule();
+                if (dragged != null) {
+                    me.collective.render.RenderUtil.drawOutline(drawContext,
+                        dragged.getX() - 2, dragged.getY() - 2,
+                        Math.max(20, dragged.getWidth()) + 4,
+                        Math.max(10, dragged.getHeight()) + 4,
+                        1, new java.awt.Color(120, 180, 255, 255).getRGB());
+                }
+            }
+
             float delta = renderTickCounter != null ? renderTickCounter.getTickProgress(false) : 1.0f;
 
             for (HudModule module : ModuleManager.INSTANCE.getHudModules()) {

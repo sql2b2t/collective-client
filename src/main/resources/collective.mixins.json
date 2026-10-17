@@ -8,6 +8,7 @@
     "MixinChatScreen",
     "MixinChatInputSuggestor",
     "MixinBaritoneBlockStateInterface",
+    "MixinChatScreenHudDrag",
     "MixinClientConnection",
     "MixinClientPlayerEntity",
     "MixinEntity",
