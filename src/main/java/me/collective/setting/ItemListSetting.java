@@ -9,6 +9,10 @@ public class ItemListSetting extends Setting<List<Item>> {
         super(name, defaultValue);
     }
 
+    public ItemListSetting(String name, List<Item> defaultValue, java.util.function.Predicate<Boolean> visible) {
+        super(name, defaultValue, visible);
+    }
+
     public static class Builder {
         private String name = "";
         private String description = "";

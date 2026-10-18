@@ -247,6 +247,13 @@ public class ConfigManager {
             }
             return arr;
         }
+        if (s instanceof me.collective.setting.ItemListSetting ils) {
+            com.google.gson.JsonArray arr = new com.google.gson.JsonArray();
+            for (net.minecraft.item.Item item : ils.getValue()) {
+                arr.add(net.minecraft.registry.Registries.ITEM.getId(item).toString());
+            }
+            return arr;
+        }
         Object v = s.getValue();
         if (v instanceof Keybind k) return new JsonPrimitive(k.getKey());
         if (v instanceof Boolean b) return new JsonPrimitive(b);
@@ -291,6 +298,19 @@ public class ConfigManager {
                     net.minecraft.entity.EntityType<?> type = net.minecraft.registry.Registries.ENTITY_TYPE.get(
                         net.minecraft.util.Identifier.of(item.getAsString()));
                     if (type != null) list.add(type);
+                } catch (Exception ignored) {
+                }
+            }
+            ((Setting<List<?>>) s).setValue(list);
+            return;
+        }
+        if (s instanceof me.collective.setting.ItemListSetting ils && el.isJsonArray()) {
+            java.util.List<net.minecraft.item.Item> list = new java.util.ArrayList<>();
+            for (var item : el.getAsJsonArray()) {
+                try {
+                    net.minecraft.item.Item it = net.minecraft.registry.Registries.ITEM.get(
+                        net.minecraft.util.Identifier.of(item.getAsString()));
+                    if (it != null && it != net.minecraft.item.Items.AIR) list.add(it);
                 } catch (Exception ignored) {
                 }
             }

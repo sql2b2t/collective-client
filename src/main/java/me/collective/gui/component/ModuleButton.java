@@ -48,6 +48,8 @@ public class ModuleButton extends Component {
                 components.add(new BlockListComponent((BlockListSetting) setting, x, curY, width, settingH));
             } else if (setting instanceof EntityListSetting) {
                 components.add(new EntityListComponent((EntityListSetting) setting, x, curY, width, settingH));
+            } else if (setting instanceof ItemListSetting) {
+                components.add(new ItemListComponent((ItemListSetting) setting, x, curY, width, settingH));
             }
             curY += settingH;
         }

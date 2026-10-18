@@ -112,6 +112,11 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
         return null;
     }
 
+    /** Подсказка левой колонки, когда ничего не выбрано и поиск пуст. */
+    protected String emptyLeftHint() {
+        return "Все блоки выбраны";
+    }
+
     // ------------------------------------------------------------- Инициализация
 
     @Override
@@ -419,7 +424,7 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
         float centerY = (top + bottom) / 2f - fm.getFontHeight() / 2f;
 
         if (leftItems.isEmpty()) {
-            String hint = query.isEmpty() ? "Все блоки выбраны" : "Ничего не найдено";
+            String hint = query.isEmpty() ? emptyLeftHint() : "Ничего не найдено";
             fm.drawStringWithShadow(ctx, hint,
                     Math.round(leftX() + (colWidth() - fm.getStringWidth(hint)) / 2f), centerY, PLACEHOLDER);
         }

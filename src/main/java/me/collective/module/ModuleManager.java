@@ -152,6 +152,7 @@ public class ModuleManager {
         register(new Tooltips());
         register(new Search());
         register(new BlockESP());
+        register(new ItemESP());
         register(new Tracers());
 
         // Misc Modules
