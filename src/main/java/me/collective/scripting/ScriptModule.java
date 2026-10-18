@@ -1,24 +1,31 @@
 package me.collective.scripting;
 
 import me.collective.category.Category;
+import me.collective.command.ChatHelper;
 import me.collective.event.EventHandler;
 import me.collective.event.events.*;
 import me.collective.module.Module;
 import me.collective.setting.*;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.Text;
 
 import java.awt.Color;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public class ScriptModule extends Module {
-    private static final MinecraftClient MC = MinecraftClient.getInstance();
+
+    private ScriptContext scriptContext;
+    private int errorCount;
 
     private Consumer<ScriptModule> onEnableAction;
     private Consumer<ScriptModule> onDisableAction;
     private Consumer<ScriptModule> onTickAction;
+    private Consumer<ScriptModule> onTickPostAction;
     private Consumer<PacketEvent.Send> onPacketSendAction;
     private Consumer<PacketEvent.Receive> onPacketReceiveAction;
     private Consumer<Render3DEvent> onRender3DAction;
+    private BiConsumer<DrawContext, Float> onRender2DAction;
     private Consumer<PlayerMoveEvent> onPlayerMoveAction;
     private Consumer<StartBreakingBlockEvent> onBreakBlockAction;
     private Consumer<SendMessageEvent> onSendMessageAction;
@@ -28,6 +35,11 @@ public class ScriptModule extends Module {
 
     public ScriptModule(String name, String description, Category category) {
         super(name, description, category);
+    }
+
+    /** Привязка к скрипту-владельцу (для отчётов об ошибках). */
+    public void setScriptContext(ScriptContext ctx) {
+        this.scriptContext = ctx;
     }
 
     // --- Fluent Settings API ---
@@ -73,6 +85,11 @@ public class ScriptModule extends Module {
         return this;
     }
 
+    public ScriptModule onTickPost(Consumer<ScriptModule> action) {
+        this.onTickPostAction = action;
+        return this;
+    }
+
     public ScriptModule onPacketSend(Consumer<PacketEvent.Send> action) {
         this.onPacketSendAction = action;
         return this;
@@ -85,6 +102,11 @@ public class ScriptModule extends Module {
 
     public ScriptModule onRender3D(Consumer<Render3DEvent> action) {
         this.onRender3DAction = action;
+        return this;
+    }
+
+    public ScriptModule onRender2D(BiConsumer<DrawContext, Float> action) {
+        this.onRender2DAction = action;
         return this;
     }
 
@@ -122,83 +144,115 @@ public class ScriptModule extends Module {
 
     @Override
     public void onEnable() {
-        if (onEnableAction != null) onEnableAction.accept(this);
+        dispatch(onEnableAction);
     }
 
     @Override
     public void onDisable() {
-        if (onDisableAction != null) onDisableAction.accept(this);
+        dispatch(onDisableAction);
+    }
+
+    @Override
+    public void onRender2D(DrawContext context, float delta) {
+        if (onRender2DAction == null || !isToggled()) return;
+        try {
+            onRender2DAction.accept(context, delta);
+        } catch (Throwable t) {
+            handleError(t);
+        }
+    }
+
+    // --- Safe Dispatch ---
+
+    /**
+     * Любая ошибка в колбэке скрипта ловится здесь: она не должна ломать клиент.
+     * После MAX_ERRORS ошибок модуль автоматически выключается.
+     */
+    private void handleError(Throwable t) {
+        errorCount++;
+        int reported = scriptContext != null ? scriptContext.reportError(getName(), t) : errorCount;
+
+        if ((errorCount >= ScriptContext.MAX_ERRORS || reported >= ScriptContext.MAX_ERRORS) && isToggled()) {
+            setToggled(false);
+            if (scriptContext != null) {
+                ChatHelper.sendMessage(Text.literal("§c[Script] §f" + scriptContext.scriptName
+                        + "§7: модуль §e" + getName() + " §7выключен после " + ScriptContext.MAX_ERRORS + " ошибок."));
+            }
+        }
+    }
+
+    private void dispatch(Consumer<ScriptModule> action) {
+        if (action == null) return;
+        try {
+            action.accept(this);
+        } catch (Throwable t) {
+            handleError(t);
+        }
+    }
+
+    private <T> void dispatchEvent(Consumer<T> action, T event) {
+        if (action == null) return;
+        try {
+            action.accept(event);
+        } catch (Throwable t) {
+            handleError(t);
+        }
     }
 
     // --- Internal Event Dispatchers ---
 
     @EventHandler
     private void handleTick(TickEvent.Pre event) {
-        if (onTickAction != null && isToggled()) {
-            onTickAction.accept(this);
-        }
+        if (isToggled()) dispatch(onTickAction);
+    }
+
+    @EventHandler
+    private void handleTickPost(TickEvent.Post event) {
+        if (isToggled()) dispatch(onTickPostAction);
     }
 
     @EventHandler
     private void handleSend(PacketEvent.Send event) {
-        if (onPacketSendAction != null && isToggled()) {
-            onPacketSendAction.accept(event);
-        }
+        if (isToggled()) dispatchEvent(onPacketSendAction, event);
     }
 
     @EventHandler
     private void handleReceive(PacketEvent.Receive event) {
-        if (onPacketReceiveAction != null && isToggled()) {
-            onPacketReceiveAction.accept(event);
-        }
+        if (isToggled()) dispatchEvent(onPacketReceiveAction, event);
     }
 
     @EventHandler
     private void handleRender3D(Render3DEvent event) {
-        if (onRender3DAction != null && isToggled()) {
-            onRender3DAction.accept(event);
-        }
+        if (isToggled()) dispatchEvent(onRender3DAction, event);
     }
 
     @EventHandler
     private void handlePlayerMove(PlayerMoveEvent event) {
-        if (onPlayerMoveAction != null && isToggled()) {
-            onPlayerMoveAction.accept(event);
-        }
+        if (isToggled()) dispatchEvent(onPlayerMoveAction, event);
     }
 
     @EventHandler
     private void handleBreakBlock(StartBreakingBlockEvent event) {
-        if (onBreakBlockAction != null && isToggled()) {
-            onBreakBlockAction.accept(event);
-        }
+        if (isToggled()) dispatchEvent(onBreakBlockAction, event);
     }
 
     @EventHandler
     private void handleSendMessage(SendMessageEvent event) {
-        if (onSendMessageAction != null && isToggled()) {
-            onSendMessageAction.accept(event);
-        }
+        if (isToggled()) dispatchEvent(onSendMessageAction, event);
     }
 
     @EventHandler
     private void handleMouseClick(MouseClickEvent event) {
-        if (onMouseClickAction != null && isToggled()) {
-            onMouseClickAction.accept(event);
-        }
+        if (isToggled()) dispatchEvent(onMouseClickAction, event);
     }
 
     @EventHandler
     private void handleKeyInput(KeyInputEvent event) {
-        if (onKeyInputAction != null && isToggled()) {
-            onKeyInputAction.accept(event);
-        }
+        if (isToggled()) dispatchEvent(onKeyInputAction, event);
     }
 
     @EventHandler
     private void handleInteractEntity(InteractEntityEvent event) {
-        if (onInteractEntityAction != null && isToggled()) {
-            onInteractEntityAction.accept(event);
-        }
+        if (isToggled()) dispatchEvent(onInteractEntityAction, event);
     }
 }

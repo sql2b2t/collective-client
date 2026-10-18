@@ -9,11 +9,18 @@ import java.util.function.BiConsumer;
 
 public class ScriptHudElement extends HudModule {
     private BiConsumer<DrawContext, Float> renderAction;
+    private ScriptContext scriptContext;
+    private int errorCount;
 
     public ScriptHudElement(String name, String description, float defaultX, float defaultY) {
         super(name, description, defaultX, defaultY);
         this.width = 100;
         this.height = 18;
+    }
+
+    /** Привязка к скрипту-владельцу (для отчётов об ошибках). */
+    public void setScriptContext(ScriptContext ctx) {
+        this.scriptContext = ctx;
     }
 
     // --- Fluent Settings API ---
@@ -85,6 +92,13 @@ public class ScriptHudElement extends HudModule {
             context.getMatrices().translate(x, y);
             try {
                 renderAction.accept(context, delta);
+            } catch (Throwable t) {
+                // Ошибка отрисовки не должна ломать кадр — сообщаем и после лимита выключаем элемент
+                errorCount++;
+                int reported = scriptContext != null ? scriptContext.reportError(getName(), t) : errorCount;
+                if ((errorCount >= ScriptContext.MAX_ERRORS || reported >= ScriptContext.MAX_ERRORS) && isToggled()) {
+                    setToggled(false);
+                }
             } finally {
                 context.getMatrices().popMatrix();
             }
