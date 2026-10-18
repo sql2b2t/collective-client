@@ -129,6 +129,7 @@ public class ModuleManager {
         register(new WorldEventCoords());
         register(new ActivatedSpawnerDetector());
         register(new WaypointCoordExploit());
+        register(new NewerNewChunks());
 
         // Render Modules
         register(new Blur());

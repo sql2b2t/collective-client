@@ -21,3 +21,5 @@ accessible class net/minecraft/network/packet/c2s/play/PlayerInteractEntityC2SPa
 accessible field net/minecraft/client/gui/screen/ChatInputSuggestor messages Ljava/util/List;
 accessible field net/minecraft/client/gui/screen/ChatInputSuggestor x I
 accessible field net/minecraft/client/gui/screen/ChatInputSuggestor width I
+accessible class net/minecraft/world/chunk/PalettedContainer$Data
+accessible field net/minecraft/world/chunk/PalettedContainer data Lnet/minecraft/world/chunk/PalettedContainer$Data;
