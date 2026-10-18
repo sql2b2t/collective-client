@@ -13,7 +13,7 @@ public class Colors extends Module {
     public final ColorSetting friendColor = add(new ColorSetting("FriendColor", new Color(85, 255, 85, 255)));
     public final ColorSetting enemyColor = add(new ColorSetting("EnemyColor", new Color(255, 85, 85, 255)));
     public final ColorSetting themeColor = add(new ColorSetting("ThemeColor", new Color(189, 153, 255, 255)));
-    public final EnumSetting<Scheme> scheme = add(new EnumSetting<>("Scheme", Scheme.CUSTOM));
+    public final EnumSetting<Scheme> scheme = add(new EnumSetting<>("Scheme", Scheme.COLLECTIVE));
 
     public enum Scheme {
         CUSTOM, COLLECTIVE, PASTEL, RAINBOW, MONOCHROME, RED, BLUE, GREEN,
