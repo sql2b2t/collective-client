@@ -1,10 +1,14 @@
 package me.collective.mixin;
 
 import me.collective.module.movement.ElytraBounce;
+import me.collective.module.render.NameTags;
 import me.collective.util.RotationUtils;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
 import net.minecraft.client.render.entity.PlayerEntityRenderer;
 import net.minecraft.client.render.entity.state.PlayerEntityRenderState;
+import net.minecraft.client.render.state.CameraRenderState;
+import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.PlayerLikeEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -47,5 +51,18 @@ public abstract class MixinPlayerEntityRenderer {
             state.bodyYaw = yaw;
             state.relativeHeadYaw = 0.0F;
         }
+    }
+
+    // HideVanillaLabel: при включённом NameTags ванильный неймтег не рисуется
+    @Inject(
+        method = "renderLabelIfPresent(Lnet/minecraft/client/render/entity/state/PlayerEntityRenderState;Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;Lnet/minecraft/client/render/state/CameraRenderState;)V",
+        at = @At("HEAD"),
+        cancellable = true
+    )
+    private void collective$hideVanillaLabel(
+        PlayerEntityRenderState state, MatrixStack matrices,
+        OrderedRenderCommandQueue queue, CameraRenderState camera, CallbackInfo ci) {
+        NameTags nametags = NameTags.INSTANCE;
+        if (nametags != null && nametags.isToggled()) ci.cancel();
     }
 }
