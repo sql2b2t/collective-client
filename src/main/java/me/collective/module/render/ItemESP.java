@@ -9,6 +9,7 @@ import me.collective.module.Module;
 import me.collective.render.RenderUtil3D;
 import me.collective.render.Renderer3D;
 import me.collective.render.ShapeMode;
+import me.collective.setting.ActionSetting;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.ColorSetting;
 import me.collective.setting.ItemListSetting;
@@ -20,6 +21,7 @@ import net.minecraft.entity.ItemEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.registry.Registries;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import org.joml.Vector2f;
@@ -27,6 +29,7 @@ import org.joml.Vector2f;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * Подсветка выпавших предметов: боксы сквозь стены с мягким затуханием к краю
@@ -43,6 +46,17 @@ public class ItemESP extends Module {
             Items.DIAMOND, Items.NETHERITE_INGOT, Items.NETHERITE_SCRAP, Items.ANCIENT_DEBRIS,
             Items.SHULKER_BOX, Items.ELYTRA, Items.TOTEM_OF_UNDYING, Items.ENCHANTED_GOLDEN_APPLE),
             v -> filter.process("Список")));
+    public final ActionSetting selectAll = add(new ActionSetting("Все предметы", 0)
+            .handle(() -> {
+                List<Item> all = new ArrayList<>();
+                for (Item item : Registries.ITEM) {
+                    if (item != Items.AIR) all.add(item);
+                }
+                items.setValue(all);
+                info("Выбраны все предметы (" + all.size() + ")");
+            })
+            .process("Выбрать")
+            .handle((Supplier<Boolean>) () -> filter.process("Список")));
     public final NumberSetting range = add(new NumberSetting("Дистанция", 48.0, 8.0, 128.0, 4.0));
     public final ColorSetting sideColor = add(new ColorSetting("Заполнение", new Color(110, 200, 255, 55)));
     public final ColorSetting lineColor = add(new ColorSetting("Контур", new Color(110, 200, 255, 200)));
