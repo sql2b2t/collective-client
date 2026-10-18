@@ -100,6 +100,7 @@ src/main/java/me/collective/
 │   ├── MixinMouse.java                 # Обработка мыши
 │   ├── MixinChatInputSuggestor.java    # Автодополнение команд и аргументов
 │   ├── MixinElytraFeatureRenderer.java # Рендер плащей и элитр
+│   ├── MixinWorldRenderer.java         # Захват матриц кадра для 2D-проекции
 │   └── MixinLivingEntityRenderer.java  # Шейдеры и Chams на сущностей
 │
 ├── module/                             # Модули клиента

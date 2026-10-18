@@ -36,6 +36,8 @@ import java.util.function.Supplier;
  * дистанции и таблички над предметами — иконка, название, суммарное количество
  * и дистанция. Стопки одного типа рядом друг с другом объединяются в одну
  * табличку, а список интересных предметов задаётся пикером (ItemListSetting).
+ * Позиции берутся из интерполированных координат кадра, поэтому при движении
+ * боксы и таблички не дёргаются на 20 tps.
  */
 public class ItemESP extends Module {
     /** Радиус объединения стопок одного типа (в блоках). */
@@ -82,7 +84,10 @@ public class ItemESP extends Module {
 
         double rangeBlocks = range.getValue();
         ShapeMode mode = currentShape();
-        Vec3d cam = mc.gameRenderer.getCamera().getCameraPos();
+        Vec3d cam = event.camera != null
+                ? event.camera.getCameraPos()
+                : mc.gameRenderer.getCamera().getCameraPos();
+        float delta = event.tickDelta;
 
         for (Entity entity : mc.world.getEntities()) {
             if (!(entity instanceof ItemEntity itemEntity)) continue;
@@ -97,7 +102,7 @@ public class ItemESP extends Module {
             Color line = fade(lineColor.getValue(), factor);
             if (side.getAlpha() <= 2 && line.getAlpha() <= 2) continue;
 
-            Box box = itemEntity.getBoundingBox().expand(0.06);
+            Box box = lerpedBox(itemEntity, delta).expand(0.06);
             Renderer3D.box(box, side, line, mode, true);
 
             if (tracers.getValue()) {
@@ -105,6 +110,15 @@ public class ItemESP extends Module {
                 Renderer3D.line(cam.x, cam.y, cam.z, center.x, center.y, center.z, line);
             }
         }
+    }
+
+    /** Бокс по интерполированной позиции кадра — без рывков тикового обновления. */
+    private static Box lerpedBox(ItemEntity entity, float delta) {
+        Vec3d lerped = entity.getLerpedPos(delta);
+        return entity.getBoundingBox().offset(
+                lerped.x - entity.getX(),
+                lerped.y - entity.getY(),
+                lerped.z - entity.getZ());
     }
 
     // ------------------------------------------------------------- 2D-таблички
@@ -127,7 +141,7 @@ public class ItemESP extends Module {
         }
         if (found.isEmpty()) return;
 
-        for (ItemLabel label : buildLabels(found)) {
+        for (ItemLabel label : buildLabels(found, delta)) {
             Vector2f screen = RenderUtil3D.worldToScreen(label.x, label.y + 0.3, label.z, sw, sh);
             if (screen == null) continue;
 
@@ -183,7 +197,7 @@ public class ItemESP extends Module {
 
     // ------------------------------------------------------------- Логика
 
-    private List<ItemLabel> buildLabels(List<ItemEntity> entities) {
+    private List<ItemLabel> buildLabels(List<ItemEntity> entities, float delta) {
         List<ItemLabel> labels = new ArrayList<>();
         boolean mergeOn = merge.getValue();
         double mergeDistSq = MERGE_RADIUS * MERGE_RADIUS;
@@ -193,7 +207,7 @@ public class ItemESP extends Module {
             ItemLabel target = null;
             if (mergeOn) {
                 for (ItemLabel label : labels) {
-                    if (label.item == stack.getItem() && label.distanceSqTo(entity) <= mergeDistSq) {
+                    if (label.item == stack.getItem() && label.distanceSqTo(entity, delta) <= mergeDistSq) {
                         target = label;
                         break;
                     }
@@ -203,7 +217,7 @@ public class ItemESP extends Module {
                 target = new ItemLabel(stack.getItem());
                 labels.add(target);
             }
-            target.add(entity);
+            target.add(entity, delta);
         }
         return labels;
     }
@@ -249,28 +263,31 @@ public class ItemESP extends Module {
             this.item = item;
         }
 
-        private void add(ItemEntity entity) {
+        private void add(ItemEntity entity, float delta) {
             ItemStack stack = entity.getStack();
-            double top = entity.getBoundingBox().maxY;
+            Vec3d lerped = entity.getLerpedPos(delta);
+            double top = lerped.y + entity.getBoundingBox().getLengthY();
             if (parts.isEmpty()) {
-                x = entity.getX();
+                x = lerped.x;
                 y = top;
-                z = entity.getZ();
+                z = lerped.z;
             } else {
                 double n = parts.size();
-                x = (x * n + entity.getX()) / (n + 1);
+                x = (x * n + lerped.x) / (n + 1);
                 y = Math.max(y, top);
-                z = (z * n + entity.getZ()) / (n + 1);
+                z = (z * n + lerped.z) / (n + 1);
             }
             count += stack.getCount();
             parts.add(entity);
             display = stack;
         }
 
-        private double distanceSqTo(ItemEntity entity) {
-            double dx = x - entity.getX();
-            double dy = y - entity.getBoundingBox().maxY;
-            double dz = z - entity.getZ();
+        private double distanceSqTo(ItemEntity entity, float delta) {
+            Vec3d lerped = entity.getLerpedPos(delta);
+            double top = lerped.y + entity.getBoundingBox().getLengthY();
+            double dx = x - lerped.x;
+            double dy = y - top;
+            double dz = z - lerped.z;
             return dx * dx + dy * dy + dz * dz;
         }
     }

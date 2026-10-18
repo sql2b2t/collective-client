@@ -26,6 +26,7 @@
     "CobwebBlockMixin",
     "MixinClientPlayerInteractionManager",
     "MixinGameRenderer",
+    "MixinWorldRenderer",
     "MixinHeldItemRenderer",
     "MixinItemRenderer",
     "MixinModelPartCommandRenderer",

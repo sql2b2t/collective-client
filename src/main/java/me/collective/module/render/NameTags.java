@@ -5,6 +5,7 @@ import me.collective.font.FontManager;
 import me.collective.gui.GuiGfx;
 import me.collective.module.Module;
 import me.collective.module.client.UI;
+import me.collective.render.RenderUtil;
 import me.collective.render.RenderUtil3D;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
@@ -17,18 +18,16 @@ import org.joml.Vector2f;
 
 import java.awt.Color;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
 
 /**
- * Информативные неймтеги над игроками: скруглённая плашка с акцентной полоской,
- * имя, пинг с цветной точкой, дистанция, полоса здоровья с числом и слоты брони.
- * Размер таблички регулируется настройкой, а движение сглаживается, чтобы тег
- * не дёргался от view-bobbing и сетевых корекций позиции.
+ * Информативные неймтеги над игроками в стиле ClickGUI: плоская плашка
+ * с акцентной шапкой (имя, пинг, дистанция) и стеклянным телом (полоса
+ * здоровья с числом), а над плашкой — слоты брони.
+ *
+ * <p>Позиция каждой плашки — интерполированная позиция игрока, спроецированная
+ * кадровыми матрицами мира ({@link me.collective.render.RenderFrame}), поэтому
+ * теги не дрожат при движении и не отстают от игрока.
  */
 public class NameTags extends Module {
     public static NameTags INSTANCE;
@@ -40,29 +39,20 @@ public class NameTags extends Module {
     public final BooleanSetting armor = add(new BooleanSetting("Броня", true));
     public final NumberSetting scale = add(new NumberSetting("Размер", 1.0, 0.5, 2.5, 0.1));
 
-    /** Сглаженные экранные позиции (гасят прыжки от view-bobbing и корекций сети). */
-    private final Map<UUID, Vector2f> smooth = new HashMap<>();
-    private final Set<UUID> seen = new HashSet<>();
-    private static final float SMOOTH = 0.6f;
-    private static final float SNAP_DIST_SQ = 40f * 40f;
+    // Палитра берётся из модуля UI (стиль ClickGUI). Альфы чуть плотнее
+    // интерфейсных: за плашкой яркий мир, а не тёмный blur.
+    private static final int HEADER_ALPHA = 170;
+    private static final int BODY_ALPHA = 205;
+    private static final int OUTLINE_ALPHA = 150;
+    private static final int SLOT_ALPHA = 215;
+    private static final int SLOT_OUTLINE_ALPHA = 130;
 
-    private static final Color PLATE = new Color(11, 11, 15, 205);
-    private static final Color BORDER = new Color(255, 255, 255, 30);
-    private static final Color NAME_COLOR = new Color(242, 245, 252);
     private static final Color DIST_COLOR = new Color(168, 172, 182);
-    private static final Color SLOT_BG = new Color(10, 10, 14, 175);
-    private static final Color BAR_BG = new Color(0, 0, 0, 145);
     private static final Color ABSORPTION_COLOR = new Color(255, 215, 90);
 
     public NameTags() {
         super("NameTags", "Отображает кастомные информативные неймтеги над игроками с броней и здоровьем", Category.RENDER);
         INSTANCE = this;
-    }
-
-    @Override
-    public void onDisable() {
-        smooth.clear();
-        seen.clear();
     }
 
     @Override
@@ -72,43 +62,31 @@ public class NameTags extends Module {
         int sw = mc.getWindow().getScaledWidth();
         int sh = mc.getWindow().getScaledHeight();
 
-        seen.clear();
         for (PlayerEntity player : mc.world.getPlayers()) {
             if (player == null || !player.isAlive()) continue;
             if (player == mc.player && !self.getValue()) continue;
 
             Vec3d pos = player.getLerpedPos(delta);
-            Vector2f target = RenderUtil3D.worldToScreen(pos.x, pos.y + player.getHeight() + 0.25, pos.z, sw, sh);
-            UUID uuid = player.getUuid();
-            if (target == null) {
-                smooth.remove(uuid);
-                continue;
-            }
-            seen.add(uuid);
+            Vector2f screen = RenderUtil3D.worldToScreen(pos.x, pos.y + player.getHeight() + 0.25, pos.z, sw, sh);
+            if (screen == null) continue;
 
-            Vector2f s = smooth.get(uuid);
-            if (s == null) {
-                s = new Vector2f(target);
-                smooth.put(uuid, s);
-            } else {
-                float dx = target.x - s.x;
-                float dy = target.y - s.y;
-                if (dx * dx + dy * dy > SNAP_DIST_SQ) {
-                    s.set(target);
-                } else {
-                    s.x += dx * SMOOTH;
-                    s.y += dy * SMOOTH;
-                }
-            }
-
-            renderTag(context, player, s.x, s.y);
+            renderTag(context, player, screen.x, screen.y);
         }
-        smooth.keySet().retainAll(seen);
     }
 
     private void renderTag(DrawContext context, PlayerEntity player, float x, float y) {
         FontManager fm = FontManager.INSTANCE;
         float s = scale.getFloatValue();
+
+        Color accent = UI.INSTANCE != null ? UI.INSTANCE.color.getValue() : new Color(189, 153, 255, 115);
+        Color themeBg = UI.INSTANCE != null ? UI.INSTANCE.bgColor.getValue() : new Color(2, 0, 8, 119);
+        Color themeText = UI.INSTANCE != null ? UI.INSTANCE.textColor.getValue() : new Color(249, 244, 255);
+
+        int headerFill = GuiGfx.withAlpha(accent.getRGB(), HEADER_ALPHA);
+        int bodyFill = GuiGfx.withAlpha(themeBg.getRGB(), BODY_ALPHA);
+        int outlineColor = GuiGfx.withAlpha(accent.getRGB(), OUTLINE_ALPHA);
+        int slotFill = GuiGfx.withAlpha(themeBg.getRGB(), SLOT_ALPHA);
+        int slotOutlineColor = GuiGfx.withAlpha(accent.getRGB(), SLOT_OUTLINE_ALPHA);
 
         // --- Данные игрока
         int playerPing = -1;
@@ -130,33 +108,31 @@ public class NameTags extends Module {
 
         // --- Метрики
         float fh = fm.getFontHeightScaled(s);
-        float padX = Math.max(4f, 4f * s);
-        float padY = Math.max(2.5f, 3f * s);
-        float gap = Math.max(3f, 4f * s);
-        float accentW = Math.max(1.5f, 2f * s);
-        int radius = Math.max(2, Math.round(3f * s));
+        float padX = Math.max(3f, 3f * s);
+        float padY = Math.max(2f, 2f * s);
+        float gap = Math.max(3f, 3.5f * s);
+        float headerH = Math.round(fh + padY * 2f);
+        float dotSize = Math.max(3f, 4f * s);
 
         float nameW = fm.getStringWidthScaled(name, s);
-        float dotR = Math.max(1.5f, 2.2f * s);
-        float pingBlockW = pingStr.isEmpty() ? 0 : dotR * 2f + 3f + fm.getStringWidthScaled(pingStr, s);
-        float distBlockW = distStr.isEmpty() ? 0 : gap + fm.getStringWidthScaled(distStr, s);
-        float row1W = nameW + pingBlockW + distBlockW;
+        float pingTextW = pingStr.isEmpty() ? 0f : fm.getStringWidthScaled(pingStr, s);
+        float pingW = pingStr.isEmpty() ? 0f : dotSize + 3f + pingTextW;
+        float distW = distStr.isEmpty() ? 0f : fm.getStringWidthScaled(distStr, s);
+        float rightW = pingW + (pingW > 0f && distW > 0f ? gap : 0f) + distW;
+        float headerW = padX * 2f + nameW + (rightW > 0f ? gap : 0f) + rightW;
 
         String hpStr = String.valueOf((int) Math.ceil(hp));
-        float barH = Math.max(3f, 4f * s);
-        float barW = showHp ? Math.max(44f * s, Math.min(90f * s, row1W * 0.55f)) : 0f;
         float hpNumW = showHp ? fm.getStringWidthScaled(hpStr, s) : 0f;
-        float row2H = showHp ? Math.max(barH, fh) : 0f;
-        float row2W = showHp ? barW + gap + hpNumW : 0f;
+        float barH = Math.max(3f, 4f * s);
+        float barW = showHp ? Math.round(Math.max(40f * s, Math.min(90f * s, headerW * 0.55f))) : 0f;
+        float bodyRowH = showHp ? Math.max(barH, fh) : 0f;
+        float bodyW = showHp ? padX * 2f + barW + gap + hpNumW : 0f;
 
         // --- Габариты плашки
-        float contentW = Math.max(row1W, row2W);
-        float contentH = fh + (showHp ? gap * 0.8f + row2H : 0f);
-        float boxW = contentW + padX * 2 + accentW + 2f;
-        float boxH = contentH + padY * 2;
+        float boxW = Math.round(Math.max(headerW, bodyW));
+        float boxH = Math.round(headerH + (showHp ? padY * 2f + bodyRowH : 0f));
         float bx = Math.round(x - boxW / 2f);
         float by = Math.round(y - boxH);
-        float textLeft = bx + 1.5f + accentW + padX;
 
         // --- Слоты брони над плашкой
         if (armor.getValue()) {
@@ -175,60 +151,62 @@ public class NameTags extends Module {
                 float ix = Math.round(x - rowW / 2f);
                 float iy = by - slot - 2f;
                 for (ItemStack stack : equipment) {
-                    GuiGfx.fillRounded(context, ix, iy, slot, slot, 3, SLOT_BG.getRGB());
-                    GuiGfx.outlineRounded(context, ix, iy, slot, slot, 3, BORDER.getRGB());
+                    RenderUtil.drawRect(context, ix, iy, ix + slot, iy + slot, slotFill);
+                    RenderUtil.drawOutline(context, ix, iy, slot, slot, 1f, slotOutlineColor);
                     context.drawItem(stack, (int) ix + 1, (int) iy + 1);
                     ix += slot;
                 }
             }
         }
 
-        // --- Плашка: тень, фон, акцентная полоска, рамка
-        GuiGfx.shadow(context, (int) bx, (int) by, (int) boxW, (int) boxH, radius);
-        GuiGfx.fillRounded(context, bx, by, boxW, boxH, radius, PLATE.getRGB());
-        Color accent = UI.INSTANCE != null ? UI.INSTANCE.color.getValue() : new Color(189, 153, 255);
-        GuiGfx.fillRounded(context, bx + 1.5f, by + padY - 1f, accentW, boxH - (padY - 1f) * 2f,
-                Math.max(1, Math.round(accentW / 2f)), accent.getRGB());
-        GuiGfx.outlineRounded(context, bx, by, boxW, boxH, radius, BORDER.getRGB());
+        // --- Шапка: акцентная полоса с именем, пингом и дистанцией
+        RenderUtil.drawRect(context, bx, by, bx + boxW, by + headerH, headerFill);
 
-        // --- Строка 1: имя, пинг, дистанция
-        float row1Y = by + padY;
-        float tx = textLeft;
+        float textY = by + (headerH - fh) / 2f + 0.5f;
+        fm.drawStringWithShadowScaled(context, name, bx + padX, textY, themeText, s);
 
-        fm.drawStringWithShadowScaled(context, name, tx, row1Y, NAME_COLOR, s);
-        tx += nameW;
-
-        if (!pingStr.isEmpty()) {
-            Color pc = pingColor(playerPing);
-            GuiGfx.dot(context, tx + dotR + 1f, row1Y + fh / 2f - 0.5f, dotR, pc.getRGB());
-            tx += dotR * 2f + 3f;
-            fm.drawStringWithShadowScaled(context, pingStr, tx, row1Y, pc, s);
-            tx += fm.getStringWidthScaled(pingStr, s);
-        }
-
+        float cursor = bx + boxW - padX;
         if (!distStr.isEmpty()) {
-            tx += gap;
-            fm.drawStringWithShadowScaled(context, distStr, tx, row1Y, DIST_COLOR, s);
+            cursor -= distW;
+            fm.drawStringWithShadowScaled(context, distStr, cursor, textY, DIST_COLOR, s);
+        }
+        if (!pingStr.isEmpty()) {
+            if (!distStr.isEmpty()) cursor -= gap;
+            cursor -= pingW;
+            Color pc = pingColor(playerPing);
+            float dotY = by + (headerH - dotSize) / 2f;
+            RenderUtil.drawRect(context, cursor, dotY, cursor + dotSize, dotY + dotSize, pc.getRGB());
+            fm.drawStringWithShadowScaled(context, pingStr, cursor + dotSize + 3f, textY, pc, s);
         }
 
-        // --- Строка 2: полоса здоровья + число
+        // --- Тело: полоса здоровья с числом (стиль слайдера ClickGUI)
         if (showHp) {
-            float row2Y = by + padY + fh + gap * 0.8f;
-            float barY = row2Y + (row2H - barH) / 2f;
+            float row2Y = by + headerH + padY;
+            float barY = Math.round(row2Y + (bodyRowH - barH) / 2f);
+            float barX = bx + padX;
+            RenderUtil.drawRect(context, barX, barY, barX + barW, barY + barH,
+                    GuiGfx.withAlpha(themeBg.getRGB(), 165));
+
             float fill = Math.min(1f, hp / maxHp);
             float absorptionFill = Math.min(Math.max(0f, 1f - fill), Math.max(0f, absorption / maxHp));
+            float inner = barW - 4f;
             Color hc = healthColor(fill);
-
-            GuiGfx.fillRounded(context, textLeft, barY, barW, barH, Math.round(barH / 2f), BAR_BG.getRGB());
-            if (fill > 0.004f) {
-                GuiGfx.fillRounded(context, textLeft, barY, barW * fill, barH, Math.round(barH / 2f), hc.getRGB());
+            if (inner > 0f) {
+                float fillW = inner * fill;
+                if (fillW > 0.4f) {
+                    RenderUtil.drawRect(context, barX + 2f, barY, barX + 2f + fillW, barY + barH, hc.getRGB());
+                }
+                float absW = inner * absorptionFill;
+                if (absW > 0.4f) {
+                    RenderUtil.drawRect(context, barX + 2f + fillW, barY, barX + 2f + fillW + absW, barY + barH,
+                            ABSORPTION_COLOR.getRGB());
+                }
             }
-            if (absorptionFill > 0.004f) {
-                GuiGfx.fillRounded(context, textLeft + barW * fill, barY, barW * absorptionFill, barH,
-                        Math.round(barH / 2f), ABSORPTION_COLOR.getRGB());
-            }
-            fm.drawStringWithShadowScaled(context, hpStr, textLeft + barW + gap, row2Y + (row2H - fh) / 2f, hc, s);
+            fm.drawStringWithShadowScaled(context, hpStr, barX + barW + gap, row2Y + (bodyRowH - fh) / 2f, hc, s);
         }
+
+        // --- Контур плашки (1px снаружи, как у окон ClickGUI)
+        RenderUtil.drawOutline(context, bx - 1f, by - 1f, boxW + 2f, boxH + 2f, 1f, outlineColor);
     }
 
     private static Color pingColor(int ping) {
