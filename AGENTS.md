@@ -317,7 +317,17 @@ public class ExampleAddon extends CollectiveAddon {
     }
 }
 ```
-Команда управления: `.addon <list | reload | folder>`
+Команды управления:
+- `.addon list` — загруженные аддоны и ошибки загрузки;
+- `.addon load <имя.jar | путь>` — подгрузить jar на лету;
+- `.addon unload <имя>` — выгрузить аддон (снимает модули/команды, закрывает загрузчик);
+- `.addon info <имя>` — версия, автор, модули и команды аддона;
+- `.addon sources` — исходники в `collective/addons-src/`;
+- `.addon build <имя>` — собрать и загрузить исходник из `collective/addons-src/` (мгновенная сборка через `AddonCompiler` работает в dev-запуске на JDK; иначе — собрать вручную);
+- `.addon reload` — перезагрузить все аддоны;
+- `.addon folder` — открыть папку аддонов.
+
+Детали: один jar может содержать несколько аддонов (сканируется весь архив; вложенные `$`-классы и `module-info`/`package-info` пропускаются); повторно загруженные имена-дубликаты игнорируются; ошибки загрузки хранятся в `AddonManager.getLoadFailures()` и видны в `.addon list`. При первом запуске в папке аддонов создаются `README.txt` и `ExampleAddon.java.example`. Через MCP аддоны пишутся и собираются инструментами `write_addon_source` + `build_addon` (см. раздел 11).
 
 ---
 
@@ -327,8 +337,9 @@ public class ExampleAddon extends CollectiveAddon {
 
 ### Пример скрипта на Kotlin (`AutoJump.kts`):
 ```kotlin
-// Быстрое создание модуля через встроенный DSL
-val myModule = module("AutoJump", me.collective.category.Category.MOVEMENT, "Прыгает при беге")
+// Все вызовы API — через ctx; голые вызовы не компилируются
+// (print(...) — встроенная функция Kotlin, пишет в stdout, а не в чат)
+val myModule = ctx.module("AutoJump", me.collective.category.Category.MOVEMENT, "Прыгает при беге")
 
 myModule.onTick { mod ->
     if (mc.player != null && mc.player!!.isOnGround && mc.options.forwardKey.isPressed) {
@@ -336,29 +347,53 @@ myModule.onTick { mod ->
     }
 }
 
-print("Скрипт AutoJump успешно запущен!")
+ctx.print("Скрипт AutoJump успешно запущен!")
 ```
 
-- В контекст скрипта автоматически проброшены: `ctx`, `mc`, `client`, `print`, `log`, `module(...)`.
-- Команда управления: `.scripts <list | reload | folder>` (мгновенная перезагрузка без перезапуска игры).
+- Точка входа API — `ctx`: все вызовы делаются с точкой (`ctx.module(...)`, `ctx.print(...)`, `ctx.every(...)`). Голые вызовы не работают: `print(...)` резолвится во встроенную функцию Kotlin (stdout, не чат), а `module(...)`/`every(...)` без `ctx` не существуют. Движок типизирует не-null биндинги их runtime-классом (`KotlinJsr223DefaultScriptEngineFactory`, provided properties), поэтому `mc.player`/`mc.options` в игре резолвятся.
+- Биндинги скрипта: `ctx`, `mc`/`client`, `friends` (FriendManager), `modules`, `commands`, `events`, `rotations`, `baritone`, `inv`, `fonts`, `blur`, `log` (мост-консюмер: `log.accept(...)`).
+- DSL через ctx: `ctx.module(...)`, `ctx.command(...)`, `ctx.hud(...)`; таймеры `ctx.every(ticks) { }` / `ctx.after(ticks) { }` (возвращают id → `ctx.cancelTask(id)`); в модулях — `onTick/onTickPost/onPacketSend/onPacketReceive/onRender3D/onRender2D { context, delta -> }/onPlayerMove/onBreakBlock/onSendMessage/onMouseClick/onKeyInput/onInteractEntity/onEnable/onDisable`; настройки `boolSetting/numberSetting/modeSetting/stringSetting/colorSetting/enumSetting`.
+- Ошибки в колбэках перехватываются: сообщение в чат (не более 5 раз на источник), после 5 ошибок модуль/таймер автоматически останавливается; причины ошибок загрузки видны в `.scripts list`.
+- Команды: `.scripts <list | load <name> | unload <name> | reload | examples | folder>` (мгновенная перезагрузка без перезапуска игры).
+- В папке скриптов автоматически создаются примеры v2 и `README.txt` с полным описанием API: `AutoJump.kts`, `ExampleCommand.kts`, `ExampleHud.kts`, `ExampleTimer.kts` (`.scripts examples` дозаписывает недостающие; устаревшие версии примеров с голыми вызовами при первом запуске автоматически обновляются на ctx-стиль).
+- Через MCP скрипты пишутся и сразу загружаются инструментом `write_script` (см. раздел 11).
 
 ---
 
 ## 11. Model Context Protocol (MCP) для AI-агентов (`me.collective.mcp`)
 
-Встроенный сервер Model Context Protocol (`http://127.0.0.1:21114/mcp`), активируемый модулем `McpModule` (категория `Category.CLIENT`). Позволяет AI-агентам (Claude Desktop, Cursor, Antigravity, внешним Python-скриптам) контролировать клиент в реальном времени.
+Встроенный сервер Model Context Protocol (`http://127.0.0.1:21114/mcp`), активируемый модулем `McpModule` (категория `Category.CLIENT`). Позволяет AI-агентам (Claude Desktop, Cursor, opencode, Antigravity, внешним Python-скриптам) контролировать клиент в реальном времени. Транспорт — stateless streamable HTTP (JSON-RPC 2.0; SSE-поток не поддерживается — GET с `Accept: text/event-stream` получает 405, обычный GET отдаёт манифест). Все обращения к состоянию игры выполняются в игровом потоке; при занятом порте берутся следующие до +10.
 
-### Реализованные инструменты (MCP Tools):
+Управление: `.mcp <status | on | off | port <n> | config | copy>`; кнопка «Копировать» (конфиг для AI-клиента) — в настройках модуля McpServer, настройка «Логировать вызовы» печатает каждый вызов инструмента в чат.
+
+### Инструменты (MCP Tools):
 | Инструмент | Параметры | Описание |
 |---|---|---|
-| `get_player_state` | — | Возвращает координаты, здоровье, голод, сервер, измерение и полный инвентарь игрока |
-| `list_modules` | — | Список всех зарегистрированных модулей с их статусом (включен/выключен) и категориями |
-| `toggle_module` | `name: string`, `enabled?: boolean` | Включение/выключение любого модуля по имени |
-| `execute_command` | `command: string` | Выполнение любой внутренней команды клиента (например, `.elytrafly 1000 2000`) |
-| `chat_message` | `message: string` | Отправка сообщения или серверной команды в чат игры |
-| `get_world_entities` | `radius?: number` | Сканирование окружающих игроков, мобов и предметов в заданном радиусе с дистанцией |
+| `get_player_state` | — | Координаты, здоровье, голод, инвентарь, сервер, измерение |
+| `get_world_info` | — | Измерение, время, погода, сложность, игроки |
+| `get_world_entities` | `radius?: number` | Сущности рядом (для предметов — item/count) |
+| `list_modules` | — | Модули со статусом и категорией |
+| `toggle_module` | `name`, `enabled?` | Включить/выключить/переключить модуль |
+| `get_module_settings` | `name` | Настройки модуля: имя, тип, значение, видимость |
+| `set_module_setting` | `module`, `setting`, `value` | Изменить настройку (boolean/number/mode/string/enum/цвет `#RRGGBB` или `#AARRGGBB`; ActionSetting — нажать) |
+| `execute_command` | `command` | Внутренняя команда клиента (например `.toggle ItemESP`) |
+| `chat_message` | `message` | Сообщение или серверная команда (/...) в чат |
+| `baritone_path` | `x? y? z? stop?` | Маршрут Baritone или отмена |
+| `set_rotation` | `yaw`, `pitch` | Углы обзора через RotationUtils |
+| `get_friends` / `add_friend` / `remove_friend` | `name` | Друзья (FriendManager) |
+| `list_scripts` | — | Активные скрипты, файлы, ошибки загрузки |
+| `write_script` | `name`, `content`, `load?` | Записать .kts в `collective/scripts` и сразу загрузить |
+| `read_script` / `delete_script` / `load_script` / `unload_script` | `name` | Чтение/удаление/загрузка/выгрузка скрипта |
+| `reload_scripts` | — | Перезагрузить все скрипты |
+| `list_addons` / `reload_addons` / `list_addon_sources` | — | Аддоны, ошибки, исходники |
+| `write_addon_source` | `name`, `content` | Записать исходник .java в `collective/addons-src` |
+| `read_addon_source` / `delete_addon_source` | `name` | Чтение/удаление исходника |
+| `build_addon` | `name` | Компиляция исходника → jar → загрузка (нужен dev-запуск/JDK) |
 
-Пример подключения AI-агента в `claude_desktop_config.json`:
+### Ресурсы (MCP Resources):
+`collective://player/state`, `collective://world`, `collective://modules`, `collective://friends`, `collective://scripts`, `collective://addons` и шаблон `collective://modules/{name}` (настройки модуля).
+
+Пример подключения AI-агента в `claude_desktop_config.json` (или `.mcp config` / `.mcp copy` в игре):
 ```json
 {
   "mcpServers": {
