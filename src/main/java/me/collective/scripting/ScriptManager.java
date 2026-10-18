@@ -88,8 +88,33 @@ public class ScriptManager {
         try {
             Path marker = scriptsFolder.resolve(EXAMPLES_MARKER);
             if (Files.exists(marker)) return;
+            migrateBrokenExamples();
             writeMissingExamples();
         } catch (Exception ignored) {}
+    }
+
+    /**
+     * Заменяет ранние версии наших примеров, которые не компилировались или писали в stdout:
+     * голые вызовы (module(...), every(...), print(...)) не работают — нужен префикс ctx.
+     * Пользовательские скрипты с этими признаками также обновляются только один раз (до маркера).
+     */
+    private void migrateBrokenExamples() {
+        try {
+            Path file = scriptsFolder.resolve("AutoJump.kts");
+            if (!Files.exists(file)) return;
+
+            String content = Files.readString(file);
+            boolean ours = content.contains("Автоматически прыгает")
+                    || content.contains("Автоматический прыжок")
+                    || content.contains("Прыгает при беге")
+                    || content.contains("Быстрое создание модуля");
+            if (ours && !content.contains("ctx.print")) {
+                Files.writeString(file, EXAMPLE_AUTOJUMP);
+                System.out.println("[Collective-Scripting] Обновлён устаревший пример AutoJump.kts (ctx-стиль)");
+            }
+        } catch (Exception e) {
+            System.err.println("[Collective-Scripting] Не удалось обновить AutoJump.kts: " + e);
+        }
     }
 
     /** Создаёт отсутствующие примеры и README. Возвращает число созданных файлов. */
@@ -399,9 +424,11 @@ public class ScriptManager {
     // --- Содержимое примеров ---
 
     private static final String EXAMPLE_AUTOJUMP = """
-            // Пример скриптового модуля: автоматический прыжок при беге.
+            // Пример скриптового модуля: автоматический прыжок при движении вперёд.
             // Модуль появится в ClickGUI (категория MOVEMENT), его можно биндить и настраивать.
-            val autoJump = module("AutoJump", me.collective.category.Category.MOVEMENT, "Автоматически прыгает при движении")
+            // Всё API доступно через ctx: ctx.module, ctx.print, ctx.every, ctx.log, ...
+
+            val autoJump = ctx.module("AutoJump", me.collective.category.Category.MOVEMENT, "Автоматически прыгает при движении")
 
             autoJump.onTick { mod ->
                 if (mc.player != null && mc.player!!.isOnGround && mc.options.forwardKey.isPressed) {
@@ -409,19 +436,19 @@ public class ScriptManager {
                 }
             }
 
-            print("AutoJump.kts успешно загружен!")
+            ctx.print("Скрипт AutoJump.kts загружен!")
             """;
 
     private static final String EXAMPLE_COMMAND = """
             // Пример клиентской команды: .mycoords — печатает ваши координаты.
-            // Можно добавлять алиасы: command("mycoords", "описание", { args -> ... }, "mc1", "coord")
+            // Алиасы добавляются после лямбды: ctx.command("mycoords", "описание", { args -> ... }, "mc1", "coord")
 
-            command("mycoords", "Показывает ваши координаты", { args ->
+            ctx.command("mycoords", "Показывает ваши координаты", { args ->
                 if (mc.player != null) {
                     val p = mc.player!!
-                    print("Координаты: " + p.blockX + ", " + p.blockY + ", " + p.blockZ)
+                    ctx.print("Координаты: " + p.blockX + ", " + p.blockY + ", " + p.blockZ)
                 } else {
-                    print("Вы не в игре")
+                    ctx.print("Вы не в игре")
                 }
             })
             """;
@@ -430,7 +457,7 @@ public class ScriptManager {
             // Пример HUD-элемента: координаты игрока на экране.
             // Элемент включается/выключается как модуль и перетаскивается в HUD-редакторе.
 
-            val hudCoords = hud("ScriptCoords", "Координаты игрока (скрипт)", 5f, 20f)
+            val hudCoords = ctx.hud("ScriptCoords", "Координаты игрока (скрипт)", 5f, 20f)
             hudCoords.setSize(120f, 12f)
 
             hudCoords.onRender { renderContext, delta ->
@@ -443,19 +470,15 @@ public class ScriptManager {
             """;
 
     private static final String EXAMPLE_TIMER = """
-            // Пример таймеров: every() повторяется, after() срабатывает один раз.
-            // Тики: 20 тиков = 1 секунда. every()/after() возвращают id — его можно
-            // передать в cancelTask(id), чтобы остановить задачу.
+            // Пример таймеров: ctx.every() повторяется, ctx.after() срабатывает один раз.
+            // Тики: 20 тиков = 1 секунда. id из every() можно передать в ctx.cancelTask(id).
 
-            every(200) {
-                if (mc.player != null) {
-                    val p = mc.player!!
-                    print("Таймер: " + p.blockX + ", " + p.blockY + ", " + p.blockZ)
-                }
+            ctx.every(200) {
+                ctx.print("Таймер: прошло 10 секунд")
             }
 
-            after(60) {
-                print("Прошло 3 секунды после загрузки скрипта")
+            ctx.after(60) {
+                ctx.print("Прошло 3 секунды после загрузки скрипта")
             }
             """;
 
@@ -467,6 +490,11 @@ public class ScriptManager {
               Эта папка (collective/scripts). Поддерживаются файлы .kts и .kt (движок Kotlin).
               .js/.groovy работают только если в сборке есть соответствующий движок.
 
+            ГЛАВНОЕ ПРАВИЛО: всё API вызывается через ctx с точкой.
+              ctx.module(...), ctx.print(...), ctx.every(20) { ... }, ctx.command(...), ctx.hud(...)
+              Голые вызовы не работают: print(...) — это встроенная функция Kotlin (пишет в stdout,
+              а не в чат!), а module(...)/every(...) без ctx просто не существуют.
+
             Команды:
               .scripts list            — список скриптов, статус и ошибки загрузки
               .scripts load <имя>      — загрузить скрипт
@@ -476,10 +504,8 @@ public class ScriptManager {
               .scripts folder          — открыть эту папку
 
             Что доступно в скрипте (глобальные имена):
+              ctx            — контекст скрипта: ВСЕ действия через него (см. ниже)
               mc, client     — MinecraftClient
-              ctx            — контекст скрипта (все методы ниже)
-              print(msg)     — сообщение в чат
-              log(msg)       — сообщение в консоль
               friends        — FriendManager (friends.isFriend("Nick"), friends.addFriend("Nick"))
               modules        — ModuleManager
               commands       — CommandManager
@@ -489,9 +515,10 @@ public class ScriptManager {
               inv            — InventoryUtil
               fonts          — FontManager
               blur           — BlurEngine
+              log            — мост-консюмер (log.accept("текст")); в чат пишет ctx.print(...)
 
             Модуль:
-              val mod = module("Имя", me.collective.category.Category.MISC, "описание")
+              val mod = ctx.module("Имя", me.collective.category.Category.MISC, "описание")
               Настройки: mod.boolSetting("Имя", true)
                          mod.numberSetting("Скорость", 1.0, 0.0, 10.0, 0.1)
                          mod.modeSetting("Режим", "A", "A", "B")
@@ -506,28 +533,29 @@ public class ScriptManager {
               Ошибки:    после 5 ошибок в колбэках модуль выключается автоматически.
 
             Команда:
-              command("имя", "описание", { args -> ... }, "алиас1", "алиас2")   // алиасы опциональны
+              ctx.command("имя", "описание", { args -> ... }, "алиас1", "алиас2")   // алиасы опциональны
 
             HUD-элемент:
-              val el = hud("Имя", "описание", 5f, 20f)
+              val el = ctx.hud("Имя", "описание", 5f, 20f)
               el.setSize(120f, 12f)
               el.onRender { context, delta -> fonts.drawStringWithShadow(context, "Текст", 1f, 1f, java.awt.Color.WHITE) }
 
             Таймеры:
-              every(100) { ... }   — выполнять каждые 100 тиков (повтор)
-              after(40) { ... }    — выполнить один раз через 40 тиков
-              cancelTask(id)       — отменить задачу по id, который вернули every/after
+              ctx.every(100) { ... }   — выполнять каждые 100 тиков (повтор)
+              ctx.after(40) { ... }    — выполнить один раз через 40 тиков
+              ctx.cancelTask(id)       — отменить задачу по id, который вернули every/after
 
             Полезные методы ctx:
-              sendChatMessage("привет")                 — отправить сообщение в чат (или /команду)
-              executeClientCommand(".toggle AutoJump")  — выполнить команду клиента
-              sendPacket(packet)                        — отправить пакет на сервер
-              rotateSilent(yaw, pitch)                  — тихая ротация через RotationUtils
-              rotateTo(x, y, z)                         — навестись на точку
-              pathTo(x, y, z), cancelPath()             — Baritone
-              getModule("ItemESP")                      — найти любой модуль клиента
-              runOnMainThread { ... }                   — выполнить код в игровом потоке
-              print(...), log(...)                      — вывод
+              ctx.print("msg")                             — сообщение в чат
+              ctx.log("msg")                               — сообщение в консоль
+              ctx.sendChatMessage("привет")                — отправить в чат (или серверную /команду)
+              ctx.executeClientCommand(".toggle AutoJump") — выполнить команду клиента
+              ctx.sendPacket(packet)                       — отправить пакет на сервер
+              ctx.rotateSilent(yaw, pitch)                 — тихая ротация через RotationUtils
+              ctx.rotateTo(x, y, z)                        — навестись на точку
+              ctx.pathTo(x, y, z), ctx.cancelPath()        — Baritone
+              ctx.getModule("ItemESP")                     — найти любой модуль клиента
+              ctx.runOnMainThread { ... }                  — выполнить код в игровом потоке
 
             Если скрипт не загрузился, причина видна в .scripts list (и в консоли игры).
             """;
