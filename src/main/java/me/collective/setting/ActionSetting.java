@@ -2,20 +2,49 @@ package me.collective.setting;
 
 import java.util.function.Supplier;
 
-public class ActionSetting extends Setting<String> {
+/**
+ * Настройка-кнопка без состояния: клик в ClickGUI мгновенно выполняет действие.
+ * Используется для служебных операций модулей (например, удаления сохранённых
+ * чанк-данных). Значение кнопки в конфиг не сохраняется.
+ */
+public class ActionSetting extends Setting<Boolean> {
+    private Runnable action = () -> {
+    };
+    private String buttonText = "Выполнить";
+    private Supplier<Boolean> visibility;
+
     public ActionSetting(String name, int dummy) {
-        super(name, "");
+        super(name, false);
     }
 
-    public ActionSetting process(String text) {
-        return this;
-    }
-
+    /** Действие, выполняемое по клику. */
     public ActionSetting handle(Runnable action) {
+        this.action = action;
         return this;
     }
 
-    public ActionSetting handle(Supplier<Boolean> hidden) {
+    /** Условие видимости кнопки в панели модуля. */
+    public ActionSetting handle(Supplier<Boolean> visibility) {
+        this.visibility = visibility;
         return this;
+    }
+
+    /** Текст кнопки (по умолчанию — «Выполнить»). */
+    public ActionSetting process(String buttonText) {
+        this.buttonText = buttonText;
+        return this;
+    }
+
+    public String getButtonText() {
+        return buttonText;
+    }
+
+    public void run() {
+        action.run();
+    }
+
+    @Override
+    public boolean isVisible() {
+        return visibility == null || Boolean.TRUE.equals(visibility.get());
     }
 }

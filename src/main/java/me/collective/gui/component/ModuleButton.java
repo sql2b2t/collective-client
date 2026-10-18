@@ -42,6 +42,8 @@ public class ModuleButton extends Component {
                 components.add(new ColorComponent((ColorSetting) setting, x, curY, width, settingH));
             } else if (setting instanceof KeybindSetting) {
                 components.add(new KeybindComponent((KeybindSetting) setting, x, curY, width, settingH));
+            } else if (setting instanceof ActionSetting) {
+                components.add(new ActionComponent((ActionSetting) setting, x, curY, width, settingH));
             } else if (setting instanceof BlockListSetting) {
                 components.add(new BlockListComponent((BlockListSetting) setting, x, curY, width, settingH));
             } else if (setting instanceof EntityListSetting) {

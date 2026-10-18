@@ -12,9 +12,11 @@ import me.collective.manager.FriendManager;
 import me.collective.module.Module;
 import me.collective.module.ModuleManager;
 import me.collective.module.hud.HudModule;
+import me.collective.setting.ActionSetting;
+import me.collective.setting.BlockListSetting;
 import me.collective.setting.ChoiceSetting;
 import me.collective.setting.ColorSetting;
-import me.collective.setting.BlockListSetting;
+import me.collective.setting.DynamicActionSetting;
 import me.collective.setting.EntityListSetting;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.Keybind;
@@ -209,6 +211,8 @@ public class ConfigManager {
     }
 
     private static JsonElement serializeSetting(Setting<?> s) {
+        // Кнопки без состояния (ActionSetting/DynamicActionSetting) в конфиг не пишутся
+        if (s instanceof ActionSetting || s instanceof DynamicActionSetting) return null;
         // ChoiceSetting: строка + вложенные тумблеры опций
         if (s instanceof ChoiceSetting cs) {
             JsonObject o = new JsonObject();
@@ -255,6 +259,7 @@ public class ConfigManager {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static void applySetting(Setting<?> s, JsonElement el) {
+        if (s instanceof ActionSetting || s instanceof DynamicActionSetting) return;
         if (s instanceof ChoiceSetting cs && el.isJsonObject()) {
             JsonObject o = el.getAsJsonObject();
             if (o.has("value")) ((Setting) s).setValue(o.get("value").getAsString());
