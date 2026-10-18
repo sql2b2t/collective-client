@@ -1,14 +1,35 @@
 package me.collective.gui;
 
+import com.mojang.blaze3d.systems.GpuDevice;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.AddressMode;
+import com.mojang.blaze3d.textures.FilterMode;
+import com.mojang.blaze3d.textures.TextureFormat;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gl.GpuSampler;
+import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.texture.AbstractTexture;
+import net.minecraft.client.texture.NativeImage;
+import net.minecraft.util.Identifier;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Примитивы Minimal Dark: скруглённые прямоугольники, обводки, диски,
- * мягкие тени и свечения. Неосевые кромки сглаживаются аналитически:
- * для каждого пикселя считается знаковое расстояние до фигуры (SDF),
- * а альфа пикселя — его покрытие фигурой (0.5 за вычетом расстояния).
- * Каждый пиксель красится ровно один раз, поэтому полупрозрачные
- * фигуры не темнеют вдвое, а углы не дают «лестницы».
+ * мягкие тени и свечения.
+ *
+ * <p>Скруглённые заливки и обводки рисуются текстурными масками: для каждого
+ * радиуса однажды генерируется маленькая маска (диск или кольцо), в альфа-канал
+ * которой записано аналитическое покрытие SDF. Углы фигуры — четыре квада с
+ * этой маской (координаты целые, UV сдвинуты на полтекселя, поэтому каждый
+ * фрагмент сэмплирует центр текселя и линейная фильтрация не размывает швы),
+ * прямые части — обычные квады. Итог: константное число квадов на фигуру
+ * вместо попиксельного перебора SDF.
+ *
+ * <p>Попиксельный аналитический проход сохранён как фолбэк на случай, если
+ * создать маски не удалось.
  */
 public final class GuiGfx {
     private GuiGfx() {
@@ -17,6 +38,136 @@ public final class GuiGfx {
     public static int withAlpha(int color, int alpha) {
         return (color & 0x00FFFFFF) | ((alpha & 0xFF) << 24);
     }
+
+    // ==================== Текстурные маски ====================
+
+    /** Отступ от краёв маски в текселях — исключает сэмплирование за пределы канвы. */
+    private static final int MASK_MARGIN = 2;
+    /** Максимальный радиус, рисуемый маской; больше — попиксельный фолбэк. */
+    private static final int MAX_MASK_RADIUS = 128;
+    /** Лимит кэша масок; одноразовое создание текстур должно быть ограниченным. */
+    private static final int MASK_CACHE_LIMIT = 64;
+
+    private static volatile boolean masksUnavailable;
+    private static final Map<Integer, Identifier> discMasks = new HashMap<>();
+    private static final Map<Long, Identifier> ringMasks = new HashMap<>();
+
+    /** Текстура-маска: GL-текстура с линейной фильтрацией, зарегистрированная в менеджере текстур. */
+    private static final class MaskTexture extends AbstractTexture {
+        private MaskTexture(com.mojang.blaze3d.textures.GpuTexture texture,
+                            com.mojang.blaze3d.textures.GpuTextureView view, GpuSampler sampler) {
+            this.glTexture = texture;
+            this.glTextureView = view;
+            this.sampler = sampler;
+        }
+    }
+
+    private static void registerMask(Identifier id, String name, NativeImage image) {
+        GpuDevice device = RenderSystem.getDevice();
+        com.mojang.blaze3d.textures.GpuTexture texture =
+            device.createTexture(name, 5, TextureFormat.RGBA8, image.getWidth(), image.getHeight(), 1, 1);
+        device.createCommandEncoder().writeToTexture(texture, image);
+        GpuSampler sampler = RenderSystem.getSamplerCache().get(
+            AddressMode.REPEAT, AddressMode.REPEAT, FilterMode.LINEAR, FilterMode.LINEAR, false);
+        MinecraftClient.getInstance().getTextureManager().registerTexture(id,
+            new MaskTexture(texture, device.createTextureView(texture), sampler));
+    }
+
+    /**
+     * Маска диска радиуса r: альфа текселя — аналитическое покрытие круга
+     * с центром в середине канвы. null — использовать попиксельный фолбэк.
+     */
+    private static Identifier discMask(int r) {
+        if (masksUnavailable || r <= 0 || r > MAX_MASK_RADIUS) return null;
+        Identifier cached = discMasks.get(r);
+        if (cached != null) return cached;
+        if (discMasks.size() + ringMasks.size() >= MASK_CACHE_LIMIT) return null;
+        try (NativeImage img = new NativeImage(2 * r + 2 * MASK_MARGIN, 2 * r + 2 * MASK_MARGIN, false)) {
+            int size = 2 * r + 2 * MASK_MARGIN;
+            float c = size * 0.5f;
+            for (int y = 0; y < size; y++) {
+                for (int x = 0; x < size; x++) {
+                    float dx = x + 0.5f - c;
+                    float dy = y + 0.5f - c;
+                    float cov = Math.max(0f, Math.min(1f, r + 0.5f - (float) Math.sqrt(dx * dx + dy * dy)));
+                    img.setColorArgb(x, y, (int) (cov * 255f + 0.5f) << 24 | 0x00FFFFFF);
+                }
+            }
+            Identifier id = Identifier.of("collective", "gui/mask/disc_" + r);
+            registerMask(id, "collective_gui_mask_disc_" + r, img);
+            discMasks.put(r, id);
+            return id;
+        } catch (Throwable t) {
+            masksUnavailable = true;
+            return null;
+        }
+    }
+
+    /**
+     * Маска кольца обводки радиуса r с полушириной half: альфа текселя —
+     * покрытие полосы |dist - r| &le; half. Кэшируется по (r, half*2).
+     * null — использовать попиксельный фолбэк.
+     */
+    private static Identifier ringMask(int r, float half) {
+        if (masksUnavailable || r <= 0 || r > MAX_MASK_RADIUS) return null;
+        int halfHalves = Math.max(1, Math.round(half * 2f));
+        Long key = ((long) r << 20) | halfHalves;
+        Identifier cached = ringMasks.get(key);
+        if (cached != null) return cached;
+        if (discMasks.size() + ringMasks.size() >= MASK_CACHE_LIMIT) return null;
+        float h = halfHalves * 0.5f;
+        int outer = (int) Math.ceil(r + h + 0.5f);
+        try (NativeImage img = new NativeImage(2 * outer + 2 * MASK_MARGIN, 2 * outer + 2 * MASK_MARGIN, false)) {
+            int size = 2 * outer + 2 * MASK_MARGIN;
+            float c = size * 0.5f;
+            for (int y = 0; y < size; y++) {
+                for (int x = 0; x < size; x++) {
+                    float dx = x + 0.5f - c;
+                    float dy = y + 0.5f - c;
+                    float cov = Math.max(0f, Math.min(1f,
+                        h + 0.5f - Math.abs((float) Math.sqrt(dx * dx + dy * dy) - r)));
+                    img.setColorArgb(x, y, (int) (cov * 255f + 0.5f) << 24 | 0x00FFFFFF);
+                }
+            }
+            Identifier id = Identifier.of("collective", "gui/mask/ring_" + r + "_" + halfHalves);
+            registerMask(id, "collective_gui_mask_ring_" + r + "_" + halfHalves, img);
+            ringMasks.put(key, id);
+            return id;
+        } catch (Throwable t) {
+            masksUnavailable = true;
+            return null;
+        }
+    }
+
+    /**
+     * Квад с наложением региона маски (u/v — старт региона от края канвы).
+     * Размер региона в текселях равен размеру квада в пикселях, поэтому
+     * фрагменты сэмплируют центры текселей один к одному.
+     */
+    private static void maskQuad(DrawContext ctx, Identifier mask, int texSize,
+                                 int x, int y, int size, float u, float v, int argb) {
+        ctx.drawTexture(RenderPipelines.GUI_TEXTURED, mask, x, y, u, v, size, size, size, size, texSize, texSize, argb);
+    }
+
+    /** Заливка угловой четверти (сторона size) маской диска. */
+    private static void discCorner(DrawContext ctx, Identifier mask, int r, int m,
+                                   int x, int y, boolean right, boolean bottom, int argb) {
+        int texSize = 2 * r + 2 * m;
+        float u = (m + (right ? r : 0)) + 0.5f;
+        float v = (m + (bottom ? r : 0)) + 0.5f;
+        maskQuad(ctx, mask, texSize, x, y, r, u, v, argb);
+    }
+
+    /** Угловая заплатка обводки (сторона outer) маской кольца. */
+    private static void ringCorner(DrawContext ctx, Identifier mask, int outer, int m,
+                                   int x, int y, boolean right, boolean bottom, int argb) {
+        int texSize = 2 * outer + 2 * m;
+        float u = (m + (right ? outer : 0)) + 0.5f;
+        float v = (m + (bottom ? outer : 0)) + 0.5f;
+        maskQuad(ctx, mask, texSize, x, y, outer, u, v, argb);
+    }
+
+    // ==================== Фигуры ====================
 
     /** Знаковое расстояние до границы скруглённого бокса (p относительно центра, hw/hh — полуразмеры). */
     private static float sdfRoundedBox(float px, float py, float cx, float cy, float hw, float hh, float r) {
@@ -47,39 +198,37 @@ public final class GuiGfx {
         int alphaBase = (color >>> 24) & 0xFF;
         if (alphaBase == 0) return;
         int rgb = color & 0x00FFFFFF;
-        float x0 = fx, y0 = fy, x1 = fx + fw, y1 = fy + fh;
-        float r = Math.min(radius, Math.min(fw, fh) * 0.5f);
-        if (r < 0.5f) {
-            fillStraight(ctx, x0, y0, x1, y1, rgb, alphaBase);
+        float rClamped = Math.min(radius, Math.min(fw, fh) * 0.5f);
+        if (rClamped < 1f) {
+            fillStraight(ctx, fx, fy, fx + fw, fy + fh, rgb, alphaBase);
             return;
         }
-        float midX = (x0 + x1) * 0.5f, midY = (y0 + y1) * 0.5f;
-        float hw = fw * 0.5f, hh = fh * 0.5f;
-        int px0 = (int) Math.floor(x0), px1 = (int) Math.ceil(x1);
-        int accY0 = -1, accY1 = -1;
-        for (int y = (int) Math.floor(y0); y < (int) Math.ceil(y1); y++) {
-            boolean vFull = y >= y0 && y + 1 <= y1;
-            if (!vFull) {
-                // Строка пересекает нижнюю/верхнюю прямую грань (дробная координата) — попиксельно.
-                if (accY0 >= 0) {
-                    fillStraight(ctx, x0, accY0, x1, accY1, rgb, alphaBase);
-                    accY0 = -1;
-                }
-                sweepFill(ctx, px0, px1, y, midX, midY, hw, hh, r, rgb, alphaBase);
-            } else if (y < y0 + r || y + 1 > y1 - r) {
-                // Строка целиком в зоне дуг: SDF у углов, полный прогон в центре.
-                if (accY0 >= 0) {
-                    fillStraight(ctx, x0, accY0, x1, accY1, rgb, alphaBase);
-                    accY0 = -1;
-                }
-                arcRow(ctx, px0, px1, x0, x1, y, midX, midY, hw, hh, r, rgb, alphaBase);
-            } else {
-                // Средняя зона: только прямые грани — копим строки и красим одним квадом.
-                if (accY0 < 0) accY0 = y;
-                accY1 = y + 1;
-            }
+        // Целая геометрия: маски сэмплируются по центрам текселей и требуют целых квадов.
+        int x0 = Math.round(fx);
+        int y0 = Math.round(fy);
+        int x1 = Math.round(fx + fw);
+        int y1 = Math.round(fy + fh);
+        int w = x1 - x0, h = y1 - y0;
+        if (w <= 0 || h <= 0) {
+            fillStraight(ctx, fx, fy, fx + fw, fy + fh, rgb, alphaBase);
+            return;
         }
-        if (accY0 >= 0) fillStraight(ctx, x0, accY0, x1, accY1, rgb, alphaBase);
+        int r = Math.min(Math.round(rClamped), Math.min(w, h) / 2);
+        Identifier mask = r >= 1 && r <= MAX_MASK_RADIUS ? discMask(r) : null;
+        if (mask == null) {
+            fillRoundedLegacy(ctx, fx, fy, fw, fh, rClamped, rgb, alphaBase);
+            return;
+        }
+        int m = MASK_MARGIN;
+        // Прямые части: центральная колонна во всю высоту плюс боковые пояса.
+        fillStraight(ctx, x0 + r, y0, x1 - r, y1, rgb, alphaBase);
+        fillStraight(ctx, x0, y0 + r, x0 + r, y1 - r, rgb, alphaBase);
+        fillStraight(ctx, x1 - r, y0 + r, x1, y1 - r, rgb, alphaBase);
+        // Четыре угла маской диска.
+        discCorner(ctx, mask, r, m, x0, y0, false, false, rgb | (alphaBase << 24));
+        discCorner(ctx, mask, r, m, x1 - r, y0, true, false, rgb | (alphaBase << 24));
+        discCorner(ctx, mask, r, m, x0, y1 - r, false, true, rgb | (alphaBase << 24));
+        discCorner(ctx, mask, r, m, x1 - r, y1 - r, true, true, rgb | (alphaBase << 24));
     }
 
     /** Скруглённая обводка 1px без заливки. */
@@ -98,28 +247,35 @@ public final class GuiGfx {
             fillStraight(ctx, fx, fy, fx + fw, fy + fh, rgb, alphaBase);
             return;
         }
-        float x0 = fx, y0 = fy, x1 = fx + fw, y1 = fy + fh;
-        float r = Math.max(0f, Math.min(radius, Math.min(fw, fh) * 0.5f));
         float half = Math.max(0.25f, thickness) * 0.5f;
-        float midX = (x0 + x1) * 0.5f, midY = (y0 + y1) * 0.5f;
-        float hw = fw * 0.5f, hh = fh * 0.5f;
-        int px0 = (int) Math.floor(x0 - half - 1f), px1 = (int) Math.ceil(x1 + half + 1f);
-        int py0 = (int) Math.floor(y0 - half - 1f), py1 = (int) Math.ceil(y1 + half + 1f);
-        float topA = y0 - half - 0.55f, topB = y0 + half + 0.55f;
-        float botA = y1 - half - 0.55f, botB = y1 + half + 0.55f;
-        for (int y = py0; y < py1; y++) {
-            boolean nearStraight = (y + 1f > topA && y < topB) || (y + 1f > botA && y < botB);
-            if (nearStraight) {
-                // Около прямой горизонтальной грани — красим всю строку.
-                sweepStroke(ctx, px0, px1, y, midX, midY, hw, hh, r, half, rgb, alphaBase);
-            } else {
-                // Около дуг/вертикальных граней — только окна слева и справа.
-                int leftEnd = (int) Math.ceil(x0 + r + half + 1.1f);
-                int rightStart = (int) Math.floor(x1 - r - half - 1.1f);
-                sweepStroke(ctx, px0, Math.min(leftEnd, px1), y, midX, midY, hw, hh, r, half, rgb, alphaBase);
-                sweepStroke(ctx, Math.max(rightStart, leftEnd), px1, y, midX, midY, hw, hh, r, half, rgb, alphaBase);
-            }
+        // Целая геометрия под маски.
+        int x0 = Math.round(fx);
+        int y0 = Math.round(fy);
+        int x1 = Math.round(fx + fw);
+        int y1 = Math.round(fy + fh);
+        int w = x1 - x0, h = y1 - y0;
+        if (w <= 0 || h <= 0) {
+            fillStraight(ctx, fx, fy, fx + fw, fy + fh, rgb, alphaBase);
+            return;
         }
+        int r = Math.min(Math.round(Math.max(0f, radius)), Math.min(w, h) / 2);
+        int outer = (int) Math.ceil(r + half + 0.5f);
+        Identifier mask = r >= 1 && outer <= MAX_MASK_RADIUS ? ringMask(r, half) : null;
+        if (mask == null) {
+            strokeRoundedLegacy(ctx, fx, fy, fw, fh, radius, half, rgb, alphaBase);
+            return;
+        }
+        int m = MASK_MARGIN;
+        // Прямые части кольца: четыре полосы по толщине.
+        fillStraight(ctx, x0 + r, y0 - half, x1 - r, y0 + half, rgb, alphaBase);
+        fillStraight(ctx, x0 + r, y1 - half, x1 - r, y1 + half, rgb, alphaBase);
+        fillStraight(ctx, x0 - half, y0 + r, x0 + half, y1 - r, rgb, alphaBase);
+        fillStraight(ctx, x1 - half, y0 + r, x1 + half, y1 - r, rgb, alphaBase);
+        // Углы — квадратные заплатки маской кольца вокруг центров дуг.
+        ringCorner(ctx, mask, outer, m, x0 + r - outer, y0 + r - outer, false, false, rgb | (alphaBase << 24));
+        ringCorner(ctx, mask, outer, m, x1 - r, y0 + r - outer, true, false, rgb | (alphaBase << 24));
+        ringCorner(ctx, mask, outer, m, x0 + r - outer, y1 - r, false, true, rgb | (alphaBase << 24));
+        ringCorner(ctx, mask, outer, m, x1 - r, y1 - r, true, true, rgb | (alphaBase << 24));
     }
 
     /** Скруглённая панель: бордер плюс заливка с отступом 1px. */
@@ -188,6 +344,67 @@ public final class GuiGfx {
                 }
             }
             if (run >= 0) ctx.fill(run, y, px1, y + 1, rgb | (alphaBase << 24));
+        }
+    }
+
+    // ==================== Попиксельный фолбэк ====================
+
+    /** Фолбэк заливки: аналитический SDF-проход по строкам. */
+    private static void fillRoundedLegacy(DrawContext ctx, float fx, float fy, float fw, float fh,
+                                          float r, int rgb, int alphaBase) {
+        float x0 = fx, y0 = fy, x1 = fx + fw, y1 = fy + fh;
+        float midX = (x0 + x1) * 0.5f, midY = (y0 + y1) * 0.5f;
+        float hw = fw * 0.5f, hh = fh * 0.5f;
+        int px0 = (int) Math.floor(x0), px1 = (int) Math.ceil(x1);
+        int accY0 = -1, accY1 = -1;
+        for (int y = (int) Math.floor(y0); y < (int) Math.ceil(y1); y++) {
+            boolean vFull = y >= y0 && y + 1 <= y1;
+            if (!vFull) {
+                // Строка пересекает нижнюю/верхнюю прямую грань (дробная координата) — попиксельно.
+                if (accY0 >= 0) {
+                    fillStraight(ctx, x0, accY0, x1, accY1, rgb, alphaBase);
+                    accY0 = -1;
+                }
+                sweepFill(ctx, px0, px1, y, midX, midY, hw, hh, r, rgb, alphaBase);
+            } else if (y < y0 + r || y + 1 > y1 - r) {
+                // Строка целиком в зоне дуг: SDF у углов, полный прогон в центре.
+                if (accY0 >= 0) {
+                    fillStraight(ctx, x0, accY0, x1, accY1, rgb, alphaBase);
+                    accY0 = -1;
+                }
+                arcRow(ctx, px0, px1, x0, x1, y, midX, midY, hw, hh, r, rgb, alphaBase);
+            } else {
+                // Средняя зона: только прямые грани — копим строки и красим одним квадом.
+                if (accY0 < 0) accY0 = y;
+                accY1 = y + 1;
+            }
+        }
+        if (accY0 >= 0) fillStraight(ctx, x0, accY0, x1, accY1, rgb, alphaBase);
+    }
+
+    /** Фолбэк обводки: аналитический SDF-проход кольца вокруг границы. */
+    private static void strokeRoundedLegacy(DrawContext ctx, float fx, float fy, float fw, float fh,
+                                            float radius, float half, int rgb, int alphaBase) {
+        float x0 = fx, y0 = fy, x1 = fx + fw, y1 = fy + fh;
+        float r = Math.max(0f, Math.min(radius, Math.min(fw, fh) * 0.5f));
+        float midX = (x0 + x1) * 0.5f, midY = (y0 + y1) * 0.5f;
+        float hw = fw * 0.5f, hh = fh * 0.5f;
+        int px0 = (int) Math.floor(x0 - half - 1f), px1 = (int) Math.ceil(x1 + half + 1f);
+        int py0 = (int) Math.floor(y0 - half - 1f), py1 = (int) Math.ceil(y1 + half + 1f);
+        float topA = y0 - half - 0.55f, topB = y0 + half + 0.55f;
+        float botA = y1 - half - 0.55f, botB = y1 + half + 0.55f;
+        for (int y = py0; y < py1; y++) {
+            boolean nearStraight = (y + 1f > topA && y < topB) || (y + 1f > botA && y < botB);
+            if (nearStraight) {
+                // Около прямой горизонтальной грани — красим всю строку.
+                sweepStroke(ctx, px0, px1, y, midX, midY, hw, hh, r, half, rgb, alphaBase);
+            } else {
+                // Около дуг/вертикальных граней — только окна слева и справа.
+                int leftEnd = (int) Math.ceil(x0 + r + half + 1.1f);
+                int rightStart = (int) Math.floor(x1 - r - half - 1.1f);
+                sweepStroke(ctx, px0, Math.min(leftEnd, px1), y, midX, midY, hw, hh, r, half, rgb, alphaBase);
+                sweepStroke(ctx, Math.max(rightStart, leftEnd), px1, y, midX, midY, hw, hh, r, half, rgb, alphaBase);
+            }
         }
     }
 
