@@ -101,6 +101,8 @@ src/main/java/me/collective/
 │   ├── MixinChatInputSuggestor.java    # Автодополнение команд и аргументов
 │   ├── MixinElytraFeatureRenderer.java # Рендер плащей и элитр
 │   ├── MixinWorldRenderer.java         # Захват матриц кадра для 2D-проекции
+│   ├── MixinClientPlayerInteractionManager.java # NoInteract: отсев ГУИ-взаимодействий
+│   ├── MixinHandledScreenScroll.java   # Перенос предметов колесом (ItemScroller)
 │   └── MixinLivingEntityRenderer.java  # Шейдеры и Chams на сущностей
 │
 ├── module/                             # Модули клиента
@@ -109,7 +111,7 @@ src/main/java/me/collective/
 │   ├── client/                         # Системные: UI, HUD, Fonts, Discord, AntiCheat
 │   ├── combat/                         # ПВП: GrimAnchorAura, KillAura, Offhand, Surround
 │   ├── movement/                       # Движение: GrimScaffold, ElytraBounce, Pitch40, HoleSnap, ControlFly
-│   ├── player/                         # Автоматизация: StashMover, StashSorter, AutoTool, MiddleClickExtra
+│   ├── player/                         # Автоматизация: StashMover, StashSorter, ItemScroller, NoInteract, AutoTool, MiddleClickExtra
 │   ├── exploit/                        # Эксплойты: NewChunks, ShulkerDupe, WorldEventCoords
 │   ├── render/                         # Визуал: TargetESP, HoleESP, NameTags, Fullbright, StorageESP
 │   ├── hud/                            # Элементы интерфейса: Watermark, ModuleList, Armor, Position, ImageHUD

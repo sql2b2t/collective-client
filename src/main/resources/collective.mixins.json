@@ -43,6 +43,7 @@
     "MixinBossBarHud",
     "MixinPlayerListHud",
     "MixinHandledScreen",
+    "MixinHandledScreenScroll",
     "MixinTextFieldWidget",
     "MixinEmoteModel",
     "MixinEntityLook",

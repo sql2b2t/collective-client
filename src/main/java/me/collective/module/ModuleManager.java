@@ -111,6 +111,7 @@ public class ModuleManager {
         register(new AntiAFK());
         register(new AutoRespawn());
         register(new MiddleClickExtra());
+        register(new NoInteract());
         register(new Excavator());
         register(new InvFix2b2t());
         register(new AutoXp());
@@ -118,6 +119,7 @@ public class ModuleManager {
         register(new LitematicaPrinter());
         register(new StashMover());
         register(new StashSorter());
+        register(new ItemScroller());
         register(new AutoMend());
         register(new GhostHand());
         register(new MultiTask());
