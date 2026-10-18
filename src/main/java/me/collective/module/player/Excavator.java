@@ -16,6 +16,7 @@ import me.collective.setting.KeybindSetting;
 import me.collective.setting.SettingColorSetting;
 import me.collective.util.SettingColor;
 import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.Vec3d;
 import org.lwjgl.glfw.GLFW;
 
 import java.awt.Color;
@@ -135,7 +136,19 @@ public class Excavator extends Module {
                 double maxX = Math.max(start.getX(), end.getX()) + 1;
                 double maxY = Math.max(start.getY(), end.getY()) + 1;
                 double maxZ = Math.max(start.getZ(), end.getZ()) + 1;
-                event.renderer.box(minX, minY, minZ, maxX, maxY, maxZ, sideColor.getValue(), lineColor.getValue(), shapeMode.getValue(), 0);
+
+                // Skip the fill while the camera is inside the area: while Baritone
+                // digs, the player usually stands inside it, and the translucent faces
+                // right in front of the camera wash out the whole screen in white.
+                Vec3d eye = mc.player != null ? mc.player.getEyePos() : null;
+                boolean inside = eye != null
+                        && eye.x >= minX && eye.x <= maxX
+                        && eye.y >= minY && eye.y <= maxY
+                        && eye.z >= minZ && eye.z <= maxZ;
+                ShapeMode mode = inside ? ShapeMode.Lines : shapeMode.getValue();
+                event.renderer.box(minX, minY, minZ, maxX, maxY, maxZ,
+                        inside ? null : sideColor.getValue(),
+                        lineColor.getValue(), mode, 0);
             }
 
             try {
