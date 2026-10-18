@@ -2,10 +2,12 @@ package me.collective.gui.hud;
 
 import me.collective.category.Category;
 import me.collective.font.FontManager;
+import me.collective.gui.GuiGfx;
 import me.collective.gui.component.Panel;
 import me.collective.module.ModuleManager;
 import me.collective.module.client.UI;
 import me.collective.module.hud.HudModule;
+import me.collective.module.hud.HudTheme;
 import me.collective.module.render.Blur;
 import me.collective.render.BlurEngine;
 import me.collective.render.RenderUtil;
@@ -139,12 +141,14 @@ public class HudEditorScreen extends Screen {
             draggingModule.setY(newY);
         }
 
-        // 5. Draw Snap Feedback (Yellow lines across the screen)
+        // 5. Draw Snap Feedback (accent lines across the screen)
+        Color acc = HudTheme.accent();
+        Color snapColor = new Color(acc.getRed(), acc.getGreen(), acc.getBlue(), 210);
         if (snappedCenterX) {
-            RenderUtil.drawRect(context, snapLineX - 0.5f, 0, snapLineX + 0.5f, screenH, Color.YELLOW);
+            RenderUtil.drawRect(context, snapLineX - 0.5f, 0, snapLineX + 0.5f, screenH, snapColor);
         }
         if (snappedCenterY) {
-            RenderUtil.drawRect(context, 0, snapLineY - 0.5f, screenW, snapLineY + 0.5f, Color.YELLOW);
+            RenderUtil.drawRect(context, 0, snapLineY - 0.5f, screenW, snapLineY + 0.5f, snapColor);
         }
 
         // 6. Detect Hovered HUD Element (excluding area under HUD Category panel)
@@ -180,8 +184,8 @@ public class HudEditorScreen extends Screen {
             float mw = Math.max(20, module.getWidth());
             float mh = Math.max(10, module.getHeight());
 
-            // Translucent black backing box (Collective style)
-            RenderUtil.drawRect(context, mx - 1, my - 1, mx + mw + 1, my + mh + 1, new Color(0, 0, 0, 120));
+            // Rounded translucent backing box (Collective style)
+            GuiGfx.fillRounded(context, mx - 1, my - 1, mw + 2, mh + 2, 4f, new Color(0, 0, 0, 70).getRGB());
 
             // Draw HUD element content
             module.render(context, delta);
@@ -189,8 +193,9 @@ public class HudEditorScreen extends Screen {
             // Highlight outline and floating name tooltip when hovered or selected
             boolean isHighlighted = (module == hoveredModule) || (module == draggingModule) || (module == selectedModule);
             if (isHighlighted) {
-                int themeColor = (UI.INSTANCE != null) ? UI.INSTANCE.color.getValue().getRGB() : new Color(189, 153, 255).getRGB();
-                RenderUtil.drawOutline(context, mx - 2, my - 2, mw + 4, mh + 4, 1, themeColor);
+                Color accent = HudTheme.accent();
+                GuiGfx.fillRounded(context, mx - 2, my - 2, mw + 4, mh + 4, 6f, GuiGfx.withAlpha(accent.getRGB(), 20));
+                GuiGfx.strokeRounded(context, mx - 2, my - 2, mw + 4, mh + 4, 6f, 1f, GuiGfx.withAlpha(accent.getRGB(), 220));
 
                 // Hover tooltip after 300ms or when dragging/selected
                 boolean showTooltip = (module == draggingModule) || (module == selectedModule) ||
@@ -199,12 +204,13 @@ public class HudEditorScreen extends Screen {
                 if (showTooltip) {
                     String name = module.getName();
                     float nw = FontManager.INSTANCE.getStringWidth(name);
+                    float nh = FontManager.INSTANCE.getFontHeight();
                     float labelX = mx + mw / 2f - nw / 2f;
                     float labelY = my - 12;
                     if (labelY < 4) labelY = my + mh + 4;
 
-                    RenderUtil.drawRect(context, labelX - 3, labelY - 1, labelX + nw + 3, labelY + FontManager.INSTANCE.getFontHeight() + 1, new Color(14, 14, 18, 220));
-                    RenderUtil.drawOutline(context, labelX - 3, labelY - 1, nw + 6, FontManager.INSTANCE.getFontHeight() + 2, 1, themeColor);
+                    GuiGfx.fillRounded(context, labelX - 4f, labelY - 2f, nw + 8f, nh + 4f, 4f, new Color(14, 14, 18, 225).getRGB());
+                    GuiGfx.strokeRounded(context, labelX - 4f, labelY - 2f, nw + 8f, nh + 4f, 4f, 1f, GuiGfx.withAlpha(accent.getRGB(), 130));
                     FontManager.INSTANCE.drawStringWithShadow(context, name, labelX, labelY + 0.5f, Color.WHITE);
                 }
             }

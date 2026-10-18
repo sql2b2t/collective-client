@@ -1,20 +1,17 @@
 package me.collective.module.hud;
 
+import me.collective.gui.GuiGfx;
 import me.collective.font.FontManager;
-import me.collective.render.RenderUtil;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-
-import java.awt.Color;
 
 public class Totems extends HudModule {
     private static final ItemStack TOTEM_STACK = new ItemStack(Items.TOTEM_OF_UNDYING);
 
     public Totems() {
         super("Totems", "Displays the number of totems in inventory.", 120, 4);
-        this.width = 36;
-        this.height = 18;
+        background.setValue(true);
     }
 
     @Override
@@ -29,11 +26,23 @@ public class Totems extends HudModule {
             }
         }
 
+        FontManager fm = FontManager.INSTANCE;
+        String num = String.valueOf(count);
+        float numW = fm.getStringWidth(num);
+        int fontH = fm.getFontHeight();
+
         if (background.getValue()) {
-            RenderUtil.drawRect(context, x, y, x + width, y + height, new Color(20, 20, 20, 160));
+            this.width = 3f + 16f + 3f + numW + 5f;
+            this.height = 22f;
+            HudTheme.plate(context, x, y, width, height, 6f);
+            context.drawItem(TOTEM_STACK, (int) x + 3, (int) y + 3);
+            fm.drawStringWithShadow(context, num, x + 3f + 16f + 3f, y + (height - fontH) / 2f + 0.5f, HudTheme.TEXT);
+            return;
         }
 
-        context.drawItem(TOTEM_STACK, (int) x + 1, (int) y + 1);
-        FontManager.INSTANCE.drawStringWithShadow(context, String.valueOf(count), x + 20, y + 5, Color.WHITE);
+        this.width = 16f + 4f + numW;
+        this.height = 18f;
+        context.drawItem(TOTEM_STACK, (int) x, (int) y + 1);
+        fm.drawStringWithShadow(context, num, x + 16f + 4f, y + 5f, HudTheme.TEXT);
     }
 }
