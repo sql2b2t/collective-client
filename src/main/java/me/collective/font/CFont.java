@@ -1,5 +1,6 @@
 package me.collective.font;
 
+import me.collective.mixin.AbstractTextureAccessor;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
@@ -143,6 +144,13 @@ public class CFont {
         try {
             nativeTexture = new NativeImageBackedTexture(() -> "collective_custom_font", nativeImage);
             nativeTexture.upload();
+            // Атлас глифов суперсэмплирован (2x) и выводится уменьшенным, поэтому
+            // NEAREST при дробном масштабе выбрасывает тексели и текст выглядит
+            // пиксельным. Линейная фильтрация даёт корректное сглаживание при
+            // уменьшении/увеличении.
+            ((AbstractTextureAccessor) (Object) nativeTexture).collective$setSampler(
+                    com.mojang.blaze3d.systems.RenderSystem.getSamplerCache().getRepeated(
+                            com.mojang.blaze3d.textures.FilterMode.LINEAR));
             textureId = Identifier.of("collective", "textures/font/cfont_" + ID_COUNTER.incrementAndGet() + ".png");
             mc.getTextureManager().registerTexture(textureId, nativeTexture);
             return true;

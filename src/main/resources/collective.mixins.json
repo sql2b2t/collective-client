@@ -29,6 +29,7 @@
     "MixinHeldItemRenderer",
     "MixinItemRenderer",
     "MixinModelPartCommandRenderer",
+    "AbstractTextureAccessor",
     "MixinInGameOverlayRenderer",
     "MixinInGameHud",
     "MixinHandledScreenTooltips",
