@@ -548,6 +548,34 @@ public class RotationUtils {
         return this.wireFreshTicks > 0;
     }
 
+    /**
+     * Немедленно досылает look-пакет с текущим серверным углом.
+     *
+     * <p>Углы обычно уходят только в пакетах движения (раз в тик, в
+     * {@code ClientPlayerEntity.sendMovementPackets()}), а боевые модули
+     * бьют раньше — в {@code TickEvent.Pre}. Так сервер оценивал удар по
+     * углу прошлого тика, и проверки «взгляд — удар» это видят. Боевой
+     * модуль вызывает метод прямо перед ударом, чтобы порядок пакетов был
+     * «поворот → удар».
+     */
+    public void flushServerRotation() {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.player == null || mc.getNetworkHandler() == null) return;
+        if (!isRotating() && !isWireFresh()) return;
+
+        float yaw = getSentYaw();
+        float pitch = getSentPitch();
+
+        // Сервер уже видел этот угол — дублирующий пакет не нужен.
+        if (Math.abs(MathHelper.wrapDegrees(yaw - this.serverYaw)) < 0.01f
+            && Math.abs(pitch - this.serverPitch) < 0.01f) {
+            return;
+        }
+
+        mc.getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.LookAndOnGround(
+            yaw, pitch, mc.player.isOnGround(), mc.player.horizontalCollision));
+    }
+
     public boolean isAligned(double eps) {
         if (this.owner != null) return false;
 

@@ -207,12 +207,24 @@ public class KillAura extends Module {
         // Handle Movement Modes
         handleMovement();
 
-        // Handle Rotations
-        handleRotations();
+        // Handle Rotations. Без захвата поворота не бьём: удар ушёл бы
+        // с устаревшим или чужим серверным углом — мгновенный флаг проверок
+        // «взгляд — удар».
+        if (!handleRotations()) {
+            return;
+        }
 
         // Pre-attack checks
         if (shouldSkipAttack()) {
             report("пропуск по предварительным проверкам");
+            return;
+        }
+
+        // Reach: бьём только в пределах реального радиуса атаки. «Радиус
+        // обнаружения» — окно удержания цели, не удлинитель удара, а
+        // расширенные HitBox-хитбоксы сервер не видит — по ним и не бьём.
+        if (boxDistance(realBox(mc.player), realBox(textureRun)) > getAttackDistance(textureRun)) {
+            report("цель дальше радиуса атаки");
             return;
         }
 
@@ -301,14 +313,26 @@ public class KillAura extends Module {
      * дальность удара между хитбоксами — как здесь.
      */
     private static double boxDistance(Entity a, Entity b) {
-        net.minecraft.util.math.Box ba = a.getBoundingBox();
-        net.minecraft.util.math.Box bb = b.getBoundingBox();
+        return boxDistance(a.getBoundingBox(), b.getBoundingBox());
+    }
 
+    private static double boxDistance(net.minecraft.util.math.Box ba, net.minecraft.util.math.Box bb) {
         double dx = Math.max(0.0, Math.max(ba.minX - bb.maxX, bb.minX - ba.maxX));
         double dy = Math.max(0.0, Math.max(ba.minY - bb.maxY, bb.minY - ba.maxY));
         double dz = Math.max(0.0, Math.max(ba.minZ - bb.maxZ, bb.minZ - ba.maxZ));
 
         return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    /**
+     * Реальный хитбокс сущности.
+     *
+     * <p>Модуль HitBox через {@code MixinEntityHitbox} расширяет
+     * {@code Entity.getBoundingBox()}, но сервер считает удары по настоящему
+     * боксу — поэтому все боевые проверки (луч, дистанция) берут его отсюда.
+     */
+    private static net.minecraft.util.math.Box realBox(Entity entity) {
+        return entity.getDimensions(entity.getPose()).getBoxAt(entity.getEntityPos());
     }
 
     /** Почему сущность не годится в цель. {@code null} — годится. */
@@ -421,8 +445,9 @@ public class KillAura extends Module {
         return dist;
     }
 
-    private void handleRotations() {
-        if (textureRun == null) return;
+    /** @return {@code true}, если поворот захвачен; иначе бить нельзя. */
+    private boolean handleRotations() {
+        if (textureRun == null) return false;
 
         Vec3d targetPos = textureRun.getBoundingBox().getCenter();
         float[] rots = RotationUtils.getLegitRotations(targetPos);
@@ -469,9 +494,10 @@ public class KillAura extends Module {
         RotationUtils rotUtils = RotationUtils.getInstance();
         if (!rotUtils.setRotationSmooth(this, ROTATION_PRIORITY, currentYaw, currentPitch, 180.0, false)) {
             report("ротацию перехватил другой модуль");
-            return;
+            return false;
         }
         rotUtils.keepWireFresh();
+        return true;
     }
 
     private void handleMovement() {
@@ -517,32 +543,20 @@ public class KillAura extends Module {
 
         Vec3d eye = mc.player.getEyePos();
 
-        // Проверяем луч по СВОЕМУ углу и по углу, который реально ушёл
-        // серверу — оба. Раньше здесь читался безусловно getSentYaw(), а это
-        // угол того, кто последним захватил ротацию: если это был другой
-        // модуль, KillAura проверял чужой прицел, луч в цель не попадал,
-        // isRayBlocked() возвращал true и удар не проходил.
-        float sentYaw   = RotationUtils.getInstance().getSentYaw();
-        float sentPitch = RotationUtils.getInstance().getSentPitch();
-        boolean sentIsOurs = MathHelper.abs(MathHelper.wrapDegrees(sentYaw - currentYaw)) < 5.0f;
-
-        // По чужому углу смысла проверять нет — сервер всё равно применит
-        // KillAura-угол только если ротация не перехвачена. Проверяем
-        // отправленный, если он наш, иначе свой.
-        float yaw   = sentIsOurs ? sentYaw   : currentYaw;
-        float pitch = sentIsOurs ? sentPitch : currentPitch;
-
-        if (yaw == 0f && pitch == 0f) {
-            yaw = mc.player.getYaw();
-            pitch = mc.player.getPitch();
-        }
+        // Бьём строго по углу, который сервер уже видел или увидит до удара:
+        // performAttack() досылает его же look-пакетом. Раньше при расхождении
+        // углов больше 5° брался свой внутренний угол, и удар уходил при
+        // рассинхроне «взгляд — удар» — это и есть флаг проверок прицела.
+        RotationUtils rotUtils = RotationUtils.getInstance();
+        float yaw   = rotUtils.getSentYaw();
+        float pitch = rotUtils.getSentPitch();
 
         Vec3d look = RotationUtils.getRotationVector(pitch, yaw);
         double reach = getAttackDistance(textureRun);
         Vec3d end = eye.add(look.multiply(reach));
 
-        // 1. Raycast to target bounding box
-        net.minecraft.util.math.Box targetBox = textureRun.getBoundingBox().expand(0.1);
+        // 1. Raycast to real target bounding box (сервер считает по настоящим)
+        net.minecraft.util.math.Box targetBox = realBox(textureRun).expand(0.1);
         java.util.Optional<Vec3d> hit = targetBox.raycast(eye, end);
 
         if (hit.isEmpty()) {
@@ -551,8 +565,8 @@ public class KillAura extends Module {
                 mc.player, eye, end, searchBox, e -> e == textureRun, reach * reach
             );
             if (entityHit == null || entityHit.getEntity() != textureRun) {
-                report(String.format("луч мимо: дистанция %.2f, лимит %.2f",
-                        mc.player.distanceTo(textureRun), reach));
+                report(String.format("луч мимо (ротация %.0f/%.0f): дистанция %.2f, лимит %.2f",
+                        yaw, pitch, mc.player.distanceTo(textureRun), reach));
                 return true;
             }
         }
@@ -643,6 +657,12 @@ public class KillAura extends Module {
         if (presetWrite.process("Обычный") || presetWrite.process("Легит")) {
             mc.player.setSprinting(false);
         }
+
+        // Порядок «поворот → удар»: удар уходит в TickEvent.Pre, а пакет
+        // с серверным углом — позже, в sendMovementPackets. Досылаем угол
+        // look-пакетом, чтобы сервер оценил удар по нашему взгляду, а не
+        // по углу предыдущего тика.
+        RotationUtils.getInstance().flushServerRotation();
 
         // Attack
         mc.interactionManager.attackEntity(mc.player, textureRun);
