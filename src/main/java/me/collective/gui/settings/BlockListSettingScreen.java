@@ -1,0 +1,62 @@
+package me.collective.gui.settings;
+
+import me.collective.setting.BlockListSetting;
+import net.minecraft.block.Block;
+import net.minecraft.block.Blocks;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.item.ItemStack;
+import net.minecraft.registry.Registries;
+import net.minecraft.util.Identifier;
+
+/**
+ * Порт BlockListSettingScreen из Meteor Client (через CollectionListSettingScreen):
+ * блоки ищутся по переведённому имени и id (нечёткий поиск), в колонках
+ * рисуется предметная иконка блока. Поведение как в оригинале:
+ * из списка исключаются только {@code air} и {@code *_wall_banner}, а стеновые
+ * баннеры добавляются и убираются парно со своими баннерами.
+ */
+public class BlockListSettingScreen extends CollectionListSettingScreen<Block> {
+
+    public BlockListSettingScreen(Screen parent, BlockListSetting setting) {
+        super(parent, setting, "Select Blocks");
+    }
+
+    @Override
+    protected Iterable<Block> allValues() {
+        return Registries.BLOCK;
+    }
+
+    @Override
+    protected boolean includeValue(Block value) {
+        if (value == Blocks.AIR) return false;
+        return !Registries.BLOCK.getId(value).getPath().endsWith("_wall_banner");
+    }
+
+    @Override
+    protected String[] getValueNames(Block value) {
+        return new String[]{
+                value.getName().getString(),
+                Registries.BLOCK.getId(value).toString()
+        };
+    }
+
+    @Override
+    protected String labelFor(Block value) {
+        return value.getName().getString();
+    }
+
+    @Override
+    protected ItemStack iconFor(Block value) {
+        return new ItemStack(value);
+    }
+
+    @Override
+    protected Block getAdditionalValue(Block value) {
+        Identifier id = Registries.BLOCK.getId(value);
+        String path = id.getPath();
+        // Баннеры добавляются/удаляются вместе со стеновой версией (как в Meteor)
+        if (path.endsWith("_wall_banner") || !path.endsWith("_banner")) return null;
+        return Registries.BLOCK.get(Identifier.of(id.getNamespace(),
+                path.substring(0, path.length() - 6) + "wall_banner"));
+    }
+}

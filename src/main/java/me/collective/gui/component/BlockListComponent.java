@@ -1,8 +1,8 @@
 package me.collective.gui.component;
 
 import me.collective.font.FontManager;
-import me.collective.gui.BlockPickerScreen;
 import me.collective.gui.ClickGuiScreen;
+import me.collective.gui.settings.BlockListSettingScreen;
 import me.collective.module.client.UI;
 import me.collective.render.RenderUtil;
 import me.collective.setting.BlockListSetting;
@@ -13,8 +13,8 @@ import java.awt.Color;
 
 /**
  * Настройка BlockListSetting в панели модуля — компактная строка, по клику
- * открывает полноэкранный пикер блоков ({@link BlockPickerScreen}) в стиле
- * Meteor: поиск и две колонки — все блоки / выбранные.
+ * открывает полноэкранный пикер блоков ({@link BlockListSettingScreen}) —
+ * порт Meteor: нечёткий поиск и две колонки — все блоки / выбранные.
  */
 public class BlockListComponent extends Component {
     private static final float HEADER_H = 11f;
@@ -60,7 +60,7 @@ public class BlockListComponent extends Component {
         if (UI.INSTANCE.sounds.getValue()) {
             me.collective.render.SoundUtil.playClick(1.0f, 1.2f);
         }
-        MinecraftClient.getInstance().setScreen(new BlockPickerScreen(setting, ClickGuiScreen.getInstance()));
+        MinecraftClient.getInstance().setScreen(new BlockListSettingScreen(ClickGuiScreen.getInstance(), setting));
         return true;
     }
 }
