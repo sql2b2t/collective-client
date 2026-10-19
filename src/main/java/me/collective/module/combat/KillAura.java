@@ -53,8 +53,7 @@ public class KillAura extends Module {
     public static NumberSetting attackRange = new NumberSetting("Радиус атаки", 3.0F, 3.0F, 6.0F, 0.1F);
     public static NumberSetting acquireRange = new NumberSetting("Радиус обнаружения", 1.0F, 0.0F, 5.0F, 0.1F);
     public static NumberSetting turnSpeed = new NumberSetting("Скорость ротации", 65.0F, 20.0F, 180.0F, 5.0F);
-    public static NumberSetting cooldownGate = new NumberSetting("Тайминг удара", 0.92F, 0.90F, 1.0F, 0.01F);
-    public static BooleanSetting onlyCritical = new BooleanSetting("Only Critical", false);
+    public static BooleanSetting smartCrits = new BooleanSetting("Умные криты", false);
     public static BooleanSetting nearestTarget = new BooleanSetting("Приоритет ближайшей цели", false);
     public static BooleanSetting followTarget = new BooleanSetting("Следовать за целью", false);
     public static BooleanSetting sprintReset = new BooleanSetting("Сброс спринта", true);
@@ -91,6 +90,9 @@ public class KillAura extends Module {
 
     public static BooleanSetting debugOutput = new BooleanSetting("Отладка", false);
 
+    /** Порог кулдауна: ниже 0.90 сервер режет урон, ниже не опускаемся. */
+    private static final float COOLDOWN_GATE = 0.92f;
+
     /**
      * Допустимое расхождение серверного угла с углом на цель перед ударом.
      * Удар уходит с углом, который сервер уже получал, — скачков не видно.
@@ -114,8 +116,7 @@ public class KillAura extends Module {
         add(attackRange);
         add(acquireRange);
         add(turnSpeed);
-        add(cooldownGate);
-        add(onlyCritical);
+        add(smartCrits);
         add(providerClose);
         add(colorMeasure);
         add(sprintReset);
@@ -191,7 +192,7 @@ public class KillAura extends Module {
         }
 
         if (!isAttackReady()) return;
-        if (onlyCritical.getValue() && !canCrit()) return;
+        if (this.smartCrits.getValue() && !canCrit()) return;
 
         performAttack();
     }
@@ -408,6 +409,13 @@ public class KillAura extends Module {
     private boolean shouldSkipAttack() {
         if (mc.player == null) return true;
 
+        // Кулаками не кликаем: удары пустой рукой выглядят как голый
+        // аутокликер и не дают урона.
+        if (mc.player.getMainHandStack().isEmpty()) {
+            report("в руке пусто — не бью");
+            return true;
+        }
+
         if (colorMeasure.process("Не бить если кушаешь") && mc.player.isUsingItem() && !(mc.player.getActiveItem().getItem() instanceof ShieldItem)) {
             return true;
         }
@@ -477,16 +485,16 @@ public class KillAura extends Module {
         return false;
     }
 
-    /** Кулдаун с лёгким человеческим дрожанием момента; ниже 0.90 не падает. */
+    /** Фиксированный порог кулдауна с лёгким человеческим дрожанием момента. */
     private boolean isAttackReady() {
         float progress = mc.player.getAttackCooldownProgress(0.5f);
-        float gate = cooldownGate.compute() - ThreadLocalRandom.current().nextFloat() * 0.02f;
+        float gate = COOLDOWN_GATE - ThreadLocalRandom.current().nextFloat() * 0.02f;
         return progress >= gate;
     }
 
     /**
      * Условия честного крита (без споофа позиций — он у Criticals и флагается).
-     * Only Critical ждёт естественного падения, ничего не имитируя.
+     * Умные криты ждут естественного падения, ничего не имитируя.
      */
     private boolean canCrit() {
         if (mc.player == null) return false;
