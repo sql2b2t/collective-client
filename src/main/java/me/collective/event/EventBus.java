@@ -45,16 +45,19 @@ public class EventBus {
                 MethodHandle impl = lookup.unreflect(method);
 
                 MethodType interfaceType = MethodType.methodType(BiConsumer.class);
-                MethodType samType = MethodType.methodType(void.class,
+                // SAM-метод интерфейса обязан быть в стёртом виде (Object, Object),
+                // иначе лямбда собирается, но кидает AbstractMethodError при вызове
+                MethodType erasedSam = MethodType.methodType(void.class, Object.class, Object.class);
+                MethodType instantiated = MethodType.methodType(void.class,
                         method.getDeclaringClass(), method.getParameterTypes()[0]);
 
                 CallSite site = LambdaMetafactory.metafactory(
                         lookup,
                         "accept",
                         interfaceType,
-                        samType,
+                        erasedSam,
                         impl,
-                        samType);
+                        instantiated);
 
                 @SuppressWarnings("unchecked")
                 BiConsumer<Object, Object> consumer = (BiConsumer<Object, Object>) site.getTarget().invokeExact();
