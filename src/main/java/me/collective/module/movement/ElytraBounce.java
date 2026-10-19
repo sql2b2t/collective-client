@@ -454,12 +454,15 @@ public class ElytraBounce extends Module {
     }
 
     /**
-     * Срезка дуги прыжка для камеры и модели (SmoothCamera).
+     * Срезка дуги прыжка для камеры и модели (SmoothCamera) до нуля:
+     * в воздухе камера и модель вообще не тянутся вверх за дугой прыжка —
+     * от клиента не видно, что персонаж прыгает, взгляд идёт ровным глайдом.
      *
-     * <p>Фильтр несимметричный: вверх почти не тянется — дуга прыжка
-     * «срезается» и взгляд идёт ровным глайдом вперёд; вниз догоняет быстро,
-     * чтобы при реальных падениях и переходах на землю не отставать.
-     * Траектория на сервере не меняется — это чисто клиентский визуал.
+     * <p>Зазоры выравниваются на земле: при касании грунта сглаженная высота
+     * быстро (за 2-3 кадра) догоняет реальную, поэтому смена уровня дороги,
+     * ступени и сетбеки не впечатываются в глаз одним рывком. На ровной трассе
+     * между прыжками дельта нулевая и камера стоит неподвижно. Траектория на
+     * сервере не меняется — чисто клиентский визуал.
      *
      * @param realY   реальная интерполированная высота игрока (ступни)
      * @param advance true — фильтр делает шаг этого кадра (камера обновляется
@@ -474,7 +477,7 @@ public class ElytraBounce extends Module {
         }
 
         long now = System.nanoTime();
-        if (Double.isNaN(this.cameraSmoothY)) {
+        if (Double.isNaN(this.cameraSmoothY) || realY < this.cameraSmoothY - 16.0) {
             this.cameraSmoothY = realY;
             this.cameraLastFrameNanos = now;
             return 0.0;
@@ -485,13 +488,23 @@ public class ElytraBounce extends Module {
             double dt = MathHelper.clamp((now - this.cameraLastFrameNanos) / 50_000_000.0, 0.25, 3.0);
             this.cameraLastFrameNanos = now;
 
-            if (realY > this.cameraSmoothY) {
-                // подъём дуги прыжка: почти не следуем (≈3% на кадр 20 мс)
-                this.cameraSmoothY += (realY - this.cameraSmoothY) * (1.0 - Math.pow(0.97, dt));
-            } else if (realY < this.cameraSmoothY) {
-                // спуск: догоняем мягко (≈13% на кадр 20 мс)
-                this.cameraSmoothY += (realY - this.cameraSmoothY) * (1.0 - Math.pow(0.875, dt));
+            double gap = realY - this.cameraSmoothY;
+            if (mc.player.isOnGround()) {
+                // на земле — быстрый плавный прилип к реальной высоте
+                // (≈75% на кадр 20 мс): ступени и смена уровня дороги
+                // склеиваются за 2-3 кадра, без рывка
+                this.cameraSmoothY += gap * (1.0 - Math.pow(0.25, dt));
+            } else if (gap > 2.0) {
+                // страховка: реальная высота уехала слишком далеко вверх
+                // (климб, сетбек) — плавно догоняем, модель не отстаёт абсурдно
+                this.cameraSmoothY += (gap - 2.0) * (1.0 - Math.pow(0.9, dt));
+            } else if (gap < 0.0) {
+                // спуск: догоняем мягко (≈13% на кадр 20 мс); в конце дуги
+                // прыжка высоты и так сходятся в ноль
+                this.cameraSmoothY += gap * (1.0 - Math.pow(0.875, dt));
             }
+            // иначе (подъём дуги прыжка в пределах 2 блоков): камера и модель
+            // не тянутся вверх вообще — прыжок полностью невидим для клиента
         }
 
         return realY - this.cameraSmoothY;
