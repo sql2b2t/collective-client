@@ -2,14 +2,19 @@ package me.collective.module.combat;
 
 import me.collective.category.Category;
 import me.collective.event.EventHandler;
+import me.collective.event.events.Render3DEvent;
 import me.collective.event.events.TickEvent;
+import me.collective.manager.FriendManager;
 import me.collective.module.Module;
+import me.collective.render.Renderer3D;
+import me.collective.render.ShapeMode;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.ExplosionDamageUtil;
 import me.collective.util.FindItemResult;
 import me.collective.util.GrimUtils;
+import me.collective.util.AuraCoordination;
 import me.collective.util.InventoryUtil;
 import me.collective.util.RotationUtils;
 import me.collective.util.SwapManager;
@@ -31,6 +36,7 @@ import net.minecraft.util.math.*;
 import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
 
+import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -45,6 +51,13 @@ public class GrimAnchorAura extends Module {
     public enum RotationMode {
         SILENT, CLIENT, BOTH
     }
+
+    // Цвета боксов визуализации: новая установка — фиолетовая, работа
+    // с существующим якорем — янтарная.
+    private static final Color PLACE_FILL  = new Color(124, 92, 255, 24);
+    private static final Color PLACE_LINE  = new Color(124, 92, 255, 160);
+    private static final Color ANCHOR_FILL = new Color(255, 176, 66, 24);
+    private static final Color ANCHOR_LINE = new Color(255, 176, 66, 160);
 
     private enum ActionType {
         PLACE, CHARGE, EXPLODE
@@ -79,6 +92,11 @@ public class GrimAnchorAura extends Module {
     public final BooleanSetting selfDamageSafety             = add(new BooleanSetting("Safety", false));
     public final NumberSetting minSafeDistance               = add(new NumberSetting("SafeDist", 3.0, 1.0, 6.0, 0.5));
     public final BooleanSetting replenish                    = add(new BooleanSetting("Replenish", false));
+    // Друзья не получают больше FriendDmg урона от взрыва; они и в цели не берутся.
+    public final BooleanSetting antiFriend                   = add(new BooleanSetting("AntiFriend", true));
+    public final NumberSetting friendDamageLimit             = add(new NumberSetting("FriendDmg", 6.0, 0.0, 20.0, 0.5));
+    // Бокс вокруг активной позиции якоря: фиолетовая — ставим, янтарная — заряжаем/взрываем.
+    public final BooleanSetting render                       = add(new BooleanSetting("Render", true));
 
     // ── Настройки урона ──────────────────────────────────────────
     // Выбирать позицию размещения якоря по максимальному уроку цели
@@ -202,8 +220,9 @@ public class GrimAnchorAura extends Module {
 
         if (this.actionTimer > 0) {
             this.actionTimer--;
-            // Продолжаем удерживать прицел пока ждём задержки действия
-            if (this.pendingHit != null) {
+            // Продолжаем удерживать прицел пока ждём задержки действия.
+            // Слот тика нужен только когда есть куда наводиться.
+            if (this.pendingHit != null && AuraCoordination.claim(this, mc.world.getTime())) {
                 applyAim(this.pendingHit.getPos());
             }
             return;
@@ -222,6 +241,12 @@ public class GrimAnchorAura extends Module {
             RotationUtils.getInstance().release(this);
             return;
         }
+
+        // Синхронизация с CrystalAura: в тике действует одна аура — обе
+        // держат один RotationUtils-провод, и одновременный заказ перезаписи
+        // углов ломает проверки прицела друг друга. Слот берём только когда
+        // есть цель: простаивающий якорь не съедает тики кристалла.
+        if (!AuraCoordination.claim(this, mc.world.getTime())) return;
 
         double reach = this.placeReach.getValue();
 
@@ -318,6 +343,12 @@ public class GrimAnchorAura extends Module {
             }
 
             if (this.selfDamageSafety.getValue() && isUnsafeToExplode(anchorPos)) {
+                cancelPending();
+                return;
+            }
+
+            // Взрыв не должен больше лимита задеть друзей поблизости.
+            if (isFriendDamaged(anchorPos)) {
                 cancelPending();
                 return;
             }
@@ -904,6 +935,41 @@ public class GrimAnchorAura extends Module {
         return !hasTotem && (mc.player.getHealth() + mc.player.getAbsorptionAmount()) <= 6.0f && playerDist < 4.0;
     }
 
+    /**
+     * Клетку заняла какая-нибудь сущность? Серверный canPlace для
+     * полноблочного якоря отсекает столкновения со всеми сущностями —
+     * от падёжных дропов до мобов, иначе клик молча отлетит.
+     */
+    private boolean entityBlocksCell(Box cell) {
+        for (Entity other : mc.world.getOtherEntities(null, cell)) {
+            if (other.getBoundingBox().intersects(cell)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Взрыв на позиции заденет дружелюбного игрока сильнее лимита?
+     * Сначала дешёвая верхняя граница (все лучи видимы), точный расчёт
+     * только для кандидатов выше лимита — как в CrystalAura.
+     */
+    private boolean isFriendDamaged(BlockPos pos) {
+        float limit = this.friendDamageLimit.getValue().floatValue();
+        if (!this.antiFriend.getValue() || limit <= 0.0f) return false;
+
+        Vec3d center = pos.toCenterPos();
+        for (PlayerEntity player : mc.world.getPlayers()) {
+            if (player == mc.player || !player.isAlive() || player.isDead()) continue;
+            if (!FriendManager.INSTANCE.isFriend(player)) continue;
+
+            float upper = ExplosionDamageUtil.getDamageUpperBound(center, ExplosionDamageUtil.ANCHOR_POWER, player);
+            if (upper <= limit) continue;
+
+            float dmg = ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.ANCHOR_POWER, player);
+            if (dmg > limit) return true;
+        }
+        return false;
+    }
+
     // ─────────────────────────────────────────────────────────────
     // Поиск якоря, цели и позиции для размещения
     // ─────────────────────────────────────────────────────────────
@@ -931,15 +997,18 @@ public class GrimAnchorAura extends Module {
             }
         }
 
+        // Скан вокруг цели: якорь ставится у неё, вокруг игрока пришлось бы
+        // перебирать сильно больше пустых клеток с прежним радиусом.
         BlockPos playerPos = mc.player.getBlockPos();
-        int r = (int) Math.ceil(reach);
+        BlockPos scanCenter = target != null ? target.getBlockPos() : playerPos;
+        int r = (int) Math.ceil(reach) + (target != null ? 1 : 0);
         BlockPos best     = null;
         double closestDist = Double.MAX_VALUE;
 
         for (int x = -r; x <= r; x++) {
             for (int y = -r; y <= r; y++) {
                 for (int z = -r; z <= r; z++) {
-                    BlockPos p = playerPos.add(x, y, z);
+                    BlockPos p = scanCenter.add(x, y, z);
                     if (GrimUtils.closestEyeDistanceSqTo(mc.player, p.toCenterPos()) > reachSq) continue;
 
                     BlockState state = mc.world.getBlockState(p);
@@ -1059,6 +1128,14 @@ public class GrimAnchorAura extends Module {
             Box box = new Box(p);
             if (mc.player.getBoundingBox().intersects(box)) continue;
             if (target.getBoundingBox().intersects(box)) continue;
+
+            // Серверный canPlace: полноблочный якорь не встаёт в клетку с
+            // любой сущностью внутри (не только с целью) — иначе клик отлетит,
+            // а цикл потеряет тики на фантомную установку.
+            if (entityBlocksCell(box)) continue;
+
+            // Взрыв по этой позиции не должен навредить друзьям.
+            if (isFriendDamaged(p)) continue;
 
             if (this.selfDamageSafety.getValue() && isUnsafeToExplode(p)) continue;
 
@@ -1210,6 +1287,7 @@ public class GrimAnchorAura extends Module {
 
         for (PlayerEntity player : mc.world.getPlayers()) {
             if (player == mc.player) continue;
+            if (FriendManager.INSTANCE.isFriend(player)) continue;
             if (player.isSpectator() || player.isDead() || !player.isAlive()) continue;
             if (!this.targetCreative.getValue() && player.isCreative()) continue;
 
@@ -1306,5 +1384,25 @@ public class GrimAnchorAura extends Module {
         }
 
         return new FindItemResult(-1, 0);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Визуал
+    // ─────────────────────────────────────────────────────────────
+
+    @EventHandler
+    private void onRender3D(Render3DEvent event) {
+        if (!isToggled() || !this.render.getValue()) return;
+
+        BlockPos pos = this.currentAnchorPos;
+        if (pos == null) return;
+
+        boolean placing = this.pendingAction == ActionType.PLACE;
+        Color fill  = placing ? PLACE_FILL : ANCHOR_FILL;
+        Color line  = placing ? PLACE_LINE : ANCHOR_LINE;
+
+        Renderer3D.box(pos.getX(), pos.getY(), pos.getZ(),
+                pos.getX() + 1.0, pos.getY() + 1.0, pos.getZ() + 1.0,
+                fill, line, ShapeMode.Both);
     }
 }

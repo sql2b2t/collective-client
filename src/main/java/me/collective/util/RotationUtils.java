@@ -286,7 +286,10 @@ public class RotationUtils {
     /** Захват поворота модулем. */
     private boolean claim(Object owner, int priority) {
         if (this.owner != null && this.owner != owner && !this.decaying && priority <= this.ownerPriority) {
-            return false;
+            // Координация боевых аур: победитель тика перехватывает «провод» —
+            // сервер видит в этом тике только его угол. Не-участники координации
+            // ведут себя как раньше.
+            if (!AuraCoordination.isCurrentWinner(owner)) return false;
         }
 
         this.owner = owner;

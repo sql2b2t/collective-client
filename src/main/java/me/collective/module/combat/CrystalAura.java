@@ -14,6 +14,7 @@ import me.collective.setting.NumberSetting;
 import me.collective.util.ExplosionDamageUtil;
 import me.collective.util.FindItemResult;
 import me.collective.util.GrimUtils;
+import me.collective.util.AuraCoordination;
 import me.collective.util.InventoryUtil;
 import me.collective.util.RotationUtils;
 import me.collective.util.SwapManager;
@@ -224,7 +225,12 @@ public class CrystalAura extends Module {
     private void tickAura() {
         if (this.actionTimer > 0) {
             this.actionTimer--;
-            if (this.pendingAim != null) applyAim(this.pendingAim);
+            // Во время кулдауна продолжаем наводиться. Слот тика нужен
+            // только когда есть куда наводиться: простаивающий кристалл
+            // не съедает тики якоря.
+            if (this.pendingAim != null && AuraCoordination.claim(this, mc.world.getTime())) {
+                applyAim(this.pendingAim);
+            }
             return;
         }
 
@@ -234,6 +240,11 @@ public class CrystalAura extends Module {
             cancelAction();
             return;
         }
+
+        // Синхронизация с другими боевыми аурами (GrimAnchorAura): в тике
+        // действует одна, иначе две одновременно перезаписывают серверный
+        // угол и сбивают друг другу проверки прицела.
+        if (!AuraCoordination.claim(this, mc.world.getTime())) return;
 
         // 1. Атака существующего кристалла — самый быстрый путь урона.
         //    Не проваливаемся к постановке в тот же тик: прицелы разные,
