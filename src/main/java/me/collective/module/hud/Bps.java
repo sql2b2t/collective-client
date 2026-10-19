@@ -62,7 +62,7 @@ public class Bps extends HudModule {
             fm.drawStringWithShadow(context, "Speed", tx, ty, HudTheme.MUTED);
             tx += titleW;
         }
-        fm.drawStringWithShadow(context, value, tx, ty, HudTheme.TEXT);
+        fm.drawStringWithShadow(context, value, tx, ty, HudTheme.text());
         fm.drawStringWithShadow(context, unitLabel, tx + valW, ty, HudTheme.MUTED);
     }
 }

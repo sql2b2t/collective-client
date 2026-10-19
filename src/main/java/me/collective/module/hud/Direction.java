@@ -30,14 +30,14 @@ public class Direction extends HudModule {
             this.height = fontH + padY * 2;
             HudTheme.plate(context, x, y, width, height, 5.5f);
             float tx = x + padX;
-            fm.drawStringWithShadow(context, facing, tx, y + padY, HudTheme.TEXT);
+            fm.drawStringWithShadow(context, facing, tx, y + padY, HudTheme.text());
             fm.drawStringWithShadow(context, brackets, tx + facingW + 3f, y + padY, HudTheme.MUTED);
             return;
         }
 
         this.width = facingW + 3f + bracketsW;
         this.height = fontH;
-        fm.drawStringWithShadow(context, facing, x, y, HudTheme.TEXT);
+        fm.drawStringWithShadow(context, facing, x, y, HudTheme.text());
         fm.drawStringWithShadow(context, brackets, x + facingW + 3f, y, HudTheme.MUTED);
     }
 }

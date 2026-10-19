@@ -81,11 +81,12 @@ public class ModuleList extends HudModule {
         if (!background.getValue()) {
             float curY = y;
             float maxWidth = 40;
+            int idx = 0;
             for (Entry e : activeModules) {
                 float w = e.width;
                 maxWidth = Math.max(maxWidth, w);
                 float textX = rightAlign ? (x + maxWidth - w) : x;
-                fm.drawStringWithShadow(context, e.module.getName(), textX, curY, HudTheme.TEXT);
+                fm.drawStringWithShadow(context, e.module.getName(), textX, curY, HudTheme.text(idx++));
                 curY += fontH + 1;
             }
             this.width = maxWidth;
@@ -107,6 +108,7 @@ public class ModuleList extends HudModule {
         }
 
         float curY = y;
+        int idx = 0;
         for (Entry e : activeModules) {
             String name = e.module.getName();
             float pillW = padX * 2 + dotR * 2 + dotGap + e.width;
@@ -115,7 +117,7 @@ public class ModuleList extends HudModule {
             GuiGfx.fillRounded(context, rowX, curY, pillW, pillH, 4f, HudTheme.PLATE.getRGB());
             GuiGfx.strokeRounded(context, rowX, curY, pillW, pillH, 4f, 1f, HudTheme.BORDER.getRGB());
             GuiGfx.dot(context, rowX + padX + dotR, curY + pillH / 2f, dotR, HudTheme.accent().getRGB());
-            fm.drawStringWithShadow(context, name, rowX + padX + dotR * 2 + dotGap, curY + padY, HudTheme.TEXT);
+            fm.drawStringWithShadow(context, name, rowX + padX + dotR * 2 + dotGap, curY + padY, HudTheme.text(idx++));
             curY += pillH + gap;
         }
 

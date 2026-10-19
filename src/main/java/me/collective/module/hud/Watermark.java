@@ -39,14 +39,14 @@ public class Watermark extends HudModule {
             GuiGfx.fillRounded(context, x + 1.5f, y + 4f, accentW, height - 8f, accentW / 2f, HudTheme.accent().getRGB());
 
             float ty = y + padY;
-            fm.drawStringWithShadow(context, logo, textLeft, ty, HudTheme.TEXT);
+            fm.drawStringWithShadow(context, logo, textLeft, ty, HudTheme.text());
             if (verW > 0) fm.drawStringWithShadow(context, ver, textLeft + logoW + 4f, ty, HudTheme.MUTED);
             return;
         }
 
         this.width = logoW + (verW > 0 ? 4f : 0f) + verW;
         this.height = fontH + 2f;
-        fm.drawStringWithShadow(context, logo, x, y, HudTheme.TEXT);
+        fm.drawStringWithShadow(context, logo, x, y, HudTheme.text());
         if (verW > 0) fm.drawStringWithShadow(context, ver, x + logoW + 4f, y, HudTheme.MUTED);
     }
 }

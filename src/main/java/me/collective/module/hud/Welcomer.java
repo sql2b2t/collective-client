@@ -50,7 +50,7 @@ public class Welcomer extends HudModule {
 
         float tx = background.getValue() ? x + padX : x;
         float ty = background.getValue() ? y + padY : y;
-        fm.drawStringWithShadow(context, greeting, tx, ty, HudTheme.TEXT);
+        fm.drawStringWithShadow(context, greeting, tx, ty, HudTheme.text());
         if (suffixW > 0) fm.drawStringWithShadow(context, suffix, tx + greetingW, ty, HudTheme.MUTED);
     }
 }

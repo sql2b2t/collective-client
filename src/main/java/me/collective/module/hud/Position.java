@@ -54,7 +54,7 @@ public class Position extends HudModule {
             HudTheme.plate(context, x, y, width, height, 5.5f);
             float textX = x + padX + dotD + dotGap;
             GuiGfx.dot(context, x + padX + 2f, y + padY + fontH / 2f - 0.5f, 2f, HudTheme.accent().getRGB());
-            fm.drawStringWithShadow(context, coords, textX, y + padY, HudTheme.TEXT);
+            fm.drawStringWithShadow(context, coords, textX, y + padY, HudTheme.text());
             if (hasSub) {
                 fm.drawStringWithShadow(context, subStr, textX, y + padY + fontH + 3f, HudTheme.MUTED);
             }
@@ -63,7 +63,7 @@ public class Position extends HudModule {
 
         this.width = Math.max(coordsW, subW);
         this.height = fontH * (subStr.isEmpty() ? 1 : 2) + 3f;
-        fm.drawStringWithShadow(context, coords, x, y, HudTheme.TEXT);
+        fm.drawStringWithShadow(context, coords, x, y, HudTheme.text());
         if (!subStr.isEmpty()) fm.drawStringWithShadow(context, subStr, x, y + fontH + 3f, HudTheme.MUTED);
     }
 }

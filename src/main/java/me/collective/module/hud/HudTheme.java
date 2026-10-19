@@ -1,6 +1,7 @@
 package me.collective.module.hud;
 
 import me.collective.gui.GuiGfx;
+import me.collective.module.client.HUD;
 import me.collective.module.client.UI;
 import net.minecraft.client.gui.DrawContext;
 
@@ -20,6 +21,22 @@ public final class HudTheme {
     public static final Color BORDER = new Color(255, 255, 255, 26);
     /** Основной текст. */
     public static final Color TEXT = new Color(242, 245, 252);
+
+    /**
+     * Главный текст элемента под тему HUD: анимированный градиент/радуга из
+     * настроек модуля HUD, как было до унификации. Без HUD — прежний белый.
+     */
+    public static Color text() {
+        return text(0);
+    }
+
+    public static Color text(int index) {
+        HUD hud = HUD.INSTANCE;
+        if (hud != null && hud.isToggled()) {
+            return hud.getHudColor(index);
+        }
+        return TEXT;
+    }
     /** Приглушённый/служебный текст. */
     public static final Color MUTED = new Color(150, 154, 166);
 

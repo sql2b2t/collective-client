@@ -38,7 +38,7 @@ public class Metrics extends HudModule {
         List<Seg> segs = new ArrayList<>();
 
         if (fps.getValue()) {
-            segs.add(new Seg(String.valueOf(mc.getCurrentFps()), HudTheme.TEXT));
+            segs.add(new Seg(String.valueOf(mc.getCurrentFps()), HudTheme.text()));
             segs.add(new Seg(" fps", HudTheme.MUTED));
         }
 
@@ -46,14 +46,14 @@ public class Metrics extends HudModule {
             PlayerListEntry entry = mc.getNetworkHandler().getPlayerListEntry(mc.player.getUuid());
             int latency = entry != null ? entry.getLatency() : 0;
             if (fps.getValue()) segs.add(new Seg("  ·  ", HudTheme.MUTED));
-            segs.add(new Seg(String.valueOf(latency), HudTheme.TEXT));
+            segs.add(new Seg(String.valueOf(latency), HudTheme.text()));
             segs.add(new Seg(" ms", HudTheme.MUTED));
         }
 
         if (server.getValue()) {
             String ip = mc.getCurrentServerEntry() != null ? mc.getCurrentServerEntry().address : "Singleplayer";
             if (!segs.isEmpty()) segs.add(new Seg("  ·  ", HudTheme.MUTED));
-            segs.add(new Seg(ip, ip.equals("Singleplayer") ? HudTheme.MUTED : HudTheme.TEXT));
+            segs.add(new Seg(ip, ip.equals("Singleplayer") ? HudTheme.MUTED : HudTheme.text()));
         }
 
         if (segs.isEmpty()) {
