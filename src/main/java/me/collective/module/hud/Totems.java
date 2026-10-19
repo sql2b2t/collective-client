@@ -36,13 +36,13 @@ public class Totems extends HudModule {
             this.height = 22f;
             HudTheme.plate(context, x, y, width, height, 6f);
             context.drawItem(TOTEM_STACK, (int) x + 3, (int) y + 3);
-            fm.drawStringWithShadow(context, num, x + 3f + 16f + 3f, y + (height - fontH) / 2f + 0.5f, HudTheme.text());
+            fm.drawStringWithShadow(context, num, x + 3f + 16f + 3f, y + (height - fontH) / 2f + 0.5f, HudTheme.TEXT);
             return;
         }
 
         this.width = 16f + 4f + numW;
         this.height = 18f;
         context.drawItem(TOTEM_STACK, (int) x, (int) y + 1);
-        fm.drawStringWithShadow(context, num, x + 16f + 4f, y + 5f, HudTheme.text());
+        fm.drawStringWithShadow(context, num, x + 16f + 4f, y + 5f, HudTheme.TEXT);
     }
 }

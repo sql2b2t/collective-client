@@ -50,7 +50,7 @@ public class Effects extends HudModule {
                 GuiGfx.strokeRounded(context, x, curY, pillW, pillH, 4f, 1f, HudTheme.BORDER.getRGB());
             }
             float tx = x + padX;
-            fm.drawStringWithShadow(context, name, tx, curY + padY, HudTheme.text());
+            fm.drawStringWithShadow(context, name, tx, curY + padY, HudTheme.TEXT);
             fm.drawStringWithShadow(context, time, tx + nameW + 4f, curY + padY, HudTheme.MUTED);
             curY += pillH + gap;
         }

@@ -100,7 +100,7 @@ public class TextRadar extends HudModule {
                 GuiGfx.strokeRounded(context, x, curY, pillW, pillH, 4f, 1f, HudTheme.BORDER.getRGB());
             }
             float tx = x + padX;
-            fm.drawStringWithShadow(context, row.name, tx, curY + padY, HudTheme.text());
+            fm.drawStringWithShadow(context, row.name, tx, curY + padY, HudTheme.TEXT);
             fm.drawStringWithShadow(context, row.brackets, tx + row.nameW + 3f, curY + padY, HudTheme.MUTED);
             fm.drawStringWithShadow(context, row.hpText, tx + row.nameW + 3f + row.bracketsW + 3f, curY + padY,
                     HudTheme.ratio(row.hp / 20f));
