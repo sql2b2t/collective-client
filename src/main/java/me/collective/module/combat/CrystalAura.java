@@ -12,22 +12,21 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.ExplosionDamageUtil;
+import me.collective.util.FindItemResult;
+import me.collective.util.GrimUtils;
 import me.collective.util.InventoryUtil;
 import me.collective.util.RotationUtils;
 import me.collective.util.SwapManager;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.client.render.Camera;
-import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.decoration.EndCrystalEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
+import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
+import net.minecraft.network.packet.c2s.play.PlayerInteractEntityC2SPacket;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
@@ -39,1334 +38,997 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.RaycastContext;
 
 import java.awt.Color;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Deque;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Random;
 
 /**
- * CrystalAura — автоматическая расстановка и подрыв кристаллов Энда.
+ * Кристальная аура под GrimAC.
  *
- * <p>Порядок работы тика: в {@code TickEvent.Pre} модуль ищет выгоднейшее
- * действие и наводится на него, в {@code TickEvent.Post} выполняет действие
- * тем углом, который реально ушёл серверу.
- *
- * <p>Потоки и коллекции:
+ * <p>Строгий порядок взаимодействия, по паттерну проверенного GrimAnchorAura:
  * <ul>
- *   <li>{@code visuals} читается и пишется из рендер-треда — только он
- *       потокобезопасен;</li>
- *   <li>{@code damageCache}, {@code placedPositions}, {@code attackedCrystals}
- *       живут исключительно в тик-треде (pre/post), поэтому обычные
- *       {@link HashMap} — это осознанный выбор, а не недосмотр.</li>
+ *   <li>одна ротация на тик, все интеракции тика валидируются по ней;</li>
+ *   <li>установка кристалла: луч по отправленному углу должен попасть
+ *       в грань опорного блока (обсидиан/коренная порода), курсор на грани
+ *       рандомизируется ±0.30 — Grim ловит фиксированный центр;</li>
+ *   <li>разбиение кристалла: перед пакетом атаки досылается ротация
+ *       ({@code flushServerRotation}), луч по отправленному углу обязан
+ *       пересечь хитбокс кристалла, расширенный на 0.1, дистанция до бокса
+ *       не больше лимита сервера (3.0);</li>
+ *   <li>постановка и разбиение чередуются по разным тикам: цели почти всегда
+ *       в разных направлениях, а одна ротация на два разных действия в тике
+ *       вылетает из проверки Grim.</li>
  * </ul>
+ *
+ * <p>Симуляция постановки повторяет серверный {@code EndCrystalItem.useOnBlock}
+ * (проверено по байткоду 1.21.11): клетка спавна — строго над кликнутым
+ * блоком, клетка обязана быть воздухом, бокс 1×2×1 не должен пересекать ни
+ * одну сущность (включая дроп) — иначе сервер молча отклоняет пакет.
+ * Центр взрыва кристалла — позиция сущности, мощность 6.0.
  */
 public class CrystalAura extends Module {
+    private static final int ROTATION_PRIORITY = 40;
 
-    public static CrystalAura INSTANCE;
+    /** Насколько Grim расширяет хитбокс сущности при проверке интеракции. */
+    private static final double ENTITY_BOX_EXPAND = 0.1;
 
-    private static final long VISUAL_MS        = 300L;
-    private static final long ATTACKED_TTL_MS  = 1500L;
-    private static final long PLACED_TTL_MS    = 400L;
-    private static final long PLACED_BLOCK_MS  = 250L;
-    private static final int  SLOT_RETURN_TICKS = 3;
-    private static final int  MAX_TARGET_HOLD_TICKS = 8;
-    private static final long DEBUG_COOLDOWN_MS     = 2000L;
+    /** Амплитуда рандомизации курсора на грани. */
+    private static final double CURSOR_JITTER = 0.30;
 
-    /** Приоритет захвата ротации — выше любых боевых модулей, чтобы их не сбивал. */
-    private static final int ROTATION_PRIORITY = SwapManager.Priority.PEARL;
+    /** Через сколько миллисекунд кристалл считается снова атакуемым. */
+    private static final long ATTACKED_TTL_MS = 600L;
 
-    public enum Preset     { Default, Donut }
-    public enum RotateMode { ReallyWorld, Smooth, Vanilla, None }
+    /** Сколько тиков держим цель, пока она примерно так же выгодна. */
+    private static final int TARGET_HOLD_TICKS = 8;
 
-    public enum PlaceResult {
-        /** Поставить обсидиан под кристалл. */
-        PlaceObsidian,
-        /** Поставить кристалл на существующий обсидиан/бедрок. */
-        PlaceCrystal,
-        /** Подорвать уже существующий кристалл. */
-        Explode,
-        /** Сломать блок под кристаллом. */
-        Break,
-        /** Дроп мешает — ждём, действие не выполняем. */
-        Awaiting
+    /** Доля от лучшего результата, ниже которой менять зацеп не имеет смысла. */
+    private static final double STICKY_KEEP_RATIO = 0.75;
+
+    private static final long STICKY_TTL_MS = 900L;
+
+    /** Верхняя граница дистанции блок-интеракции на сервере (1.20.5+). */
+    private static final double SERVER_BLOCK_REACH = 4.5;
+
+    /** Тики ожидания подтверждения сервера после установки обсидиана. */
+    private static final int SUPPORT_CONFIRM_TICKS = 2;
+
+    private static final Random RANDOM = new Random();
+
+    private static final Color ATTACK_FILL = new Color(110, 255, 150, 24);
+    private static final Color ATTACK_LINE = new Color(110, 255, 150, 160);
+    private static final Color PLACE_FILL  = new Color(124, 92, 255, 24);
+    private static final Color PLACE_LINE  = new Color(124, 92, 255, 160);
+
+    public enum RotationMode {
+        SILENT, CLIENT, BOTH
     }
 
-    private enum Blocking { None, Item, Player }
+    public enum TargetMode {
+        DAMAGE, DISTANCE, HEALTH
+    }
 
-    // ─────────────────────────────────────────────────────────────
-    // Настройки
-    // ─────────────────────────────────────────────────────────────
+    // ── Ротация ──────────────────────────────────────────────────────
+    public final EnumSetting<RotationMode> rotationMode = add(new EnumSetting<>("Rotation", RotationMode.SILENT));
+    public final BooleanSetting syncMovement            = add(new BooleanSetting("SyncMovement", true));
+    public final NumberSetting turnSpeed                = add(new NumberSetting("TurnSpeed", 180.0, 15.0, 180.0, 5.0));
+    public final NumberSetting smoothness               = add(new NumberSetting("Smoothness", 0.0, 0.0, 0.95, 0.05));
 
-    public final EnumSetting<Preset> preset = add(new EnumSetting<>("Режим", Preset.Default));
-    public final EnumSetting<RotateMode> rotate = add(new EnumSetting<>("Ротация", RotateMode.ReallyWorld));
+    // ── Цели ─────────────────────────────────────────────────────────
+    public final EnumSetting<TargetMode> targetMode     = add(new EnumSetting<>("Targeting", TargetMode.DAMAGE));
+    public final NumberSetting targetRange              = add(new NumberSetting("TargetRange", 10.0, 1.0, 15.0, 0.5));
+    public final BooleanSetting targetMobs              = add(new BooleanSetting("TargetMobs", false));
+    public final BooleanSetting targetCreative          = add(new BooleanSetting("TargetCreative", false));
+    public final BooleanSetting antiFriend              = add(new BooleanSetting("AntiFriend", true));
+    public final NumberSetting friendDamageLimit        = add(new NumberSetting("FriendDmg", 6.0, 0.0, 20.0, 0.5));
 
-    public final NumberSetting smoothSpeed = add(new NumberSetting(
-            "Скорость ротации", 0.5, 0.1, 1.0, 0.05,
-            ignored -> this.rotate.getValue() == RotateMode.Smooth));
+    // ── Атака кристаллов ─────────────────────────────────────────────
+    public final NumberSetting breakDelay               = add(new NumberSetting("BreakDelay", 0.0, 0.0, 5.0, 1.0));
+    public final NumberSetting attackRange              = add(new NumberSetting("AttackRange", 2.9, 2.0, 3.0, 0.1));
 
-    public final BooleanSetting autoKrot = add(new BooleanSetting(
-            "Делать подкоп", true,
-            ignored -> this.preset.getValue() == Preset.Default));
+    // ── Постановка кристаллов ────────────────────────────────────────
+    public final NumberSetting placeDelay               = add(new NumberSetting("PlaceDelay", 0.0, 0.0, 5.0, 1.0));
+    public final NumberSetting placeReach               = add(new NumberSetting("Reach", 4.2, 1.0, 4.5, 0.1));
+    public final BooleanSetting smartPlacement          = add(new BooleanSetting("SmartPlacement", true));
+    public final NumberSetting smartCandidates          = add(new NumberSetting("SmartCandidates", 6.0, 1.0, 16.0, 1.0));
 
-    public final NumberSetting explosionDelay = add(new NumberSetting("Задержка", 0.0, 0.0, 500.0, 10.0));
-    public final BooleanSetting render = add(new BooleanSetting("Рендер", true));
-    public final BooleanSetting predict = add(new BooleanSetting("Предсказание", false));
+    // ── Урон ─────────────────────────────────────────────────────────
+    public final NumberSetting minDamage                = add(new NumberSetting("MinDmg", 3.0, 0.0, 20.0, 0.5));
+    public final NumberSetting facePlaceHp              = add(new NumberSetting("FacePlaceHp", 6.0, 0.0, 20.0, 0.5));
+    public final NumberSetting maxSelfDamage            = add(new NumberSetting("MaxSelfDmg", 8.0, 0.0, 20.0, 0.5));
+    public final NumberSetting damageRatio              = add(new NumberSetting("DamageRatio", 2.0, 1.0, 5.0, 0.1));
+    public final BooleanSetting safety                  = add(new BooleanSetting("Safety", true));
 
-    public final NumberSetting targetRange = add(new NumberSetting("Дальность цели", 8.0, 2.0, 16.0, 0.5));
-    public final NumberSetting maxSelfDamage = add(new NumberSetting("Макс. самоурон", 30.0, 0.0, 60.0, 1.0));
+    // ── Прочее ───────────────────────────────────────────────────────
+    public final BooleanSetting autoSupport             = add(new BooleanSetting("AutoSupport", false));
+    public final BooleanSetting predict                 = add(new BooleanSetting("Predict", false));
+    public final BooleanSetting render                  = add(new BooleanSetting("Render", true));
 
-    /** 0 — брать дальность из атрибута игрока (4.5 в ванилле). */
-    public final NumberSetting placeReach = add(new NumberSetting("Дальность блока", 0.0, 0.0, 6.0, 0.1));
-    /** 0 — брать дальность из атрибута игрока (3.0 в ванилле). */
-    public final NumberSetting hitReach = add(new NumberSetting("Дальность сущности", 0.0, 0.0, 6.0, 0.1));
-
-    /**
-     * Коррекция движения при тихой ротации.
-     *
-     * <p>{@code true} — клиент считает вектор движения по углу, ушедшему
-     * серверу, ввод не перемапливается: совпадение с серверным предиктом
-     * точное. {@code false} — старое поведение, две коррекции складываются
-     * и дают уход до 45° (Strafe на GrimAC).
-     */
-    public final BooleanSetting syncMovement = add(new BooleanSetting("SyncMovement", true));
-
-    /** Пишет в чат, почему модуль не сработал. Не чаще раза в 2 секунды. */
-    public final BooleanSetting debug = add(new BooleanSetting("Отладка", false));
-
-    // ─────────────────────────────────────────────────────────────
-    // Состояние
-    // ─────────────────────────────────────────────────────────────
-
-    private int ticksToBack;
-    private int lastSlot = -1;
-    private long lastExplosionAt;
-
-    /** Текущее решение — для внешних потребителей (ESP, другие модули). */
-    private PlaceData lastData;
-
-    /**
-     * Снимок решения, принятого в pre-тике.
-     *
-     * <p>Post-тик работает только с ним и немедленно сбрасывает. Поэтому
-     * перезапись {@link #lastData} между фазами не может увести действие по
-     * устаревшим данным — раньше post читал то же поле, что и pre.
-     */
-    private PendingAction pending;
-
-    private float[] rotation;
-
-    /** Угол, который реально ушёл в серверные пакеты в этом тике. */
-    private float appliedYaw;
-    private float appliedPitch;
-    private boolean rotationApplied;
-
-    private boolean miningThisTick;
-    private boolean acted;
-
-    // Тик-тред. Намеренно обычные коллекции — см. javadoc класса.
-    private final Map<DamageKey, Float> damageCache       = new HashMap<>();
-    private final Map<BlockPos, Long> placedPositions     = new HashMap<>();
-    private final Map<Integer, Long> attackedCrystals     = new HashMap<>();
-
-    // Рендер-тред.
-    private final Deque<VisualData> visuals = new ArrayDeque<>();
-    private final Map<BlockPos, Boolean> visualSeen = new ConcurrentHashMap<>();
-
+    private Entity currentTarget;
     private int targetHoldTicks;
+    private boolean aiming;
 
-    private float smoothedYaw;
-    private float smoothedPitch;
-    private float noiseYaw;
-    private float noisePitch;
-    private boolean rotationInitialized;
+    /** Общий кулдаун действия: placeDelay — после постановки, breakDelay — после атаки. */
+    private int actionTimer;
+
+    /** Точка наведения последнего запланированного действия (для удержания ротации). */
+    private Vec3d pendingAim;
+
+    /** Зацепленная клетка постановки: постоянная смена точки сбивает плавную ротацию. */
+    private BlockPos stickyCell;
+    private int stickyTargetId = -1;
+    private long stickyMs;
+
+    /** Id кристаллов, атакованных только что: повторный удар до TTL запрещён. */
+    private final Map<Integer, Long> attackedCrystals = new HashMap<>();
+
+    /** Клетка, в которую AutoSupport ставит обсидиан. */
+    private BlockPos pendingSupportCell;
+
+    /** Кулдаун подтверждения установленной опоры. */
+    private int supportWaitTicks;
+
+    /** Боксы для визуализации текущего решения. */
+    private Box attackBox;
+    private Box placeBox;
 
     public CrystalAura() {
-        super("CrystalAura", "Автоматически ставит и взрывает кристаллы Энда", Category.COMBAT);
-        INSTANCE = this;
+        super("CrystalAura", "Grim-safe End Crystal aura: automatic crystal placement and burst breaking.", Category.COMBAT);
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Публичный доступ — по одному геттеру на значение
-    // ─────────────────────────────────────────────────────────────
-
-    public boolean isMiningThisTick() {
-        return isEnabled() && this.miningThisTick;
-    }
-
-    public boolean holdsSlot() {
-        return isEnabled() && this.lastSlot != -1;
-    }
-
-    public boolean usesAnchors() {
-        return this.preset.getValue() == Preset.Donut;
-    }
-
-    public PlaceData getLastData() {
-        return this.lastData;
-    }
-
-    public float[] getRotation() {
-        return this.rotation;
-    }
-
-    public boolean actedThisTick() {
-        return isEnabled() && this.acted;
-    }
-
-    private boolean diggingAllowed() {
-        return this.preset.getValue() == Preset.Default && this.autoKrot.getValue();
+    @Override
+    public void onEnable() {
+        this.currentTarget = null;
+        this.targetHoldTicks = 0;
+        this.actionTimer = 0;
+        this.pendingAim = null;
+        this.stickyCell = null;
+        this.stickyTargetId = -1;
+        this.pendingSupportCell = null;
+        this.supportWaitTicks = 0;
+        this.attackBox = null;
+        this.placeBox = null;
+        this.attackedCrystals.clear();
     }
 
     @Override
     public void onDisable() {
-        this.ticksToBack       = 0;
-        this.rotation          = null;
-        this.lastData          = null;
-        this.pending           = null;
-        this.rotationInitialized = false;
-        this.targetHoldTicks   = 0;
-        this.noiseYaw          = 0.0F;
-        this.noisePitch        = 0.0F;
-        this.miningThisTick    = false;
-        this.acted             = false;
-        this.rotationApplied   = false;
-        this.lastExplosionAt   = 0L;
-
-        this.visuals.clear();
-        this.visualSeen.clear();
-        this.placedPositions.clear();
+        RotationUtils.getInstance().release(this);
+        this.currentTarget = null;
+        this.targetHoldTicks = 0;
+        this.actionTimer = 0;
+        this.pendingAim = null;
+        this.stickyCell = null;
+        this.stickyTargetId = -1;
+        this.pendingSupportCell = null;
+        this.supportWaitTicks = 0;
+        this.attackBox = null;
+        this.placeBox = null;
         this.attackedCrystals.clear();
-
-        RotationUtils.getInstance().release(this);
-
-        if (this.lastSlot != -1 && mc.player != null) {
-            mc.player.getInventory().setSelectedSlot(this.lastSlot);
-            InventoryManagerBridge.syncSlot(this.lastSlot);
-        }
-        this.lastSlot = -1;
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // Тик
-    // ─────────────────────────────────────────────────────────────
-
-    @EventHandler
-    private void onTick(TickEvent.Pre event) {
-        this.miningThisTick  = false;
-        this.acted           = false;
-        this.rotationApplied = false;
-        this.damageCache.clear();
-
-        ClientPlayerEntity self = mc.player;
-        ClientWorld world       = mc.world;
-
-        if (self == null || world == null || mc.interactionManager == null) {
-            finishAction();
-            return;
-        }
-        if (self.isUsingItem()) {
-            holdPosition();
-            return;
-        }
-
-        long now = System.currentTimeMillis();
-        this.attackedCrystals.entrySet().removeIf(e -> now - e.getValue() > ATTACKED_TTL_MS);
-        this.placedPositions.entrySet().removeIf(e -> now - e.getValue() > PLACED_TTL_MS);
-
-        returnSlotIfDue(self);
-
-        PlayerEntity target = findTarget(self, world);
-        if (target == null) {
-            report("нет цели в " + this.targetRange.getValue() + " блоках");
-            finishAction();
-            return;
-        }
-
-        // Кристаллы нужны только для взрыва и для установки кристалла.
-        // Обсидиан ставится без них — иначе на серверах без кристаллов
-        // (2b2t, анархия) модуль не делает вообще ничего.
-        boolean canExplode = hasCrystals(self);
-        boolean canPlaceObsidian = hasObsidian(self);
-
-        if (!canExplode && !canPlaceObsidian) {
-            report("в инвентаре нет ни кристаллов, ни обсидиана");
-            finishAction();
-            return;
-        }
-        if (!canExplode) report("нет кристаллов — взрыв и установка кристалла отключены");
-
-        List<Entity> entities = collectEntities(self, world);
-
-        PlaceData explosionData = canExplode
-                ? findBestExplosion(target, world, self, entities)
-                : PlaceData.empty(PlaceResult.Explode);
-        PlaceData obsidianData  = canPlaceObsidian
-                ? findBestObsidian(target, world, self, entities)
-                : PlaceData.empty(PlaceResult.PlaceObsidian);
-        PlaceData crystalData  = canExplode
-                ? findBestCrystal(target, world, self, entities)
-                : PlaceData.empty(PlaceResult.PlaceCrystal);
-
-        PlaceData finalData = explosionData;
-        if (crystalData.damage() > finalData.damage())  finalData = crystalData;
-        if (obsidianData.damage() > finalData.damage()) finalData = obsidianData;
-
-        if (diggingAllowed()) {
-            PlaceData breakData = findBestBreak(target, world, self, entities);
-            if (breakData.damage() > finalData.damage()) finalData = breakData;
-        }
-
-        // AWAITING — это пауза, а не действие, иdamage у неё нулевой.
-        // Раньше она затирала любой вариант безусловно, из-за чего удачный
-        // взрыв терялся из-за брошенного дропа. Теперь она побеждает
-        // только когда другого варианта вообще нет.
-        if (finalData.placeResult() == PlaceResult.Awaiting
-                && obsidianData.placeResult() == PlaceResult.Awaiting) {
-            finalData = obsidianData;
-        }
-
-        boolean keepTarget = shouldKeepTarget(target, world, self, entities);
-
-        if (keepTarget) {
-            this.targetHoldTicks++;
-        } else {
-            this.targetHoldTicks = 0;
-            this.lastData = finalData;
-        }
-
-        if (this.lastData == null) {
-            finishAction();
-            return;
-        }
-        if (this.lastData.placeResult() == PlaceResult.Awaiting) {
-            // Дроп в зоне установки — действие не выполняем. Ротацию тоже
-            // снимаем: удерживать её без реальной цели бессмысленно, камера
-            // всё равно не должна дёргаться.
-            holdPosition();
-            return;
-        }
-        if (this.lastData.damage() <= 0.0D) {
-            report(String.format("не нашёл выгодной позиции (взрыв %.1f / кристалл %.1f / обсидиан %.1f)",
-                    explosionData.damage(), crystalData.damage(), obsidianData.damage()));
-            finishAction();
-            return;
-        }
-
-        this.acted = true;
-
-        Vec3d targetPoint = resolveAimPoint(world, self);
-        if (targetPoint == null) {
-            report("цель наведения пропала");
-            finishAction();
-            return;
-        }
-        applyRotation(calculate(targetPoint, self));
-
-        // Снимок для post-тика — последнее действие pre-фазы.
-        this.pending = buildPending(this.lastData, targetPoint);
     }
 
     @EventHandler
-    private void onTickPost(TickEvent.Post event) {
-        PendingAction action = this.pending;
-        this.pending = null;
+    private void onTickPre(TickEvent.Pre event) {
+        if (mc.player == null || mc.world == null || mc.getNetworkHandler() == null) return;
 
-        if (action == null) return;
+        this.aiming = false;
+        pruneAttacked();
+        tickAura();
 
-        ClientPlayerEntity self = mc.player;
-        ClientWorld world       = mc.world;
-        if (self == null || world == null || mc.interactionManager == null) return;
-
-        if (action.kind() == PlaceResult.Explode) explodeCrystal(self, action);
-        else                                    interactWithBlock(self, world, action);
+        if (!this.aiming) RotationUtils.getInstance().release(this);
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Сборка снимка
-    // ─────────────────────────────────────────────────────────────
-
-    private PendingAction buildPending(PlaceData data, Vec3d targetPoint) {
-        if (data.placeResult() == PlaceResult.Explode) {
-            Entity crystal = data.entity();
-            if (crystal == null) return null;
-            return new PendingAction(PlaceResult.Explode, null, null,
-                    crystal.getId(), this.appliedYaw, this.appliedPitch);
-        }
-
-        BlockPos pos  = data.blockPos();
-        Direction face = data.face();
-        if (pos == null || face == null) return null;
-
-        return new PendingAction(data.placeResult(), pos.toImmutable(), face,
-                -1, this.appliedYaw, this.appliedPitch);
-    }
-
-    private Vec3d resolveAimPoint(ClientWorld world, ClientPlayerEntity self) {
-        if (this.lastData.placeResult() == PlaceResult.Explode) {
-            Entity crystal = this.lastData.entity();
-            if (crystal != null && crystal.isAlive() && !crystal.isRemoved()) {
-                BlockPos pos  = this.lastData.blockPos();
-                Direction face = this.lastData.face();
-                return (pos != null && face != null) ? getFacePoint(pos, face) : nearestPoint(crystal, 0.0D, 0.05D);
-            }
-            return null;
-        }
-
-        BlockPos pos  = this.lastData.blockPos();
-        Direction face = this.lastData.face();
-        return (pos != null && face != null) ? getFacePoint(pos, face) : null;
-    }
-
-    private boolean shouldKeepTarget(PlayerEntity target, ClientWorld world,
-                                     ClientPlayerEntity self, List<Entity> entities) {
-        if (this.lastData == null || this.targetHoldTicks >= MAX_TARGET_HOLD_TICKS) return false;
-
-        if (this.lastData.placeResult() == PlaceResult.Explode) {
-            Entity c = this.lastData.entity();
-            if (c instanceof EndCrystalEntity crystal && crystal.isAlive() && !c.isRemoved()
-                    && !this.attackedCrystals.containsKey(crystal.getId())
-                    && self.getEyePos().squaredDistanceTo(nearestPoint(crystal, 0.0D, 0.05D))
-                        <= hitReach() * hitReach()) {
-                return true;
-            }
-        } else if (this.lastData.placeResult() == PlaceResult.PlaceCrystal) {
-            BlockPos bp = this.lastData.blockPos();
-            if (bp != null
-                    && world.getBlockState(bp).isOf(Blocks.OBSIDIAN)
-                    && world.getBlockState(bp.up()).isAir()
-                    && !blockedForCrystal(entities, bp.up())) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // Действия
-    // ─────────────────────────────────────────────────────────────
-
-    private void explodeCrystal(ClientPlayerEntity self, PendingAction action) {
-        Entity crystal = entityById(action.id());
-
-        // Кристалл не удаляем локально. Раньше здесь стоял discard() сразу
-        // после отправки пакета: при потере пакета кристал исчезал у нас,
-        // но оставался на сервере, и весь подсчёт ворот вставал на паузу.
-        // Сервер пришлёт удаление сам, а повторный удар за это время
-        // отсекает attackedCrystals.
-        if (!(crystal instanceof EndCrystalEntity end) || !end.isAlive() || end.isRemoved()) {
-            this.lastData = null;
-            this.targetHoldTicks = 0;
+    private void tickAura() {
+        if (this.actionTimer > 0) {
+            this.actionTimer--;
+            if (this.pendingAim != null) applyAim(this.pendingAim);
             return;
         }
 
-        boolean lookingAt = isInstantRotation()
-                || rayTrace(action.yaw(), action.pitch(), hitReach(), end.getBoundingBox(), self);
+        refreshTarget();
 
-        if (!lookingAt) {
-            report("луч не попал в кристалл (yaw " + fmt(action.yaw()) + ")");
+        if (this.currentTarget == null) {
+            cancelAction();
             return;
         }
 
-        long now = System.currentTimeMillis();
-        if (now - this.lastExplosionAt < this.explosionDelay.getValue().longValue()) return;
-
-        if (this.attackedCrystals.put(end.getId(), now) == null && mc.interactionManager != null) {
-            BlockPos base = end.getBlockPos().down();
-            this.placedPositions.remove(base);
-            this.placedPositions.remove(end.getBlockPos());
-
-            mc.interactionManager.attackEntity(self, end);
-            self.swingHand(Hand.MAIN_HAND);
-            this.lastExplosionAt = now;
-
-            addVisual(end.getBlockPos().up(), 0.2F, 0.8F, 1.0F);
-
-            this.lastData = null;
-            this.targetHoldTicks = 0;
-        }
-    }
-
-    private void interactWithBlock(ClientPlayerEntity self, ClientWorld world, PendingAction action) {
-        BlockPos pos  = action.pos();
-        Direction face = action.face();
-        if (pos == null || face == null) {
-            finishAction();
+        // 1. Атака существующего кристалла — самый быстрый путь урона.
+        //    Не проваливаемся к постановке в тот же тик: прицелы разные,
+        //    каждая смена точки обнуляет ход ротации.
+        EndCrystalEntity crystal = bestAttackableCrystal();
+        this.placeBox = crystal != null ? null : this.placeBox;
+        if (crystal != null) {
+            this.attackBox = crystal.getBoundingBox();
+            handleAttack(crystal);
             return;
         }
 
-        double reach = blockReach();
-
-        // Угол берём из снимка — тот, что реально ушёл серверу в этом тике,
-        // а не из RotationContext: при плавной ротации там может лежать
-        // промежуточное значение, и клиент с сервером разойдутся на
-        // полградуса-полтора.
-        BlockHitResult hit = raycastBlock(action.yaw(), action.pitch(), pos, reach, self);
-
-        boolean lookingAt;
-        if (isInstantRotation()) {
-            lookingAt = true;
-            if (hit == null) hit = new BlockHitResult(getFacePoint(pos, face), face, pos, false);
-        } else {
-            lookingAt = hit != null;
-        }
-
-        if (!lookingAt || hit == null) {
-            report("луч не попал в " + pos.toShortString()
-                    + " (yaw " + fmt(action.yaw()) + ", pitch " + fmt(action.pitch()) + ")");
-            return;
-        }
-
-        if (action.kind() == PlaceResult.Break) breakBlock(self, world, pos, face);
-        else                               placeBlock(self, pos, face, hit,
-                                                     action.kind() == PlaceResult.PlaceCrystal);
-
-        this.lastData = null;
-        this.targetHoldTicks = 0;
+        // 2. Постановка нового кристалла (в т.ч. опоры под него).
+        this.attackBox = null;
+        handlePlacement();
     }
 
-    private void breakBlock(ClientPlayerEntity self, ClientWorld world, BlockPos pos, Direction face) {
-        BlockState state = world.getBlockState(pos);
-
-        if (state.isAir()) {
-            if (mc.interactionManager != null) mc.interactionManager.cancelBlockBreaking();
-            finishAction();
-            return;
-        }
-
-        int tool = findBestHotbarTool(self, state);
-        if (tool == -1) {
-            report("нечем ломать " + pos.toShortString());
-            finishAction();
-            return;
-        }
-        if (!holdSlot(self, tool)) return;
-
-        this.miningThisTick = true;
-        if (mc.interactionManager != null) {
-            mc.interactionManager.attackBlock(pos, face);
-            self.swingHand(Hand.MAIN_HAND);
-            if (!world.getBlockState(pos).isAir()
-                    && mc.interactionManager.updateBlockBreakingProgress(pos, face)) {
-                self.swingHand(Hand.MAIN_HAND);
-            }
-        }
-        addVisual(pos, 0.8F, 0.1F, 0.1F);
+    private void cancelAction() {
+        this.pendingAim = null;
     }
 
-    private void placeBlock(ClientPlayerEntity self, BlockPos pos, Direction face,
-                            BlockHitResult hit, boolean crystal) {
-        Item item = crystal ? Items.END_CRYSTAL : Items.OBSIDIAN;
-        Hand hand = handFor(self, item);
-
-        if (hand == null) {
-            report("нет " + item.getName().getString() + " для установки");
-            return;
-        }
-
-        if (hand == Hand.MAIN_HAND) {
-            int slot = InventoryUtil.findInHotbar(item).slot();
-            if (slot == -1) return;
-            if (!holdSlot(self, slot)) return;
-        }
-
-        if (mc.interactionManager != null) {
-            mc.interactionManager.interactBlock(self, hand, hit);
-            self.swingHand(hand);
-
-            if (crystal) {
-                long now = System.currentTimeMillis();
-                this.placedPositions.put(pos.toImmutable(), now);
-                this.placedPositions.put(pos.up().toImmutable(), now);
-            }
-            if (this.predict.getValue() && !crystal) {
-                // Кристалл — сущность, а не блок: его установку предсказать нечем.
-                // Обсидиан можно поставить в мир локально, чтобы рендер не мигал.
-                if (mc.world != null) mc.world.setBlockState(pos, Blocks.OBSIDIAN.getDefaultState());
-            }
-        }
-
-        BlockPos visual = crystal ? pos.up() : pos.offset(face);
-        addVisual(visual, 0.2F, 0.8F, 1.0F);
-    }
-
-    private Hand handFor(ClientPlayerEntity self, Item item) {
-        if (self.getOffHandStack().isOf(item))  return Hand.OFF_HAND;
-        if (self.getMainHandStack().isOf(item)) return Hand.MAIN_HAND;
-        return InventoryUtil.findInHotbar(item).found() ? Hand.MAIN_HAND : null;
-    }
-
-    /**
-     * Удержание слота через SwapManager — он же вернёт слот и снимет
-     * конфликт с другими модулями. Приоритет CRYSTAL: ниже PLACE и PEARL,
-     * но выше MINING, чтобы подкоп не перебивался ставкой кристалла.
-     */
-    private boolean holdSlot(ClientPlayerEntity self, int slot) {
-        if (self.getInventory().getSelectedSlot() != slot) {
-            this.lastSlot = self.getInventory().getSelectedSlot();
-            this.ticksToBack = SLOT_RETURN_TICKS;
-        }
-        return SwapManager.getInstance().hold(this, slot, SwapManager.Priority.CRYSTAL, SLOT_RETURN_TICKS);
-    }
-
-    private void returnSlotIfDue(ClientPlayerEntity self) {
-        if (this.ticksToBack > 0) {
-            this.ticksToBack--;
-            return;
-        }
-        if (this.lastSlot == -1) return;
-
-        self.getInventory().setSelectedSlot(this.lastSlot);
-        InventoryManagerBridge.syncSlot(this.lastSlot);
-        this.lastSlot = -1;
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // Ротация
-    // ─────────────────────────────────────────────────────────────
-
-    private boolean isInstantRotation() {
-        RotateMode mode = this.rotate.getValue();
-        return mode == RotateMode.Vanilla || mode == RotateMode.None;
-    }
-
-    private void applyRotation(float[] rot) {
-        this.rotation = rot;
-        if (mc.player == null) return;
-
-        switch (this.rotate.getValue()) {
-            case ReallyWorld -> updateSmoothRotation(mc.player, rot[0], rot[1], 0.65F, true);
-            case Smooth      -> updateSmoothRotation(mc.player, rot[0], rot[1],
-                    this.smoothSpeed.getValue().floatValue(), false);
-            case Vanilla     -> pushRotation(rot[0], rot[1]);
-            case None        -> RotationUtils.getInstance().release(this);
-        }
-    }
-
-    private void updateSmoothRotation(ClientPlayerEntity player, float idealYaw, float idealPitch,
-                                      float lerpSpeed, boolean addNoise) {
-        if (!this.rotationInitialized) {
-            this.smoothedYaw   = RotationUtils.getInstance().isRotating()
-                    ? RotationUtils.getInstance().getSentYaw() : player.getYaw();
-            this.smoothedPitch = RotationUtils.getInstance().isRotating()
-                    ? RotationUtils.getInstance().getSentPitch() : player.getPitch();
-            this.rotationInitialized = true;
-        }
-
-        float deltaYaw   = MathHelper.wrapDegrees(idealYaw - this.smoothedYaw);
-        float deltaPitch = idealPitch - this.smoothedPitch;
-        float totalDist  = (float) Math.hypot(deltaYaw, deltaPitch);
-
-        if (totalDist > 0.001F) {
-            float minStep = 2.5F;
-            float maxStep = 25.0F + 35.0F * lerpSpeed;
-            float step    = MathHelper.clamp(totalDist * lerpSpeed * 0.8F + minStep, minStep, maxStep);
-            step = Math.min(step, totalDist);
-
-            this.smoothedYaw   = MathHelper.wrapDegrees(this.smoothedYaw + (deltaYaw / totalDist) * step);
-            this.smoothedPitch = MathHelper.clamp(this.smoothedPitch + (deltaPitch / totalDist) * step, -90.0F, 90.0F);
-        }
-
-        if (addNoise) {
-            this.noiseYaw   = approach(this.noiseYaw,   (float) Math.random() * 0.70F - 0.35F, 0.15F);
-            this.noisePitch = approach(this.noisePitch, (float) Math.random() * 0.50F - 0.25F, 0.15F);
-        } else {
-            this.noiseYaw = 0.0F;
-            this.noisePitch = 0.0F;
-        }
-
-        pushRotation(
-                this.smoothedYaw + this.noiseYaw,
-                MathHelper.clamp(this.smoothedPitch + this.noisePitch, -90.0F, 90.0F));
-    }
-
-    private void pushRotation(float yaw, float pitch) {
-        RotationUtils rotUtils = RotationUtils.getInstance();
-        rotUtils.setRotationSmooth(this, ROTATION_PRIORITY, yaw, pitch, 180.0,
-                this.syncMovement.getValue());
-        rotUtils.keepWireFresh();
-
-        // Снимок угла для post-тика берём именно оттуда, куда он ушёл в
-        // пакет, а не из нашего smoothedYaw: RotationUtils квантует угол по
-        // GCD мыши, и между ними остаётся доли градуса.
-        this.appliedYaw = rotUtils.getSentYaw();
-        this.appliedPitch = rotUtils.getSentPitch();
-        this.rotationApplied = true;
-    }
-
-    private static float approach(float current, float target, float t) {
-        return current + (target - current) * t;
-    }
-
-    private void finishAction() {
-        this.lastData = null;
-        this.rotation = null;
-        this.pending = null;
-        this.rotationInitialized = false;
-        this.targetHoldTicks = 0;
-        this.noiseYaw = 0.0F;
-        this.noisePitch = 0.0F;
-        RotationUtils.getInstance().release(this);
-    }
-
-    /** Пауза: действие в этом тике не выполняем, ротацию тоже снимаем. */
-    private void holdPosition() {
-        finishAction();
-    }
-
-    private long lastDebugAt;
-
-    private static String fmt(float v) {
-        return String.format("%.2f", v);
-    }
-
-    private void report(String reason) {
-        if (!this.debug.getValue()) return;
-
-        long now = System.currentTimeMillis();
-        if (now - this.lastDebugAt < DEBUG_COOLDOWN_MS) return;
-
-        this.lastDebugAt = now;
-        info("CrystalAura: %s", reason);
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // Поиск цели
-    // ─────────────────────────────────────────────────────────────
-
-    private PlayerEntity findTarget(ClientPlayerEntity self, ClientWorld world) {
-        Camera camera = mc.gameRenderer.getCamera();
-        double range = this.targetRange.getValue();
-
-        // Друзья выкидываются до цикла — раньше проверка INSTANCE идла
-        // на каждом игроке в мире.
-        FriendManager friends = FriendManager.getInstance();
-
-        List<TargetCandidate> targets = new ArrayList<>();
-
-        for (PlayerEntity candidate : world.getPlayers()) {
-            if (candidate == self || !candidate.isAlive() || candidate.isSpectator()) continue;
-            if (candidate.isCreative()) continue;
-            if (friends.isFriend(candidate.getName().getString())) continue;
-
-            Vec3d point = nearestTargetPoint(candidate.getBoundingBox(), self.getEyePos());
-            if (point == null || self.getEyePos().squaredDistanceTo(point) > range * range) continue;
-
-            float[] targetRotation = calculate(point, self);
-            double dot = MathHelper.clamp(
-                    RotationUtils.getRotationVector(targetRotation[1], targetRotation[0])
-                            .dotProduct(RotationUtils.getRotationVector(camera.getPitch(), camera.getYaw())),
-                    -1.0, 1.0);
-
-            targets.add(new TargetCandidate(candidate, Math.toDegrees(Math.acos(dot))));
-        }
-
-        targets.sort(Comparator.comparingDouble(TargetCandidate::viewAngle));
-        return targets.isEmpty() ? null : targets.get(0).player();
-    }
-
-    private Vec3d nearestTargetPoint(Box box, Vec3d eye) {
-        return new Vec3d(
-                MathHelper.clamp(eye.x, box.minX, box.maxX),
-                MathHelper.clamp(eye.y, box.minY, box.maxY),
-                MathHelper.clamp(eye.z, box.minZ, box.maxZ));
-    }
-
-    private List<Entity> collectEntities(ClientPlayerEntity self, ClientWorld world) {
-        List<Entity> out = new ArrayList<>();
-        for (Entity entity : world.getEntitiesByClass(Entity.class,
-                self.getBoundingBox().expand(16.0D), e -> e.isAlive() && !e.isSpectator())) {
-            if (entity instanceof EndCrystalEntity crystal && crystal.isAlive() && !crystal.isRemoved()) {
-                this.placedPositions.remove(crystal.getBlockPos().down());
-                this.placedPositions.remove(crystal.getBlockPos());
-            }
-            out.add(entity);
-        }
-        return out;
-    }
-
-    private Entity entityById(int id) {
-        if (id < 0 || mc.world == null) return null;
-        return mc.world.getEntityById(id);
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // Подбор позиций
-    // ─────────────────────────────────────────────────────────────
-
-    private PlaceData findBestExplosion(PlayerEntity target, ClientWorld world,
-                                        ClientPlayerEntity self, List<Entity> entities) {
-        EndCrystalEntity bestCrystal = null;
-        BlockPos bestBase = null;
-        Direction bestFace = null;
-        double bestScore = 0.0D;
-
-        double reach = hitReach();
-
-        for (Entity entity : entities) {
-            if (!(entity instanceof EndCrystalEntity crystal)
-                    || !crystal.isAlive() || crystal.isRemoved()
-                    || this.attackedCrystals.containsKey(crystal.getId())) continue;
-
-            Vec3d hitPoint = nearestPoint(crystal, 0.0D, 0.05D);
-            if (self.getEyePos().squaredDistanceTo(hitPoint) > reach * reach) continue;
-
-            // Источник — центр хитбокса кристалла, а не центр блока под ним.
-            // Разница на подлёте к границе радиуса даёт пару единиц урона.
-            Vec3d source = crystal.getBoundingBox().getCenter();
-
-            double real = crystalDamage(source, target, null);
-            if (real < 1.0D) continue;
-
-            double score = real + 30.0D;
-            if (score <= bestScore) continue;
-
-            double selfDamage = crystalDamage(source, self, null);
-            if (selfDamage > this.maxSelfDamage.getValue()) continue;
-
-            BlockPos pos      = crystal.getBlockPos().down();
-            Direction face    = Direction.UP;
-            BlockPos hitBase  = null;
-            Direction hitFace = null;
-
-            float[] rot  = calculate(getFacePoint(pos, face), self);
-            BlockHitResult hit = raycastBlock(rot[0], rot[1], pos, blockReach(), self);
-
-            if (hit != null && hit.getSide() == face
-                    && rayTrace(rot[0], rot[1], reach, crystal.getBoundingBox(), self)) {
-                hitBase  = pos;
-                hitFace = face;
-            }
-
-            bestScore = score;
-            bestCrystal = crystal;
-            bestBase  = hitBase;
-            bestFace  = hitFace;
-        }
-
-        if (bestCrystal != null) {
-            return new PlaceData(bestBase, bestFace, bestScore, PlaceResult.Explode, bestCrystal);
-        }
-        return PlaceData.empty(PlaceResult.Explode);
-    }
-
-    private PlaceData findBestObsidian(PlayerEntity target, ClientWorld world,
-                                        ClientPlayerEntity self, List<Entity> entities) {
-        BlockPos bestPos = null;
-        Direction bestFace = null;
-        double bestScore = 0.0D;
-
-        BlockPos base = self.getBlockPos();
-        BlockPos.Mutable cursor = new BlockPos.Mutable();
-        int targetY = (int) target.getY();
-
-        for (int x = -5; x <= 5; x++) {
-            for (int y = -5; y <= 5; y++) {
-                for (int z = -5; z <= 5; z++) {
-                    cursor.set(base.getX() + x, base.getY() + y, base.getZ() + z);
-                    if (!world.getBlockState(cursor).isSolid()) continue;
-                    if (cursor.getY() >= targetY) continue;
-
-                    Direction face = bestVisibleFace(world, cursor, self, true);
-                    if (face == null) continue;
-
-                    BlockPos placePos  = cursor.offset(face);
-                    if (placePos.getY() >= targetY) continue;
-                    if (!world.getBlockState(placePos).isAir()) continue;
-
-                    BlockPos crystalPos = placePos.up();
-                    if (blockedForObsidian(entities, placePos)  != Blocking.None) continue;
-                    if (blockedForObsidian(entities, crystalPos) != Blocking.None) continue;
-                    if (!canReachBox(self, reachBox(placePos), 3.8D)) continue;
-
-                    Vec3d source = Vec3d.ofCenter(crystalPos);
-                    double real = crystalDamage(source, target, placePos);
-                    if (real < 1.5D) continue;
-
-                    double score = real + 13.0D;
-                    if (score <= bestScore) continue;
-
-                    double selfDamage = crystalDamage(source, self, placePos);
-                    if (selfDamage > this.maxSelfDamage.getValue()) continue;
-
-                    if (blockedForObsidian(entities, crystalPos) == Blocking.Item) {
-                        return PlaceData.empty(PlaceResult.Awaiting);
-                    }
-
-                    bestScore = score;
-                    bestPos   = cursor.toImmutable();
-                    bestFace  = face;
-                }
-            }
-        }
-
-        return new PlaceData(bestPos, bestFace, bestScore, PlaceResult.PlaceObsidian, null);
-    }
-
-    private PlaceData findBestCrystal(PlayerEntity target, ClientWorld world,
-                                      ClientPlayerEntity self, List<Entity> entities) {
-        BlockPos bestPos = null;
-        Direction bestFace = null;
-        double bestScore = 0.0D;
-
-        BlockPos base = self.getBlockPos();
-        BlockPos.Mutable cursor = new BlockPos.Mutable();
-        int targetY = (int) target.getY();
-
-        for (int x = -5; x <= 5; x++) {
-            for (int y = -5; y <= 5; y++) {
-                for (int z = -5; z <= 5; z++) {
-                    cursor.set(base.getX() + x, base.getY() + y, base.getZ() + z);
-                    if (cursor.getY() >= targetY) continue;
-
-                    BlockState state = world.getBlockState(cursor);
-                    if (!state.isOf(Blocks.OBSIDIAN) && !state.isOf(Blocks.BEDROCK)) continue;
-
-                    BlockPos placePos = cursor.up();
-                    if (blockedForCrystal(entities, placePos)) continue;
-                    if (!canReachBox(self, reachBox(placePos), 3.8D)) continue;
-
-                    Direction face = bestVisibleFace(world, cursor, self, false);
-                    if (face == null) continue;
-
-                    // Верхняя грань надёжнее боковой — ставим сверху, если видна.
-                    float[] topRot  = calculate(getFacePoint(cursor, Direction.UP), self);
-                    BlockHitResult topHit = raycastBlock(topRot[0], topRot[1], cursor, blockReach(), self);
-                    if (topHit != null && topHit.getSide() == Direction.UP) face = Direction.UP;
-
-                    long now = System.currentTimeMillis();
-                    Long placedAt = this.placedPositions.get(cursor);
-                    if (placedAt == null) placedAt = this.placedPositions.get(placePos);
-                    if (placedAt != null) {
-                        if (now - placedAt < PLACED_BLOCK_MS) continue;
-                        this.placedPositions.remove(cursor);
-                        this.placedPositions.remove(placePos);
-                    }
-
-                    Vec3d source = Vec3d.ofCenter(placePos);
-                    double real = crystalDamage(source, target, null);
-                    if (real < 1.5D) continue;
-
-                    double score = real + 19.0D;
-                    if (score <= bestScore) continue;
-
-                    double selfDamage = crystalDamage(source, self, null);
-                    if (selfDamage > this.maxSelfDamage.getValue()) continue;
-
-                    bestScore = score;
-                    bestPos   = cursor.toImmutable();
-                    bestFace  = face;
-                }
-            }
-        }
-
-        return new PlaceData(bestPos, bestFace, bestScore, PlaceResult.PlaceCrystal, null);
-    }
-
-    private PlaceData findBestBreak(PlayerEntity target, ClientWorld world,
-                                    ClientPlayerEntity self, List<Entity> entities) {
-        BlockPos bestPlace = null;
-        Direction bestPlaceFace = null;
-        double bestPlaceScore = 0.0D;
-
-        BlockPos bestBreak = null;
-        Direction bestBreakFace = null;
-        double bestBreakScore = 0.0D;
-
-        BlockPos base = self.getBlockPos();
-        BlockPos.Mutable cursor = new BlockPos.Mutable();
-        int targetY = (int) target.getY();
-        double selfLimit = this.maxSelfDamage.getValue();
-
-        for (int x = -5; x <= 5; x++) {
-            for (int y = -5; y <= 5; y++) {
-                for (int z = -5; z <= 5; z++) {
-                    cursor.set(base.getX() + x, base.getY() + y, base.getZ() + z);
-                    if (cursor.getY() >= targetY || !world.getBlockState(cursor).isSolid()) continue;
-
-                    BlockPos placePos = cursor.up();
-                    if (blockedForBreak(entities, placePos)) continue;
-                    if (!canReachBox(self, reachBox(placePos), 3.8D)) continue;
-
-                    Direction face = bestVisibleFace(world, cursor, self, false);
-                    if (face == null) continue;
-
-                    float[] rot = calculate(getFacePoint(cursor, face), self);
-                    BlockHitResult hit = raycastBlock(rot[0], rot[1], cursor, blockReach(), self);
-                    if (hit == null || hit.getSide() != face) continue;
-
-                    BlockState placeState = world.getBlockState(placePos);
-                    Vec3d source = Vec3d.ofCenter(placePos);
-
-                    if (!placeState.isAir()) {
-                        // Кристалл стоит на блоке — сносим опору под ним.
-                        if (findBestHotbarTool(self, placeState) == -1) continue;
-
-                        double real = crystalDamage(source, target, placePos);
-                        if (real < 1.5D) continue;
-
-                        double score = real + 7.0D;
-                        if (score <= bestBreakScore) continue;
-
-                        double selfDamage = crystalDamage(source, self, placePos);
-                        if (selfDamage > selfLimit) continue;
-
-                        bestBreakScore = score;
-                        bestBreak      = placePos.toImmutable();
-                        bestBreakFace  = face;
-                    } else {
-                        if (findBestHotbarTool(self, world.getBlockState(cursor)) == -1) continue;
-
-                        double real = crystalDamage(source, target, null);
-                        if (real < 1.5D) continue;
-
-                        double score = real + 7.0D;
-                        if (score <= bestPlaceScore) continue;
-
-                        double selfDamage = crystalDamage(source, self, null);
-                        if (selfDamage > selfLimit) continue;
-
-                        bestPlaceScore = score;
-                        bestPlace      = cursor.toImmutable();
-                        bestPlaceFace  = face;
-                    }
-                }
-            }
-        }
-
-        if (bestBreakScore > bestPlaceScore) {
-            return new PlaceData(bestBreak, bestBreakFace, bestBreakScore, PlaceResult.Break, null);
-        }
-        return new PlaceData(bestPlace, bestPlaceFace, bestPlaceScore, PlaceResult.Break, null);
-    }
-
-    /**
-     * Грань для установки.
-     *
-     * @param requireAirSide {@code true} — режим обсидиана: грань должна
-     *                       смотреть в воздух, выбираем ту, где нас меньше
-     *                       всего приметит собственный взрыв.
-     */
-    private Direction bestVisibleFace(ClientWorld world, BlockPos pos, ClientPlayerEntity self,
-                                      boolean requireAirSide) {
-        Direction best = null;
-        double bestValue = requireAirSide ? 0.0D : Double.MAX_VALUE;
-
-        for (Direction face : Direction.values()) {
-            BlockPos side = pos.offset(face);
-            if (requireAirSide && !world.getBlockState(side).isAir()) continue;
-
-            Vec3d point = getFacePoint(pos, face);
-            float[] rot = calculate(point, self);
-            BlockHitResult hit = raycastBlock(rot[0], rot[1], pos, 4.5D, self);
-            if (hit == null) continue;
-
-            if (requireAirSide) {
-                double damage = crystalDamage(Vec3d.ofCenter(side.up()), self, side);
-                if (damage > bestValue) {
-                    bestValue = damage;
-                    best = face;
-                }
-            } else {
-                double distance = self.getEyePos().squaredDistanceTo(point);
-                if (distance < bestValue) {
-                    bestValue = distance;
-                    best = face;
-                }
+    // ─────────────────────────────────────────────────────────────────
+    // Атака: выбор и исполнение
+    // ─────────────────────────────────────────────────────────────────
+
+    private EndCrystalEntity bestAttackableCrystal() {
+        double reachSq = this.attackRange.getValue() * this.attackRange.getValue();
+        LivingEntity target = livingTarget();
+
+        EndCrystalEntity best = null;
+        float bestValue = Float.NEGATIVE_INFINITY;
+        double bestDist = Double.MAX_VALUE;
+
+        for (Entity entity : mc.world.getEntities()) {
+            if (!(entity instanceof EndCrystalEntity crystal)) continue;
+            if (!crystal.isAlive() || crystal.isRemoved()) continue;
+            if (isRecentlyAttacked(crystal.getId())) continue;
+
+            Box box = crystal.getBoundingBox();
+            double dist = GrimUtils.closestEyeDistanceSqTo(mc.player, box);
+            if (dist > reachSq) continue;
+
+            Vec3d center = crystalCenter(crystal);
+            float targetDmg = target != null
+                    ? ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, target)
+                    : 0.0f;
+
+            if (target != null && !damageAcceptable(center, target, targetDmg)) continue;
+
+            if (targetDmg > bestValue || (targetDmg == bestValue && dist < bestDist)) {
+                bestValue = targetDmg;
+                bestDist = dist;
+                best = crystal;
             }
         }
 
         return best;
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Геометрия и проверки
-    // ─────────────────────────────────────────────────────────────
+    private void handleAttack(EndCrystalEntity crystal) {
+        // Держим прицел на центре хитбокса кристалла, даже если луч пока
+        // не дошёл: rot доедет к следующему тику, и проверка пройдёт.
+        this.pendingAim = crystal.getBoundingBox().getCenter();
 
-    private static Box reachBox(BlockPos pos) {
-        return new Box(pos.getX() - 0.5D, pos.getY(), pos.getZ() - 0.5D,
-                pos.getX() + 2.0D, pos.getY() + 1.5D, pos.getZ() + 1.5D);
+        Box hitBox = crystal.getBoundingBox().expand(ENTITY_BOX_EXPAND);
+        if (!aimAtEntityBox(hitBox)) {
+            return;
+        }
+
+        if (SwapManager.getInstance().isActionConflictTick()) return;
+
+        RotationUtils rot = RotationUtils.getInstance();
+        rot.flushServerRotation();
+        rot.keepWireFresh();
+
+        mc.getNetworkHandler().sendPacket(
+                PlayerInteractEntityC2SPacket.attack(crystal, mc.player.isSneaking()));
+        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+
+        this.attackedCrystals.put(crystal.getId(), System.currentTimeMillis());
+        this.actionTimer = this.breakDelay.getValue().intValue();
+        cancelAction();
     }
 
-    private static Box crystalBox(BlockPos pos) {
-        return new Box(pos.getX(), pos.getY(), pos.getZ(),
-                pos.getX() + 1.0D, pos.getY() + 2.0D, pos.getZ() + 1.0D);
+    private boolean isRecentlyAttacked(int id) {
+        Long ts = this.attackedCrystals.get(id);
+        return ts != null && System.currentTimeMillis() - ts < ATTACKED_TTL_MS;
     }
 
-    private static boolean intersectsEntityBox(BlockPos pos, Entity entity) {
-        return entity.getBoundingBox().intersects(crystalBox(pos));
+    private void pruneAttacked() {
+        long now = System.currentTimeMillis();
+        Iterator<Map.Entry<Integer, Long>> it = this.attackedCrystals.entrySet().iterator();
+        while (it.hasNext()) {
+            if (now - it.next().getValue() >= ATTACKED_TTL_MS) it.remove();
+        }
     }
 
-    private Blocking blockedForObsidian(List<Entity> entities, BlockPos pos) {
-        Box blockBox = new Box(pos.getX(), pos.getY() - 0.2D, pos.getZ(),
-                pos.getX() + 1.0D, pos.getY() + 2.2D, pos.getZ() + 1.0D);
+    /** Центр взрыва кристалла — позиция сущности (проверено по байткоду). */
+    private static Vec3d crystalCenter(EndCrystalEntity crystal) {
+        return new Vec3d(crystal.getX(), crystal.getY(), crystal.getZ());
+    }
 
-        for (Entity entity : entities) {
-            if (entity instanceof ItemEntity && !entity.isOnGround()
-                    && entity.getBoundingBox().intersects(blockBox)) {
-                return Blocking.Item;
+    // ─────────────────────────────────────────────────────────────────
+    // Постановка: выбор клетки и исполнение
+    // ─────────────────────────────────────────────────────────────────
+
+    private void handlePlacement() {
+        if (this.pendingSupportCell != null) {
+            handleSupportBuild();
+            return;
+        }
+
+        BlockPos cell = bestPlacementCell();
+        if (cell == null) {
+            cancelAction();
+            return;
+        }
+
+        BlockState supportState = mc.world.getBlockState(cell.down());
+        if (!isCrystalSupport(supportState)) {
+            if (this.autoSupport.getValue()) {
+                this.pendingSupportCell = cell.down();
+                this.supportWaitTicks = 0;
+                handleSupportBuild();
+            } else {
+                cancelAction();
             }
-            if ((entity instanceof PlayerEntity || entity instanceof EndCrystalEntity)
-                    && intersectsEntityBox(pos, entity)) {
-                return Blocking.Player;
+            return;
+        }
+
+        aimPlacement(cell);
+    }
+
+    private void handleSupportBuild() {
+        BlockPos supportCell = this.pendingSupportCell;
+
+        // Ожидание подтверждения: обсидиан встал — дальше кристалл.
+        BlockState state = mc.world.getBlockState(supportCell);
+        if (state.isOf(Blocks.OBSIDIAN)) {
+            this.pendingSupportCell = null;
+            this.supportWaitTicks = 0;
+            return;
+        }
+        if (!state.isReplaceable()) {
+            this.pendingSupportCell = null;
+            cancelAction();
+            return;
+        }
+
+        if (this.supportWaitTicks > 0) {
+            this.supportWaitTicks--;
+            return;
+        }
+
+        FindItemResult obsidian = InventoryUtil.findInHotbar(Items.OBSIDIAN);
+        if (!obsidian.found()) {
+            this.pendingSupportCell = null;
+            cancelAction();
+            return;
+        }
+
+        // Обсидиан ставим кликом по верхней грани блока под опорной клеткой.
+        BlockPos under = supportCell.down();
+        BlockState underState = mc.world.getBlockState(under);
+        if (underState.isReplaceable() || !underState.isSolidBlock(mc.world, under)) {
+            this.pendingSupportCell = null;
+            cancelAction();
+            return;
+        }
+
+        BlockHitResult hit = findFaceHit(under, Direction.UP, this.placeReach.getValue());
+        if (hit == null) {
+            // Вверх не видно — пробуем боковые грани опорного блока-соседа.
+            hit = findSupportSideHit(supportCell);
+            if (hit == null) {
+                cancelAction();
+                return;
             }
         }
-        return Blocking.None;
-    }
 
-    private boolean blockedForCrystal(List<Entity> entities, BlockPos pos) {
-        for (Entity entity : entities) {
-            if (intersectsEntityBox(pos, entity)) return true;
+        this.pendingAim = hit.getPos();
+        applyAim(hit.getPos());
+
+        if (!isAimedViaSentRot(hit, this.placeReach.getValue())) return;
+        if (SwapManager.getInstance().isActionConflictTick()) return;
+
+        if (!SwapManager.getInstance().hold(this, obsidian.slot(), SwapManager.Priority.PLACE, 2)) return;
+
+        BlockHitResult finalHit = randomizeCursor(hit);
+        int seq = GrimUtils.nextSequence();
+        mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, finalHit, seq));
+        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+
+        if (this.predict.getValue() && isFaceFacingEye(mc.player.getEyePos(), under, Direction.UP)) {
+            mc.world.setBlockState(supportCell, Blocks.OBSIDIAN.getDefaultState());
         }
-        return false;
+
+        this.supportWaitTicks = SUPPORT_CONFIRM_TICKS;
+        cancelAction();
     }
 
-    private boolean blockedForBreak(List<Entity> entities, BlockPos pos) {
-        for (Entity entity : entities) {
-            if (!(entity instanceof ItemEntity) && intersectsEntityBox(pos, entity)) return true;
-        }
-        return false;
-    }
+    /**
+     * Ставка обсидиана боковой гранью: сосед опорной клетки, чья грань
+     * граничит с опорной клеткой и видна с глаз.
+     */
+    private BlockHitResult findSupportSideHit(BlockPos supportCell) {
+        double reach = Math.min(this.placeReach.getValue(), SERVER_BLOCK_REACH);
+        for (Direction dir : Direction.values()) {
+            BlockPos neighbor = supportCell.offset(dir);
+            BlockState neighborState = mc.world.getBlockState(neighbor);
+            if (neighborState.isReplaceable() || !neighborState.isSolidBlock(mc.world, neighbor)) continue;
 
-    private boolean hasCrystals(ClientPlayerEntity self) {
-        return self.getOffHandStack().isOf(Items.END_CRYSTAL)
-                || self.getMainHandStack().isOf(Items.END_CRYSTAL)
-                || InventoryUtil.findInHotbar(Items.END_CRYSTAL).found();
-    }
-
-    private boolean hasObsidian(ClientPlayerEntity self) {
-        return self.getOffHandStack().isOf(Items.OBSIDIAN)
-                || self.getMainHandStack().isOf(Items.OBSIDIAN)
-                || InventoryUtil.findInHotbar(Items.OBSIDIAN).found();
-    }
-
-    private int findBestHotbarTool(ClientPlayerEntity player, BlockState state) {
-        int bestSlot = -1;
-        float bestSpeed = 1.0F;
-
-        for (int slot = 0; slot < 9; slot++) {
-            ItemStack stack = player.getInventory().getStack(slot);
-            float speed = stack.getMiningSpeedMultiplier(state);
-            if (speed > bestSpeed) {
-                bestSpeed = speed;
-                bestSlot  = slot;
-            }
-        }
-        return bestSlot;
-    }
-
-    /** Дальность до блоков: атрибут игрока, при желании ограниченная настройкой. */
-    private double blockReach() {
-        double attribute = mc.player.getBlockInteractionRange();
-        double configured = this.placeReach.getValue();
-        return configured > 0.0D ? Math.min(configured, attribute) : attribute;
-    }
-
-    /** Дальность до сущностей: атрибут игрока, при желании ограниченная настройкой. */
-    private double hitReach() {
-        double attribute = mc.player.getEntityInteractionRange();
-        double configured = this.hitReach.getValue();
-        return configured > 0.0D ? Math.min(configured, attribute) : attribute;
-    }
-
-    private static boolean canReachBox(ClientPlayerEntity player, Box box, double maxDistance) {
-        Vec3d eye = player.getEyePos();
-        return eye.squaredDistanceTo(
-                MathHelper.clamp(eye.x, box.minX, box.maxX),
-                MathHelper.clamp(eye.y, box.minY, box.maxY),
-                MathHelper.clamp(eye.z, box.minZ, box.maxZ)) <= maxDistance * maxDistance;
-    }
-
-    private static Vec3d getFacePoint(BlockPos pos, Direction face) {
-        return new Vec3d(
-                pos.getX() + 0.5D + face.getOffsetX() * 0.5D,
-                pos.getY() + 0.5D + face.getOffsetY() * 0.5D,
-                pos.getZ() + 0.5D + face.getOffsetZ() * 0.5D);
-    }
-
-    private static float[] calculate(Vec3d point, ClientPlayerEntity player) {
-        double dx = point.x - player.getX();
-        double dy = point.y - player.getEyeY();
-        double dz = point.z - player.getZ();
-        double distXZ = Math.sqrt(dx * dx + dz * dz);
-        float yaw   = (float) Math.toDegrees(Math.atan2(dz, dx)) - 90.0F;
-        float pitch = (float) -Math.toDegrees(Math.atan2(dy, distXZ));
-        return new float[]{yaw, pitch};
-    }
-
-    private static Vec3d nearestPoint(Entity crystal, double offsetXZ, double offsetY) {
-        if (mc.player == null) return crystal.getEntityPos();
-        Box box = crystal.getBoundingBox();
-        Vec3d eye = mc.player.getEyePos();
-        return new Vec3d(
-                MathHelper.clamp(eye.x, box.minX + offsetXZ, box.maxX - offsetXZ),
-                MathHelper.clamp(eye.y, box.minY + offsetY, box.maxY - offsetY),
-                MathHelper.clamp(eye.z, box.minZ + offsetXZ, box.maxZ - offsetXZ));
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // Урон (с кэшем на тик)
-    // ─────────────────────────────────────────────────────────────
-
-    private float crystalDamage(Vec3d source, LivingEntity target, BlockPos transparentBlock) {
-        DamageKey key = new DamageKey(source, target.getId(), transparentBlock);
-        Float cached = this.damageCache.get(key);
-        if (cached != null) return cached;
-
-        float value = ExplosionDamageUtil.getDamageRaw(mc.world, source,
-                ExplosionDamageUtil.CRYSTAL_POWER, target, transparentBlock);
-
-        this.damageCache.put(key, value);
-        return value;
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // Raycast'ы
-    // ─────────────────────────────────────────────────────────────
-
-    private BlockHitResult raycastBlock(float yaw, float pitch, BlockPos targetPos,
-                                        double maxDistance, ClientPlayerEntity player) {
-        if (player == null || mc.world == null) return null;
-
-        Vec3d eye = player.getEyePos();
-        Vec3d end = eye.add(RotationUtils.getRotationVector(pitch, yaw).multiply(maxDistance));
-
-        BlockHitResult hit = mc.world.raycast(new RaycastContext(
-                eye, end, RaycastContext.ShapeType.OUTLINE, RaycastContext.FluidHandling.NONE, player));
-
-        if (hit != null && hit.getType() == HitResult.Type.BLOCK
-                && hit.getBlockPos().equals(targetPos)) {
-            return hit;
+            BlockHitResult hit = findFaceHit(neighbor, dir.getOpposite(), reach);
+            if (hit != null) return hit;
         }
         return null;
     }
 
-    /**
-     * Пересечение луча с AABB — слэб-метод.
-     *
-     * <p>У Yarn нет обёртки {@code AABB.clip}, а полагаться на то, что
-     * серверный {@code raycast} попадёт именно в сущность, нельзя: кристалл
-     * не коллидит с лучом как блок, а рейкаст по миру его не вернёт.
-     */
-    private boolean rayTrace(float yaw, float pitch, double maxDistance, Box box, ClientPlayerEntity player) {
-        if (player == null || box == null) return false;
+    private BlockPos bestPlacementCell() {
+        LivingEntity target = livingTarget();
+        if (target == null) return null;
 
-        Vec3d eye = player.getEyePos();
-        Vec3d end = eye.add(RotationUtils.getRotationVector(pitch, yaw).multiply(maxDistance));
+        double reach = Math.min(this.placeReach.getValue(), SERVER_BLOCK_REACH);
+        double reachSq = reach * reach;
 
-        double dirX = end.x - eye.x, dirY = end.y - eye.y, dirZ = end.z - eye.z;
-        double tMin = 0.0, tMax = maxDistance;
+        BlockPos origin = mc.player.getBlockPos();
+        int r = (int) Math.ceil(reach);
 
-        double[] origins = {eye.x, eye.y, eye.z};
-        double[] deltas  = {dirX, dirY, dirZ};
-        double[] mins    = {box.minX, box.minY, box.minZ};
-        double[] maxs    = {box.maxX, box.maxY, box.maxZ};
+        List<BlockPos> valid = new ArrayList<>();
+        for (int dx = -r; dx <= r; dx++) {
+            for (int dy = -2; dy <= 3; dy++) {
+                for (int dz = -r; dz <= r; dz++) {
+                    BlockPos cell = origin.add(dx, dy, dz);
+                    if (!mc.world.getBlockState(cell).isAir()) continue;
 
-        for (int i = 0; i < 3; i++) {
-            if (Math.abs(deltas[i]) < 1.0E-8) {
-                if (origins[i] < mins[i] || origins[i] > maxs[i]) return false;
-                continue;
+                    BlockState supportState = mc.world.getBlockState(cell.down());
+                    boolean supportReady = isCrystalSupport(supportState);
+                    if (!supportReady) {
+                        if (!this.autoSupport.getValue()) continue;
+                        // AutoSupport: обсидиан поставим позже, клетка опоры — заменяемая.
+                        if (!supportState.isReplaceable()) continue;
+                    }
+
+                    // Симуляция серверного EndCrystalItem: бокс 1×2×1 пуст от сущностей.
+                    Box space = new Box(
+                            cell.getX(), cell.getY(), cell.getZ(),
+                            cell.getX() + 1.0, cell.getY() + 2.0, cell.getZ() + 1.0);
+                    if (!mc.world.getOtherEntities(null, space).isEmpty()) continue;
+
+                    Vec3d center = bottomCenter(cell);
+                    if (GrimUtils.closestEyeDistanceSqTo(mc.player, center) > reachSq) continue;
+
+                    valid.add(cell);
+                }
             }
-            double inv = 1.0 / deltas[i];
-            double t1 = (mins[i] - origins[i]) * inv;
-            double t2 = (maxs[i] - origins[i]) * inv;
-            if (t1 > t2) { double tmp = t1; t1 = t2; t2 = tmp; }
-            tMin = Math.max(tMin, t1);
-            tMax = Math.min(tMax, t2);
-            if (tMin > tMax) return false;
         }
 
-        return tMax >= 0.0;
+        if (valid.isEmpty()) return null;
+
+        float maxSelf = this.maxSelfDamage.getValue().floatValue();
+        float minDmg  = effectiveMinDamage(target);
+        double ratio  = this.damageRatio.getValue();
+
+        // Дешёвая верхняя граница урона для сортировки перед точным расчётом.
+        List<BlockPos> pool = valid;
+        if (this.smartPlacement.getValue() && pool.size() > this.smartCandidates.getValue().intValue()) {
+            pool = new ArrayList<>(valid);
+            pool.sort(Comparator.comparingDouble((BlockPos p) -> -(
+                    ExplosionDamageUtil.getDamageUpperBound(bottomCenter(p), ExplosionDamageUtil.CRYSTAL_POWER, target)
+                    - 0.001 * ExplosionDamageUtil.getDamageUpperBound(bottomCenter(p), ExplosionDamageUtil.CRYSTAL_POWER, mc.player)
+            )));
+            pool = pool.subList(0, Math.max(1, this.smartCandidates.getValue().intValue()));
+        }
+
+        BlockPos best = null;
+        float bestScore = Float.NEGATIVE_INFINITY;
+
+        for (BlockPos p : pool) {
+            Vec3d center = bottomCenter(p);
+            float targetDmg = ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, target);
+            if (targetDmg < minDmg) continue;
+            if (this.antiFriend.getValue() && isFriendDamaged(center)) continue;
+
+            float selfDmg = ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, mc.player);
+            if (selfDmg > maxSelf) continue;
+            if (selfDmg > 0.5f && targetDmg / selfDmg < ratio) continue;
+
+            if (this.smartPlacement.getValue()) {
+                // Жёсткий сейф: позиция, на которой мы переживаем взрыв.
+                if (this.safety.getValue() && !selfDamageSurvivable(selfDmg)) continue;
+                float score = targetDmg * 2.0f - selfDmg;
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = p;
+                }
+            } else {
+                if (targetDmg > bestScore) {
+                    bestScore = targetDmg;
+                    best = p;
+                }
+            }
+        }
+
+        return best == null ? null : keepSticky(best, bestScore, pool, target);
     }
 
-    // ─────────────────────────────────────────────────────────────
+    private BlockPos keepSticky(BlockPos best, float bestScore, List<BlockPos> pool, LivingEntity target) {
+        long now = System.currentTimeMillis();
+        BlockPos pinned = this.stickyCell;
+
+        if (this.stickyTargetId != this.currentTarget.getId() || now - this.stickyMs > STICKY_TTL_MS) {
+            this.stickyCell = null;
+            pinned = null;
+        }
+        this.stickyTargetId = this.currentTarget.getId();
+        this.stickyMs = now;
+
+        if (pinned != null && (!pool.contains(pinned) || !mc.world.getBlockState(pinned).isAir())) {
+            this.stickyCell = null;
+            pinned = null;
+        }
+
+        if (pinned != null) {
+            Vec3d center = bottomCenter(pinned);
+            float score = ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, target) * 2.0f
+                    - ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, mc.player);
+            if (score >= bestScore * STICKY_KEEP_RATIO) return pinned;
+        }
+
+        this.stickyCell = best;
+        return best;
+    }
+
+    private void aimPlacement(BlockPos cell) {
+        BlockPos support = cell.down();
+        BlockState supportState = mc.world.getBlockState(support);
+
+        BlockHitResult hit = null;
+        if (isCrystalSupport(supportState)) {
+            for (Direction face : facePreferenceOrder(support)) {
+                hit = findFaceHit(support, face, this.placeReach.getValue());
+                if (hit != null) break;
+            }
+        } else {
+            hit = findSupportSideHit(support);
+        }
+        if (hit == null) {
+            cancelAction();
+            return;
+        }
+
+        this.pendingAim = hit.getPos();
+        applyAim(hit.getPos());
+        this.placeBox = new Box(
+                cell.getX(), cell.getY(), cell.getZ(),
+                cell.getX() + 1.0, cell.getY() + 2.0, cell.getZ() + 1.0);
+
+        if (!isAimedViaSentRot(hit, this.placeReach.getValue())) return;
+        if (SwapManager.getInstance().isActionConflictTick()) return;
+
+        FindItemResult crystals = InventoryUtil.findInHotbar(Items.END_CRYSTAL);
+        if (!crystals.found()) {
+            cancelAction();
+            return;
+        }
+        if (!SwapManager.getInstance().hold(this, crystals.slot(), SwapManager.Priority.CRYSTAL, 2)) return;
+
+        BlockHitResult finalHit = randomizeCursor(hit);
+        int seq = GrimUtils.nextSequence();
+        mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, finalHit, seq));
+        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+
+        this.actionTimer = this.placeDelay.getValue().intValue();
+        cancelAction();
+    }
+
+    private boolean isCrystalSupport(BlockState state) {
+        return state.isOf(Blocks.OBSIDIAN) || state.isOf(Blocks.BEDROCK);
+    }
+
+    /**
+     * Поиск кликабельного хита по грани блока. COLLIDER — как в
+     * GrimAnchorAura для физической поддержки placement-лучей.
+     */
+    private BlockHitResult findFaceHit(BlockPos pos, Direction face, double reach) {
+        Vec3d eye = mc.player.getEyePos();
+
+        if (!isFaceFacingEye(eye, pos, face)) return null;
+
+        Vec3d sample = faceCenter(pos, face);
+        Vec3d dir = sample.subtract(eye);
+        if (dir.lengthSquared() < 1.0E-6) return null;
+
+        Vec3d end = eye.add(dir.normalize().multiply(reach + 0.1));
+
+        BlockHitResult clip = mc.world.raycast(new RaycastContext(
+                eye, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, mc.player));
+
+        if (clip.getType() != HitResult.Type.BLOCK) return null;
+        if (!clip.getBlockPos().equals(pos) || clip.getSide() != face) return null;
+        return eye.squaredDistanceTo(clip.getPos()) > reach * reach ? null : clip;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Ротация и проверки прицела
+    // ─────────────────────────────────────────────────────────────────
+
+    private void applyAim(Vec3d targetPos) {
+        this.aiming = true;
+
+        float[] rot = RotationUtils.getRotationsTo(mc.player.getEyePos(), targetPos);
+        double maxSpeed = this.turnSpeed.getValue();
+        double smooth = this.smoothness.getValue();
+        RotationMode mode = this.rotationMode.getValue();
+
+        if (mode == RotationMode.CLIENT || mode == RotationMode.BOTH) {
+            float curYaw = mc.player.getYaw();
+            float curPitch = mc.player.getPitch();
+
+            float dy = MathHelper.wrapDegrees(rot[0] - curYaw);
+            float dp = rot[1] - curPitch;
+            double totalDist = Math.hypot(dy, dp);
+
+            if (maxSpeed >= 180.0 && smooth <= 0.0) {
+                mc.player.setYaw(curYaw + dy);
+                mc.player.setPitch(MathHelper.clamp(rot[1], -90.0f, 90.0f));
+            } else if (totalDist > 0.0001) {
+                double decelRange = Math.max(16.0, maxSpeed * 0.40);
+                double easePow = 0.50 + smooth * 0.30;
+                double speedFactor = totalDist < decelRange ? Math.pow(totalDist / decelRange, easePow) : 1.0;
+                double desiredSpeed = Math.max(maxSpeed * speedFactor, 3.0);
+                double step = Math.min(totalDist, Math.min(desiredSpeed, maxSpeed));
+
+                double stepY = dy / totalDist * step;
+                double stepP = dp / totalDist * step;
+
+                // GCD-квантование под мышачий ввод.
+                double sens = mc.options.getMouseSensitivity().getValue();
+                double f = sens * 0.6 + 0.2;
+                double gcd = f * f * f * 8.0 * 0.15;
+                if (gcd > 0.001) {
+                    double qY = Math.round(stepY / gcd) * gcd;
+                    double qP = Math.round(stepP / gcd) * gcd;
+                    if (qY == 0 && Math.abs(dy) > gcd * 0.5) qY = Math.signum(dy) * gcd;
+                    if (qP == 0 && Math.abs(dp) > gcd * 0.5) qP = Math.signum(dp) * gcd;
+                    stepY = qY;
+                    stepP = qP;
+                }
+
+                mc.player.setYaw(curYaw + (float) stepY);
+                mc.player.setPitch(MathHelper.clamp(curPitch + (float) stepP, -90.0f, 90.0f));
+            }
+        }
+
+        if (mode == RotationMode.SILENT || mode == RotationMode.BOTH) {
+            RotationUtils rotUtils = RotationUtils.getInstance();
+            if (mode == RotationMode.BOTH) {
+                rotUtils.setRotationFullInstant(this, ROTATION_PRIORITY, mc.player.getYaw(), mc.player.getPitch());
+            } else {
+                rotUtils.setRotationSmooth(this, ROTATION_PRIORITY, rot[0], rot[1], maxSpeed, this.syncMovement.getValue());
+            }
+            rotUtils.keepWireFresh();
+        } else {
+            RotationUtils.getInstance().release(this);
+        }
+    }
+
+    /** Проверка прицела по отправленному углу: луч обязан попасть в блок и грань. */
+    private boolean isAimedViaSentRot(BlockHitResult expected, double reach) {
+        if (mc.player == null || mc.world == null || expected == null) return false;
+
+        RotationUtils rotUtils = RotationUtils.getInstance();
+        Vec3d eye = mc.player.getEyePos();
+
+        float yaw, pitch;
+        if (this.rotationMode.getValue() == RotationMode.CLIENT) {
+            yaw = mc.player.getYaw();
+            pitch = mc.player.getPitch();
+        } else {
+            yaw = rotUtils.getSentYaw();
+            pitch = rotUtils.getSentPitch();
+        }
+
+        Vec3d look = RotationUtils.getRotationVector(pitch, yaw);
+        Vec3d end = eye.add(look.multiply(reach + 0.1));
+
+        // GrimAC валидирует интеракции через OUTLINE-форму блока.
+        BlockHitResult clip = mc.world.raycast(new RaycastContext(
+                eye, end, RaycastContext.ShapeType.OUTLINE, RaycastContext.FluidHandling.NONE, mc.player));
+
+        if (clip == null || clip.getType() != HitResult.Type.BLOCK) return false;
+        if (!clip.getBlockPos().equals(expected.getBlockPos())) return false;
+        if (clip.getSide() != expected.getSide()) return false;
+        return eye.squaredDistanceTo(clip.getPos()) <= reach * reach;
+    }
+
+    /** Проверка, что по отправленному углу луч пересекает хитбокс кристалла. */
+    private boolean aimAtEntityBox(Box hitBox) {
+        double reach = this.attackRange.getValue();
+        Vec3d eye = mc.player.getEyePos();
+
+        if (GrimUtils.closestEyeDistanceSqTo(mc.player, hitBox) > reach * reach) return false;
+
+        float yaw, pitch;
+        if (this.rotationMode.getValue() == RotationMode.CLIENT) {
+            yaw = mc.player.getYaw();
+            pitch = mc.player.getPitch();
+        } else {
+            RotationUtils rotUtils = RotationUtils.getInstance();
+            yaw = rotUtils.getSentYaw();
+            pitch = rotUtils.getSentPitch();
+        }
+
+        Vec3d look = RotationUtils.getRotationVector(pitch, yaw);
+        Vec3d end = eye.add(look.multiply(reach + 0.2));
+        return hitBox.raycast(eye, end).isPresent();
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Урон и безопасность
+    // ─────────────────────────────────────────────────────────────────
+
+    /** Гейт урона: минДмг / соотношение / фейсплейс / самоподрыв / друзья. */
+    private boolean damageAcceptable(Vec3d center, LivingEntity target, float targetDmg) {
+        float selfDmg = ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, mc.player);
+
+        boolean facePlace = isFacePlace(target);
+        if (!facePlace) {
+            if (targetDmg < this.minDamage.getValue().floatValue()) return false;
+            if (selfDmg > 0.5f && targetDmg / selfDmg < this.damageRatio.getValue()) return false;
+        }
+
+        if (selfDmg > this.maxSelfDamage.getValue().floatValue()) return false;
+        if (this.antiFriend.getValue() && isFriendDamaged(center)) return false;
+        if (this.safety.getValue() && !selfDamageSurvivable(selfDmg)) return false;
+
+        return true;
+    }
+
+    private boolean isFacePlace(LivingEntity target) {
+        return this.facePlaceHp.getValue() > 0.0
+                && (target.getHealth() + target.getAbsorptionAmount()) <= this.facePlaceHp.getValue().floatValue();
+    }
+
+    private float effectiveMinDamage(LivingEntity target) {
+        return isFacePlace(target) ? 0.0f : this.minDamage.getValue().floatValue();
+    }
+
+    private boolean isFriendDamaged(Vec3d center) {
+        float limit = this.friendDamageLimit.getValue().floatValue();
+        if (limit <= 0.0f) return false;
+
+        for (String name : FriendManager.INSTANCE.getFriends()) {
+            for (PlayerEntity player : mc.world.getPlayers()) {
+                if (!player.getName().getString().equals(name)) continue;
+                if (player == mc.player || !player.isAlive() || player.isDead()) continue;
+
+                float upper = ExplosionDamageUtil.getDamageUpperBound(center, ExplosionDamageUtil.CRYSTAL_POWER, player);
+                if (upper <= limit) continue;
+
+                float dmg = ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, player);
+                if (dmg > limit) return true;
+            }
+        }
+        return false;
+    }
+
+    /** Тотем в руках или здоровья хватит пережить самоурон. */
+    private boolean selfDamageSurvivable(float selfDmg) {
+        if (selfDmg <= 6.0f) return true;
+
+        boolean hasTotem = mc.player.getMainHandStack().isOf(Items.TOTEM_OF_UNDYING)
+                || mc.player.getOffHandStack().isOf(Items.TOTEM_OF_UNDYING);
+        if (hasTotem) return true;
+
+        return (mc.player.getHealth() + mc.player.getAbsorptionAmount()) > selfDmg;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Цели
+    // ─────────────────────────────────────────────────────────────────
+
+    private void refreshTarget() {
+        double rangeSq = this.targetRange.getValue() * this.targetRange.getValue();
+
+        Entity best = null;
+        double bestValue = Double.MAX_VALUE;      // для DISTANCE/HEALTH — меньше, тем лучше
+        float bestDamage = Float.NEGATIVE_INFINITY;
+
+        for (PlayerEntity player : mc.world.getPlayers()) {
+            if (player == mc.player) continue;
+            if (player.isSpectator() || player.isDead() || !player.isAlive()) continue;
+            if (!this.targetCreative.getValue() && player.isCreative()) continue;
+            if (this.antiFriend.getValue() && FriendManager.INSTANCE.isFriend(player)) continue;
+
+            double dist = mc.player.squaredDistanceTo(player);
+            if (dist > rangeSq) continue;
+
+            switch (this.targetMode.getValue()) {
+                case DISTANCE -> {
+                    if (dist < bestValue) {
+                        bestValue = dist;
+                        best = player;
+                    }
+                }
+                case HEALTH -> {
+                    double hp = player.getHealth() + player.getAbsorptionAmount();
+                    if (hp < bestValue) {
+                        bestValue = hp;
+                        best = player;
+                    }
+                }
+                case DAMAGE -> {
+                    float upper = ExplosionDamageUtil.getDamageUpperBound(
+                            mc.player.getEntityPos().add(0.0, 1.0, 0.0), ExplosionDamageUtil.CRYSTAL_POWER, player);
+                    if (upper > bestDamage) {
+                        bestDamage = upper;
+                        best = player;
+                    }
+                }
+            }
+        }
+
+        if (best == null && this.targetMobs.getValue()) {
+            for (Entity entity : mc.world.getEntities()) {
+                if (!(entity instanceof LivingEntity living)
+                        || living instanceof PlayerEntity
+                        || !living.isAlive()
+                        || living.isDead()) continue;
+
+                double dist = mc.player.squaredDistanceTo(living);
+                if (dist > rangeSq) continue;
+
+                if (this.targetMode.getValue() == TargetMode.HEALTH) {
+                    double hp = living.getHealth() + living.getAbsorptionAmount();
+                    if (hp < bestValue) {
+                        bestValue = hp;
+                        best = living;
+                    }
+                } else {
+                    if (dist < bestValue) {
+                        bestValue = dist;
+                        best = living;
+                    }
+                }
+            }
+        }
+
+        // Зацеп цели: мигание выбором между равными кандидатами сбивает ротацию.
+        if (best != null && this.currentTarget != null
+                && best.getId() != this.currentTarget.getId()
+                && this.targetHoldTicks > 0
+                && this.currentTarget.isAlive()
+                && mc.player.squaredDistanceTo(this.currentTarget) <= rangeSq) {
+            this.targetHoldTicks--;
+            best = this.currentTarget;
+        }
+
+        if (this.currentTarget == null || best == null || best.getId() != this.currentTarget.getId()) {
+            this.targetHoldTicks = TARGET_HOLD_TICKS;
+            this.stickyCell = null;
+            this.pendingSupportCell = null;
+        }
+        this.currentTarget = best;
+    }
+
+    private LivingEntity livingTarget() {
+        return this.currentTarget instanceof LivingEntity living && living.isAlive() && !living.isDead()
+                ? living : null;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Геометрия и пакеты
+    // ─────────────────────────────────────────────────────────────────
+
+    private boolean isFaceFacingEye(Vec3d eye, BlockPos pos, Direction face) {
+        return switch (face) {
+            case DOWN -> eye.y < pos.getY();
+            case UP -> eye.y > pos.getY() + 1.0;
+            case NORTH -> eye.z < pos.getZ();
+            case SOUTH -> eye.z > pos.getZ() + 1.0;
+            case WEST -> eye.x < pos.getX();
+            case EAST -> eye.x > pos.getX() + 1.0;
+        };
+    }
+
+    /** Центр грани блока — фиксированная точка прицеливания. */
+    private Vec3d faceCenter(BlockPos pos, Direction face) {
+        double x = pos.getX();
+        double y = pos.getY();
+        double z = pos.getZ();
+        return switch (face) {
+            case DOWN -> new Vec3d(x + 0.5, y, z + 0.5);
+            case UP -> new Vec3d(x + 0.5, y + 1.0, z + 0.5);
+            case NORTH -> new Vec3d(x + 0.5, y + 0.5, z);
+            case SOUTH -> new Vec3d(x + 0.5, y + 0.5, z + 1.0);
+            case WEST -> new Vec3d(x, y + 0.5, z + 0.5);
+            case EAST -> new Vec3d(x + 1.0, y + 0.5, z + 0.5);
+        };
+    }
+
+    /**
+     * Порядок предпочтения граней опоры: верхняя, потому что её центр —
+     * это нижний центр кристалла: честный луч сразу и для установки,
+     * и для атаки. Сбоку — когда верхняя не видна. Снизу — из-под опоры.
+     */
+    private Direction[] facePreferenceOrder(BlockPos support) {
+        Vec3d eye = mc.player.getEyePos();
+        Direction[] topFirst = {Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, Direction.DOWN};
+        Direction[] bottomFirst = {Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, Direction.UP};
+
+        return eye.y > support.getY() + 1.0
+                ? topFirst
+                : eye.y < support.getY() ? bottomFirst : topFirst;
+    }
+
+    /** Точка, из которой сервер считает урон взрыва кристалла (низ клетки). */
+    private static Vec3d bottomCenter(BlockPos cell) {
+        return new Vec3d(cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5);
+    }
+
+    /**
+     * GrimAC фиксирует курсор взаимодействия в центре грани (0.5, 0.5).
+     * Рандомизируем в пределах ±0.30 — как живой игрок.
+     */
+    private BlockHitResult randomizeCursor(BlockHitResult original) {
+        BlockPos blockPos = original.getBlockPos();
+        Direction face = original.getSide();
+
+        double bx = blockPos.getX();
+        double by = blockPos.getY();
+        double bz = blockPos.getZ();
+
+        double rx, ry, rz;
+
+        switch (face) {
+            case UP -> {
+                rx = bx + 0.5 + jitter();
+                ry = by + 1.0;
+                rz = bz + 0.5 + jitter();
+            }
+            case DOWN -> {
+                rx = bx + 0.5 + jitter();
+                ry = by;
+                rz = bz + 0.5 + jitter();
+            }
+            case NORTH -> {
+                rx = bx + 0.5 + jitter();
+                ry = by + 0.5 + jitter();
+                rz = bz;
+            }
+            case SOUTH -> {
+                rx = bx + 0.5 + jitter();
+                ry = by + 0.5 + jitter();
+                rz = bz + 1.0;
+            }
+            case WEST -> {
+                rx = bx;
+                ry = by + 0.5 + jitter();
+                rz = bz + 0.5 + jitter();
+            }
+            case EAST -> {
+                rx = bx + 1.0;
+                ry = by + 0.5 + jitter();
+                rz = bz + 0.5 + jitter();
+            }
+            default -> {
+                return original;
+            }
+        }
+
+        return new BlockHitResult(new Vec3d(rx, ry, rz), face, blockPos, original.isInsideBlock());
+    }
+
+    private static double jitter() {
+        return (RANDOM.nextDouble() - 0.5) * 2.0 * CURSOR_JITTER;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
     // Визуал
-    // ─────────────────────────────────────────────────────────────
-
-    private void addVisual(BlockPos pos, float r, float g, float b) {
-        BlockPos immutable = pos.toImmutable();
-        if (this.visualSeen.putIfAbsent(immutable, Boolean.TRUE) != null) return;
-        this.visuals.addLast(new VisualData(immutable, r, g, b));
-    }
+    // ─────────────────────────────────────────────────────────────────
 
     @EventHandler
     private void onRender3D(Render3DEvent event) {
-        if (!this.render.getValue() || mc.player == null || mc.world == null || this.visuals.isEmpty()) return;
+        if (!isToggled() || !this.render.getValue()) return;
 
-        long now = System.currentTimeMillis();
-        while (!this.visuals.isEmpty()) {
-            VisualData data = this.visuals.peekFirst();
-            if (now - data.startedAt <= VISUAL_MS) break;
-            this.visuals.pollFirst();
-            this.visualSeen.remove(data.pos);
+        if (this.attackBox != null) {
+            Renderer3D.box(this.attackBox.minX, this.attackBox.minY, this.attackBox.minZ,
+                    this.attackBox.maxX, this.attackBox.maxY, this.attackBox.maxZ,
+                    ATTACK_FILL, ATTACK_LINE, ShapeMode.Both);
         }
-        if (this.visuals.isEmpty()) return;
-
-        for (VisualData data : this.visuals) {
-            float remaining = MathHelper.clamp(1.0F - (float) (now - data.startedAt) / VISUAL_MS, 0.0F, 1.0F);
-            float fade = remaining * remaining * remaining;
-            if (fade <= 0.01F) continue;
-
-            int alphaFill = (int) (fade * 0.35F * 255.0F);
-            int alphaLine = (int) (fade * 0.85F * 255.0F);
-
-            Renderer3D.box(new Box(data.pos),
-                    new Color((int) (data.r * 255), (int) (data.g * 255), (int) (data.b * 255), alphaFill),
-                    new Color((int) (data.r * 255), (int) (data.g * 255), (int) (data.b * 255), alphaLine),
-                    ShapeMode.Both, false);
-        }
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // Модели
-    // ─────────────────────────────────────────────────────────────
-
-    /**
-     * Снимок pre-тика для post-тика.
-     *
-     * @param yaw угол, реально ушедший серверу в этом тике
-     * @param id  id кристалла (только для {@link PlaceResult#Explode})
-     */
-    private record PendingAction(PlaceResult kind, BlockPos pos, Direction face,
-                                 int id, float yaw, float pitch) {}
-
-    private record TargetCandidate(PlayerEntity player, double viewAngle) {}
-
-    private record DamageKey(Vec3d source, int entityId, BlockPos transparentBlock) {}
-
-    public record PlaceData(BlockPos blockPos, Direction face, double damage,
-                            PlaceResult placeResult, Entity entity) {
-
-        public static PlaceData empty(PlaceResult result) {
-            return new PlaceData(null, null, 0.0D, result, null);
-        }
-    }
-
-    private static final class VisualData {
-        private final BlockPos pos;
-        private final long startedAt = System.currentTimeMillis();
-        private final float r;
-        private final float g;
-        private final float b;
-
-        VisualData(BlockPos pos, float r, float g, float b) {
-            this.pos = pos;
-            this.r = r;
-            this.g = g;
-            this.b = b;
-        }
-    }
-
-    /** Отправка пакета смены слота через общий инвентарный менеджер клиента. */
-    private static final class InventoryManagerBridge {
-        private InventoryManagerBridge() {}
-
-        static void syncSlot(int slot) {
-            me.collective.util.InventoryManager.getInstance().setSlotForced(slot);
+        if (this.placeBox != null) {
+            Renderer3D.box(this.placeBox.minX, this.placeBox.minY, this.placeBox.minZ,
+                    this.placeBox.maxX, this.placeBox.maxY, this.placeBox.maxZ,
+                    PLACE_FILL, PLACE_LINE, ShapeMode.Both);
         }
     }
 }
