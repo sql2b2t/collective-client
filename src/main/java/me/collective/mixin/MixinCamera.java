@@ -57,6 +57,17 @@ public abstract class MixinCamera {
             return;
         }
 
+        // ElytraBounce SmoothCamera: камера не следует за дугой прыжка —
+        // полёт выглядит ровным элитрафлаем вперёд. Чисто клиентский визуал.
+        me.collective.module.movement.ElytraBounce bounce = me.collective.module.movement.ElytraBounce.INSTANCE;
+        if (bounce != null && bounce.isToggled() && bounce.smoothCamera.getValue()) {
+            double smoothedY = bounce.smoothedCameraY(this.pos.y);
+            if (smoothedY != this.pos.y) {
+                setPos(new Vec3d(this.pos.x, smoothedY, this.pos.z));
+            }
+            return;
+        }
+
         BetterF5 module = BetterF5.INSTANCE;
         if (module == null || !module.isToggled()) {
             return;
