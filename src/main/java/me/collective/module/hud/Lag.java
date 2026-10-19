@@ -3,7 +3,6 @@ package me.collective.module.hud;
 import me.collective.event.EventHandler;
 import me.collective.event.events.PacketEvent;
 import me.collective.font.FontManager;
-import me.collective.render.RenderUtil;
 import me.collective.setting.NumberSetting;
 import net.minecraft.client.gui.DrawContext;
 
@@ -20,6 +19,7 @@ public class Lag extends HudModule {
 
     public Lag() {
         super("Lag", "Shows server lag duration.", 350, 40);
+        background.setValue(true);
     }
 
     @Override
@@ -48,14 +48,26 @@ public class Lag extends HudModule {
             return;
         }
 
-        String lagText = String.format("Server not responding: §c%.1fs", diff / 1000.0f);
-        this.width = FontManager.INSTANCE.getStringWidth(lagText) + 6;
-        this.height = FontManager.INSTANCE.getFontHeight() + 4;
+        FontManager fm = FontManager.INSTANCE;
+        String message = "Server not responding";
+        String seconds = String.format("%.1fs", diff / 1000.0f);
+        float messageW = fm.getStringWidth(message);
+        float secondsW = fm.getStringWidth(seconds);
+        int fontH = fm.getFontHeight();
+        float padX = 7f, padY = 4f;
 
         if (background.getValue()) {
-            RenderUtil.drawRect(context, x, y, x + width, y + height, new Color(20, 20, 20, 180));
+            this.width = padX * 2 + messageW + 4f + secondsW;
+            this.height = fontH + padY * 2;
+            HudTheme.plate(context, x, y, width, height, 5.5f);
+        } else {
+            this.width = messageW + 4f + secondsW;
+            this.height = fontH;
         }
 
-        FontManager.INSTANCE.drawStringWithShadow(context, lagText, x + 3, y + 2, Color.RED);
+        float tx = background.getValue() ? x + padX : x;
+        float ty = background.getValue() ? y + padY : y;
+        fm.drawStringWithShadow(context, message, tx, ty, HudTheme.TEXT);
+        fm.drawStringWithShadow(context, seconds, tx + messageW + 4f, ty, HudTheme.BAD);
     }
 }

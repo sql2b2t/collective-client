@@ -1,13 +1,10 @@
 package me.collective.module.hud;
 
 import me.collective.font.FontManager;
-import me.collective.module.client.HUD;
-import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.EnumSetting;
 import net.minecraft.client.gui.DrawContext;
 
-import java.awt.Color;
 import java.util.Locale;
 
 public class Bps extends HudModule {
@@ -22,6 +19,7 @@ public class Bps extends HudModule {
 
     public Bps() {
         super("BPS", "Displays your current movement speed in blocks per second.", 4, 360);
+        background.setValue(true);
     }
 
     @Override
@@ -35,26 +33,36 @@ public class Bps extends HudModule {
         double distance = both3D.getValue() ? Math.sqrt(dX * dX + dY * dY + dZ * dZ) : Math.hypot(dX, dZ);
         double speed = distance * 20.0;
 
-        String unitLabel = "b/s";
+        String unitLabel = " b/s";
         if (unit.getValue() == Unit.KMH) {
             speed *= 3.6;
-            unitLabel = "km/h";
+            unitLabel = " km/h";
         }
 
-        String text;
-        if (showTitle.getValue()) {
-            text = String.format(Locale.ROOT, "Speed: §f%.1f §7%s", speed, unitLabel);
-        } else {
-            text = String.format(Locale.ROOT, "§f%.1f §7%s", speed, unitLabel);
-        }
-
-        this.width = FontManager.INSTANCE.getStringWidth(text) + 6;
-        this.height = FontManager.INSTANCE.getFontHeight() + 4;
+        FontManager fm = FontManager.INSTANCE;
+        int fontH = fm.getFontHeight();
+        String value = String.format(Locale.ROOT, "%.1f", speed);
+        float valW = fm.getStringWidth(value);
+        float labW = fm.getStringWidth(unitLabel);
+        float titleW = showTitle.getValue() ? fm.getStringWidth("Speed") + 5f : 0f;
+        float padX = 7f, padY = 4f;
 
         if (background.getValue()) {
-            RenderUtil.drawRect(context, x, y, x + width, y + height, new Color(20, 20, 20, 160));
+            this.width = padX * 2 + titleW + valW + labW;
+            this.height = fontH + padY * 2;
+            HudTheme.plate(context, x, y, width, height, 5.5f);
+        } else {
+            this.width = titleW + valW + labW;
+            this.height = fontH;
         }
 
-        FontManager.INSTANCE.drawStringWithShadow(context, text, x + 3, y + 2, HUD.INSTANCE.getHudColor(0));
+        float tx = background.getValue() ? x + padX : x;
+        float ty = background.getValue() ? y + padY : y;
+        if (titleW > 0) {
+            fm.drawStringWithShadow(context, "Speed", tx, ty, HudTheme.MUTED);
+            tx += titleW;
+        }
+        fm.drawStringWithShadow(context, value, tx, ty, HudTheme.TEXT);
+        fm.drawStringWithShadow(context, unitLabel, tx + valW, ty, HudTheme.MUTED);
     }
 }
