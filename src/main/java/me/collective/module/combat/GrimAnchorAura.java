@@ -221,7 +221,9 @@ public class GrimAnchorAura extends Module {
         if (this.actionTimer > 0) {
             this.actionTimer--;
             // Продолжаем удерживать прицел пока ждём задержки действия.
-            // Слот тика нужен только когда есть куда наводиться.
+            // Провод не отпускаем: серверный угол остаётся у грани действия,
+            // следующий шаг цепочки (заряд/взрыв) не заводится заново.
+            this.aiming = true;
             if (this.pendingHit != null && AuraCoordination.claim(this, mc.world.getTime())) {
                 applyAim(this.pendingHit.getPos());
             }
@@ -246,6 +248,8 @@ public class GrimAnchorAura extends Module {
         // держат один RotationUtils-провод, и одновременный заказ перезаписи
         // углов ломает проверки прицела друг друга. Слот берём только когда
         // есть цель: простаивающий якорь не съедает тики кристалла.
+        // Отказ слота наведение не отменяет — доворот доживёт до своего тика.
+        this.aiming = true;
         if (!AuraCoordination.claim(this, mc.world.getTime())) return;
 
         double reach = this.placeReach.getValue();
@@ -1006,7 +1010,9 @@ public class GrimAnchorAura extends Module {
         double closestDist = Double.MAX_VALUE;
 
         for (int x = -r; x <= r; x++) {
-            for (int y = -r; y <= r; y++) {
+            // Вертикально якорям хватать ±3: выше и ниже интерактив всё равно
+            // не дотянется — вдвое меньше getBlockState на просмотр.
+            for (int y = -3; y <= 3; y++) {
                 for (int z = -r; z <= r; z++) {
                     BlockPos p = scanCenter.add(x, y, z);
                     if (GrimUtils.closestEyeDistanceSqTo(mc.player, p.toCenterPos()) > reachSq) continue;

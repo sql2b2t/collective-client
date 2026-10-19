@@ -228,8 +228,13 @@ public class CrystalAura extends Module {
             // Во время кулдауна продолжаем наводиться. Слот тика нужен
             // только когда есть куда наводиться: простаивающий кристалл
             // не съедает тики якоря.
-            if (this.pendingAim != null && AuraCoordination.claim(this, mc.world.getTime())) {
-                applyAim(this.pendingAim);
+            if (this.pendingAim != null) {
+                // Заявку слота считаем «провод нужен»: отказ координации —
+                // не повод сбрасывать собственное наведение.
+                this.aiming = true;
+                if (AuraCoordination.claim(this, mc.world.getTime())) {
+                    applyAim(this.pendingAim);
+                }
             }
             return;
         }
@@ -243,7 +248,9 @@ public class CrystalAura extends Module {
 
         // Синхронизация с другими боевыми аурами (GrimAnchorAura): в тике
         // действует одна, иначе две одновременно перезаписывают серверный
-        // угол и сбивают друг другу проверки прицела.
+        // угол и сбивают друг другу проверки прицела. Отказ слота наведение
+        // не отменяет — доворот доживёт до своего следующего тика.
+        this.aiming = true;
         if (!AuraCoordination.claim(this, mc.world.getTime())) return;
 
         // 1. Атака существующего кристалла — самый быстрый путь урона.
@@ -305,10 +312,14 @@ public class CrystalAura extends Module {
     }
 
     private void handleAttack(EndCrystalEntity crystal) {
-        // Держим прицел на центре хитбокса кристалла, даже если луч пока
-        // не дошёл: rot доедет к следующему тику, и проверка пройдёт.
+        // Наведение заказывается ДО проверок луча: без этого отправленный
+        // угол никогда не дойдёт до кристалла и атаа не выстрелит.
+        // Держим прицел на центре хитбокса кристалла даже пока луч не дошёл.
         this.pendingAim = crystal.getBoundingBox().getCenter();
+        applyAim(this.pendingAim);
 
+        // Удар уходит только когда луч по отправленному углу уже пересекает
+        // расширенный хитбокс кристалла; дубль наведения выше гонит доворот.
         Box hitBox = crystal.getBoundingBox().expand(ENTITY_BOX_EXPAND);
         if (!aimAtEntityBox(hitBox)) {
             return;
