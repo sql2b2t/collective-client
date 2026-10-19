@@ -67,7 +67,7 @@ public class Lag extends HudModule {
 
         float tx = background.getValue() ? x + padX : x;
         float ty = background.getValue() ? y + padY : y;
-        fm.drawStringWithShadow(context, message, tx, ty, Color.RED);
+        fm.drawStringWithShadow(context, message, tx, ty, HudTheme.text());
         fm.drawStringWithShadow(context, seconds, tx + messageW + 4f, ty, HudTheme.BAD);
     }
 }
