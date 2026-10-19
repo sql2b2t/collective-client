@@ -5,8 +5,7 @@
   "name": "Collective Client",
   "description": "Collective Client for Minecraft 1.21.11",
   "authors": [
-    "Collective Team",
-    "GzSakura"
+    "sql"
   ],
   "environment": "client",
   "entrypoints": {
