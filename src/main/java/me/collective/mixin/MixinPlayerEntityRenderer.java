@@ -51,6 +51,15 @@ public abstract class MixinPlayerEntityRenderer {
             state.bodyYaw = yaw;
             state.relativeHeadYaw = 0.0F;
         }
+
+        // ElytraBounce SmoothCamera in F5: the player model glides smoothly too,
+        // without the jump arc — the same cutoff that the camera got.
+        // The filter makes the frame advance in Camera.update, here we read it.
+        ElytraBounce bounce = ElytraBounce.INSTANCE;
+        if (bounce != null && bounce.isToggled() && bounce.smoothCamera.getValue()) {
+            double realY = self.getLerpedPos(tickDelta).y;
+            state.y -= bounce.smoothVisualDeltaY(realY, false);
+        }
     }
 
     // HideVanillaLabel: при включённом NameTags ванильный неймтег не рисуется

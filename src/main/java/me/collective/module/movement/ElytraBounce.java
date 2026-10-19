@@ -454,42 +454,47 @@ public class ElytraBounce extends Module {
     }
 
     /**
-     * Высота камеры со срезанной дугой прыжка (SmoothCamera).
+     * Срезка дуги прыжка для камеры и модели (SmoothCamera).
      *
-     * <p>Фильтр несимметричный: вверх камера почти не тянется — дуга прыжка
+     * <p>Фильтр несимметричный: вверх почти не тянется — дуга прыжка
      * «срезается» и взгляд идёт ровным глайдом вперёд; вниз догоняет быстро,
      * чтобы при реальных падениях и переходах на землю не отставать.
      * Траектория на сервере не меняется — это чисто клиентский визуал.
      *
-     * @param realY фактическая позиция камеры с учётом интерполяции
-     * @return сглаженная высота камере; при неактивном полёте — {@code realY}
+     * @param realY   реальная интерполированная высота игрока (ступни)
+     * @param advance true — фильтр делает шаг этого кадра (камера обновляется
+     *                в кадре первой); false — переиспользовать шаг кадра
+     *                (состояние рендера модели в F5 читает готовую дельту)
+     * @return сколько визуально «срезали» по вертикали: realY − сглаженная
      */
-    public double smoothedCameraY(double realY) {
+    public double smoothVisualDeltaY(double realY, boolean advance) {
         if (!this.smoothCamera.getValue() || mc.player == null || !this.enabled()) {
             this.cameraSmoothY = realY;
-            return realY;
+            return 0.0;
         }
 
         long now = System.nanoTime();
         if (Double.isNaN(this.cameraSmoothY)) {
             this.cameraSmoothY = realY;
             this.cameraLastFrameNanos = now;
-            return realY;
+            return 0.0;
         }
 
-        // Нормализация шага по времени кадра: на 144+ fps скорость не падает.
-        double dt = MathHelper.clamp((now - this.cameraLastFrameNanos) / 50_000_000.0, 0.25, 3.0);
-        this.cameraLastFrameNanos = now;
+        if (advance) {
+            // Нормализация шага по времени кадра: на 144+ fps скорость не падает.
+            double dt = MathHelper.clamp((now - this.cameraLastFrameNanos) / 50_000_000.0, 0.25, 3.0);
+            this.cameraLastFrameNanos = now;
 
-        if (realY > this.cameraSmoothY) {
-            // подъём дуги прыжка: почти не следуем (≈6% на кадр 20 мс)
-            this.cameraSmoothY += (realY - this.cameraSmoothY) * (1.0 - Math.pow(0.94, dt));
-        } else if (realY < this.cameraSmoothY) {
-            // спуск: догоняем быстро (≈25% на кадр 20 мс)
-            this.cameraSmoothY += (realY - this.cameraSmoothY) * (1.0 - Math.pow(0.75, dt));
+            if (realY > this.cameraSmoothY) {
+                // подъём дуги прыжка: почти не следуем (≈6% на кадр 20 мс)
+                this.cameraSmoothY += (realY - this.cameraSmoothY) * (1.0 - Math.pow(0.94, dt));
+            } else if (realY < this.cameraSmoothY) {
+                // спуск: догоняем быстро (≈25% на кадр 20 мс)
+                this.cameraSmoothY += (realY - this.cameraSmoothY) * (1.0 - Math.pow(0.75, dt));
+            }
         }
 
-        return this.cameraSmoothY;
+        return realY - this.cameraSmoothY;
     }
 
     private void doGrimEflyStuff() {

@@ -57,33 +57,33 @@ public abstract class MixinCamera {
             return;
         }
 
-        // ElytraBounce SmoothCamera: камера не следует за дугой прыжка —
-        // полёт выглядит ровным элитрафлаем вперёд. Чисто клиентский визуал.
-        me.collective.module.movement.ElytraBounce bounce = me.collective.module.movement.ElytraBounce.INSTANCE;
-        if (bounce != null && bounce.isToggled() && bounce.smoothCamera.getValue()) {
-            double smoothedY = bounce.smoothedCameraY(this.pos.y);
-            if (smoothedY != this.pos.y) {
-                setPos(new Vec3d(this.pos.x, smoothedY, this.pos.z));
-            }
-            return;
-        }
-
         BetterF5 module = BetterF5.INSTANCE;
-        if (module == null || !module.isToggled()) {
-            return;
+        if (module != null && module.isToggled()) {
+            module.onCameraUpdate((Camera) (Object) this);
+
+            double smoothX = module.getSmoothX();
+            double smoothY = module.getSmoothY();
+            double smoothZ = module.getSmoothZ();
+            if (module.isPositionModified() && (smoothX != this.pos.x || smoothY != this.pos.y || smoothZ != this.pos.z)) {
+                setPos(new Vec3d(smoothX, smoothY, smoothZ));
+            }
+
+            if (module.isRotationModified() && !thirdPerson) {
+                setRotation(module.getRotationYaw(), module.getRotationPitch());
+            }
         }
 
-        module.onCameraUpdate((Camera) (Object) this);
-
-        double smoothX = module.getSmoothX();
-        double smoothY = module.getSmoothY();
-        double smoothZ = module.getSmoothZ();
-        if (module.isPositionModified() && (smoothX != this.pos.x || smoothY != this.pos.y || smoothZ != this.pos.z)) {
-            setPos(new Vec3d(smoothX, smoothY, smoothZ));
-        }
-
-        if (module.isRotationModified() && !thirdPerson) {
-            setRotation(module.getRotationYaw(), module.getRotationPitch());
+        // ElytraBounce SmoothCamera: применяется ПОВЕРХ остальных модулей
+        // камеры (BetterF5 в том числе), и в F5 тоже — дуга прыжка срезается
+        // у позиции игрока.
+        me.collective.module.movement.ElytraBounce bounce = me.collective.module.movement.ElytraBounce.INSTANCE;
+        if (bounce != null && bounce.isToggled() && bounce.smoothCamera.getValue()
+                && focusedEntity instanceof net.minecraft.entity.player.PlayerEntity bouncePlayer) {
+            double realY = bouncePlayer.getLerpedPos(tickProgress).y;
+            double delta = bounce.smoothVisualDeltaY(realY, true);
+            if (delta != 0.0) {
+                setPos(new Vec3d(this.pos.x, this.pos.y - delta, this.pos.z));
+            }
         }
     }
 }
