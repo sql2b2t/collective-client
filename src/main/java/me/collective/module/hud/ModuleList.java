@@ -8,9 +8,10 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.EnumSetting;
 import net.minecraft.client.gui.DrawContext;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Collectors;
+
 
 public class ModuleList extends HudModule {
     public enum SortMode {
@@ -26,23 +27,52 @@ public class ModuleList extends HudModule {
         background.setValue(true);
     }
 
+    /**
+     * Готовая строка списка: имя и ширина посчитаны один раз на пересборку,
+     * а не заново меряются у шрифта на каждый кадр.
+     */
+    private static final class Entry {
+        final Module module;
+        final float width;
+
+        Entry(Module module, float width) {
+            this.module = module;
+            this.width = width;
+        }
+    }
+
+    /** Стрим с фильтром и сортировкой (~90 модулей) — не чаще, чем раз в 50 мс. */
+    private List<Entry> cachedEntries = List.of();
+    private long lastRebuild;
+
+    private List<Entry> entries() {
+        long now = System.currentTimeMillis();
+        if (now - this.lastRebuild < 50) return this.cachedEntries;
+        this.lastRebuild = now;
+
+        FontManager fm = FontManager.INSTANCE;
+        boolean onlyBound = this.onlyBound.getValue();
+        List<Entry> list = new ArrayList<>();
+        for (Module m : ModuleManager.INSTANCE.getModules()) {
+            if (!m.isToggled() || m instanceof HudModule) continue;
+            if (onlyBound && m.getKeybind().getValue() == -1) continue;
+            list.add(new Entry(m, fm.getStringWidth(m.getName())));
+        }
+
+        if (this.sort.getValue() == SortMode.LENGTH) {
+            list.sort((e1, e2) -> Float.compare(e2.width, e1.width));
+        } else {
+            list.sort(Comparator.comparing(e -> fm.getStringWidth(e.module.getName())));
+        }
+
+        return this.cachedEntries = list;
+    }
+
     @Override
     public void render(DrawContext context, float delta) {
         if (!isToggled()) return;
 
-        List<Module> activeModules = ModuleManager.INSTANCE.getModules().stream()
-                .filter(m -> m.isToggled() && !(m instanceof HudModule))
-                .filter(m -> !onlyBound.getValue() || m.getKeybind().getValue() != -1)
-                .collect(Collectors.toList());
-
-        if (sort.getValue() == SortMode.LENGTH) {
-            activeModules.sort((m1, m2) -> Float.compare(
-                    FontManager.INSTANCE.getStringWidth(m2.getName()),
-                    FontManager.INSTANCE.getStringWidth(m1.getName())
-            ));
-        } else {
-            activeModules.sort(Comparator.comparing(Module::getName));
-        }
+        List<Entry> activeModules = entries();
 
         FontManager fm = FontManager.INSTANCE;
         int fontH = fm.getFontHeight();
@@ -51,15 +81,12 @@ public class ModuleList extends HudModule {
         if (!background.getValue()) {
             float curY = y;
             float maxWidth = 40;
-            int idx = 0;
-            for (Module m : activeModules) {
-                String name = m.getName();
-                float w = fm.getStringWidth(name);
+            for (Entry e : activeModules) {
+                float w = e.width;
                 maxWidth = Math.max(maxWidth, w);
                 float textX = rightAlign ? (x + maxWidth - w) : x;
-                fm.drawStringWithShadow(context, name, textX, curY, HudTheme.TEXT);
+                fm.drawStringWithShadow(context, e.module.getName(), textX, curY, HudTheme.TEXT);
                 curY += fontH + 1;
-                idx++;
             }
             this.width = maxWidth;
             this.height = Math.max(fontH, curY - y);
@@ -75,15 +102,14 @@ public class ModuleList extends HudModule {
 
         // Первый проход: колонка = максимальная ширина пилюли.
         float columnW = 40f;
-        for (Module m : activeModules) {
-            columnW = Math.max(columnW, padX * 2 + dotR * 2 + dotGap + fm.getStringWidth(m.getName()));
+        for (Entry e : activeModules) {
+            columnW = Math.max(columnW, padX * 2 + dotR * 2 + dotGap + e.width);
         }
 
         float curY = y;
-        for (Module m : activeModules) {
-            String name = m.getName();
-            float nameW = fm.getStringWidth(name);
-            float pillW = padX * 2 + dotR * 2 + dotGap + nameW;
+        for (Entry e : activeModules) {
+            String name = e.module.getName();
+            float pillW = padX * 2 + dotR * 2 + dotGap + e.width;
             float rowX = rightAlign ? (x + columnW - pillW) : x;
 
             GuiGfx.fillRounded(context, rowX, curY, pillW, pillH, 4f, HudTheme.PLATE.getRGB());

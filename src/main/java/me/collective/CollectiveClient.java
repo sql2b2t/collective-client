@@ -98,9 +98,17 @@ public class CollectiveClient implements ClientModInitializer {
             float tickDelta = MinecraftClient.getInstance().getRenderTickCounter() != null
                 ? MinecraftClient.getInstance().getRenderTickCounter().getTickProgress(false)
                 : 1.0f;
-            me.collective.event.EventBus.INSTANCE.post(new me.collective.event.events.Render3DEvent(
-                context.matrices(), camera, tickDelta, context.consumers()
-            ));
+
+            // Один gizmo-скоуп на весь кадр: все Renderer3D.box/line рисуют в
+            // общую сборку вместо своего try(startDrawingGizmos) на каждый бокс.
+            me.collective.render.Renderer3D.beginFrameScope();
+            try {
+                me.collective.event.EventBus.INSTANCE.post(new me.collective.event.events.Render3DEvent(
+                    context.matrices(), camera, tickDelta, context.consumers()
+                ));
+            } finally {
+                me.collective.render.Renderer3D.endFrameScope();
+            }
         });
 
         // Initialize Baritone Overworld Elytra Process

@@ -16,8 +16,8 @@ import net.minecraft.util.math.Vec3d;
 import org.joml.Vector2f;
 
 import java.awt.Color;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Информативные неймтеги над игроками: скруглённая плашка с акцентной полоской,
@@ -36,6 +36,8 @@ public class NameTags extends Module {
     public final BooleanSetting distance = add(new BooleanSetting("Дистанция", false));
     public final BooleanSetting armor = add(new BooleanSetting("Броня", true));
     public final NumberSetting scale = add(new NumberSetting("Размер", 1.0, 0.5, 2.5, 0.1));
+    /** Дальше этой дистанции табличка не рисуется — на толпе это главный срез растра. */
+    public final NumberSetting cullDist = add(new NumberSetting("Макс. дистанция", 128.0, 16.0, 512.0, 8.0));
 
     private static final Color PLATE = new Color(11, 11, 15, 205);
     private static final Color BORDER = new Color(255, 255, 255, 30);
@@ -54,42 +56,100 @@ public class NameTags extends Module {
 
         int sw = mc.getWindow().getScaledWidth();
         int sh = mc.getWindow().getScaledHeight();
+        double cullSq = this.cullDist.getValue() * this.cullDist.getValue();
 
         for (PlayerEntity player : mc.world.getPlayers()) {
             if (player == null || !player.isAlive()) continue;
             if (player == mc.player && !self.getValue()) continue;
+            if (player != mc.player && mc.player.squaredDistanceTo(player) > cullSq) continue;
+
+            TagData data = this.tagCache.get(player.getId());
+            if (data == null) continue; // выйдет из кэша на следующем тике
 
             Vec3d pos = player.getLerpedPos(delta);
             Vector2f screen = RenderUtil3D.worldToScreen(pos.x, pos.y + player.getHeight() + 0.25, pos.z, sw, sh);
             if (screen == null) continue;
 
-            renderTag(context, player, screen.x, screen.y);
+            renderTag(context, player, screen.x, screen.y, data);
         }
     }
 
-    private void renderTag(DrawContext context, PlayerEntity player, float x, float y) {
+    /**
+     * Кэш подписи на игрока: строки, цвета и ширины считаются раз в тик,
+     * отрисовка каждый кадр уже не собирает ничего заново.
+     */
+    private static final class TagData {
+        String name = "";
+        String hpStr = "";
+        String pingStr = "";
+        String distStr = "";
+        Color hpColor = new Color(255, 255, 255);
+        Color pingColor = new Color(255, 255, 255);
+        int ping = -1;
+        float nameW;
+        float hpW;
+        float pingBlockW;
+        float distBlockW;
+    }
+
+    private final Map<Integer, TagData> tagCache = new HashMap<>();
+
+    @Override
+    public void onUpdate() {
+        this.tagCache.clear();
+        if (!isToggled() || mc.world == null || mc.player == null) return;
+
         FontManager fm = FontManager.INSTANCE;
         float s = scale.getFloatValue();
 
-        // --- Данные игрока
-        int playerPing = -1;
-        if (ping.getValue() && mc.getNetworkHandler() != null) {
-            var entry = mc.getNetworkHandler().getPlayerListEntry(player.getUuid());
-            if (entry != null) playerPing = entry.getLatency();
+        for (PlayerEntity player : mc.world.getPlayers()) {
+            if (player == null || !player.isAlive()) continue;
+
+            TagData d = new TagData();
+            d.name = player.getName().getString();
+
+            if (ping.getValue() && mc.getNetworkHandler() != null) {
+                var entry = mc.getNetworkHandler().getPlayerListEntry(player.getUuid());
+                if (entry != null) d.ping = entry.getLatency();
+            }
+            d.pingStr = d.ping >= 0 ? d.ping + "ms" : "";
+            d.pingColor = pingColor(d.ping);
+
+            float hp = player.getHealth() + player.getAbsorptionAmount();
+            float maxHp = Math.max(1.0f, player.getMaxHealth());
+            d.hpColor = healthColor(Math.min(1f, hp / maxHp));
+            d.hpStr = health.getValue() ? String.valueOf((int) Math.ceil(hp)) : "";
+
+            d.distStr = distance.getValue()
+                    ? Math.round(Math.sqrt(mc.player.squaredDistanceTo(player))) + "м" : "";
+
+            d.nameW = fm.getStringWidthScaled(d.name, s);
+            d.hpW = d.hpStr.isEmpty() ? 0 : fm.getStringWidthScaled(d.hpStr, s);
+            float dotR = Math.max(1.5f, 2.2f * s);
+            d.pingBlockW = d.pingStr.isEmpty() ? 0 : dotR * 2f + 3f + fm.getStringWidthScaled(d.pingStr, s);
+            d.distBlockW = d.distStr.isEmpty() ? 0 : gapWidth(s) + fm.getStringWidthScaled(d.distStr, s);
+
+            this.tagCache.put(player.getId(), d);
         }
+    }
 
-        boolean showHp = health.getValue();
-        float hp = player.getHealth() + player.getAbsorptionAmount();
-        float maxHp = Math.max(1.0f, player.getMaxHealth());
-        float hpFill = Math.min(1f, hp / maxHp);
-        Color hpColor = healthColor(hpFill);
+    private float gapWidth(float s) {
+        return Math.max(3f, 4f * s);
+    }
 
-        String name = player.getName().getString();
-        String hpStr = String.valueOf((int) Math.ceil(hp));
-        String pingStr = playerPing >= 0 ? playerPing + "ms" : "";
-        String distStr = distance.getValue()
-                ? Math.round(Math.sqrt(mc.player.squaredDistanceTo(player))) + "м"
-                : "";
+    private void renderTag(DrawContext context, PlayerEntity player, float x, float y, TagData d) {
+        FontManager fm = FontManager.INSTANCE;
+        float s = scale.getFloatValue();
+
+        // --- Данные игрока: готовые из кэша тика
+        int playerPing = d.ping;
+        boolean showHp = !d.hpStr.isEmpty();
+        Color hpColor = d.hpColor;
+
+        String name = d.name;
+        String hpStr = d.hpStr;
+        String pingStr = d.pingStr;
+        String distStr = d.distStr;
 
         // --- Метрики
         float fh = fm.getFontHeightScaled(s);
@@ -99,11 +159,11 @@ public class NameTags extends Module {
         float accentW = Math.max(1.5f, 2f * s);
         int radius = Math.max(2, Math.round(3f * s));
 
-        float nameW = fm.getStringWidthScaled(name, s);
-        float hpW = showHp ? fm.getStringWidthScaled(hpStr, s) : 0f;
+        float nameW = d.nameW;
+        float hpW = d.hpW;
         float dotR = Math.max(1.5f, 2.2f * s);
-        float pingBlockW = pingStr.isEmpty() ? 0 : dotR * 2f + 3f + fm.getStringWidthScaled(pingStr, s);
-        float distBlockW = distStr.isEmpty() ? 0 : gap + fm.getStringWidthScaled(distStr, s);
+        float pingBlockW = d.pingBlockW;
+        float distBlockW = d.distBlockW;
         float rowW = nameW + (showHp ? gap + hpW : 0f) + pingBlockW + distBlockW;
 
         // --- Габариты плашки
@@ -113,26 +173,32 @@ public class NameTags extends Module {
         float by = Math.round(y - boxH);
         float textLeft = bx + 1.5f + accentW + padX;
 
-        // --- Слоты брони над плашкой
+        // --- Слоты брони над плашкой: без списков и removeIf на каждый кадр
         if (armor.getValue()) {
-            List<ItemStack> equipment = new ArrayList<>();
-            equipment.add(player.getEquippedStack(EquipmentSlot.MAINHAND));
-            equipment.add(player.getEquippedStack(EquipmentSlot.HEAD));
-            equipment.add(player.getEquippedStack(EquipmentSlot.CHEST));
-            equipment.add(player.getEquippedStack(EquipmentSlot.LEGS));
-            equipment.add(player.getEquippedStack(EquipmentSlot.FEET));
-            equipment.add(player.getEquippedStack(EquipmentSlot.OFFHAND));
-            equipment.removeIf(ItemStack::isEmpty);
+            ItemStack[] equipment = new ItemStack[6];
+            int count = 0;
+            equipment[count++] = player.getEquippedStack(EquipmentSlot.MAINHAND);
+            equipment[count++] = player.getEquippedStack(EquipmentSlot.HEAD);
+            equipment[count++] = player.getEquippedStack(EquipmentSlot.CHEST);
+            equipment[count++] = player.getEquippedStack(EquipmentSlot.LEGS);
+            equipment[count++] = player.getEquippedStack(EquipmentSlot.FEET);
+            equipment[count++] = player.getEquippedStack(EquipmentSlot.OFFHAND);
 
-            if (!equipment.isEmpty()) {
+            int visible = 0;
+            for (int i = 0; i < count; i++) {
+                if (!equipment[i].isEmpty()) visible++;
+            }
+
+            if (visible > 0) {
                 float slot = 18f;
-                float rowW2 = equipment.size() * slot;
+                float rowW2 = visible * slot;
                 float ix = Math.round(x - rowW2 / 2f);
                 float iy = by - slot - 2f;
-                for (ItemStack stack : equipment) {
+                for (int i = 0; i < count; i++) {
+                    if (equipment[i].isEmpty()) continue;
                     GuiGfx.fillRounded(context, ix, iy, slot, slot, 3, SLOT_BG.getRGB());
                     GuiGfx.outlineRounded(context, ix, iy, slot, slot, 3, BORDER.getRGB());
-                    context.drawItem(stack, (int) ix + 1, (int) iy + 1);
+                    context.drawItem(equipment[i], (int) ix + 1, (int) iy + 1);
                     ix += slot;
                 }
             }
@@ -160,10 +226,9 @@ public class NameTags extends Module {
         }
 
         if (!pingStr.isEmpty()) {
-            Color pc = pingColor(playerPing);
-            GuiGfx.dot(context, tx + dotR + 1f, rowY + fh / 2f - 0.5f, dotR, pc.getRGB());
+            GuiGfx.dot(context, tx + dotR + 1f, rowY + fh / 2f - 0.5f, dotR, d.pingColor.getRGB());
             tx += dotR * 2f + 3f;
-            fm.drawStringWithShadowScaled(context, pingStr, tx, rowY, pc, s);
+            fm.drawStringWithShadowScaled(context, pingStr, tx, rowY, d.pingColor, s);
             tx += fm.getStringWidthScaled(pingStr, s);
         }
 

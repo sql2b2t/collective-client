@@ -1,6 +1,5 @@
 package me.collective.mixin;
 
-import me.collective.module.ModuleManager;
 import me.collective.module.combat.HitBox;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
@@ -32,10 +31,18 @@ public abstract class MixinEntityHitbox {
     @Shadow
     public abstract Vec3d getEntityPos();
 
+    /** Модуль кэшируется один раз: getBoundingBox вызывается тысячи раз за кадр. */
+    private HitBox collective$module;
+
     @Inject(method = "getBoundingBox", at = @At("HEAD"), cancellable = true)
     private void expandHitbox(CallbackInfoReturnable<Box> cir) {
-        HitBox mod = ModuleManager.INSTANCE.getModule(HitBox.class);
-        if (mod == null || !mod.isToggled()) return;
+        HitBox mod = this.collective$module;
+        if (mod == null) {
+            this.collective$module = mod = HitBox.INSTANCE;
+            if (mod == null) return; // модули ещё не зарегистрированы — попробуем в следующий вызов
+        }
+
+        if (!mod.isToggled()) return;
 
         Entity self = (Entity) (Object) this;
         if (self == MinecraftClient.getInstance().player) return;

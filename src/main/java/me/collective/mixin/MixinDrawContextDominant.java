@@ -1,6 +1,5 @@
 package me.collective.mixin;
 
-import me.collective.module.ModuleManager;
 import me.collective.module.render.Tooltips;
 import me.collective.module.tooltips.DominantStacks;
 import net.minecraft.client.font.TextRenderer;
@@ -26,14 +25,23 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(DrawContext.class)
 public abstract class MixinDrawContextDominant {
 
+    /** Модуль кэшируется один раз: drawStackOverlay вызывается на каждый отрисованный предмет. */
+    private Tooltips collective$module;
+
     @Inject(
         method = "drawStackOverlay(Lnet/minecraft/client/font/TextRenderer;"
             + "Lnet/minecraft/item/ItemStack;IILjava/lang/String;)V",
         at = @At("HEAD"))
     private void collective$majorityItem(TextRenderer font, ItemStack stack, int x, int y,
                                    String countLabel, CallbackInfo ci) {
-        Tooltips module = ModuleManager.INSTANCE.getModule(Tooltips.class);
-        if (module == null || !module.majorityActive()) return;
+        Tooltips module = this.collective$module;
+        if (module == null) {
+            this.collective$module = module = Tooltips.INSTANCE;
+            if (module == null) return; // модули ещё не зарегистрированы
+        }
+
+        if (!module.majorityActive()) return;
+        if (module.dominantEntries().isEmpty()) return;
 
         for (DominantStacks.Entry entry : module.dominantEntries()) {
             if (entry.container() != stack || entry.dominant() == null) continue;

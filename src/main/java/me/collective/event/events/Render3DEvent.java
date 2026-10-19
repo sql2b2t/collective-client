@@ -9,7 +9,8 @@ public class Render3DEvent {
     public final Camera camera;
     public final float tickDelta;
     public final VertexConsumerProvider consumers;
-    public final me.collective.render.Renderer3D renderer = new me.collective.render.Renderer3D();
+    /** Все методы Renderer3D статические — разделяем один экземпляр вместо аллокации на каждый кадр. */
+    public final me.collective.render.Renderer3D renderer = me.collective.render.Renderer3D.SHARED;
 
     public Render3DEvent(MatrixStack matrices, Camera camera, float tickDelta, VertexConsumerProvider consumers) {
         this.matrices = matrices;

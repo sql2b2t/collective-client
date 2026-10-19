@@ -78,24 +78,43 @@ public class ItemESP extends Module {
 
     // ------------------------------------------------------------- 3D-боксы
 
-    @EventHandler
-    public void onRender3D(Render3DEvent event) {
+    /**
+     * Полный скан мира — только раз в тик. Оба путя отрисовки (3D и 2D)
+     * читают готовый список, дистанция между тиками уточняется на кадре.
+     */
+    private final List<ItemEntity> cachedItems = new ArrayList<>();
+
+    @Override
+    public void onUpdate() {
+        this.cachedItems.clear();
         if (!isToggled() || mc.world == null || mc.player == null) return;
 
+        double rangeSq = this.range.getValue() * this.range.getValue();
+        for (Entity entity : mc.world.getEntities()) {
+            if (!(entity instanceof ItemEntity itemEntity)) continue;
+            ItemStack stack = itemEntity.getStack();
+            if (stack.isEmpty() || !passesFilter(stack.getItem())) continue;
+            if (mc.player.squaredDistanceTo(itemEntity) > rangeSq) continue;
+            this.cachedItems.add(itemEntity);
+        }
+    }
+
+    @EventHandler
+    public void onRender3D(Render3DEvent event) {
+        if (!isToggled() || mc.world == null || mc.player == null || this.cachedItems.isEmpty()) return;
+
         double rangeBlocks = range.getValue();
+        double rangeSq = rangeBlocks * rangeBlocks;
         ShapeMode mode = currentShape();
         Vec3d cam = event.camera != null
                 ? event.camera.getCameraPos()
                 : mc.gameRenderer.getCamera().getCameraPos();
         float delta = event.tickDelta;
 
-        for (Entity entity : mc.world.getEntities()) {
-            if (!(entity instanceof ItemEntity itemEntity)) continue;
-            ItemStack stack = itemEntity.getStack();
-            if (stack.isEmpty() || !passesFilter(stack.getItem())) continue;
-
-            double dist = Math.sqrt(mc.player.squaredDistanceTo(itemEntity));
-            if (dist > rangeBlocks) continue;
+        for (ItemEntity itemEntity : this.cachedItems) {
+            double distSq = mc.player.squaredDistanceTo(itemEntity);
+            if (distSq > rangeSq) continue;
+            double dist = Math.sqrt(distSq);
 
             double factor = fadeFactor(dist, rangeBlocks);
             Color side = fade(sideColor.getValue(), factor);
@@ -125,21 +144,15 @@ public class ItemESP extends Module {
 
     @Override
     public void onRender2D(DrawContext context, float delta) {
-        if (!isToggled() || !names.getValue() || mc.world == null || mc.player == null) return;
+        if (!isToggled() || !names.getValue() || mc.world == null || mc.player == null
+                || this.cachedItems.isEmpty()) return;
 
         int sw = mc.getWindow().getScaledWidth();
         int sh = mc.getWindow().getScaledHeight();
         double rangeBlocks = range.getValue();
 
-        List<ItemEntity> found = new ArrayList<>();
-        for (Entity entity : mc.world.getEntities()) {
-            if (!(entity instanceof ItemEntity itemEntity)) continue;
-            ItemStack stack = itemEntity.getStack();
-            if (stack.isEmpty() || !passesFilter(stack.getItem())) continue;
-            if (Math.sqrt(mc.player.squaredDistanceTo(itemEntity)) > rangeBlocks) continue;
-            found.add(itemEntity);
-        }
-        if (found.isEmpty()) return;
+        // Список собран раз в тик в onUpdate — здесь только отрисовка.
+        List<ItemEntity> found = this.cachedItems;
 
         for (ItemLabel label : buildLabels(found, delta)) {
             Vector2f screen = RenderUtil3D.worldToScreen(label.x, label.y + 0.3, label.z, sw, sh);

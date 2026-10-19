@@ -104,7 +104,9 @@ public class Search extends Module {
         Color fill = color.getValue();
         Color line = new Color(fill.getRed(), fill.getGreen(), fill.getBlue(), 255);
         Vec3d cam = mc.gameRenderer.getCamera().getCameraPos();
-        for (BlockPos pos : new ArrayList<>(found)) {
+        // found меняется только в тиковых обработчиках того же потока —
+        // обход напрямую, без защитной копии на каждый кадр
+        for (BlockPos pos : found) {
             Box box = new Box(pos);
             Renderer3D.box(box, fill, line, ShapeMode.Both, true);
             if (tracers.getValue()) {

@@ -1,9 +1,16 @@
 package me.collective.event;
 
+import java.lang.invoke.CallSite;
+import java.lang.invoke.LambdaMetafactory;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiConsumer;
 
 public class EventBus {
     public static final EventBus INSTANCE = new EventBus();
@@ -13,18 +20,58 @@ public class EventBus {
         public final Method method;
         public final int priority;
 
+        /**
+         * Скомпилированный прямой вызов (LambdaMetafactory): обычный вызов
+         * метода вместо рефлексии на каждом пакете и тике. Null — рефлексия
+         * не сложилась, работаем через method.invoke.
+         */
+        private final BiConsumer<Object, Object> invoker;
+
         public Listener(Object target, Method method, int priority) {
             this.target = target;
             this.method = method;
             this.priority = priority;
             this.method.setAccessible(true);
+            this.invoker = buildInvoker(method);
+        }
+
+        /** Refлексия → прямой вызов: дешёвый hot path пакетного потока. */
+        private static BiConsumer<Object, Object> buildInvoker(Method method) {
+            try {
+                MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(
+                        method.getDeclaringClass(), MethodHandles.lookup());
+
+                // Реальная сигнатура: (targetType, eventType) → void
+                MethodHandle impl = lookup.unreflect(method);
+
+                MethodType interfaceType = MethodType.methodType(BiConsumer.class);
+                MethodType samType = MethodType.methodType(void.class,
+                        method.getDeclaringClass(), method.getParameterTypes()[0]);
+
+                CallSite site = LambdaMetafactory.metafactory(
+                        lookup,
+                        "accept",
+                        interfaceType,
+                        samType,
+                        impl,
+                        samType);
+
+                @SuppressWarnings("unchecked")
+                BiConsumer<Object, Object> consumer = (BiConsumer<Object, Object>) site.getTarget().invokeExact();
+                return consumer;
+            } catch (Throwable t) {
+                return null;
+            }
         }
 
         public void invoke(Object event) {
             try {
-                method.invoke(target, event);
-            } catch (Exception e) {
-                e.printStackTrace();
+                if (this.invoker != null) this.invoker.accept(this.target, event);
+                else this.method.invoke(this.target, event);
+            } catch (InvocationTargetException e) {
+                e.getCause().printStackTrace();
+            } catch (Throwable t) {
+                t.printStackTrace();
             }
         }
     }

@@ -3,7 +3,6 @@ package me.collective.module.highway;
 import me.collective.category.Category;
 import me.collective.event.EventHandler;
 import me.collective.event.events.PacketEvent;
-import me.collective.event.events.Render3DEvent;
 import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.module.ModuleManager;
@@ -69,9 +68,15 @@ public class OffhandManager extends Module {
         if (eating) stopEating();
     }
 
+    /**
+     * Обслуживание офхенда переведено из Render3DEvent в тик: раньше каждый
+     * кадр (60-300 раз/с) делался линейный поиск модуля и при недостающем
+     * офхенде — полный скан инвентаря с отправкой кликов. На тике — тоже
+     * быстро, но в 3-15 раз реже и без фризов отрисовки.
+     */
     @EventHandler
-    public void onRender3D(Render3DEvent event) {
-        if (!isToggled() || mc.player == null || mc.world == null) return;
+    public void onPreTick(TickEvent.Pre event) {
+        if (mc.player == null || mc.world == null || !isToggled()) return;
 
         // Anti cursor stack
         if (moved) {
@@ -80,7 +85,8 @@ public class OffhandManager extends Module {
         }
 
         ScaffoldHIG scaffold = ModuleManager.INSTANCE.getModule(ScaffoldHIG.class);
-        if (scaffold != null && scaffold.isToggled() && scaffold.hasWorked()) return;
+        boolean scaffolding = scaffold != null && scaffold.isToggled() && scaffold.hasWorked();
+        if (scaffolding) return;
 
         // Switch back if swap key has been used
         if (mc.options.swapHandsKey.isPressed() && !swapped
@@ -106,14 +112,10 @@ public class OffhandManager extends Module {
                 moved = true;
             }
         }
-    }
 
-    @EventHandler
-    private void onPreTick(TickEvent.Pre event) {
-        if (mc.player == null) return;
-
+        // ── Авто-гепы ─────────────────────────────────────────────────
         if (eating) {
-            if (shouldEat()) {
+            if (shouldEat(scaffolding)) {
                 if (mc.player.getOffHandStack().get(DataComponentTypes.FOOD) == null) {
                     stopEating();
                 } else {
@@ -122,10 +124,9 @@ public class OffhandManager extends Module {
             } else {
                 stopEating();
             }
-        } else {
-            if (shouldEat() && mc.player.getOffHandStack().get(DataComponentTypes.FOOD) != null) {
-                startEating();
-            }
+        } else if (shouldEat(scaffolding)
+                && mc.player.getOffHandStack().get(DataComponentTypes.FOOD) != null) {
+            startEating();
         }
     }
 
@@ -151,9 +152,7 @@ public class OffhandManager extends Module {
         if (event.getPacket() instanceof PlayerInteractBlockC2SPacket) stopEating();
     }
 
-    private boolean shouldEat() {
-        ScaffoldHIG scaffold = ModuleManager.INSTANCE.getModule(ScaffoldHIG.class);
-        boolean scaffolding = scaffold != null && scaffold.isToggled() && scaffold.hasWorked();
+    private boolean shouldEat(boolean scaffolding) {
         return (mc.player.getHungerManager().getFoodLevel() <= hungerThreshold.getIntValue()
             || (autoFireRes.getValue() && !mc.player.hasStatusEffect(StatusEffects.FIRE_RESISTANCE)))
             && !scaffolding;

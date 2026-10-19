@@ -101,7 +101,9 @@ public class BlockESP extends Module {
             default -> ShapeMode.Both;
         };
         Vec3d cam = mc.gameRenderer.getCamera().getCameraPos();
-        for (BlockPos pos : new ArrayList<>(found)) {
+        // found меняется только в тиковых обработчиках того же потока —
+        // обход напрямую, без защитной копии на каждый кадр
+        for (BlockPos pos : found) {
             Box box = new Box(pos);
             Renderer3D.box(box, fill, line, mode, true);
             if (tracers.getValue()) {

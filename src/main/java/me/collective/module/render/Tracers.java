@@ -41,30 +41,41 @@ public class Tracers extends Module {
     public void onRender3D(Render3DEvent event) {
         if (!isToggled() || mc.player == null || mc.world == null) return;
         Vec3d cam = mc.gameRenderer.getCamera().getCameraPos();
+        double rangeSq = this.range.getFloatValue() * this.range.getFloatValue();
 
-        for (Entity e : mc.world.getEntities()) {
-            if (e == mc.player || !e.isAlive()) continue;
-            if (mc.player.distanceTo(e) > range.getFloatValue()) continue;
+        // Игроки — через готовый маленький список игроков; полный скан всех
+        // сущностей мира стартует только когда включены предметы или мобы.
+        for (PlayerEntity p : mc.world.getPlayers()) {
+            if (p == mc.player || !p.isAlive() || p.isSpectator()) continue;
+            boolean friend = FriendManager.getInstance().isFriend(p);
+            if (friend && !friends.getValue()) continue;
+            if (!friend && !players.getValue()) continue;
+            if (mc.player.squaredDistanceTo(p) > rangeSq) continue;
 
-            Color c = null;
-            if (e instanceof PlayerEntity p) {
-                if (p.isSpectator()) continue;
-                boolean friend = FriendManager.getInstance().isFriend(p);
-                if (friend && !friends.getValue()) continue;
-                if (!friend && !players.getValue()) continue;
-                c = friend ? friendColor.getValue() : playerColor.getValue();
-            } else if (e instanceof ItemEntity) {
-                if (!items.getValue()) continue;
-                c = itemColor.getValue();
-            } else if (e instanceof LivingEntity) {
-                if (!mobs.getValue()) continue;
-                c = mobColor.getValue();
-            } else {
-                continue;
+            Vec3d target = p.getBoundingBox().getCenter();
+            Renderer3D.line(cam.x, cam.y, cam.z, target.x, target.y, target.z,
+                    friend ? friendColor.getValue() : playerColor.getValue());
+        }
+
+        if (items.getValue() || mobs.getValue()) {
+            for (Entity e : mc.world.getEntities()) {
+                if (e == mc.player || !e.isAlive() || e instanceof PlayerEntity) continue;
+                if (mc.player.squaredDistanceTo(e) > rangeSq) continue;
+
+                Color c;
+                if (e instanceof ItemEntity) {
+                    if (!items.getValue()) continue;
+                    c = itemColor.getValue();
+                } else if (e instanceof LivingEntity) {
+                    if (!mobs.getValue()) continue;
+                    c = mobColor.getValue();
+                } else {
+                    continue;
+                }
+
+                Vec3d target = e.getBoundingBox().getCenter();
+                Renderer3D.line(cam.x, cam.y, cam.z, target.x, target.y, target.z, c);
             }
-
-            Vec3d target = e.getBoundingBox().getCenter();
-            Renderer3D.line(cam.x, cam.y, cam.z, target.x, target.y, target.z, c);
         }
     }
 }

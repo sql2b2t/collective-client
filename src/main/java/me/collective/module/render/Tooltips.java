@@ -126,7 +126,11 @@ public class Tooltips extends Module {
 
     public Tooltips() {
         super("Tooltips", "Расширенные подсказки предметов (содержимое шалкеров, карты).", Category.RENDER);
+        INSTANCE = this;
     }
+
+    /** Хот-путь миксинов: ноль линейных поисков модулей на каждый отрисованный слот. */
+    public static Tooltips INSTANCE;
 
     // ── Накопление списка по пакетам ──
 
