@@ -486,11 +486,11 @@ public class ElytraBounce extends Module {
             this.cameraLastFrameNanos = now;
 
             if (realY > this.cameraSmoothY) {
-                // подъём дуги прыжка: почти не следуем (≈6% на кадр 20 мс)
-                this.cameraSmoothY += (realY - this.cameraSmoothY) * (1.0 - Math.pow(0.94, dt));
+                // подъём дуги прыжка: почти не следуем (≈3% на кадр 20 мс)
+                this.cameraSmoothY += (realY - this.cameraSmoothY) * (1.0 - Math.pow(0.97, dt));
             } else if (realY < this.cameraSmoothY) {
-                // спуск: догоняем быстро (≈25% на кадр 20 мс)
-                this.cameraSmoothY += (realY - this.cameraSmoothY) * (1.0 - Math.pow(0.75, dt));
+                // спуск: догоняем мягко (≈13% на кадр 20 мс)
+                this.cameraSmoothY += (realY - this.cameraSmoothY) * (1.0 - Math.pow(0.875, dt));
             }
         }
 
