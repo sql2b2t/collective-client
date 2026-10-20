@@ -69,6 +69,13 @@ public final class ClickGui2Theme {
     private ClickGui2Theme() {
     }
 
+    /** Переопределить значение роли (мост с настройками UI). */
+    public static void setRole(Role role, Color color) {
+        if (role != null && color != null) {
+            colors.put(role, color);
+        }
+    }
+
     /** Текущий цвет роли (ARGB). */
     public static Color c(Role role) {
         return colors.getOrDefault(role, Color.GRAY);

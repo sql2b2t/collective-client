@@ -5,6 +5,7 @@ import me.collective.gui.GuiGfx;
 import me.collective.module.Module;
 import me.collective.category.Category;
 import me.collective.module.client.UI;
+import me.collective.render.RenderUtil;
 import me.collective.render.SoundUtil;
 import me.collective.setting.Setting;
 import net.minecraft.client.gui.DrawContext;
@@ -275,8 +276,13 @@ public final class ClickGui2Card {
         expandT = ClickGui2Anim.to01(expandT, expanded, dt, expanded ? 14f : 18f);
         focusFlash = Math.max(0f, focusFlash - dt * 0.8f);
 
-        // подложка: тень, вспышка фокуса, стеклянная заливка, обводка
+        // подложка: тень, свечение включённого, вспышка фокуса, заливка, обводки
         GuiGfx.shadow(ctx, (int) x + 1, (int) y + 2, (int) CARD_W - 2, (int) h, 7);
+        if (toggleT > 0.02f) {
+            GuiGfx.softGlow(ctx, (int) x + 1, (int) y + 1, (int) CARD_W - 2, (int) h - 2, 10,
+                    ClickGui2Theme.rgb(ClickGui2Theme.Role.MAIN) & 0xFFFFFF,
+                    Math.round(16f * toggleT), 1, 0);
+        }
         if (focusFlash > 0.01f) {
             float pulse = (float) Math.sin(Math.min(1f, focusFlash) * Math.PI);
             fillRounded(ctx, x, y, CARD_W, h, 12f,
@@ -286,10 +292,19 @@ public final class ClickGui2Card {
         fillRounded(ctx, x, y, CARD_W, h, 12f,
                 ClickGui2Theme.alpha(ClickGui2Theme.Role.BACKGROUND, fillAlpha));
         outlineRounded(ctx, x, y, CARD_W, h, 12f, ClickGui2Theme.rgb(ClickGui2Theme.Role.OUTLINE));
+        if (toggleT > 0.02f) {
+            outlineRounded(ctx, x, y, CARD_W, h, 12f,
+                    ClickGui2Theme.alpha(ClickGui2Theme.Role.MAIN, Math.round(70f * toggleT)));
+        }
 
         renderHeader(ctx, favorite);
 
         float revealBase = ClickGui2Anim.smooth(expandT);
+        if (revealBase > 0.05f) {
+            // разделитель шапки и строк
+            RenderUtil.drawRect(ctx, x + 12f, y + HEADER_H - 3f, x + CARD_W - 12f, y + HEADER_H - 2f,
+                    ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, Math.round(80f * revealBase)));
+        }
         if (revealBase > 0.01f) {
             ensureRows();
             ctx.enableScissor((int) x, (int) (y + HEADER_H - 2f), (int) (x + CARD_W), (int) (y + h + 2f));
@@ -317,6 +332,16 @@ public final class ClickGui2Card {
         String desc = module.getDescription() == null ? "" : module.getDescription();
         if (!desc.isEmpty()) {
             renderMarquee(ctx, desc, x + 12f, y + 24f, CARD_W - 100f);
+        }
+
+        // индикатор наличия настроек: шеврон (вправо сложен, влево раскрыт)
+        if (rowsHeight() > 0f) {
+            float cxv = x + CARD_W - 74f;
+            float strength = Math.max(0.45f * headerHoverT, expandT * 0.9f);
+            int chevCol = ClickGui2Theme.blend(
+                    ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT),
+                    ClickGui2Theme.rgb(ClickGui2Theme.Role.MAIN), expandT);
+            ClickGui2Widgets.chevronSide(ctx, cxv, y + 19f, expandT < 0.5f, chevCol, strength);
         }
 
         float starX = x + CARD_W - 58f;

@@ -261,11 +261,13 @@ public final class ClickGui2Popups {
         private static final float SV_H = 86f;
         private static final float STRIP_W = 5f;
         private static final float HEX_H = 16f;
+        private static final float RAIN_ROW_H = 18f;
 
         private final ColorSetting setting;
         private float hue, sat, val;
-        private boolean dragSV, dragHue, dragAlpha, editingHex;
+        private boolean dragSV, dragHue, dragAlpha, dragSpeed, editingHex;
         private String hexBuffer = "";
+        private float rainbowT;
 
         ColorPicker(float anchorX, float anchorY, ColorSetting setting) {
             this.setting = setting;
@@ -275,7 +277,7 @@ public final class ClickGui2Popups {
             this.sat = hsb[1];
             this.val = hsb[2];
             this.w = PAD * 2f + SV_W + 6f + STRIP_W + 10f;
-            this.h = PAD + SV_H + 8f + STRIP_W + 8f + HEX_H + PAD;
+            this.h = PAD + SV_H + 8f + STRIP_W + 10f + HEX_H + 10f + RAIN_ROW_H + 8f + 8f + PAD;
             this.x = anchorX - w;
             this.y = anchorY;
         }
@@ -298,6 +300,19 @@ public final class ClickGui2Popups {
 
         private float hexY() {
             return alphaY() + STRIP_W + 10f;
+        }
+
+        private float rainbowY() {
+            return hexY() + HEX_H + 10f;
+        }
+
+        private float speedY() {
+            return rainbowY() + RAIN_ROW_H + 8f;
+        }
+
+        /** Полоса скорости радуги: нормализация [0.2..3.0]. */
+        private float speedT() {
+            return Math.max(0f, Math.min(1f, (setting.getRainbowSpeed() - 0.2f) / 2.8f));
         }
 
         private void apply() {
@@ -387,6 +402,32 @@ public final class ClickGui2Popups {
             // подпись формата
             drawText(ctx, "Цвет", tx + SV_W + STRIP_W + 8f, ty + 4f,
                     ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), a));
+
+            // Ряд «Радуга»: подпись + мини-переключатель справа
+            float ry = rainbowY();
+            float innerW = SV_W + STRIP_W + 6f;
+            boolean rainbowOn = setting.isRainbow();
+            rainbowT = ClickGui2Anim.to01(rainbowT, rainbowOn, 0.016f, 12f);
+            drawText(ctx, "Радуга", sx, ry + 5f, ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), a));
+            ClickGui2Widgets.togglePill(ctx, sx + innerW - 30f, ry, rainbowT, false);
+            if (rainbowOn) {
+                // контур пилюли подкрашен живым оттенком радуги
+                float hueNow = ((System.currentTimeMillis() % 4000L) / 4000f);
+                int live = Color.HSBtoRGB(hueNow, 0.8f, 1f) & 0xFFFFFF;
+                outlineRounded(ctx, sx + innerW - 30f, ry, 30f, 18f, 7f,
+                        live | (Math.round(140f * a) << 24));
+            }
+
+            // Полоса скорости: радужный градиент с бегунком
+            float stY = speedY();
+            for (int i = 0; i < (int) innerW; i += 4) {
+                int packed = Color.HSBtoRGB(i / innerW, 0.85f, 1f) & 0xFFFFFF;
+                RenderUtil.drawRect(ctx, sx + i, stY, sx + Math.min(i + 4, innerW), stY + 4f,
+                        packed | (Math.round(115f * a) << 24));
+            }
+            float speedKnobX = sx + speedT() * innerW;
+            GuiGfx.dot(ctx, speedKnobX, stY + 2f, 3.2f,
+                    ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.CIRCLE), a));
         }
 
         private static float hNearest(float ob) {
@@ -434,9 +475,32 @@ public final class ClickGui2Popups {
                 }
                 return;
             }
+            // пилюля «Радуга»
+            float ry = rainbowY();
+            float innerW = SV_W + STRIP_W + 6f;
+            if (ClickGui2Widgets.inRect(mx, my, sx + innerW - 30f, ry, 30f, RAIN_ROW_H)) {
+                setting.setRainbow(!setting.isRainbow());
+                return;
+            }
+            // трек скорости радуги
+            if (ClickGui2Widgets.inRect(mx, my, sx, speedY() - 4f, innerW, 12f)) {
+                dragSpeed = true;
+                moveSpeed(mx);
+                return;
+            }
             if (editingHex) {
                 editingHex = false;
             }
+        }
+
+        private void moveSpeed(float mx) {
+            float innerW = SV_W + STRIP_W + 6f;
+            float t = Math.max(0f, Math.min(1f, (mx - sx0()) / innerW));
+            setting.setRainbowSpeed(0.2f + t * 2.8f);
+        }
+
+        private float sx0() {
+            return svX();
         }
 
         private void moveSV(float mx, float my) {
@@ -470,12 +534,16 @@ public final class ClickGui2Popups {
                 moveAlpha(mx);
                 return true;
             }
+            if (dragSpeed) {
+                moveSpeed(mx);
+                return true;
+            }
             return false;
         }
 
         @Override
         void mouseReleased() {
-            dragSV = dragHue = dragAlpha = false;
+            dragSV = dragHue = dragAlpha = dragSpeed = false;
         }
 
         @Override
@@ -563,14 +631,25 @@ public final class ClickGui2Popups {
             FontManager fm = FontManager.INSTANCE;
             fm.drawStringScaled(ctx, "Кнопка", x + 10f, y + 8f,
                     ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.TEXT), a), 1f);
+            if (capturing) {
+                String hint = "Esc — отмена";
+                float hintW = fm.getStringWidthScaled(hint, 8f);
+                fm.drawStringScaled(ctx, hint, x + w - 10f - hintW, y + 9f,
+                        ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT),
+                                Math.round(0.8f * a)), 1f);
+            }
 
             boolean btnHover = !closing && ClickGui2Widgets.inRect(mx, my, x + 10f, y + 24f, w - 20f, 22f);
             String label = capturing ? "..." : keyDisplay();
             fillRounded(ctx, x + 10f, y + 24f, w - 20f, 22f, 5f,
                     ClickGui2Theme.fade(btnHover ? ClickGui2Theme.Role.SELECTED : ClickGui2Theme.Role.LINE, a * (capturing ? 1.8f : 1f)));
+            // при захвате — дышащий акцентный контур
+            int captureTone = capturing
+                    ? ClickGui2Theme.alpha(ClickGui2Theme.Role.MAIN,
+                            Math.round(120f + 70f * (0.5f + (float) Math.sin(System.currentTimeMillis() / 160.0))) )
+                    : -1;
             outlineRounded(ctx, x + 10f, y + 24f, w - 20f, 22f, 5f,
-                    capturing ? ClickGui2Theme.alpha(ClickGui2Theme.Role.MAIN, 190)
-                            : ClickGui2Theme.fade(ClickGui2Theme.Role.OUTLINE, a));
+                    capturing ? captureTone : ClickGui2Theme.fade(ClickGui2Theme.Role.OUTLINE, a));
             float tw = fm.getStringWidthScaled(label, 9f);
             fm.drawStringScaled(ctx, label, x + (w - tw) / 2f, y + 24f + 7f,
                     ClickGui2Theme.fade(btnHover || capturing

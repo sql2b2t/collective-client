@@ -87,6 +87,18 @@ public final class ClickGui2Widgets {
         }
     }
 
+    /** Боковой шеврон (вправо сложен, влево раскрыт): понятийный индикатор раскрытия карточки. */
+    public static void chevronSide(DrawContext ctx, float cx, float cy, boolean right, int color, float strength) {
+        if (strength <= 0.02f) return;
+        color = ClickGui2Theme.fade(color, Math.min(1f, strength));
+        int cols = 3;
+        for (int i = 0; i < cols; i++) {
+            float half = Math.max(0f, (cols - i) * 0.55f);
+            float x = right ? cx + i - cols / 2f : cx - i + cols / 2f - 1f;
+            RenderUtil.drawRect(ctx, x, cy - half, x + 1f, cy + half, color);
+        }
+    }
+
     /** Каретка текстового поля: 1px вертикаль цветом MAIN. */
     public static void caret(DrawContext ctx, float x, float yTop, float height) {
         RenderUtil.drawRect(ctx, x, yTop, x + 1f, yTop + height,

@@ -168,6 +168,7 @@ public class ClickGui2Screen extends Screen {
         lastNano = now;
 
         introT = ClickGui2Anim.to01(introT, true, dt, 6f);
+        syncTheme();
 
         // фон: затемнение + мягкие свечения (аппроксимация шейдеров исходника)
         RenderUtil.drawRect(context, 0f, 0f, (float) width, (float) height,
@@ -225,6 +226,34 @@ public class ClickGui2Screen extends Screen {
         return width / 2f + (raw - width / 2f) / Math.max(0.05f, drawnScale);
     }
 
+    /** Общий акцент/фон берём из настроек UI — оба стиля держат одну палитру. */
+    private void syncTheme() {
+        UI uiMod = UI.INSTANCE;
+        if (uiMod == null) return;
+        try {
+            java.awt.Color accent = uiMod.color.getValue();
+            if (accent != null) {
+                int rgb = accent.getRGB() & 0x00FFFFFF;
+                ClickGui2Theme.setRole(ClickGui2Theme.Role.MAIN, new java.awt.Color(rgb));
+                ClickGui2Theme.setRole(ClickGui2Theme.Role.MAIN_TWO, new java.awt.Color(mixe(rgb, 0.72f)));
+                ClickGui2Theme.setRole(ClickGui2Theme.Role.ACTIVE_STATE, new java.awt.Color(rgb));
+            }
+            java.awt.Color bg = uiMod.bgColor.getValue();
+            if (bg != null) {
+                ClickGui2Theme.setRole(ClickGui2Theme.Role.BACKGROUND,
+                        new java.awt.Color(bg.getRed(), bg.getGreen(), bg.getBlue()));
+            }
+        } catch (RuntimeException ignored) {
+        }
+    }
+
+    private static int mixe(int rgb, float k) {
+        int r = Math.round(((rgb >> 16) & 0xFF) * k);
+        int g = Math.round(((rgb >> 8) & 0xFF) * k);
+        int b = Math.round((rgb & 0xFF) * k);
+        return (r << 16) | (g << 8) | b;
+    }
+
     private float toPanelY(float raw) {
         return height / 2f + (raw - height / 2f) / Math.max(0.05f, drawnScale);
     }
@@ -239,6 +268,9 @@ public class ClickGui2Screen extends Screen {
 
         renderRail(ctx, mx, my, dt, navAlpha, interact);
         renderHeaderRow(ctx, mx, my, navAlpha, interact);
+        // разделитель шапки и портала
+        RenderUtil.drawRect(ctx, panelX + RAIL_W + 12f, panelY + 70f, panelX + PANEL_W - 16f, panelY + 71f,
+                ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, Math.round(90f * navAlpha)));
         renderModules(ctx, mx, my, dt, navAlpha, interact);
         renderSearchDropdown(ctx, navAlpha, interact);
         popups.render(ctx, mx, my, dt,
@@ -253,8 +285,11 @@ public class ClickGui2Screen extends Screen {
         RenderUtil.drawRect(ctx, panelX + RAIL_W, panelY + 18f, panelX + RAIL_W + 1f, panelY + PANEL_H - 18f,
                 ClickGui2Theme.fade(ClickGui2Theme.Role.LINE, navAlpha));
 
+        int brandTone = ClickGui2Theme.blend(
+                ClickGui2Theme.rgb(ClickGui2Theme.Role.CATEGORY_TEXT),
+                ClickGui2Theme.rgb(ClickGui2Theme.Role.MAIN), 0.4f);
         fm.drawStringScaled(ctx, "Collective", panelX + 16f, panelY + 15f,
-                ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.CATEGORY_TEXT), navAlpha), 1.22f);
+                ClickGui2Theme.fade(brandTone, navAlpha), 1.22f);
         fm.drawStringScaled(ctx, "GUI / v1.2", panelX + 16f, panelY + 30f,
                 ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), 0.9f * navAlpha), 1f);
         ClickGui2Widgets.hairline(ctx, panelX + 12f, panelY + 48f, RAIL_W - 24f);
@@ -279,6 +314,16 @@ public class ClickGui2Screen extends Screen {
                 pingHoverSound();
             }
             float reaction = Math.max(anim, hover ? 0.55f : 0f);
+
+            // счётчик модулей на ховере
+            if (hover && !button.favorites) {
+                int n = cardCache.get(button.category).size();
+                String num = String.valueOf(n);
+                float nw = fm.getStringWidthScaled(num, 8f);
+                fm.drawStringScaled(ctx, num, button.x + button.w - nw - 10f,
+                        button.y + button.h / 2f - 4f,
+                        ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), 0.7f * navAlpha), 1f);
+            }
 
             if (reaction > 0.02f) {
                 fillRounded(ctx, button.x, button.y, button.w, button.h, 8f,
@@ -403,14 +448,29 @@ public class ClickGui2Screen extends Screen {
     }
 
     private void renderSearchDropdown(DrawContext ctx, float navAlpha, boolean interact) {
-        if (searchResults.isEmpty()) {
-            return;
-        }
         FontManager fm = FontManager.INSTANCE;
         float boxW = 210f;
         float boxH = 24f;
         float boxX = searchBoxX();
         float dropY = searchBoxY() + boxH + 6f;
+        if (searchResults.isEmpty()) {
+            // после сканирования с пустым результатом — вежливая заглушка
+            if (!searchQuery.isEmpty() && searchQuery.equals(scannedQuery)) {
+                float dropH = 28f;
+                GuiGfx.shadow(ctx, (int) boxX, (int) dropY, (int) boxW, (int) dropH, 8);
+                fillRounded(ctx, boxX, dropY, boxW, dropH, 9f,
+                        ClickGui2Theme.rgb(ClickGui2Theme.Role.BACKGROUND));
+                outlineRounded(ctx, boxX, dropY, boxW, dropH, 9f,
+                        ClickGui2Theme.rgb(ClickGui2Theme.Role.OUTLINE));
+                String stub = "Ничего не найдено";
+                int tone = ClickGui2Theme.blend(
+                        ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT),
+                        ClickGui2Theme.rgb(ClickGui2Theme.Role.DEACTIVE_TEXT), 0.45f);
+                fm.drawStringScaled(ctx, stub, boxX + 10f, dropY + 10f,
+                        ClickGui2Theme.fade(tone, 0.9f * navAlpha), 1f);
+            }
+            return;
+        }
         float dropH = 26f + searchResults.size() * 20f;
 
         GuiGfx.shadow(ctx, (int) boxX, (int) dropY, (int) boxW, (int) dropH, 8);
@@ -546,17 +606,22 @@ public class ClickGui2Screen extends Screen {
         }
         ctx.disableScissor();
 
-        // пустое состояние избранного
+        // пустое состояние избранного: искра + подсказка
         if (visible.isEmpty()) {
+            float midX = viewportX() + viewportW() / 2f;
+            ClickGui2Widgets.starIcon(ctx, midX, viewportY() + viewportH() / 2f - 12f, 14f,
+                    ClickGui2Theme.fade((255 << 16) | (210 << 8) | 64, 0.45f * navAlpha));
             String empty = "Нет избранных. Нажми на звезду на карточке модуля.";
             float ew = fm.getStringWidthScaled(empty, 9f);
-            fm.drawStringScaled(ctx, empty, viewportX() + (viewportW() - ew) / 2f,
-                    viewportY() + viewportH() / 2f - 4f,
+            fm.drawStringScaled(ctx, empty, midX - ew / 2f, viewportY() + viewportH() / 2f + 6f,
                     ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), 0.9f * navAlpha), 1f);
         }
 
-        // полоса прокрутки
+        // полоса прокрутки: тонкий трек + бегунок
         if (contentHeight > viewportH()) {
+            RenderUtil.drawRect(ctx, viewportX() + viewportW() - SCROLL_W - 2f, viewportY(),
+                    viewportX() + viewportW() - 2f, viewportY() + viewportH(),
+                    ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, Math.round(55f * navAlpha)));
             float trackH = viewportH();
             float th = Math.max(22f, trackH * trackH / contentHeight);
             float trackRun = trackH - th;

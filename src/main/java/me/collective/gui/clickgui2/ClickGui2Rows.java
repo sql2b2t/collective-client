@@ -548,14 +548,14 @@ final class ClickGui2Rows {
             drawText(ctx, setting.getName(), x, y + 5f, 10f,
                     ClickGui2Theme.fade(labelColor(hovered ? 0.85f : 0.35f), alpha));
 
+            // getColor() учитывает радугу и синхронизацию — свотч живой
+            java.awt.Color shown = setting.getValue() != null ? setting.getColor() : java.awt.Color.WHITE;
             float sw = 14f;
-            ClickGui2Widgets.colorSwatch(ctx, x + w - sw - 2f, y + 4f,
-                    setting.getValue() == null ? java.awt.Color.WHITE : setting.getValue(),
+            ClickGui2Widgets.colorSwatch(ctx, x + w - sw - 2f, y + 4f, shown,
                     hovered && alpha > 0.5f);
 
             if (hovered) {
-                java.awt.Color c = setting.getValue() != null ? setting.getValue() : java.awt.Color.WHITE;
-                String hex = String.format("#%06X%02X", c.getRGB() & 0xFFFFFF, c.getAlpha());
+                String hex = String.format("#%06X%02X", shown.getRGB() & 0xFFFFFF, shown.getAlpha());
                 float hw = textWidth(hex, 9f);
                 drawText(ctx, hex, x + w - sw - 6f - hw, y + 5f, 9f,
                         ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), alpha));
