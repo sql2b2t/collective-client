@@ -1,131 +1,135 @@
 package me.collective.gui.clickgui2;
 
 import me.collective.font.FontManager;
+import me.collective.gui.GuiGfx;
+import me.collective.render.RenderUtil;
 import net.minecraft.client.gui.DrawContext;
 
 import java.awt.Color;
 
+import static me.collective.gui.GuiGfx.dot;
+import static me.collective.gui.GuiGfx.dotRing;
 import static me.collective.gui.GuiGfx.fillRounded;
 import static me.collective.gui.GuiGfx.outlineRounded;
-import static me.collective.gui.GuiGfx.dot;
-import static me.collective.gui.GuiGfx.shadow;
 
 /**
- * Отрисовщики элемента ClickGui2 — порт стиля из исходника:
- * скруглённые панели (радиусы 7–10), ховер с альфа-смешением
- * (hover 0.8 / idle 0.55 — как в mod0004), тумблер ACTIVE/DEACTIVE_STATE,
- * слайдер с круглым бегуном CIRCLE, кнопка "< значение >", колор-пикер с
- * полосой hue 6px и hex-подписью "#%02X%02X%02X%02X".
+ * Кирпичи второго стиля — перенесённые с исходника размеры и цвета:
+ * тумблер 30×18 (радиус 7, бегунок 14×14/шаг 12), звезда избранного 6.2px,
+ * бегунок слайдера радиусом 4.5 по тонкому треку, шеврон построчной
+ * отрисовкой, курсор-каретка текстовых полей.
  */
 public final class ClickGui2Widgets {
     private ClickGui2Widgets() {
     }
 
-    // ── Базовая кнопка (mod0004): 28px высота, радиус 7, ховер-бленд ──
-
-    public static void button(DrawContext ctx, float x, float y, float w, float h,
-                              boolean hovered, ClickGui2Theme.Role fillRole,
-                              int activeAlpha, int idleAlpha, int outlineAlpha) {
-        int fill = hovered
-                ? ClickGui2Theme.alpha(fillRole, activeAlpha)
-                : ClickGui2Theme.alpha(fillRole, idleAlpha);
-        float radius = Math.min(7f, h / 2f);
-        fillRounded(ctx, x, y, w, h, radius, fill);
-        outlineRounded(ctx, x, y, w, h, radius, ClickGui2Theme.alpha(ClickGui2Theme.Role.OUTLINE, outlineAlpha));
+    public static boolean inRect(float mx, float my, float x, float y, float w, float h) {
+        return mx >= x && mx <= x + w && my >= y && my <= y + h;
     }
 
-    public static void buttonLabel(DrawContext ctx, String text, float x, float y, float h,
-                                   boolean hovered, int size) {
-        FontManager fm = FontManager.INSTANCE;
-        fm.drawStringWithShadow(ctx, text, x, y + (h - fm.getFontHeightScaled(size)) / 2f,
-                hovered ? ClickGui2Theme.c(ClickGui2Theme.Role.ACTIVE_TEXT) : ClickGui2Theme.c(ClickGui2Theme.Role.DEACTIVE_TEXT));
-    }
-
-    // ── Тумблер BooleanSetting ──
-
-    public static void toggle(DrawContext ctx, float x, float y, float progress, boolean focused) {
-        float w = 20f, h = 10f;
-        float radius = h / 2f;
-
-        int r = lerp(ClickGui2Theme.c(ClickGui2Theme.Role.DEACTIVE_STATE).getRed(), ClickGui2Theme.c(ClickGui2Theme.Role.ACTIVE_STATE).getRed(), progress);
-        int g = lerp(ClickGui2Theme.c(ClickGui2Theme.Role.DEACTIVE_STATE).getGreen(), ClickGui2Theme.c(ClickGui2Theme.Role.ACTIVE_STATE).getGreen(), progress);
-        int b = lerp(ClickGui2Theme.c(ClickGui2Theme.Role.DEACTIVE_STATE).getBlue(), ClickGui2Theme.c(ClickGui2Theme.Role.ACTIVE_STATE).getBlue(), progress);
-        int a = lerp(ClickGui2Theme.c(ClickGui2Theme.Role.DEACTIVE_STATE).getAlpha(), 255, progress);
-
-        fillRounded(ctx, x, y, w, h, radius, r << 16 | g << 8 | b | a << 24);
-        outlineRounded(ctx, x, y, w, h, radius,
-                focused ? ClickGui2Theme.alpha(ClickGui2Theme.Role.OUTLINE, 90) : ClickGui2Theme.rgb(ClickGui2Theme.Role.LINE));
-
-        float cx = lerp(x + radius + 1f, x + w - radius - 1f, progress);
-        dot(ctx, cx, y + h / 2f, 3.2f, ClickGui2Theme.rgb(ClickGui2Theme.Role.CIRCLE));
-    }
-
-    // ── Слайдер NumberSetting: тонкий трек LINE + бегунок CIRCLE ──
-
-    public static void slider(DrawContext ctx, float x, float y, float w, float progress, boolean dragging, float size) {
-        float trackH = 3f;
-        fillRounded(ctx, x, y, w, trackH, trackH / 2f, ClickGui2Theme.rgb(ClickGui2Theme.Role.LINE));
-        float knobX = x + w * Math.max(0f, Math.min(1f, progress));
-        if (progress > 0.01f) {
-            fillRounded(ctx, x, y, knobX - x, trackH, trackH / 2f,
-                    ClickGui2Theme.alpha(ClickGui2Theme.Role.ACTIVE_STATE, 200));
-        }
-        float knobR = dragging ? 4.2f : 3.4f;
-        shadow(ctx, (int) (knobX - knobR - 2), (int) (y + trackH / 2f - knobR - 2), (int) (knobR * 2 + 4), (int) (knobR * 2 + 4), 2);
-        dot(ctx, knobX, y + trackH / 2f, knobR, ClickGui2Theme.rgb(ClickGui2Theme.Role.CIRCLE));
-    }
-
-    // ── Переключатель режима "< значение >" ──
-
-    public static void modeArrows(DrawContext ctx, float y, float h, float rightEdge, int color, float size) {
-        FontManager fm = FontManager.INSTANCE;
-        fm.drawStringWithShadow(ctx, "<", rightEdge - 22f, y + (h - fm.getFontHeightScaled(size)) / 2f, color);
-        fm.drawStringWithShadow(ctx, ">", rightEdge - 8f, y + (h - fm.getFontHeightScaled(size)) / 2f, color);
-    }
-
-    // ── Плашка цвета (свотч) ──
-
-    public static void swatch(DrawContext ctx, float x, float y, Color color, boolean open) {
-        fillRounded(ctx, x, y, 14f, 10f, 3f, color.getRGB());
-        outlineRounded(ctx, x, y, 14f, 10f, 3f,
-                open ? ClickGui2Theme.alpha(ClickGui2Theme.Role.MAIN, 200) : ClickGui2Theme.rgb(ClickGui2Theme.Role.LINE));
-    }
-
-    // ── Полоса скролла ──
-
-    public static void scrollBar(DrawContext ctx, float x, float y, float trackH, float thumbY, float thumbH) {
-        fillRounded(ctx, x, y, 2f, trackH, 1f, ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, 60));
-        if (thumbH > 4f) {
-            fillRounded(ctx, x, y + thumbY, 2f, thumbH, 1f, ClickGui2Theme.rgb(ClickGui2Theme.Role.SCROLL));
+    /**
+     * Тумблер-пилюля как в карточке модуля: 30×18 r7, бегунок 14×14 r6,
+     * ход 12px, цвета через интерполяцию DEACTIVE/ACTIVE_STATE.
+     */
+    public static void togglePill(DrawContext ctx, float x, float y, float t, boolean hovered) {
+        int base = ClickGui2Theme.blend(ClickGui2Theme.rgb(ClickGui2Theme.Role.DEACTIVE_STATE),
+                ClickGui2Theme.rgb(ClickGui2Theme.Role.ACTIVE_STATE), t);
+        int knob = ClickGui2Theme.blend(0xFF8D8791, 0xFFFFFFFF, t);
+        fillRounded(ctx, x, y, 30f, 18f, 7f, base);
+        fillRounded(ctx, x + 2f + 12f * t, y + 2f, 14f, 14f, 6f, knob);
+        if (hovered) {
+            outlineRounded(ctx, x, y, 30f, 18f, 7f, ClickGui2Theme.alpha(ClickGui2Theme.Role.MAIN, 90));
         }
     }
 
-    // ── Каретка текстового поля ──
-
-    public static boolean caretNow() {
-        return System.currentTimeMillis() / 500L % 2L == 0L;
+    /** Ромб сканлайнами — используется в иконке избранного. */
+    public static void diamond(DrawContext ctx, float cx, float cy, float hw, float hh, int color) {
+        for (float y0 = cy - hh; y0 < cy + hh; y0 += 1f) {
+            float dist = Math.abs(y0 + 0.5f - cy);
+            float half = Math.max(0f, hw * (1f - dist / hh));
+            if (half <= 0f) continue;
+            RenderUtil.drawRect(ctx, cx - half, y0, cx + half, y0 + 1f, color);
+        }
     }
 
-    /** Идентично исходнику: ENTER — сохранить (257/335), BACKSPACE — стереть (259). */
-    public static boolean isEnter(int keyCode) {
-        return keyCode == 257 || keyCode == 335;
+    /** Звезда/искры избранного: ромб + маленький ромб поперёк — восьмиконечная искра. */
+    public static void starIcon(DrawContext ctx, float cx, float cy, float size, int color) {
+        float half = size / 2f;
+        diamond(ctx, cx, cy, half, half, color);
+        diamond(ctx, cx, cy, half * 0.62f, half * 0.62f, color);
     }
 
-    public static boolean isBackspace(int keyCode) {
-        return keyCode == 259;
+    /**
+     * Слайдер числа: тонкий трек 5px r2.5 + заполнение + круг радиусом 4.5
+     * (+1.5 на драге/ховере) — по мотивам mod0367.
+     */
+    public static void sliderTrack(DrawContext ctx, float x, float y, float w, float t,
+                                   boolean hovered, boolean dragging) {
+        float trackH = 5f;
+        fillRounded(ctx, x, y, w, trackH, trackH / 2f, ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, 70));
+        float fillW = Math.max(trackH, w * Math.max(0f, Math.min(1f, t)));
+        fillRounded(ctx, x, y, fillW, trackH, trackH / 2f,
+                ClickGui2Theme.fade(ClickGui2Theme.Role.ACTIVE_STATE, 0.9f));
+        float knobR = dragging ? 6f : hovered ? 5.2f : 4.5f;
+        if (dragging || hovered) {
+            GuiGfx.softGlow(ctx, (int) (x + fillW - knobR), (int) (y - (knobR - trackH / 2f)),
+                    (int) (knobR * 2f), (int) (knobR * 2f), (int) knobR,
+                    ClickGui2Theme.rgb(ClickGui2Theme.Role.ACTIVE_STATE) & 0xFFFFFF, 40, 2, 0);
+        }
+        dot(ctx, x + fillW, y + trackH / 2f, knobR, ClickGui2Theme.rgb(ClickGui2Theme.Role.CIRCLE));
     }
 
-    private static int lerp(int a, int b, float t) {
-        return Math.round(a + (b - a) * t);
+    /** Стрелочка-шеврон вниз (для «Выбрать»): построчный треугольник 8×4. */
+    public static void chevronDown(DrawContext ctx, float cx, float y, float scale, int color) {
+        int rows = Math.max(2, Math.round(4f * scale));
+        for (int i = 0; i < rows; i++) {
+            float half = rows - 1 - i;
+            RenderUtil.drawRect(ctx, cx - half, y + i * scale, cx + half, y + (i + 1) * scale, color);
+        }
     }
 
-    private static float lerp(float a, float b, float t) {
-        return a + (b - a) * t;
+    /** Каретка текстового поля: 1px вертикаль цветом MAIN. */
+    public static void caret(DrawContext ctx, float x, float yTop, float height) {
+        RenderUtil.drawRect(ctx, x, yTop, x + 1f, yTop + height,
+                ClickGui2Theme.alpha(ClickGui2Theme.Role.MAIN, 220));
     }
 
-    /** Плавное приближение кадровой анимации: dt в секундах, k — скорость. */
-    public static float ease(float current, float target, float dt, float speed) {
-        float factor = (float) Math.pow(0.0001, dt * speed);
-        return target + (current - target) * factor;
+    public static float textWidth(String value, float sizePx) {
+        return FontManager.INSTANCE.getStringWidthScaled(value, sizePx - 2f);
+    }
+
+    /** Тонкая линия-разделитель. */
+    public static void hairline(DrawContext ctx, float x, float y, float w) {
+        RenderUtil.drawRect(ctx, x, y, x + w, y + 1f, ClickGui2Theme.rgb(ClickGui2Theme.Role.LINE));
+    }
+
+    /** Свотч цвета 14×14 с мягким кольцом при открытии. */
+    public static void colorSwatch(DrawContext ctx, float x, float y, Color color, boolean open) {
+        int argb = open ? ClickGui2Theme.alpha(ClickGui2Theme.Role.MAIN, 200)
+                : ClickGui2Theme.rgb(ClickGui2Theme.Role.LINE);
+        int a = color.getAlpha();
+        // шахматная подложка 3×3 делает прозрачность видимой
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                boolean light = ((i + j) & 1) == 0;
+                int bg = light ? (30 << 24) | 0xFFFFFF : 0;
+                RenderUtil.drawRect(ctx, x + i * 3.5f, y + j * 3.5f, x + (i + 1) * 3.5f, y + (j + 1) * 3.5f, bg);
+            }
+        }
+        RenderUtil.drawRect(ctx, x, y, x + 14f, y + 14f, color.getRGB());
+        outlineRounded(ctx, x - 0.5f, y - 0.5f, 15f, 15f, 3.5f, argb);
+        if (a < 250) {
+            dotRing(ctx, x + 7f, y + 7f, 3.2f, ClickGui2Theme.alpha(ClickGui2Theme.Role.TEXT, 140));
+        }
+    }
+
+    /** Кнопка-«чип» с текстом (используется пикапом бинда). */
+    public static void chip(DrawContext ctx, float x, float y, float w, float h, boolean hover, String label) {
+        int bg = hover ? ClickGui2Theme.fade(ClickGui2Theme.Role.SELECTED, 2.2f)
+                : ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, 90);
+        fillRounded(ctx, x, y, w, h, Math.min(6f, h / 2f), bg);
+        outlineRounded(ctx, x, y, w, h, Math.min(6f, h / 2f), ClickGui2Theme.rgb(ClickGui2Theme.Role.OUTLINE));
+        float tw = textWidth(label, 9f);
+        FontManager.INSTANCE.drawStringWithShadow(ctx, label, x + (w - tw) / 2f, y + h / 2f - 3f,
+                hover ? ClickGui2Theme.rgb(ClickGui2Theme.Role.TEXT) : ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT));
     }
 }

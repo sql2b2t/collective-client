@@ -2,32 +2,52 @@ package me.collective.gui.clickgui2;
 
 import java.awt.Color;
 import java.util.EnumMap;
+import java.util.Map;
 
 /**
- * Палитра ClickGui2 — порт ролей из отрисованного исходника
- * (MAIN/OUTLINE/BACKGROUND/SHADOW/LINE/SCROLL/ACTIVE_STATE/DEACTIVE_STATE/
- * CIRCLE/SELECTED/ACTIVE_TEXT/DEACTIVE_TEXT/OPEN_SETTING_TEXT/DEOPEN_SETTING_TEXT/
- * TEXT/SUR_TEXT/CATEGORY_*), с дефолтами sotto стилистику Collective.
- * Как и в источнике, любой цвет можно переопределить (см. {@link #setRole}).
+ * Ролевая палитра второго стиля — перенос ролей исходника (mod0021):
+ * каждая роль задаёт смысл (选中/hover/текст и т.д.), а не конкретный цвет,
+ * поэтому любую роль можно переопределить через {@link #setRole}.
+ * Значения по умолчанию — прошлельная лаванда на глубоком тёмном стекле,
+ * совместимая с подписью классического стиля (UI.Color 189,153,255).
  */
 public final class ClickGui2Theme {
     public enum Role {
-        MAIN, MAIN_TWO, OUTLINE, BACKGROUND, SHADOW, LINE, SCROLL,
-        ACTIVE_STATE, DEACTIVE_STATE, CIRCLE, SELECTED,
-        ACTIVE_TEXT, DEACTIVE_TEXT,
-        OPEN_SETTING_TEXT, DEOPEN_SETTING_TEXT,
-        TEXT, SUR_TEXT,
-        CATEGORY_TEXT, CATEGORY_SUR_TEXT, DESELECT_CATEGORY_TEXT
+        MAIN("Основной акцент"),
+        MAIN_TWO("Второй акцент"),
+        OUTLINE("Обводка панелей"),
+        BACKGROUND("Задний фон карточек"),
+        SHADOW("Свечение/тень"),
+        LINE("Разделители"),
+        SCROLL("Полоса скролла"),
+        ACTIVE_STATE("Включённый тумблер"),
+        DEACTIVE_STATE("Выключенный тумблер"),
+        CIRCLE("Круг слайдера"),
+        SELECTED("Подсветка выбранного"),
+        ACTIVE_TEXT("Активный текст"),
+        DEACTIVE_TEXT("Неактивный текст"),
+        OPEN_SETTING_TEXT("Открытая настройка"),
+        DEOPEN_SETTING_TEXT("Закрытая настройка"),
+        TEXT("Текст"),
+        SUR_TEXT("Под-текст"),
+        CATEGORY_TEXT("Текст выбранной категории"),
+        CATEGORY_SUR_TEXT("Под-текст категорий"),
+        DESELECT_CATEGORY_TEXT("Текст невыбранной категории");
+
+        public final String label;
+
+        Role(String label) {
+            this.label = label;
+        }
     }
 
-    private static final EnumMap<Role, Color> colors = new EnumMap<>(Role.class);
+    private static final Map<Role, Color> colors = new EnumMap<>(Role.class);
 
     static {
-        // Дефолты подобраны под стилистику:o тёмное стекло + лавандовый акцент
         colors.put(Role.MAIN, new Color(189, 153, 255));
         colors.put(Role.MAIN_TWO, new Color(150, 125, 205));
         colors.put(Role.OUTLINE, new Color(255, 255, 255, 34));
-        colors.put(Role.BACKGROUND, new Color(12, 11, 18, 222));
+        colors.put(Role.BACKGROUND, new Color(16, 15, 22, 216));
         colors.put(Role.SHADOW, new Color(0, 0, 0, 70));
         colors.put(Role.LINE, new Color(255, 255, 255, 22));
         colors.put(Role.SCROLL, new Color(255, 255, 255, 55));
@@ -35,70 +55,62 @@ public final class ClickGui2Theme {
         colors.put(Role.DEACTIVE_STATE, new Color(120, 116, 138, 190));
         colors.put(Role.CIRCLE, new Color(250, 248, 255));
         colors.put(Role.SELECTED, new Color(255, 255, 255, 30));
-        colors.put(Role.ACTIVE_TEXT, new Color(242, 245, 252));
-        colors.put(Role.DEACTIVE_TEXT, new Color(138, 134, 158));
-        colors.put(Role.OPEN_SETTING_TEXT, new Color(242, 245, 252));
-        colors.put(Role.DEOPEN_SETTING_TEXT, new Color(168, 165, 188));
-        colors.put(Role.TEXT, new Color(242, 245, 252));
-        colors.put(Role.SUR_TEXT, new Color(150, 154, 166));
+        colors.put(Role.ACTIVE_TEXT, new Color(238, 240, 250));
+        colors.put(Role.DEACTIVE_TEXT, new Color(134, 132, 152));
+        colors.put(Role.OPEN_SETTING_TEXT, new Color(226, 228, 244));
+        colors.put(Role.DEOPEN_SETTING_TEXT, new Color(158, 156, 178));
+        colors.put(Role.TEXT, new Color(236, 238, 250));
+        colors.put(Role.SUR_TEXT, new Color(148, 152, 168));
         colors.put(Role.CATEGORY_TEXT, new Color(242, 245, 252));
         colors.put(Role.CATEGORY_SUR_TEXT, new Color(138, 134, 158));
-        colors.put(Role.DESELECT_CATEGORY_TEXT, new Color(110, 108, 130));
+        colors.put(Role.DESELECT_CATEGORY_TEXT, new Color(112, 110, 132));
     }
 
     private ClickGui2Theme() {
     }
 
+    /** Текущий цвет роли (ARGB). */
     public static Color c(Role role) {
-        Color color = colors.get(role);
-        return color != null ? color : Role.BACKGROUND != null ? colors.get(Role.BACKGROUND) : Color.GRAY;
+        return colors.getOrDefault(role, Color.GRAY);
     }
 
+    /** Цвет роли как непрозрачный int для обычных отрисовщиков. */
     public static int rgb(Role role) {
         return c(role).getRGB();
     }
 
-    /** Цвет роли с изменённой альфой (без мутации исходного). */
+    /** Цвет роли, переопределённый альфой (0..255). */
     public static int alpha(Role role, int alpha) {
         Color base = c(role);
-        return alpha << 24 | (base.getRed() & 0xFF) << 16 | (base.getGreen() & 0xFF) << 8 | (base.getBlue() & 0xFF);
+        return (clamp8(alpha) << 24) | (base.getRGB() & 0x00FFFFFF);
     }
 
-    /** Затемнение уже непрозрачного цвета (для вертикального градиента заголовка). */
-    public static Color derive(Color base, float darkFactor, int alpha) {
-        int r = Math.round(base.getRed() * darkFactor);
-        int g = Math.round(base.getGreen() * darkFactor);
-        int b = Math.round(base.getBlue() * darkFactor);
-        return new Color(Math.min(255, r), Math.min(255, g), Math.min(255, b), Math.max(0, Math.min(255, alpha)));
+    /** Прямая интерполяция между двумя int-цветами по t (0..1) — как в исходнике. */
+    public static int blend(int from, int to, float t) {
+        t = Math.max(0f, Math.min(1f, t));
+        int a = lerp((from >>> 24) & 0xFF, (to >>> 24) & 0xFF, t);
+        int r = lerp((from >>> 16) & 0xFF, (to >>> 16) & 0xFF, t);
+        int g = lerp((from >>> 8) & 0xFF, (to >>> 8) & 0xFF, t);
+        int b = lerp(from & 0xFF, to & 0xFF, t);
+        return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
-    public static void setRole(Role role, Color color) {
-        if (role != null && color != null) {
-            colors.put(role, color);
-        }
+    /** Тональное ослабление цвета: умножает альфу на множитель (как mod0692.西). */
+    public static int fade(int argb, float mul) {
+        int a = (int) (((argb >>> 24) & 0xFF) * mul);
+        return (clamp8(a) << 24) | (argb & 0x00FFFFFF);
     }
 
-    /** «Готовые темы» — пресет №1: Collective по умолчанию. */
-    public static void presetDefault() {
-        setRole(Role.MAIN, new Color(189, 153, 255));
-        setRole(Role.MAIN_TWO, new Color(150, 125, 205));
-        setRole(Role.BACKGROUND, new Color(12, 11, 18, 222));
-        setRole(Role.SHADOW, new Color(0, 0, 0, 70));
+    /** Цвет роли с умноженной альфой — ховер/ввод панелей. */
+    public static int fade(Role role, float mul) {
+        return fade(c(role).getRGB(), mul);
     }
 
-    /** Пресет №2: тёплая вишня. */
-    public static void presetCherry() {
-        setRole(Role.MAIN, new Color(255, 128, 138));
-        setRole(Role.MAIN_TWO, new Color(210, 100, 112));
-        setRole(Role.BACKGROUND, new Color(20, 11, 14, 226));
-        setRole(Role.SHADOW, new Color(0, 0, 0, 78));
+    private static int lerp(int a, int b, float t) {
+        return Math.round(a + (b - a) * t);
     }
 
-    /** Пресет №3: холодный мятный. */
-    public static void presetMint() {
-        setRole(Role.MAIN, new Color(120, 230, 200));
-        setRole(Role.MAIN_TWO, new Color(95, 190, 168));
-        setRole(Role.BACKGROUND, new Color(10, 18, 17, 224));
-        setRole(Role.SHADOW, new Color(0, 0, 0, 70));
+    private static int clamp8(int v) {
+        return Math.max(0, Math.min(255, v));
     }
 }
