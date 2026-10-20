@@ -564,10 +564,19 @@ public class RotationUtils {
     public void flushServerRotation() {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.player == null || mc.getNetworkHandler() == null) return;
-        if (!isRotating() && !isWireFresh()) return;
 
-        float yaw = getSentYaw();
-        float pitch = getSentPitch();
+        boolean rotating = isRotating() || isWireFresh();
+        float yaw;
+        float pitch;
+        if (rotating) {
+            yaw = getSentYaw();
+            pitch = getSentPitch();
+        } else {
+            // Модули с прямой камерой (клиентский режим) двигают взгляд
+            // напрямую, без захвата RotationUtils.
+            yaw = mc.player.getYaw();
+            pitch = mc.player.getPitch();
+        }
 
         // Сервер уже видел этот угол — дублирующий пакет не нужен.
         if (Math.abs(MathHelper.wrapDegrees(yaw - this.serverYaw)) < 0.01f
@@ -577,6 +586,32 @@ public class RotationUtils {
 
         mc.getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.LookAndOnGround(
             yaw, pitch, mc.player.isOnGround(), mc.player.horizontalCollision));
+    }
+
+    /**
+     * Страховка порядка «поворот → взаимодействие» на уровне проводки:
+     * перед ударом или interact досылаем актуальный взгляд, если сервер его
+     * ещё не видел. Работает для всех модулей, в том числе тех, что наводятся
+     * напрямую камерой и не вызывают flushServerRotation сами.
+     */
+    @EventHandler(priority = -100)
+    public void onPacketSendLookGuard(PacketEvent.Send event) {
+        if (event.isCancelled()) return;
+        Packet<?> packet = event.packet;
+
+        boolean needsLook;
+        if (packet instanceof net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket) {
+            needsLook = true;
+        } else if (packet instanceof net.minecraft.network.packet.c2s.play.PlayerInteractEntityC2SPacket) {
+            needsLook = true;
+        } else if (packet instanceof net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket action) {
+            needsLook = action.getAction()
+                == net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket.Action.START_DESTROY_BLOCK;
+        } else {
+            needsLook = false;
+        }
+
+        if (needsLook) flushServerRotation();
     }
 
     public boolean isAligned(double eps) {
