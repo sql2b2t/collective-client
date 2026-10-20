@@ -4,6 +4,7 @@ import me.collective.font.FontManager;
 import me.collective.gui.GuiGfx;
 import me.collective.render.RenderUtil;
 import me.collective.render.SoundUtil;
+import me.collective.setting.BooleanSetting;
 import me.collective.setting.ColorSetting;
 import me.collective.setting.KeybindSetting;
 import me.collective.setting.ModeSetting;
@@ -14,6 +15,8 @@ import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import static me.collective.gui.GuiGfx.fillRounded;
 import static me.collective.gui.GuiGfx.outlineRounded;
@@ -42,6 +45,27 @@ public final class ClickGui2Popups {
     public void openKeybind(float anchorX, float anchorY, KeybindSetting setting) {
         stack.clear();
         stack.add(new KeybindDialog(anchorX, anchorY, setting));
+    }
+
+    /** Общий список выбора (EnumSetting и любые строковые альтернативы). */
+    public void openSelect(float anchorX, float anchorY, List<String> options,
+                           Supplier<String> current, Consumer<String> onSelect) {
+        if (options == null || options.isEmpty()) return;
+        stack.clear();
+        stack.add(new StringSelect(anchorX, anchorY, "Выбрать", options, current, onSelect));
+    }
+
+    /** Чек-лист (ChoiceSetting: включение/выключение отдельных опций). */
+    public void openChecks(float anchorX, float anchorY, String title, List<BooleanSetting> options) {
+        if (options == null || options.isEmpty()) return;
+        stack.clear();
+        stack.add(new CheckList(anchorX, anchorY, title, options));
+    }
+
+    /** Пикер для структурного цвета (SettingColorSetting: r/g/b/a треки). */
+    public void openStructColor(float anchorX, float anchorY, me.collective.setting.SettingColorSetting setting) {
+        stack.clear();
+        stack.add(new StructColorPicker(anchorX, anchorY, setting));
     }
 
     public boolean isOpen() {
@@ -240,6 +264,319 @@ public final class ClickGui2Popups {
 
         @Override
         void mouseReleased() {
+        }
+
+        @Override
+        boolean mouseScrolled(double deltaY) {
+            return false;
+        }
+
+        @Override
+        boolean charTyped(String character) {
+            return false;
+        }
+    }
+
+    // ── Общий список выбора (EnumSetting и строковые альтернативы) ──
+
+    private static final class StringSelect extends Popup {
+        private final String title;
+        private final List<String> options;
+        private final Supplier<String> current;
+        private final Consumer<String> onSelect;
+
+        StringSelect(float anchorX, float anchorY, String title, List<String> options,
+                     Supplier<String> current, Consumer<String> onSelect) {            float widest = FontManager.INSTANCE.getStringWidthScaled(title, 9f);
+            for (String o : options) {
+                widest = Math.max(widest, FontManager.INSTANCE.getStringWidthScaled(o, 9f));
+            }
+            this.w = Math.max(120f, widest + 34f);
+            this.h = 26f + options.size() * 20f;
+            this.x = anchorX;
+            this.y = anchorY;
+            this.title = title;
+            this.options = options;
+            this.current = current;
+            this.onSelect = onSelect;
+        }
+
+        @Override
+        void render(DrawContext ctx, float mx, float my) {
+            float a = alpha;
+            GuiGfx.shadow(ctx, (int) x, (int) y, (int) w, (int) h, 8);
+            fillRounded(ctx, x, y, w, h, 9f, ClickGui2Theme.rgb(ClickGui2Theme.Role.BACKGROUND));
+            outlineRounded(ctx, x, y, w, h, 9f, ClickGui2Theme.rgb(ClickGui2Theme.Role.OUTLINE));
+
+            FontManager fm = FontManager.INSTANCE;
+            fm.drawStringScaled(ctx, title, x + 10f, y + 6f,
+                    ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), a), 1f);
+            ClickGui2Widgets.hairline(ctx, x + 10f, y + 18f, w - 20f);
+            ctx.enableScissor((int) x, (int) (y + 20f), (int) (x + w), (int) (y + h));
+            float rowY = y + 22f;
+            String cur = current.get();
+            for (String option : options) {
+                boolean active = option.equals(cur);
+                boolean hover = !closing && ClickGui2Widgets.inRect(mx, my, x + 6f, rowY - 2f, w - 12f, 18f);
+                if (hover) {
+                    fillRounded(ctx, x + 6f, rowY - 2f, w - 12f, 18f, 5f,
+                            ClickGui2Theme.fade(ClickGui2Theme.Role.SELECTED, a));
+                }
+                if (active) {
+                    GuiGfx.dotRing(ctx, x + 8f, rowY + 7f, 2.6f,
+                            ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.MAIN), a));
+                }
+                int col = active ? ClickGui2Theme.rgb(ClickGui2Theme.Role.ACTIVE_TEXT)
+                        : hover ? ClickGui2Theme.rgb(ClickGui2Theme.Role.OPEN_SETTING_TEXT)
+                        : ClickGui2Theme.rgb(ClickGui2Theme.Role.DEOPEN_SETTING_TEXT);
+                fm.drawStringScaled(ctx, option, x + 16f, rowY + 2f, ClickGui2Theme.fade(col, a), 1f);
+                rowY += 20f;
+            }
+            ctx.disableScissor();
+        }
+
+        @Override
+        void mouseClicked(float mx, float my, int button) {
+            if (button != 0 || closing) return;
+            float rowY = y + 22f;
+            for (String option : options) {
+                if (ClickGui2Widgets.inRect(mx, my, x + 6f, rowY - 2f, w - 12f, 18f)) {
+                    onSelect.accept(option);
+                    SoundUtil.playClick(0.22f, 1.2f);
+                    closing = true;
+                    return;
+                }
+                rowY += 20f;
+            }
+        }
+
+        @Override
+        boolean mouseDragging(float mx, float my) {
+            return false;
+        }
+
+        @Override
+        void mouseReleased() {
+        }
+
+        @Override
+        boolean mouseScrolled(double deltaY) {
+            return false;
+        }
+
+        @Override
+        boolean charTyped(String character) {
+            return false;
+        }
+    }
+
+    // ── Чек-лист (ChoiceSetting: опции-тумблеры) ──
+
+    private static final class CheckList extends Popup {
+        private final String title;
+        private final List<BooleanSetting> options;
+
+        CheckList(float anchorX, float anchorY, String title, List<BooleanSetting> options) {
+            FontManager fm = FontManager.INSTANCE;
+            float widest = fm.getStringWidthScaled(title, 9f);
+            for (BooleanSetting o : options) {
+                widest = Math.max(widest, fm.getStringWidthScaled(o.getName(), 9f));
+            }
+            this.w = Math.max(150f, widest + 74f);
+            this.h = 26f + options.size() * 20f;
+            this.x = anchorX;
+            this.y = anchorY;
+            this.title = title;
+            this.options = options;
+        }
+
+        @Override
+        void render(DrawContext ctx, float mx, float my) {
+            float a = alpha;
+            GuiGfx.shadow(ctx, (int) x, (int) y, (int) w, (int) h, 8);
+            fillRounded(ctx, x, y, w, h, 9f, ClickGui2Theme.rgb(ClickGui2Theme.Role.BACKGROUND));
+            outlineRounded(ctx, x, y, w, h, 9f, ClickGui2Theme.rgb(ClickGui2Theme.Role.OUTLINE));
+
+            FontManager fm = FontManager.INSTANCE;
+            fm.drawStringScaled(ctx, title, x + 10f, y + 6f,
+                    ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), a), 1f);
+            ClickGui2Widgets.hairline(ctx, x + 10f, y + 18f, w - 20f);
+            ctx.enableScissor((int) x, (int) (y + 20f), (int) (x + w), (int) (y + h));
+            float rowY = y + 22f;
+            for (BooleanSetting o : options) {
+                boolean hover = !closing && ClickGui2Widgets.inRect(mx, my, x + 6f, rowY - 2f, w - 12f, 18f);
+                if (hover) {
+                    fillRounded(ctx, x + 6f, rowY - 2f, w - 12f, 18f, 5f,
+                            ClickGui2Theme.fade(ClickGui2Theme.Role.SELECTED, a));
+                }
+                boolean on = o.getValue();
+                int col = on ? ClickGui2Theme.rgb(ClickGui2Theme.Role.ACTIVE_TEXT)
+                        : hover ? ClickGui2Theme.rgb(ClickGui2Theme.Role.OPEN_SETTING_TEXT)
+                        : ClickGui2Theme.rgb(ClickGui2Theme.Role.DEOPEN_SETTING_TEXT);
+                fm.drawStringScaled(ctx, o.getName(), x + 10f, rowY + 2f, ClickGui2Theme.fade(col, a), 1f);
+                GuiGfx.dotRing(ctx, x + w - 18f, rowY + 7f, on ? 3.2f : 2.4f,
+                        ClickGui2Theme.fade(ClickGui2Theme.rgb(on
+                                ? ClickGui2Theme.Role.MAIN
+                                : ClickGui2Theme.Role.OUTLINE), a));
+                rowY += 20f;
+            }
+            ctx.disableScissor();
+        }
+
+        @Override
+        void mouseClicked(float mx, float my, int button) {
+            if (button != 0 || closing) return;
+            float rowY = y + 22f;
+            for (BooleanSetting o : options) {
+                if (ClickGui2Widgets.inRect(mx, my, x + 6f, rowY - 2f, w - 12f, 18f)) {
+                    o.setValue(!o.getValue());
+                    SoundUtil.playClick(0.22f, o.getValue() ? 1.2f : 0.95f);
+                    return;
+                }
+                rowY += 20f;
+            }
+        }
+
+        @Override
+        boolean mouseDragging(float mx, float my) {
+            return false;
+        }
+
+        @Override
+        void mouseReleased() {
+        }
+
+        @Override
+        boolean mouseScrolled(double deltaY) {
+            return false;
+        }
+
+        @Override
+        boolean charTyped(String character) {
+            return false;
+        }
+    }
+
+    // ── Пикер структурного цвета (SettingColorSetting) ──
+
+    private static final class StructColorPicker extends Popup {
+        private static final float PAD = 10f;
+        private static final float ROW_H = 26f;
+
+        private final me.collective.setting.SettingColorSetting setting;
+        int dragChannel = -1;
+
+        StructColorPicker(float anchorX, float anchorY, me.collective.setting.SettingColorSetting setting) {
+            this.w = 150f;
+            this.h = 30f + 4 * ROW_H;
+            this.x = anchorX;
+            this.y = anchorY;
+            this.setting = setting;
+        }
+
+        private me.collective.util.SettingColor value() {
+            return setting.getValue() != null
+                    ? setting.getValue()
+                    : new me.collective.util.SettingColor(255, 255, 255, 255);
+        }
+
+        private float trackX() {
+            return x + PAD;
+        }
+
+        private float trackW() {
+            return w - 2 * PAD;
+        }
+
+        private void applyChannel(float mx) {
+            me.collective.util.SettingColor c = value();
+            float t = Math.max(0f, Math.min(1f, (mx - trackX()) / Math.max(1f, trackW())));
+            int v = Math.round(t * 255f);
+            switch (dragChannel) {
+                case 0 -> c.r = v;
+                case 1 -> c.g = v;
+                case 2 -> c.b = v;
+                case 3 -> c.a = v;
+                default -> {
+                    return;
+                }
+            }
+        }
+
+        private int channelValue(int ch) {
+            me.collective.util.SettingColor c = value();
+            return switch (ch) {
+                case 0 -> c.r;
+                case 1 -> c.g;
+                case 2 -> c.b;
+                default -> c.a;
+            };
+        }
+
+        private void renderRow(DrawContext ctx, float mx, float my, int ch, String label) {
+            float rowY = y + 30f + ch * ROW_H;
+            int col = ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT);
+            FontManager.INSTANCE.drawStringScaled(ctx, label, trackX(), rowY + 1f,
+                    ClickGui2Theme.fade(col, alpha), 1f);
+            String num = String.valueOf(channelValue(ch));
+            float nw = FontManager.INSTANCE.getStringWidthScaled(num, 9f);
+            FontManager.INSTANCE.drawStringScaled(ctx, num, x + w - PAD - nw, rowY + 1f,
+                    ClickGui2Theme.fade(col, alpha), 1f);
+            ClickGui2Widgets.sliderTrack(ctx, trackX(), rowY + 12f, trackW(),
+                    channelValue(ch) / 255f, dragChannel == ch, dragChannel == ch);
+        }
+
+        private int rowAt(float mx, float my) {
+            if (mx < trackX() || mx > trackX() + trackW()) return -1;
+            float rel = my - (y + 42f);
+            int ch = (int) Math.floor(rel / ROW_H);
+            if (ch < 0 || ch > 3) return -1;
+            // трек находится на rowY + 12f, высота 5px — допуск по вертикали
+            float rowY = y + 30f + ch * ROW_H;
+            if (my < rowY + 6f || my > rowY + 24f) return -1;
+            return ch;
+        }
+
+        @Override
+        void render(DrawContext ctx, float mx, float my) {
+            float a = alpha;
+            GuiGfx.shadow(ctx, (int) x, (int) y, (int) w, (int) h, 8);
+            fillRounded(ctx, x, y, w, h, 9f, ClickGui2Theme.rgb(ClickGui2Theme.Role.BACKGROUND));
+            outlineRounded(ctx, x, y, w, h, 9f, ClickGui2Theme.rgb(ClickGui2Theme.Role.OUTLINE));
+
+            FontManager fm = FontManager.INSTANCE;
+            fm.drawStringScaled(ctx, setting.getName(), x + PAD, y + 6f,
+                    ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), a), 1f);
+            ClickGui2Widgets.colorSwatch(ctx, x + w - PAD - 14f, y + 4f, value().toAwt(),
+                    !closing && a > 0.5f);
+            ClickGui2Widgets.hairline(ctx, x + PAD, y + 22f, w - 2 * PAD);
+
+            renderRow(ctx, mx, my, 0, "R");
+            renderRow(ctx, mx, my, 1, "G");
+            renderRow(ctx, mx, my, 2, "B");
+            renderRow(ctx, mx, my, 3, "A");
+        }
+
+        @Override
+        void mouseClicked(float mx, float my, int button) {
+            if (button != 0 || closing) return;
+            int ch = rowAt(mx, my);
+            if (ch >= 0) {
+                dragChannel = ch;
+                applyChannel(mx);
+                SoundUtil.playClick(0.18f, 1.1f);
+            }
+        }
+
+        @Override
+        boolean mouseDragging(float mx, float my) {
+            if (dragChannel < 0) return false;
+            applyChannel(mx);
+            return true;
+        }
+
+        @Override
+        void mouseReleased() {
+            dragChannel = -1;
         }
 
         @Override

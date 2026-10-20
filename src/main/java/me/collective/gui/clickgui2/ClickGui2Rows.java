@@ -1,16 +1,25 @@
 package me.collective.gui.clickgui2;
 
 import me.collective.font.FontManager;
+import me.collective.gui.settings.BlockListSettingScreen;
+import me.collective.gui.settings.ItemListSettingScreen;
 import me.collective.module.client.UI;
 import me.collective.render.SoundUtil;
+import me.collective.setting.ActionSetting;
+import me.collective.setting.BlockListSetting;
 import me.collective.setting.BooleanSetting;
+import me.collective.setting.ChoiceSetting;
 import me.collective.setting.ColorSetting;
+import me.collective.setting.EnumSetting;
+import me.collective.setting.IntegerSetting;
+import me.collective.setting.ItemListSetting;
 import me.collective.setting.KeybindSetting;
 import me.collective.setting.ModeSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.setting.Setting;
 import me.collective.setting.StringSetting;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.Screen;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.Locale;
@@ -523,6 +532,714 @@ final class ClickGui2Rows {
         }
     }
 
+    // ── Перечисление (EnumSetting): чип «< значение >» + список, как у режима ──
+
+    static final class EnumRow extends Base {
+        private final EnumSetting<?> setting;
+
+        EnumRow(EnumSetting<?> setting) {
+            this.setting = setting;
+        }
+
+        @Override
+        public Setting<?> setting() {
+            return setting;
+        }
+
+        @Override
+        public float height() {
+            return MODE_H;
+        }
+
+        private String value() {
+            Enum<?> v = setting.getValue();
+            return v == null ? "-" : v.name();
+        }
+
+        private java.util.List<String> options() {
+            Enum<?>[] values = setting.getValues();
+            java.util.List<String> list = new java.util.ArrayList<>();
+            if (values != null) {
+                for (Enum<?> v : values) list.add(v.name());
+            }
+            return list;
+        }
+
+        @Override
+        public void render(DrawContext ctx, float mx, float my, float dt, float alpha) {
+            trackHover(mx, my, dt);
+            drawText(ctx, setting.getName(), x, y + 3.5f, 10f,
+                    ClickGui2Theme.fade(labelColor(hoverT), alpha));
+
+            String v = value();
+            float chipH = 16f;
+            float chipW = chipW(v);
+            float chipX = x + w - chipW;
+            float chipY = y + (height() - chipH) / 2f;
+            boolean chipHover = hovered && ClickGui2Widgets.inRect(mx, my, chipX, chipY, chipW, chipH);
+
+            int bg = chipHover
+                    ? ClickGui2Theme.fade(ClickGui2Theme.Role.SELECTED, 2.0f)
+                    : ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, 90);
+            fillRounded(ctx, chipX, chipY, chipW, chipH, 4f, ClickGui2Theme.fade(bg, alpha));
+            outlineRounded(ctx, chipX, chipY, chipW, chipH, 4f, ClickGui2Theme.fade(ClickGui2Theme.Role.OUTLINE, alpha));
+
+            drawText(ctx, v, chipX + 8f, chipY + (chipH - 9f) / 2f + 1f, 9f,
+                    ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.ACTIVE_TEXT), alpha));
+            ClickGui2Widgets.chevronDown(ctx, chipX + chipW - 9f, chipY + chipH / 2f - 2.5f, 1f,
+                    ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), alpha));
+        }
+
+        private float chipW(String v) {
+            return Math.max(44f, Math.min(w * 0.62f, textWidth(v, 9f) + 30f));
+        }
+
+        @Override
+        public boolean mouseClicked(float mx, float my, int button, ClickGui2Popups popups) {
+            if (!ClickGui2Widgets.inRect(mx, my, x, y, w, height())) return false;
+            java.util.List<String> list = options();
+            if (list.isEmpty()) return false;
+
+            float chipH = 16f;
+            float chipW = chipW(value());
+            boolean onChip = ClickGui2Widgets.inRect(mx, my, x + w - chipW, y + (height() - chipH) / 2f, chipW, chipH);
+
+            if (onChip && popups != null) {
+                popups.openSelect(x + w - chipW, y + height() + 4f, list, this::value, setting::setByName);
+                clickSound();
+                return true;
+            }
+            if (button == 0) {
+                setting.setByName(next(list, 1));
+                clickSound();
+                return true;
+            }
+            if (button == 1) {
+                setting.setByName(next(list, -1));
+                clickSound();
+                return true;
+            }
+            return false;
+        }
+
+        private String next(java.util.List<String> list, int dir) {
+            int idx = Math.max(0, list.indexOf(value()));
+            return list.get((idx + dir + list.size()) % list.size());
+        }
+
+        @Override
+        public boolean mouseDragging(float mx, float my) {
+            return false;
+        }
+
+        @Override
+        public void mouseReleased() {
+        }
+
+        /** Колесо не отбираем у скролла карточки — цикление по ЛКМ/ПКМ и чипу. */
+        @Override
+        public boolean scrolled(double deltaY, boolean ctrl) {
+            return false;
+        }
+
+        @Override
+        public void charTyped(String character) {
+        }
+
+        @Override
+        public boolean keyPressed(int key) {
+            return false;
+        }
+
+        @Override
+        public boolean wantsKeys() {
+            return false;
+        }
+
+        @Override
+        public void clearFocus() {
+        }
+    }
+
+    // ── Группа флагов (ChoiceSetting): чип «N/M», список тумблеров ──
+
+    static final class ChoiceRow extends Base {
+        private final ChoiceSetting setting;
+
+        ChoiceRow(ChoiceSetting setting) {
+            this.setting = setting;
+        }
+
+        @Override
+        public Setting<?> setting() {
+            return setting;
+        }
+
+        @Override
+        public float height() {
+            return TOGGLE_H;
+        }
+
+        private java.util.List<BooleanSetting> visibleOptions() {
+            java.util.List<BooleanSetting> list = new java.util.ArrayList<>();
+            for (BooleanSetting o : setting.getOptions()) {
+                if (o.isVisible()) list.add(o);
+            }
+            return list;
+        }
+
+        @Override
+        public void render(DrawContext ctx, float mx, float my, float dt, float alpha) {
+            trackHover(mx, my, dt);
+            drawText(ctx, setting.getName(), x, y + 5f, 10f,
+                    ClickGui2Theme.fade(labelColor(hoverT), alpha));
+
+            java.util.List<BooleanSetting> opts = visibleOptions();
+            int enabled = 0;
+            for (BooleanSetting o : opts) {
+                if (o.getValue()) enabled++;
+            }
+            String v = opts.isEmpty() ? "—" : enabled + "/" + opts.size();
+            float chipW = Math.max(36f, textWidth(v, 9f) + 18f);
+            float chipX = x + w - chipW;
+            float chipY = y + 3f;
+            boolean chipHover = hovered && ClickGui2Widgets.inRect(mx, my, chipX, chipY, chipW, 16f);
+
+            int bg = chipHover
+                    ? ClickGui2Theme.fade(ClickGui2Theme.Role.SELECTED, 2.0f)
+                    : ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, 90);
+            fillRounded(ctx, chipX, chipY, chipW, 16f, 4f, ClickGui2Theme.fade(bg, alpha));
+            outlineRounded(ctx, chipX, chipY, chipW, 16f, 4f, ClickGui2Theme.fade(ClickGui2Theme.Role.OUTLINE, alpha));
+            int vCol = opts.isEmpty() ? ClickGui2Theme.rgb(ClickGui2Theme.Role.DEACTIVE_TEXT)
+                    : enabled > 0 ? ClickGui2Theme.rgb(ClickGui2Theme.Role.ACTIVE_TEXT)
+                    : ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT);
+            drawText(ctx, v, chipX + (chipW - textWidth(v, 9f)) / 2f, chipY + 4f, 9f,
+                    ClickGui2Theme.fade(vCol, alpha));
+        }
+
+        @Override
+        public boolean mouseClicked(float mx, float my, int button, ClickGui2Popups popups) {
+            if (!ClickGui2Widgets.inRect(mx, my, x, y, w, height())) return false;
+            java.util.List<BooleanSetting> opts = visibleOptions();
+            if (opts.isEmpty()) return false;
+            if (popups != null && button == 0) {
+                float chipW = Math.max(36f, textWidth(
+                        enabledCountText(opts), 9f) + 18f);
+                popups.openChecks(x + w - chipW, y + height() + 4f, setting.getName(), opts);
+                clickSound();
+                return true;
+            }
+            return false;
+        }
+
+        private String enabledCountText(java.util.List<BooleanSetting> opts) {
+            int enabled = 0;
+            for (BooleanSetting o : opts) {
+                if (o.getValue()) enabled++;
+            }
+            return opts.isEmpty() ? "—" : enabled + "/" + opts.size();
+        }
+
+        @Override
+        public boolean mouseDragging(float mx, float my) {
+            return false;
+        }
+
+        @Override
+        public void mouseReleased() {
+        }
+
+        @Override
+        public boolean scrolled(double deltaY, boolean ctrl) {
+            return false;
+        }
+
+        @Override
+        public void charTyped(String character) {
+        }
+
+        @Override
+        public boolean keyPressed(int key) {
+            return false;
+        }
+
+        @Override
+        public boolean wantsKeys() {
+            return false;
+        }
+
+        @Override
+        public void clearFocus() {
+        }
+    }
+
+    // ── Целое число (IntegerSetting): подпись + значение + трек, как у числа ──
+
+    static final class IntegerRow extends Base {
+        private final IntegerSetting setting;
+        private boolean editing;
+        private String buffer = "";
+        private boolean dragging;
+        private double wheelAccum;
+
+        IntegerRow(IntegerSetting setting) {
+            this.setting = setting;
+        }
+
+        @Override
+        public Setting<?> setting() {
+            return setting;
+        }
+
+        @Override
+        public float height() {
+            return NUMBER_H;
+        }
+
+        private String display() {
+            return String.valueOf(setting.getIntValue());
+        }
+
+        private void startEdit() {
+            editing = true;
+            buffer = display();
+        }
+
+        private void commit() {
+            try {
+                setting.setValue(Integer.parseInt(buffer.trim()));
+            } catch (NumberFormatException ignored) {
+            }
+            editing = false;
+        }
+
+        private void applyParsed() {
+            try {
+                setting.setValue(Integer.parseInt(buffer.trim()));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+
+        @Override
+        public void render(DrawContext ctx, float mx, float my, float dt, float alpha) {
+            trackHover(mx, my, dt);
+
+            float valueX = x + w;
+            int label = ClickGui2Theme.blend(
+                    ClickGui2Theme.rgb(ClickGui2Theme.Role.DEOPEN_SETTING_TEXT),
+                    ClickGui2Theme.rgb(ClickGui2Theme.Role.ACTIVE_TEXT), hoverT);
+            drawText(ctx, setting.getName(), x, y + 3f, 10f, ClickGui2Theme.fade(label, alpha));
+
+            String shown = editing ? buffer : display();
+            float tw = textWidth(shown, 9f);
+            int valueColor = editing
+                    ? ClickGui2Theme.rgb(ClickGui2Theme.Role.ACTIVE_TEXT)
+                    : ClickGui2Theme.blend(
+                            ClickGui2Theme.rgb(ClickGui2Theme.Role.DEACTIVE_TEXT),
+                            ClickGui2Theme.rgb(ClickGui2Theme.Role.ACTIVE_TEXT), hoverT);
+            drawText(ctx, shown, valueX - tw, y + 3f, 9f, ClickGui2Theme.fade(valueColor, alpha));
+            if (editing && ClickGui2Anim.caretBlink()) {
+                ClickGui2Widgets.caret(ctx, valueX - tw + tw + 1f, y + 3.5f, 9f);
+            }
+
+            float min = setting.getMin();
+            float max = setting.getMax();
+            float t = (setting.getIntValue() - min) / Math.max(0.0001f, max - min);
+            ClickGui2Widgets.sliderTrack(ctx, x, y + 19f, w, t, hovered && !editing,
+                    dragging || editing);
+
+            if (editing) {
+                outlineRounded(ctx, valueX - tw - 4f, y + 1f, tw + 8f, 13f, 3f,
+                        ClickGui2Theme.alpha(ClickGui2Theme.Role.MAIN, 150));
+            }
+        }
+
+        @Override
+        public boolean mouseClicked(float mx, float my, int button, ClickGui2Popups popups) {
+            if (!ClickGui2Widgets.inRect(mx, my, x, y, w, height())) {
+                if (editing) editing = false;
+                return false;
+            }
+            if (button == 0) {
+                float valueZone = Math.max(64f, w * 0.3f);
+                boolean onValue = ClickGui2Widgets.inRect(mx, my, x + w - valueZone, y, valueZone, 14f);
+                boolean onTrack = my >= y + 14f;
+                if (editing) {
+                    commit();
+                    return true;
+                }
+                if (onValue && !onTrack) {
+                    startEdit();
+                    clickSound();
+                    return true;
+                }
+                if (onTrack) {
+                    dragging = true;
+                    applyFromMouse(mx);
+                    clickSound();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public boolean mouseDragging(float mx, float my) {
+            if (dragging) {
+                applyFromMouse(mx);
+                return true;
+            }
+            return false;
+        }
+
+        @Override
+        public void mouseReleased() {
+            dragging = false;
+        }
+
+        private void applyFromMouse(float mx) {
+            int min = setting.getMin();
+            int max = setting.getMax();
+            double v = min + Math.max(0f, Math.min(1f, (mx - x) / w)) * (max - min);
+            setting.setValue((int) Math.round(v));
+        }
+
+        @Override
+        public boolean scrolled(double deltaY, boolean ctrl) {
+            if (!ctrl) return false;
+            wheelAccum += deltaY > 0 ? 1.0 : -1.0;
+            int steps = (int) wheelAccum;
+            if (steps != 0) {
+                wheelAccum -= steps;
+                setting.setValue(setting.getIntValue() + steps);
+                clickSound();
+            }
+            return true;
+        }
+
+        @Override
+        public void charTyped(String character) {
+            if (!editing) return;
+            char c = character.isEmpty() ? '\0' : character.charAt(0);
+            if (c == '-' || (c >= '0' && c <= '9')) {
+                if (buffer.length() < 12) {
+                    buffer += c;
+                }
+                applyParsed();
+            }
+        }
+
+        @Override
+        public boolean keyPressed(int key) {
+            if (!editing) return false;
+            if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
+                commit();
+                return true;
+            }
+            if (key == GLFW.GLFW_KEY_ESCAPE) {
+                editing = false;
+                return true;
+            }
+            if (key == GLFW.GLFW_KEY_BACKSPACE && !buffer.isEmpty()) {
+                buffer = buffer.substring(0, buffer.length() - 1);
+                applyParsed();
+                return true;
+            }
+            return false;
+        }
+
+        @Override
+        public boolean wantsKeys() {
+            return editing;
+        }
+
+        @Override
+        public void clearFocus() {
+            editing = false;
+            dragging = false;
+        }
+    }
+
+    // ── Структурный цвет (SettingColorSetting): свотч открывает RGBA-пикер ──
+
+    static final class StructColorRow extends Base {
+        private final me.collective.setting.SettingColorSetting setting;
+
+        StructColorRow(me.collective.setting.SettingColorSetting setting) {
+            this.setting = setting;
+        }
+
+        @Override
+        public Setting<?> setting() {
+            return setting;
+        }
+
+        @Override
+        public float height() {
+            return TOGGLE_H;
+        }
+
+        @Override
+        public void render(DrawContext ctx, float mx, float my, float dt, float alpha) {
+            trackHover(mx, my, dt);
+            drawText(ctx, setting.getName(), x, y + 5f, 10f,
+                    ClickGui2Theme.fade(labelColor(hovered ? 0.85f : 0.35f), alpha));
+
+            java.awt.Color shown = setting.getValue() != null
+                    ? setting.getValue().toAwt()
+                    : java.awt.Color.WHITE;
+            float sw = 14f;
+            ClickGui2Widgets.colorSwatch(ctx, x + w - sw - 2f, y + 4f, shown,
+                    hovered && alpha > 0.5f);
+        }
+
+        @Override
+        public boolean mouseClicked(float mx, float my, int button, ClickGui2Popups popups) {
+            if (!ClickGui2Widgets.inRect(mx, my, x, y, w, height())) return false;
+            if (popups != null && button == 0) {
+                popups.openStructColor(x + w - 16f, y - 2f, setting);
+                clickSound();
+                return true;
+            }
+            return false;
+        }
+
+        @Override
+        public boolean mouseDragging(float mx, float my) {
+            return false;
+        }
+
+        @Override
+        public void mouseReleased() {
+        }
+
+        @Override
+        public boolean scrolled(double deltaY, boolean ctrl) {
+            return false;
+        }
+
+        @Override
+        public void charTyped(String character) {
+        }
+
+        @Override
+        public boolean keyPressed(int key) {
+            return false;
+        }
+
+        @Override
+        public boolean wantsKeys() {
+            return false;
+        }
+
+        @Override
+        public void clearFocus() {
+        }
+    }
+
+    // ── Кнопка (ActionSetting): чип «Выполнить» ──
+
+    static final class ActionRow extends Base {
+        private final ActionSetting setting;
+
+        ActionRow(ActionSetting setting) {
+            this.setting = setting;
+        }
+
+        private String label() {
+            return setting.getName() == null ? "Выполнить" : setting.getName();
+        }
+
+        @Override
+        public Setting<?> setting() {
+            return setting;
+        }
+
+        @Override
+        public float height() {
+            return TOGGLE_H;
+        }
+
+        @Override
+        public void render(DrawContext ctx, float mx, float my, float dt, float alpha) {
+            trackHover(mx, my, dt);
+
+            String v = label();
+            float chipW = Math.max(60f, Math.min(w * 0.62f, textWidth(v, 9f) + 20f));
+            float chipX = x + w - chipW;
+            float chipY = y + 3f;
+            boolean chipHover = hovered && ClickGui2Widgets.inRect(mx, my, chipX, chipY, chipW, 16f);
+
+            int bg = chipHover
+                    ? ClickGui2Theme.fade(ClickGui2Theme.Role.SELECTED, 2.0f)
+                    : ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, 90);
+            fillRounded(ctx, chipX, chipY, chipW, 16f, 4f, ClickGui2Theme.fade(bg, alpha));
+            outlineRounded(ctx, chipX, chipY, chipW, 16f, 4f, ClickGui2Theme.fade(ClickGui2Theme.Role.OUTLINE, alpha));
+            drawText(ctx, v, chipX + (chipW - textWidth(v, 9f)) / 2f, chipY + 4f, 9f,
+                    ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.ACTIVE_TEXT), alpha));
+        }
+
+        @Override
+        public boolean mouseClicked(float mx, float my, int button, ClickGui2Popups popups) {
+            if (!ClickGui2Widgets.inRect(mx, my, x, y, w, height())) return false;
+            if (button == 0) {
+                setting.run();
+                clickSound();
+                return true;
+            }
+            return false;
+        }
+
+        @Override
+        public boolean mouseDragging(float mx, float my) {
+            return false;
+        }
+
+        @Override
+        public void mouseReleased() {
+        }
+
+        @Override
+        public boolean scrolled(double deltaY, boolean ctrl) {
+            return false;
+        }
+
+        @Override
+        public void charTyped(String character) {
+        }
+
+        @Override
+        public boolean keyPressed(int key) {
+            return false;
+        }
+
+        @Override
+        public boolean wantsKeys() {
+            return false;
+        }
+
+        @Override
+        public void clearFocus() {
+        }
+    }
+
+    // ── Список (BlockList/ItemList): чип открывает экран выбора ──
+
+    static final class ListRow extends Base {
+        private final Setting<?> setting;
+        private final boolean items;
+        private final String countSuffix() {
+            return String.valueOf(count());
+        }
+
+        ListRow(BlockListSetting setting) {
+            this.setting = setting;
+            this.items = false;
+        }
+
+        ListRow(ItemListSetting setting) {
+            this.setting = setting;
+            this.items = true;
+        }
+
+        private java.util.List<?> count() {
+            try {
+                java.util.List<?> value = (java.util.List<?>) setting.getValue();
+                return value == null ? java.util.List.of() : value;
+            } catch (Exception e) {
+                return java.util.List.of();
+            }
+        }
+
+        @Override
+        public Setting<?> setting() {
+            return setting;
+        }
+
+        @Override
+        public float height() {
+            return TOGGLE_H;
+        }
+
+        @Override
+        public void render(DrawContext ctx, float mx, float my, float dt, float alpha) {
+            trackHover(mx, my, dt);
+            drawText(ctx, setting.getName(), x, y + 5f, 10f,
+                    ClickGui2Theme.fade(labelColor(hoverT), alpha));
+
+            String v = countSuffix() + " шт.";
+            float textW = textWidth(v, 9f);
+            float chipW = Math.max(50f, Math.min(w * 0.62f, textW + 64f));
+            float chipX = x + w - chipW;
+            float chipY = y + 3f;
+            boolean chipHover = hovered && ClickGui2Widgets.inRect(mx, my, chipX, chipY, chipW, 16f);
+
+            int bg = chipHover
+                    ? ClickGui2Theme.fade(ClickGui2Theme.Role.SELECTED, 2.0f)
+                    : ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, 90);
+            fillRounded(ctx, chipX, chipY, chipW, 16f, 4f, ClickGui2Theme.fade(bg, alpha));
+            outlineRounded(ctx, chipX, chipY, chipW, 16f, 4f, ClickGui2Theme.fade(ClickGui2Theme.Role.OUTLINE, alpha));
+            drawText(ctx, v, chipX + 8f, chipY + 4f, 9f,
+                    ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.ACTIVE_TEXT), alpha));
+            ClickGui2Widgets.chevronDown(ctx, chipX + chipW - 9f, chipY + 8f - 2.5f, 1f,
+                    ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), alpha));
+        }
+
+        @Override
+        public boolean mouseClicked(float mx, float my, int button, ClickGui2Popups popups) {
+            if (!ClickGui2Widgets.inRect(mx, my, x, y, w, height())) return false;
+            if (button == 0) {
+                float chipW = Math.max(50f, Math.min(w * 0.62f,
+                        textWidth(countSuffix() + " шт.", 9f) + 64f));
+                if (ClickGui2Widgets.inRect(mx, my, x + w - chipW, y + 3f, chipW, 16f)) {
+                    openEditor();
+                    clickSound();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private void openEditor() {
+            Screen screen = items
+                    ? new ItemListSettingScreen(ClickGui2Screen.getInstance(), (ItemListSetting) setting)
+                    : new BlockListSettingScreen(ClickGui2Screen.getInstance(), (BlockListSetting) setting);
+            net.minecraft.client.MinecraftClient.getInstance().setScreen(screen);
+        }
+
+        @Override
+        public boolean mouseDragging(float mx, float my) {
+            return false;
+        }
+
+        @Override
+        public void mouseReleased() {
+        }
+
+        @Override
+        public boolean scrolled(double deltaY, boolean ctrl) {
+            return false;
+        }
+
+        @Override
+        public void charTyped(String character) {
+        }
+
+        @Override
+        public boolean keyPressed(int key) {
+            return false;
+        }
+
+        @Override
+        public boolean wantsKeys() {
+            return false;
+        }
+
+        @Override
+        public void clearFocus() {
+        }
+    }
+
     // ── Цвет (ColorSetting): свотч открывает пикер ──
 
     static final class ColorRow extends Base {
@@ -844,11 +1561,18 @@ final class ClickGui2Rows {
     /** Фабрика: привести настройку к строке в карточке. */
     static Row of(Setting<?> setting) {
         if (setting instanceof BooleanSetting bool) return new ToggleRow(bool);
+        if (setting instanceof IntegerSetting intNum) return new IntegerRow(intNum);
         if (setting instanceof NumberSetting num) return new NumberRow(num);
+        if (setting instanceof EnumSetting<?> enumSetting) return new EnumRow(enumSetting);
         if (setting instanceof ModeSetting mode) return new ModeRow(mode);
+        if (setting instanceof ChoiceSetting choice) return new ChoiceRow(choice);
         if (setting instanceof ColorSetting color) return new ColorRow(color);
+        if (setting instanceof me.collective.setting.SettingColorSetting structColor) return new StructColorRow(structColor);
         if (setting instanceof KeybindSetting bind) return new BindRow(bind);
         if (setting instanceof StringSetting str) return new TextRow(str);
+        if (setting instanceof ActionSetting action) return new ActionRow(action);
+        if (setting instanceof BlockListSetting blockList) return new ListRow(blockList);
+        if (setting instanceof ItemListSetting itemList) return new ListRow(itemList);
         return null;
     }
 }
