@@ -5,6 +5,7 @@ import me.collective.gui.ClickGuiScreen;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.ColorSetting;
+import me.collective.setting.ModeSetting;
 import me.collective.setting.NumberSetting;
 import org.lwjgl.glfw.GLFW;
 
@@ -49,6 +50,7 @@ public class UI extends Module {
     }
 
     public final BooleanSetting gear = add(new BooleanSetting("Gear", false));
+    public final ModeSetting style = add(new ModeSetting("Style", "Classic", "Classic", "ClickGui2"));
     public final BooleanSetting binds = add(new BooleanSetting("Binds", true));
     public final BooleanSetting line = add(new BooleanSetting("Line", true));
     public final BooleanSetting snow = add(new BooleanSetting("Snow", true));
@@ -79,13 +81,19 @@ public class UI extends Module {
     @Override
     public void onEnable() {
         if (mc.currentScreen == null) {
-            mc.setScreen(ClickGuiScreen.getInstance());
+            if (style.process("ClickGui2")) {
+                mc.setScreen(me.collective.gui.clickgui2.ClickGui2Screen.getInstance());
+            } else {
+                mc.setScreen(ClickGuiScreen.getInstance());
+            }
         }
     }
 
     @Override
     public void onDisable() {
-        if (mc.currentScreen instanceof ClickGuiScreen || mc.currentScreen instanceof me.collective.gui.hud.HudEditorScreen) {
+        if (mc.currentScreen instanceof ClickGuiScreen
+                || mc.currentScreen instanceof me.collective.gui.clickgui2.ClickGui2Screen
+                || mc.currentScreen instanceof me.collective.gui.hud.HudEditorScreen) {
             mc.setScreen(null);
         }
     }
