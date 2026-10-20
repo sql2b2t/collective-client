@@ -178,12 +178,6 @@ public final class GuiGfx {
         return (float) Math.sqrt(ox * ox + oy * oy) + Math.min(Math.max(qx, qy), 0f) - r;
     }
 
-    /** Покрытие пикселя по знаковому расстоянию (1 — полностью внутри). */
-    private static float coverage(float d) {
-        float c = 0.5f - d;
-        return c <= 0f ? 0f : (c >= 1f ? 1f : c);
-    }
-
     /** Цвет с альфой alphaBase, умноженной на покрытие cov (0 — прозрачный). */
     private static int alphaOf(int rgb, int alphaBase, float cov) {
         int a = (int) (alphaBase * cov + 0.5f);
@@ -216,7 +210,7 @@ public final class GuiGfx {
         int r = Math.min(Math.round(rClamped), Math.min(w, h) / 2);
         Identifier mask = r >= 1 && r <= MAX_MASK_RADIUS ? discMask(r) : null;
         if (mask == null) {
-            fillRoundedLegacy(ctx, fx, fy, fw, fh, rClamped, rgb, alphaBase);
+            coarseFillRounded(ctx, fx, fy, fw, fh, rClamped, rgb, alphaBase);
             return;
         }
         int m = MASK_MARGIN;
@@ -262,7 +256,9 @@ public final class GuiGfx {
         int outer = (int) Math.ceil(r + half + 0.5f);
         Identifier mask = r >= 1 && outer <= MAX_MASK_RADIUS ? ringMask(r, half) : null;
         if (mask == null) {
-            strokeRoundedLegacy(ctx, fx, fy, fw, fh, radius, half, rgb, alphaBase);
+            // Фолбэк обводки только для умеренных радиусов (мелкая область);
+            // очень большие радиусы зажимаем — крупные обводки нигде не нужны.
+            strokeRoundedLegacy(ctx, fx, fy, fw, fh, Math.min(radius, MAX_MASK_RADIUS), half, rgb, alphaBase);
             return;
         }
         int m = MASK_MARGIN;
@@ -349,39 +345,6 @@ public final class GuiGfx {
 
     // ==================== Попиксельный фолбэк ====================
 
-    /** Фолбэк заливки: аналитический SDF-проход по строкам. */
-    private static void fillRoundedLegacy(DrawContext ctx, float fx, float fy, float fw, float fh,
-                                          float r, int rgb, int alphaBase) {
-        float x0 = fx, y0 = fy, x1 = fx + fw, y1 = fy + fh;
-        float midX = (x0 + x1) * 0.5f, midY = (y0 + y1) * 0.5f;
-        float hw = fw * 0.5f, hh = fh * 0.5f;
-        int px0 = (int) Math.floor(x0), px1 = (int) Math.ceil(x1);
-        int accY0 = -1, accY1 = -1;
-        for (int y = (int) Math.floor(y0); y < (int) Math.ceil(y1); y++) {
-            boolean vFull = y >= y0 && y + 1 <= y1;
-            if (!vFull) {
-                // Строка пересекает нижнюю/верхнюю прямую грань (дробная координата) — попиксельно.
-                if (accY0 >= 0) {
-                    fillStraight(ctx, x0, accY0, x1, accY1, rgb, alphaBase);
-                    accY0 = -1;
-                }
-                sweepFill(ctx, px0, px1, y, midX, midY, hw, hh, r, rgb, alphaBase);
-            } else if (y < y0 + r || y + 1 > y1 - r) {
-                // Строка целиком в зоне дуг: SDF у углов, полный прогон в центре.
-                if (accY0 >= 0) {
-                    fillStraight(ctx, x0, accY0, x1, accY1, rgb, alphaBase);
-                    accY0 = -1;
-                }
-                arcRow(ctx, px0, px1, x0, x1, y, midX, midY, hw, hh, r, rgb, alphaBase);
-            } else {
-                // Средняя зона: только прямые грани — копим строки и красим одним квадом.
-                if (accY0 < 0) accY0 = y;
-                accY1 = y + 1;
-            }
-        }
-        if (accY0 >= 0) fillStraight(ctx, x0, accY0, x1, accY1, rgb, alphaBase);
-    }
-
     /** Фолбэк обводки: аналитический SDF-проход кольца вокруг границы. */
     private static void strokeRoundedLegacy(DrawContext ctx, float fx, float fy, float fw, float fh,
                                             float radius, float half, int rgb, int alphaBase) {
@@ -408,43 +371,6 @@ public final class GuiGfx {
         }
     }
 
-    /**
-     * Строка дуговой зоны: попиксельные окна у обоих углов плюс полный
-     * центральный прогон (пиксели в нём гарантированно покрыты целиком).
-     */
-    private static void arcRow(DrawContext ctx, int px0, int px1, float x0, float x1, int y,
-                               float midX, float midY, float hw, float hh, float r, int rgb, int alphaBase) {
-        int rs = (int) Math.ceil(x0 + r);
-        int re = (int) Math.floor(x1 - r);
-        if (rs > re) {
-            sweepFill(ctx, px0, px1, y, midX, midY, hw, hh, r, rgb, alphaBase);
-            return;
-        }
-        sweepFill(ctx, px0, Math.min(rs, px1), y, midX, midY, hw, hh, r, rgb, alphaBase);
-        ctx.fill(rs, y, re, y + 1, rgb | (alphaBase << 24));
-        sweepFill(ctx, Math.max(re, rs), px1, y, midX, midY, hw, hh, r, rgb, alphaBase);
-    }
-
-    /** Попиксельный проход заливки по SDF; полностью покрытые пиксели объединяются в прогоны. */
-    private static void sweepFill(DrawContext ctx, int from, int to, int y,
-                                  float midX, float midY, float hw, float hh, float r, int rgb, int alphaBase) {
-        int run = -1;
-        for (int x = from; x < to; x++) {
-            float d = sdfRoundedBox(x + 0.5f, y + 0.5f, midX, midY, hw, hh, r);
-            float c = coverage(d);
-            if (c >= 1f) {
-                if (run < 0) run = x;
-            } else {
-                if (run >= 0) {
-                    ctx.fill(run, y, x, y + 1, rgb | (alphaBase << 24));
-                    run = -1;
-                }
-                if (c > 0f) ctx.fill(x, y, x + 1, y + 1, alphaOf(rgb, alphaBase, c));
-            }
-        }
-        if (run >= 0) ctx.fill(run, y, to, y + 1, rgb | (alphaBase << 24));
-    }
-
     /** Попиксельный проход обводки по SDF (кольцо вокруг границы). */
     private static void sweepStroke(DrawContext ctx, int from, int to, int y,
                                     float midX, float midY, float hw, float hh, float r, float half,
@@ -464,6 +390,66 @@ public final class GuiGfx {
             }
         }
         if (run >= 0) ctx.fill(run, y, to, y + 1, rgb | (alphaBase << 24));
+    }
+
+    /**
+     * Геометрический фолбэк без попиксельных SDF-проходов: прямые пояса —
+     * точные квад-пояса, углы — стопки полос, вычисленных из уравнения
+     * окружности (консервативно по дальнему краю полосы). Радиус ≤16 рисуется
+     * полосами по пикселю (визуально совпадает с кругом), крупные —
+     * до 20 полос на угол; шаг >1px незаметен на мягких заливках.
+     */
+    private static void coarseFillRounded(DrawContext ctx, float fx, float fy, float fw, float fh,
+                                          float radius, int rgb, int alphaBase) {
+        float x0 = fx, y0 = fy, x1 = fx + fw, y1 = fy + fh;
+        float r = Math.max(0f, Math.min(radius, Math.min(fw, fh) * 0.5f));
+        if (r < 0.5f) {
+            fillStraight(ctx, x0, y0, x1, y1, rgb, alphaBase);
+            return;
+        }
+        // прямые пояса: центральная колонна во всю высоту плюс боковые
+        fillStraight(ctx, x0 + r, y0, x1 - r, y1, rgb, alphaBase);
+        fillStraight(ctx, x0, y0 + r, x0 + r, y1 - r, rgb, alphaBase);
+        fillStraight(ctx, x1 - r, y0 + r, x1, y1 - r, rgb, alphaBase);
+        // центры четырёх дуг
+        int k = r <= 16f ? (int) Math.ceil(r) : Math.max(8, Math.min(20, (int) Math.ceil(r / 12f)));
+        cornerStrips(ctx, x0 + r, y0 + r, r, -1, -1, k, rgb, alphaBase);
+        cornerStrips(ctx, x1 - r, y0 + r, r, 1, -1, k, rgb, alphaBase);
+        cornerStrips(ctx, x0 + r, y1 - r, r, -1, 1, k, rgb, alphaBase);
+        cornerStrips(ctx, x1 - r, y1 - r, r, 1, 1, k, rgb, alphaBase);
+    }
+
+    /**
+     * Полосы одной четверти: центр дуги (cx, cy), dirX/dirY — направления
+     * наружу (к углу коробки). Хорда берётся на дальнем крае полосы —
+     * заливка слегка внутрь диска, без наружного выпирания.
+     */
+    private static void cornerStrips(DrawContext ctx, float cx, float cy, float r,
+                                     float dirX, float dirY, int k, int rgb, int alphaBase) {
+        float step = r / k;
+        for (int i = 0; i < k; i++) {
+            float dFar = (i + 1) * step;
+            float half = (float) Math.sqrt(Math.max(0f, r * r - dFar * dFar));
+            float y0, y1;
+            if (dirY < 0f) {
+                y0 = Math.round(cy - dFar);
+                y1 = Math.round(cy - i * step);
+            } else {
+                y0 = Math.round(cy + i * step);
+                y1 = Math.round(cy + dFar);
+            }
+            if (y1 <= y0) continue;
+            float x0, x1;
+            if (dirX < 0f) {
+                x0 = Math.round(cx - half);
+                x1 = Math.round(cx);
+            } else {
+                x0 = Math.round(cx);
+                x1 = Math.round(cx + half);
+            }
+            if (x1 <= x0) continue;
+            ctx.fill((int) x0, (int) y0, (int) x1, (int) y1, rgb | (alphaBase << 24));
+        }
     }
 
     /**
