@@ -133,6 +133,8 @@ public class ModuleManager {
         register(new ActivatedSpawnerDetector());
         register(new WaypointCoordExploit());
         register(new NewerNewChunks());
+        register(new BaseFinder());
+        register(new CaveDisturbanceDetector());
 
         // Render Modules
         register(new Blur());
