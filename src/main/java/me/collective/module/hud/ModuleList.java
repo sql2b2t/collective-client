@@ -1,17 +1,18 @@
 package me.collective.module.hud;
 
 import me.collective.font.FontManager;
-import me.collective.gui.GuiGfx;
 import me.collective.module.Module;
 import me.collective.module.ModuleManager;
+import me.collective.module.client.HUD;
+import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.EnumSetting;
 import net.minecraft.client.gui.DrawContext;
 
+import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-
 
 public class ModuleList extends HudModule {
     public enum SortMode {
@@ -24,13 +25,9 @@ public class ModuleList extends HudModule {
 
     public ModuleList() {
         super("ModuleList", "Displays active client modules.", 4, 30);
-        background.setValue(true);
     }
 
-    /**
-     * Готовая строка списка: имя и ширина посчитаны один раз на пересборку,
-     * а не заново меряются у шрифта на каждый кадр.
-     */
+    /** Строка списка: ширина посчитана один раз на пересборку, а не на каждый кадр. */
     private static final class Entry {
         final Module module;
         final float width;
@@ -62,7 +59,7 @@ public class ModuleList extends HudModule {
         if (this.sort.getValue() == SortMode.LENGTH) {
             list.sort((e1, e2) -> Float.compare(e2.width, e1.width));
         } else {
-            list.sort(Comparator.comparing(e -> fm.getStringWidth(e.module.getName())));
+            list.sort(Comparator.comparing(e -> e.module.getName()));
         }
 
         return this.cachedEntries = list;
@@ -76,52 +73,24 @@ public class ModuleList extends HudModule {
 
         FontManager fm = FontManager.INSTANCE;
         int fontH = fm.getFontHeight();
+        float curY = y;
+        float maxWidth = 40;
+        int idx = 0;
         boolean rightAlign = mc.getWindow() != null && x > (mc.getWindow().getScaledWidth() / 2f);
 
-        if (!background.getValue()) {
-            float curY = y;
-            float maxWidth = 40;
-            int idx = 0;
-            for (Entry e : activeModules) {
-                float w = e.width;
-                maxWidth = Math.max(maxWidth, w);
-                float textX = rightAlign ? (x + maxWidth - w) : x;
-                fm.drawStringWithShadow(context, e.module.getName(), textX, curY, HudTheme.text(idx++));
-                curY += fontH + 1;
-            }
-            this.width = maxWidth;
-            this.height = Math.max(fontH, curY - y);
-            return;
-        }
-
-        float padX = 6f;
-        float padY = 3.5f;
-        float pillH = fontH + padY * 2f;
-        float gap = 2.5f;
-        float dotR = 2f;
-        float dotGap = 3.5f;
-
-        // Первый проход: колонка = максимальная ширина пилюли.
-        float columnW = 40f;
         for (Entry e : activeModules) {
-            columnW = Math.max(columnW, padX * 2 + dotR * 2 + dotGap + e.width);
+            float w = e.width;
+            maxWidth = Math.max(maxWidth, w);
+
+            Color color = HUD.INSTANCE.getHudColor(idx);
+
+            float textX = rightAlign ? (x + maxWidth - w) : x;
+            fm.drawStringWithShadow(context, e.module.getName(), textX, curY, color);
+            curY += fontH + 1;
+            idx++;
         }
 
-        float curY = y;
-        int idx = 0;
-        for (Entry e : activeModules) {
-            String name = e.module.getName();
-            float pillW = padX * 2 + dotR * 2 + dotGap + e.width;
-            float rowX = rightAlign ? (x + columnW - pillW) : x;
-
-            GuiGfx.fillRounded(context, rowX, curY, pillW, pillH, 4f, HudTheme.PLATE.getRGB());
-            GuiGfx.strokeRounded(context, rowX, curY, pillW, pillH, 4f, 1f, HudTheme.BORDER.getRGB());
-            GuiGfx.dot(context, rowX + padX + dotR, curY + pillH / 2f, dotR, HudTheme.accent().getRGB());
-            fm.drawStringWithShadow(context, name, rowX + padX + dotR * 2 + dotGap, curY + padY, HudTheme.text(idx++));
-            curY += pillH + gap;
-        }
-
-        this.width = columnW;
-        this.height = activeModules.isEmpty() ? fontH : curY - y - gap;
+        this.width = maxWidth;
+        this.height = Math.max(fontH, curY - y);
     }
 }

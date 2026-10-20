@@ -1,9 +1,12 @@
 package me.collective.module.hud;
 
 import me.collective.font.FontManager;
-import me.collective.gui.GuiGfx;
+import me.collective.module.client.HUD;
+import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
 import net.minecraft.client.gui.DrawContext;
+
+import java.awt.Color;
 
 public class Position extends HudModule {
     public final BooleanSetting nether = add(new BooleanSetting("Nether", true));
@@ -11,59 +14,38 @@ public class Position extends HudModule {
 
     public Position() {
         super("Position", "Displays current coordinates.", 4, 300);
-        background.setValue(true);
     }
 
     @Override
     public void render(DrawContext context, float delta) {
         if (!isToggled() || mc.player == null) return;
 
-        FontManager fm = FontManager.INSTANCE;
-
         double posX = mc.player.getX();
         double posY = mc.player.getY();
         double posZ = mc.player.getZ();
-        String coords = String.format("%.1f, %.1f, %.1f", posX, posY, posZ);
 
-        StringBuilder sub = new StringBuilder();
+        String coords = String.format("XYZ: §f%.1f, %.1f, %.1f", posX, posY, posZ);
+
         if (nether.getValue()) {
             boolean isNether = mc.world != null && mc.world.getRegistryKey().getValue().getPath().contains("the_nether");
             double nX = isNether ? posX * 8.0 : posX / 8.0;
             double nZ = isNether ? posZ * 8.0 : posZ / 8.0;
-            sub.append(String.format("%.1f, %.1f", nX, nZ));
+            coords += String.format(" §7[§f%.1f, %.1f§7]", nX, nZ);
         }
+
         if (angles.getValue()) {
-            if (sub.length() > 0) sub.append("  ·  ");
             float yaw = mc.player.getYaw() % 360;
             float pitch = mc.player.getPitch();
-            sub.append(String.format("%.0f°, %.0f°", yaw, pitch));
+            coords += String.format(" §7(§f%.1f§7, §f%.1f§7)", yaw, pitch);
         }
 
-        int fontH = fm.getFontHeight();
-        float coordsW = fm.getStringWidth(coords);
-        String subStr = sub.toString();
-        float subW = subStr.isEmpty() ? 0f : fm.getStringWidth(subStr);
-        float padX = 7f, padY = 4f;
+        this.width = FontManager.INSTANCE.getStringWidth(coords) + 6;
+        this.height = FontManager.INSTANCE.getFontHeight() + 4;
 
         if (background.getValue()) {
-            float dotD = 4f, dotGap = 3.5f;
-            boolean hasSub = !subStr.isEmpty();
-            this.width = (hasSub ? Math.max(coordsW, subW) : coordsW) + padX * 2 + dotD + dotGap;
-            this.height = fontH + padY * 2 + (hasSub ? fontH + 3f : 0f);
-
-            HudTheme.plate(context, x, y, width, height, 5.5f);
-            float textX = x + padX + dotD + dotGap;
-            GuiGfx.dot(context, x + padX + 2f, y + padY + fontH / 2f - 0.5f, 2f, HudTheme.accent().getRGB());
-            fm.drawStringWithShadow(context, coords, textX, y + padY, HudTheme.text());
-            if (hasSub) {
-                fm.drawStringWithShadow(context, subStr, textX, y + padY + fontH + 3f, HudTheme.MUTED);
-            }
-            return;
+            RenderUtil.drawRect(context, x, y, x + width, y + height, new Color(20, 20, 20, 160));
         }
 
-        this.width = Math.max(coordsW, subW);
-        this.height = fontH * (subStr.isEmpty() ? 1 : 2) + 3f;
-        fm.drawStringWithShadow(context, coords, x, y, HudTheme.text());
-        if (!subStr.isEmpty()) fm.drawStringWithShadow(context, subStr, x, y + fontH + 3f, HudTheme.MUTED);
+        FontManager.INSTANCE.drawStringWithShadow(context, coords, x + 3, y + 2, HUD.INSTANCE.getHudColor(0));
     }
 }

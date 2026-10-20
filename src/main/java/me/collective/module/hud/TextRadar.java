@@ -1,11 +1,12 @@
 package me.collective.module.hud;
 
 import me.collective.font.FontManager;
-import me.collective.gui.GuiGfx;
+import me.collective.render.RenderUtil;
 import me.collective.setting.NumberSetting;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.entity.player.PlayerEntity;
 
+import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,31 +15,17 @@ public class TextRadar extends HudModule {
 
     public TextRadar() {
         super("TextRadar", "Displays nearby players and their distance.", 4, 180);
-        background.setValue(true);
     }
 
-    /**
-     * Готовая строка радара: строки, ширины и здоровье посчитаны на пересборке.
-     * Список пересобирается не чаще, чем раз в 50 мс, а не на каждый кадр.
-     */
+    /** Строка радара: текст, ширина и здоровье посчитаны на пересборке (раз в 50 мс). */
     private static final class Row {
-        final String name;
-        final String brackets;
-        final String hpText;
-        final float nameW;
-        final float bracketsW;
-        final float hpW;
-        final int hp;
+        final String info;
+        final float w;
         final int dist;
 
-        Row(String name, String brackets, String hpText, float nameW, float bracketsW, float hpW, int hp, int dist) {
-            this.name = name;
-            this.brackets = brackets;
-            this.hpText = hpText;
-            this.nameW = nameW;
-            this.bracketsW = bracketsW;
-            this.hpW = hpW;
-            this.hp = hp;
+        Row(String info, float w, int dist) {
+            this.info = info;
+            this.w = w;
             this.dist = dist;
         }
     }
@@ -54,7 +41,6 @@ public class TextRadar extends HudModule {
         if (mc.player == null || mc.world == null) return this.cachedRows = List.of();
 
         double rangeSq = (double) this.range.getIntValue() * this.range.getIntValue();
-        FontManager fm = FontManager.INSTANCE;
         List<Row> list = new ArrayList<>();
         for (PlayerEntity p : mc.world.getPlayers()) {
             if (p == mc.player || !p.isAlive()) continue;
@@ -62,12 +48,9 @@ public class TextRadar extends HudModule {
             if (dSq > rangeSq) continue;
 
             int dist = (int) Math.sqrt(dSq);
-            String name = p.getName().getString();
-            String brackets = "[" + dist + "m]";
             int hp = (int) (p.getHealth() + p.getAbsorptionAmount());
-            String hpText = hp + "❤";
-            list.add(new Row(name, brackets, hpText,
-                    fm.getStringWidth(name), fm.getStringWidth(brackets), fm.getStringWidth(hpText), hp, dist));
+            String info = String.format("%s §7[%dm] §c%d❤", p.getName().getString(), dist, hp);
+            list.add(new Row(info, FontManager.INSTANCE.getStringWidth(info) + 6, dist));
         }
         list.sort((r1, r2) -> Integer.compare(r1.dist, r2.dist));
         return this.cachedRows = list;
@@ -75,39 +58,33 @@ public class TextRadar extends HudModule {
 
     @Override
     public void render(DrawContext context, float delta) {
-        if (!isToggled()) return;
+        if (!isToggled() || mc.player == null || mc.world == null) return;
 
         List<Row> players = rows();
+
         if (players.isEmpty()) {
             this.width = 0;
             this.height = 0;
             return;
         }
 
-        FontManager fm = FontManager.INSTANCE;
-        int fontH = fm.getFontHeight();
-        float padX = 6f, padY = 3.5f, gap = 2.5f;
-        float pillH = fontH + padY * 2f;
-
         float curY = y;
         float maxWidth = 60;
+        int fontH = FontManager.INSTANCE.getFontHeight();
+
         for (Row row : players) {
-            float pillW = padX * 2 + row.nameW + 3f + row.bracketsW + 3f + row.hpW;
-            maxWidth = Math.max(maxWidth, pillW);
+            float w = row.w;
+            maxWidth = Math.max(maxWidth, w);
 
             if (background.getValue()) {
-                GuiGfx.fillRounded(context, x, curY, pillW, pillH, 4f, HudTheme.PLATE.getRGB());
-                GuiGfx.strokeRounded(context, x, curY, pillW, pillH, 4f, 1f, HudTheme.BORDER.getRGB());
+                RenderUtil.drawRect(context, x, curY, x + w, curY + fontH + 2, new Color(20, 20, 20, 160));
             }
-            float tx = x + padX;
-            fm.drawStringWithShadow(context, row.name, tx, curY + padY, HudTheme.text());
-            fm.drawStringWithShadow(context, row.brackets, tx + row.nameW + 3f, curY + padY, HudTheme.MUTED);
-            fm.drawStringWithShadow(context, row.hpText, tx + row.nameW + 3f + row.bracketsW + 3f, curY + padY,
-                    HudTheme.ratio(row.hp / 20f));
-            curY += pillH + gap;
+
+            FontManager.INSTANCE.drawStringWithShadow(context, row.info, x + 3, curY + 1, Color.WHITE);
+            curY += fontH + 3;
         }
 
         this.width = maxWidth;
-        this.height = Math.max(fontH, curY - y - gap);
+        this.height = Math.max(fontH, curY - y);
     }
 }

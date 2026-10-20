@@ -1,13 +1,16 @@
 package me.collective.module.hud;
 
 import me.collective.font.FontManager;
+import me.collective.module.client.HUD;
+import me.collective.render.RenderUtil;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.util.math.Direction.AxisDirection;
+
+import java.awt.Color;
 
 public class Direction extends HudModule {
     public Direction() {
         super("Direction", "Displays player facing direction.", 4, 320);
-        background.setValue(true);
     }
 
     @Override
@@ -16,28 +19,15 @@ public class Direction extends HudModule {
 
         net.minecraft.util.math.Direction dir = mc.player.getHorizontalFacing();
         String axis = dir.getDirection() == AxisDirection.POSITIVE ? "+" : "-";
-        String facing = dir.asString().toUpperCase();
-        String brackets = "[" + axis + dir.getAxis().asString().toUpperCase() + "]";
+        String dirText = dir.asString().toUpperCase() + " §7[§f" + axis + dir.getAxis().asString().toUpperCase() + "§7]";
 
-        FontManager fm = FontManager.INSTANCE;
-        int fontH = fm.getFontHeight();
-        float facingW = fm.getStringWidth(facing);
-        float bracketsW = fm.getStringWidth(brackets);
-        float padX = 7f, padY = 4f;
+        this.width = FontManager.INSTANCE.getStringWidth(dirText) + 6;
+        this.height = FontManager.INSTANCE.getFontHeight() + 4;
 
         if (background.getValue()) {
-            this.width = padX * 2 + facingW + 3f + bracketsW;
-            this.height = fontH + padY * 2;
-            HudTheme.plate(context, x, y, width, height, 5.5f);
-            float tx = x + padX;
-            fm.drawStringWithShadow(context, facing, tx, y + padY, HudTheme.text());
-            fm.drawStringWithShadow(context, brackets, tx + facingW + 3f, y + padY, HudTheme.MUTED);
-            return;
+            RenderUtil.drawRect(context, x, y, x + width, y + height, new Color(20, 20, 20, 160));
         }
 
-        this.width = facingW + 3f + bracketsW;
-        this.height = fontH;
-        fm.drawStringWithShadow(context, facing, x, y, HudTheme.text());
-        fm.drawStringWithShadow(context, brackets, x + facingW + 3f, y, HudTheme.MUTED);
+        FontManager.INSTANCE.drawStringWithShadow(context, dirText, x + 3, y + 2, HUD.INSTANCE.getHudColor(0));
     }
 }

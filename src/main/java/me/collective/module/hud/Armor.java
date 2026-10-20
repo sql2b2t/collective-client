@@ -1,6 +1,7 @@
 package me.collective.module.hud;
 
 import me.collective.font.FontManager;
+import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.item.ItemStack;
@@ -16,7 +17,6 @@ public class Armor extends HudModule {
 
     public Armor() {
         super("Armor", "Displays armor status and durability.", 200, 200);
-        background.setValue(true);
     }
 
     @Override
@@ -36,16 +36,15 @@ public class Armor extends HudModule {
         }
         Collections.reverse(items);
 
-        int fontH = FontManager.INSTANCE.getFontHeight();
-        this.width = items.size() * 18 + 4;
-        this.height = 20 + (showDamage.getValue() ? fontH + 3f : 0f);
+        int itemX = (int) x;
+        int itemY = (int) y;
+        this.width = items.size() * 18;
+        this.height = showDamage.getValue() ? 28 : 18;
 
         if (background.getValue()) {
-            HudTheme.plate(context, x, y, width, height, 6f);
+            RenderUtil.drawRect(context, x, y, x + width, y + height, new Color(20, 20, 20, 150));
         }
 
-        int itemX = (int) x + 2;
-        int itemY = (int) y + 2;
         for (ItemStack stack : items) {
             if (!stack.isEmpty()) {
                 context.drawItem(stack, itemX, itemY);
@@ -56,7 +55,7 @@ public class Armor extends HudModule {
                     int damage = stack.getDamage();
                     int percent = (int) (((maxDamage - damage) / (float) maxDamage) * 100);
 
-                    Color dmgColor = HudTheme.ratio(percent / 100f);
+                    Color dmgColor = percent > 50 ? Color.GREEN : (percent > 25 ? Color.YELLOW : Color.RED);
                     String pctText = percent + "%";
                     float textX = itemX + 9 - FontManager.INSTANCE.getStringWidth(pctText) / 2f;
                     FontManager.INSTANCE.drawStringWithShadow(context, pctText, textX, itemY + 18, dmgColor);

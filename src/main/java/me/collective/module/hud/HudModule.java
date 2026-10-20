@@ -2,9 +2,9 @@ package me.collective.module.hud;
 
 import me.collective.category.Category;
 import me.collective.font.FontManager;
-import me.collective.gui.GuiGfx;
 import me.collective.module.Module;
 import me.collective.module.client.HUD;
+import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
 import net.minecraft.client.gui.DrawContext;
 
@@ -46,16 +46,12 @@ public abstract class HudModule extends Module {
         render(context, delta);
 
         boolean hovered = isHovered(mouseX, mouseY);
-        if (hovered) {
-            GuiGfx.fillRounded(context, x - 2, y - 2, width + 4, height + 4, 4f,
-                    GuiGfx.withAlpha(HudTheme.accent().getRGB(), 26));
-            GuiGfx.strokeRounded(context, x - 2, y - 2, width + 4, height + 4, 4f, 1f,
-                    GuiGfx.withAlpha(HudTheme.accent().getRGB(), 210));
-        } else {
-            GuiGfx.strokeRounded(context, x - 2, y - 2, width + 4, height + 4, 4f, 1f,
-                    new Color(255, 255, 255, 60).getRGB());
-        }
-        FontManager.INSTANCE.drawStringWithShadow(context, getName(), x, y - 11, new Color(255, 255, 255, 120));
+        int outlineColor = hovered ? new Color(110, 80, 230, 255).getRGB() : new Color(255, 255, 255, 80).getRGB();
+        int boxColor = hovered ? new Color(110, 80, 230, 60).getRGB() : new Color(0, 0, 0, 40).getRGB();
+
+        RenderUtil.drawRect(context, x - 2, y - 2, x + width + 2, y + height + 2, boxColor);
+        RenderUtil.drawOutline(context, x - 2, y - 2, width + 4, height + 4, 1, outlineColor);
+        FontManager.INSTANCE.drawString(context, getName(), x, y - 10, new Color(200, 200, 200, 200));
     }
 
     public boolean isHovered(double mouseX, double mouseY) {

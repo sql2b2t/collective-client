@@ -1,9 +1,12 @@
 package me.collective.module.hud;
 
 import me.collective.font.FontManager;
+import me.collective.module.client.HUD;
+import me.collective.render.RenderUtil;
 import me.collective.setting.StringSetting;
 import net.minecraft.client.gui.DrawContext;
 
+import java.awt.Color;
 import java.time.LocalTime;
 
 public class Welcomer extends HudModule {
@@ -11,46 +14,32 @@ public class Welcomer extends HudModule {
 
     public Welcomer() {
         super("Welcomer", "Displays a welcoming message.", 300, 4);
-        background.setValue(true);
     }
 
     @Override
     public void render(DrawContext context, float delta) {
         if (!isToggled() || mc.player == null) return;
 
-        FontManager fm = FontManager.INSTANCE;
         String name = mc.player.getName().getString();
+        String welcome;
 
-        String greeting;
-        String suffix = "";
         if (!text.getValue().isEmpty()) {
-            greeting = text.getValue().replace("%player%", name);
+            welcome = text.getValue().replace("%player%", name);
         } else {
             int hour = LocalTime.now().getHour();
             String timeGreeting = (hour >= 6 && hour < 12) ? "Good morning" :
                     (hour >= 12 && hour < 18) ? "Good afternoon" :
                             (hour >= 18 && hour < 23) ? "Good evening" : "Good night";
-            greeting = timeGreeting + ", " + name;
-            suffix = "  ·  Collective";
+            welcome = String.format("%s, %s §7(Collective)", timeGreeting, name);
         }
 
-        float greetingW = fm.getStringWidth(greeting);
-        float suffixW = suffix.isEmpty() ? 0f : fm.getStringWidth(suffix);
-        int fontH = fm.getFontHeight();
-        float padX = 7f, padY = 4f;
+        this.width = FontManager.INSTANCE.getStringWidth(welcome) + 6;
+        this.height = FontManager.INSTANCE.getFontHeight() + 4;
 
         if (background.getValue()) {
-            this.width = padX * 2 + greetingW + suffixW;
-            this.height = fontH + padY * 2;
-            HudTheme.plate(context, x, y, width, height, 5.5f);
-        } else {
-            this.width = greetingW + suffixW;
-            this.height = fontH;
+            RenderUtil.drawRect(context, x, y, x + width, y + height, new Color(20, 20, 20, 160));
         }
 
-        float tx = background.getValue() ? x + padX : x;
-        float ty = background.getValue() ? y + padY : y;
-        fm.drawStringWithShadow(context, greeting, tx, ty, HudTheme.text());
-        if (suffixW > 0) fm.drawStringWithShadow(context, suffix, tx + greetingW, ty, HudTheme.MUTED);
+        FontManager.INSTANCE.drawStringWithShadow(context, welcome, x + 3, y + 2, HUD.INSTANCE.getHudColor(0));
     }
 }
