@@ -29,6 +29,7 @@ public final class ClickGui2Card {
 
     private final Module module;
     private final Category category;
+    private final String lowName;
     private final List<ClickGui2Rows.Row> rows = new ArrayList<>();
     private String rowsKey = "";
 
@@ -44,10 +45,15 @@ public final class ClickGui2Card {
     public ClickGui2Card(Module module, Category category) {
         this.module = module;
         this.category = category;
+        this.lowName = module.getName().toLowerCase();
     }
 
     public Category category() {
         return category;
+    }
+
+    String lowName() {
+        return lowName;
     }
 
     public Module module() {
@@ -74,34 +80,52 @@ public final class ClickGui2Card {
         focusFlash = 1f;
     }
 
-    // ── Актуализация строк (сигнатурный ключ состава, как кл() в исходнике) ──
+    // ── Актуализация строк: сверка по ссылкам, без аллокаций в кадре ──
 
     private void ensureRows() {
-        StringBuilder key = new StringBuilder();
-        List<ClickGui2Rows.Row> fresh = new ArrayList<>();
+        visibleScratch.clear();
+        boolean touch = false;
         for (Setting<?> s : module.getSettings()) {
             if (!s.isVisible()) continue;
-            ClickGui2Rows.Row row = ClickGui2Rows.of(s);
-            if (row == null) continue;
-            fresh.add(row);
-            key.append(s.getName()).append('\u0000').append(s.getClass().getName()).append('\n');
+            if (ClickGui2Rows.of(s) == null) continue;
+            visibleScratch.add(s);
+            touch = true;
         }
-        if (!key.toString().equals(rowsKey) || rows.size() != fresh.size()) {
-            rowsKey = key.toString();
-            boolean[] expandedState = new boolean[1];
-            rows.clear();
-            rows.addAll(fresh);
-            expandedState[0] = expanded;
+        boolean same = visibleScratch.size() == rows.size();
+        if (same) {
+            for (int i = 0; i < rows.size(); i++) {
+                if (rows.get(i).setting() != visibleScratch.get(i)) {
+                    same = false;
+                    break;
+                }
+            }
         }
+        if (same || !touch) {
+            return;
+        }
+        rows.clear();
+        StringBuilder key = new StringBuilder();
+        for (Setting<?> s : visibleScratch) {
+            rows.add(ClickGui2Rows.of(s));
+            key.append(s.getClass().getName()).append('\n');
+        }
+        rowsKey = key.toString();
+        cachedRowsH = -1f;
     }
+
+    private final ArrayList<Setting<?>> visibleScratch = new ArrayList<>();
+    private float cachedRowsH = -1f;
 
     float rowsHeight() {
         ensureRows();
-        float total = 0f;
-        for (ClickGui2Rows.Row row : rows) {
-            total += row.height() + SET_GAP;
+        if (cachedRowsH < 0f) {
+            float total = 0f;
+            for (ClickGui2Rows.Row row : rows) {
+                total += row.height() + SET_GAP;
+            }
+            cachedRowsH = total > 0f ? total - SET_GAP + BOTTOM_PAD : 0f;
         }
-        return total > 0f ? total - SET_GAP + BOTTOM_PAD : 0f;
+        return cachedRowsH;
     }
 
     /** Полная высота карточки (с раскрытыми строками). */

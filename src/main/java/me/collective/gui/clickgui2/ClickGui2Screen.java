@@ -95,6 +95,17 @@ public class ClickGui2Screen extends Screen {
     private float lastMouseY;
     private boolean built;
 
+    // адаптивный масштаб панели: подгон под текущее GUI-разрешение
+    private float fitScale = 1f;
+    private float drawnScale = 1f;
+
+    // кэш избранного
+    private List<ClickGui2Card> favoritesCache;
+    private long favoritesVersion = -1L;
+
+    // кэш сканирования поиска
+    private String scannedQuery;
+
     private static final class RailButton {
         final Category category;
         final boolean favorites;
@@ -152,46 +163,70 @@ public class ClickGui2Screen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        float mx = mouseX;
-        float my = mouseY;
-        lastMouseX = mx;
-        lastMouseY = my;
         long now = System.nanoTime();
         float dt = Math.min(0.1f, Math.max(0.001f, (now - lastNano) / 1_000_000_000f));
         lastNano = now;
 
         introT = ClickGui2Anim.to01(introT, true, dt, 6f);
 
-        // фон: затемнение + блюр и два мягких свечения (аппроксимация шейдеров mod0162)
+        // фон: затемнение + мягкие свечения (аппроксимация шейдеров исходника)
         RenderUtil.drawRect(context, 0f, 0f, (float) width, (float) height,
                 Math.round(150f * introT) << 24);
-        if (Blur.INSTANCE != null && Blur.INSTANCE.isToggled() && Blur.INSTANCE.clickGui.getValue()) {
-            List<float[]> regions = new ArrayList<>();
-            regions.add(new float[]{0f, 0f, (float) width, (float) height});
-            BlurEngine.INSTANCE.renderBlur(context, regions, Blur.INSTANCE.radius.getFloatValue());
-        }
         int mainRgb = ClickGui2Theme.rgb(ClickGui2Theme.Role.MAIN) & 0xFFFFFF;
         int twoRgb = ClickGui2Theme.rgb(ClickGui2Theme.Role.MAIN_TWO) & 0xFFFFFF;
         float glowA = 0.10f * introT;
         GuiGfx.softGlow(context, (int) (width * 0.18f) - 320, (int) (height * 0.9f) - 260, 640, 520, 240,
-                mainRgb, Math.round(34f * glowA * 4f), 3, 0);
+                mainRgb, Math.round(30f * glowA * 4f), 2, 0);
         GuiGfx.softGlow(context, (int) (width * 0.85f) - 300, (int) (height * 0.12f) - 220, 600, 440, 220,
-                twoRgb, Math.round(26f * glowA * 4f), 3, 0);
+                twoRgb, Math.round(22f * glowA * 4f), 2, 0);
 
+        // мышь и геометрия в логических координатах панели
+        float centerX = width / 2f;
+        float centerY = height / 2f;
+        float uiScale = 1f;
+        UI uiMod = UI.INSTANCE;
+        if (uiMod != null && uiMod.gui2Scale != null) {
+            uiScale = uiMod.gui2Scale.getFloatValue();
+        }
+        fitScale = Math.max(0.5f, Math.min(1.15f,
+                Math.min(width * 0.84f / PANEL_W, height * 0.74f / PANEL_H) * uiScale));
+        drawnScale = fitScale * (0.94f + 0.06f * ClickGui2Anim.spring(introT));
         panelX = (width - PANEL_W) / 2f;
         panelY = (height - PANEL_H) / 2f;
-        float scale = 0.94f + 0.06f * ClickGui2Anim.spring(introT);
+        float mx = toPanelX(mouseX);
+        float my = toPanelY(mouseY);
+        lastMouseX = mx;
+        lastMouseY = my;
         float navAlpha = ClickGui2Anim.easeOut(Math.min(1f, introT * 1.35f));
 
+        // блюр — ровно по области панели (в реальных координатах), не весь экран
+        if (Blur.INSTANCE != null && Blur.INSTANCE.isToggled() && Blur.INSTANCE.clickGui.getValue()) {
+            float pad = 10f * drawnScale;
+            float bw = PANEL_W * drawnScale + pad * 2f;
+            float bh = PANEL_H * drawnScale + pad * 2f;
+            List<float[]> regions = new ArrayList<>();
+            regions.add(new float[]{centerX - bw / 2f, centerY - bh / 2f,
+                    centerX + bw / 2f, centerY + bh / 2f});
+            BlurEngine.INSTANCE.renderBlur(context, regions, Blur.INSTANCE.radius.getFloatValue());
+        }
+
         context.getMatrices().pushMatrix();
-        context.getMatrices().translate(width / 2f, height / 2f);
-        context.getMatrices().scale(scale, scale);
-        context.getMatrices().translate(-width / 2f, -height / 2f);
+        context.getMatrices().translate(centerX, centerY);
+        context.getMatrices().scale(drawnScale, drawnScale);
+        context.getMatrices().translate(-centerX, -centerY);
 
         renderPanel(context, mx, my, dt, navAlpha);
 
         context.getMatrices().popMatrix();
         super.render(context, mouseX, mouseY, delta);
+    }
+
+    private float toPanelX(float raw) {
+        return width / 2f + (raw - width / 2f) / Math.max(0.05f, drawnScale);
+    }
+
+    private float toPanelY(float raw) {
+        return height / 2f + (raw - height / 2f) / Math.max(0.05f, drawnScale);
     }
 
     private void renderPanel(DrawContext ctx, float mx, float my, float dt, float navAlpha) {
@@ -315,17 +350,21 @@ public class ClickGui2Screen extends Screen {
         fm.drawStringScaled(ctx, crumbs, panelX + RAIL_W + 16f, panelY + 18f,
                 ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.CATEGORY_TEXT), navAlpha), 1.28f);
 
-        searchResults.clear();
-        if (!searchQuery.isEmpty()) {
-            String q = searchQuery.toLowerCase();
-            float resultY = searchBoxY() + 24f + 36f;
-            outer:
-            for (Category cat : ORDER) {
-                for (ClickGui2Card card : cardCache.get(cat)) {
-                    if (card.module().getName().toLowerCase().contains(q)) {
-                        searchResults.add(new SearchResult(card, resultY));
-                        resultY += 20f;
-                        if (searchResults.size() >= 6) break outer;
+        // пересканирование только при изменении запроса (без аллокаций в кадре)
+        if (!searchQuery.equals(scannedQuery)) {
+            searchResults.clear();
+            scannedQuery = searchQuery;
+            if (!searchQuery.isEmpty()) {
+                String q = searchQuery.toLowerCase();
+                float resultY = searchBoxY() + 24f + 36f;
+                outer:
+                for (Category cat : ORDER) {
+                    for (ClickGui2Card card : cardCache.get(cat)) {
+                        if (card.lowName().contains(q)) {
+                            searchResults.add(new SearchResult(card, resultY));
+                            resultY += 20f;
+                            if (searchResults.size() >= 6) break outer;
+                        }
                     }
                 }
             }
@@ -415,15 +454,19 @@ public class ClickGui2Screen extends Screen {
 
     private List<ClickGui2Card> visibleCards() {
         if (favoritesView) {
-            List<ClickGui2Card> list = new ArrayList<>();
-            for (Category cat : ORDER) {
-                for (ClickGui2Card card : cardCache.get(cat)) {
-                    if (FavoriteStore.isFavorite(card.module().getName())) {
-                        list.add(card);
+            long v = FavoriteStore.version();
+            if (favoritesCache == null || favoritesVersion != v) {
+                favoritesCache = new ArrayList<>();
+                for (Category cat : ORDER) {
+                    for (ClickGui2Card card : cardCache.get(cat)) {
+                        if (FavoriteStore.isFavorite(card.module().getName())) {
+                            favoritesCache.add(card);
+                        }
                     }
                 }
+                favoritesVersion = v;
             }
-            return list;
+            return favoritesCache;
         }
         return cardCache.get(category);
     }
@@ -547,8 +590,8 @@ public class ClickGui2Screen extends Screen {
 
     @Override
     public boolean mouseClicked(Click click, boolean bl) {
-        float mx = (float) click.x();
-        float my = (float) click.y();
+        float mx = toPanelX((float) click.x());
+        float my = toPanelY((float) click.y());
         int button = click.button();
         if (introT <= 0.92f) {
             return true;
@@ -683,8 +726,8 @@ public class ClickGui2Screen extends Screen {
             return true;
         }
 
-        float mx = (float) mouseX;
-        float my = (float) mouseY;
+        float mx = toPanelX((float) mouseX);
+        float my = toPanelY((float) mouseY);
 
         // Ctrl + колесо — пошаговые числа внутри строк
         if (hasCtrl()) {
@@ -714,17 +757,19 @@ public class ClickGui2Screen extends Screen {
 
     @Override
     public boolean mouseDragged(Click click, double mouseX, double mouseY) {
+        float mx = toPanelX((float) mouseX);
+        float my = toPanelY((float) mouseY);
         if (draggingThumb) {
             float trackH = viewportH();
             float minScroll = Math.min(0f, trackH - contentHeight);
             float content = Math.max(1f, contentHeight - trackH);
             float th = Math.max(22f, trackH * trackH / Math.max(1f, contentHeight));
             float usable = Math.max(1f, trackH - th);
-            float progress = ((float) mouseY - dragGrabOffset - viewportY()) / usable;
+            float progress = (my - dragGrabOffset - viewportY()) / usable;
             scrollTarget = Math.max(minScroll, Math.min(0f, -progress * content));
             return true;
         }
-        if (popups.mouseDragging((float) mouseX, (float) mouseY)) {
+        if (popups.mouseDragging(mx, my)) {
             return true;
         }
         return super.mouseDragged(click, mouseX, mouseY);

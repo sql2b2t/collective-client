@@ -51,6 +51,8 @@ public class UI extends Module {
 
     public final BooleanSetting gear = add(new BooleanSetting("Gear", false));
     public final ModeSetting style = add(new ModeSetting("Style", "Classic", "Classic", "ClickGui2"));
+    public final NumberSetting gui2Scale = add(new NumberSetting("Gui2 Scale", 0.8, 0.6, 1.0, 0.05,
+            (visible) -> style.process("ClickGui2")));
     public final BooleanSetting binds = add(new BooleanSetting("Binds", true));
     public final BooleanSetting line = add(new BooleanSetting("Line", true));
     public final BooleanSetting snow = add(new BooleanSetting("Snow", true));

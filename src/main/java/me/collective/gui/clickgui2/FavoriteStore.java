@@ -19,8 +19,15 @@ public final class FavoriteStore {
     private static final Gson GSON = new Gson();
     private static final Set<String> favorites = new HashSet<>();
     private static boolean loaded;
+    private static long version;
 
     private FavoriteStore() {
+    }
+
+    /** Счётчик изменений: экраны кэшируют список избранного по нему. */
+    public static long version() {
+        ensureLoaded();
+        return version;
     }
 
     private static Path file() {
@@ -63,6 +70,7 @@ public final class FavoriteStore {
         if (!favorites.remove(moduleName)) {
             favorites.add(moduleName);
         }
+        version++;
         save();
     }
 }

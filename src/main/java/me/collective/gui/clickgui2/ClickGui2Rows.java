@@ -37,6 +37,8 @@ final class ClickGui2Rows {
     }
 
     interface Row {
+        Setting<?> setting();
+
         float height();
 
         void layout(float x, float y, float w);
@@ -94,6 +96,9 @@ final class ClickGui2Rows {
         private boolean hoverLatch;
 
         @Override
+        public abstract Setting<?> setting();
+
+        @Override
         public void layout(float x, float y, float w) {
             this.x = x;
             this.y = y;
@@ -127,6 +132,11 @@ final class ClickGui2Rows {
 
         ToggleRow(BooleanSetting setting) {
             this.setting = setting;
+        }
+
+        @Override
+        public Setting<?> setting() {
+            return setting;
         }
 
         @Override
@@ -203,6 +213,11 @@ final class ClickGui2Rows {
         NumberRow(NumberSetting setting) {
             this.setting = setting;
         }
+        @Override
+        public Setting<?> setting() {
+            return setting;
+        }
+
         @Override
         public float height() {
             return NUMBER_H;
@@ -393,6 +408,11 @@ final class ClickGui2Rows {
         }
 
         @Override
+        public Setting<?> setting() {
+            return setting;
+        }
+
+        @Override
         public float height() {
             return MODE_H;
         }
@@ -513,6 +533,11 @@ final class ClickGui2Rows {
         }
 
         @Override
+        public Setting<?> setting() {
+            return setting;
+        }
+
+        @Override
         public float height() {
             return TOGGLE_H;
         }
@@ -588,6 +613,11 @@ final class ClickGui2Rows {
 
         BindRow(KeybindSetting setting) {
             this.setting = setting;
+        }
+
+        @Override
+        public Setting<?> setting() {
+            return setting;
         }
 
         @Override
@@ -675,6 +705,11 @@ final class ClickGui2Rows {
 
         TextRow(StringSetting setting) {
             this.setting = setting;
+        }
+
+        @Override
+        public Setting<?> setting() {
+            return setting;
         }
 
         @Override
