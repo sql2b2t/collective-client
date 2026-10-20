@@ -15,7 +15,7 @@ import java.util.UUID;
  * <p>Спавнит клиентского болванчика для теста аур.
  */
 public class FakePlayer extends Module {
-    private static final int FAKE_ID = -9000;
+    private OtherClientPlayerEntity fakeEntity;
 
     public FakePlayer() {
         super("FakePlayer", "Болванчик для проверки аур.", Category.MISC);
@@ -25,6 +25,10 @@ public class FakePlayer extends Module {
     public void onEnable() {
         if (mc.player == null || mc.world == null) {
             setToggled(false);
+            return;
+        }
+        if (fakeEntity != null && fakeEntity.isAlive()) {
+            info("Болванчик уже на месте.");
             return;
         }
         Vec3d look = mc.player.getRotationVec(1.0f);
@@ -39,14 +43,26 @@ public class FakePlayer extends Module {
         };
         fake.setPosition(pos.x, pos.y, pos.z);
         fake.setYaw(mc.player.getYaw());
+        fakeEntity = fake;
         mc.world.addEntity(fake);
         info("Болванчик заспавнен.");
     }
 
     @Override
     public void onDisable() {
-        if (mc.world != null) {
-            mc.world.removeEntity(FAKE_ID, Entity.RemovalReason.DISCARDED);
+        if (mc.world != null && fakeEntity != null) {
+            mc.world.removeEntity(fakeEntity.getId(), Entity.RemovalReason.DISCARDED);
+        }
+        fakeEntity = null;
+    }
+
+    @Override
+    public void onUpdate() {
+        // Мир сменился (переход/дисконнект) — ссылка протухла, чищем чтобы
+        // старый id не выкосил чужую сущность из нового мира.
+        if (fakeEntity != null && (mc.world == null || fakeEntity.isRemoved() || fakeEntity.isAlive() && fakeEntity.getId() != -1 && mc.world.getEntityById(fakeEntity.getId()) == null)) {
+            fakeEntity = null;
+            setToggled(false);
         }
     }
 }

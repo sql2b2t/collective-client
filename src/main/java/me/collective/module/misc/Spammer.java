@@ -34,6 +34,7 @@ public class Spammer extends Module {
     private final List<String> spamList = new ArrayList<>();
     private String fact = null;
     private long lastSend = 0L;
+    private long lastFactAttempt = 0L;
 
     public Spammer() {
         super("Spammer", "Флуд в чат по файлу или фактами.", Category.MISC);
@@ -64,7 +65,16 @@ public class Spammer extends Module {
             }
             msg = spamList.get(ThreadLocalRandom.current().nextInt(spamList.size()));
         } else {
-            if (fact == null) return;
+            // Первый fetch мог упасть (без сети): без ретрая режим CatFacts
+            // молчал бы вечно. Повторяем не чаще раза в 5 секунд.
+            if (fact == null) {
+                long now = System.currentTimeMillis();
+                if (now - lastFactAttempt > 5000) {
+                    lastFactAttempt = now;
+                    fetchFact();
+                }
+                return;
+            }
             msg = fact;
             fetchFact();
         }
@@ -118,6 +128,7 @@ public class Spammer extends Module {
     }
 
     private void fetchFact() {
+        lastFactAttempt = System.currentTimeMillis();
         new Thread(() -> {
             try {
                 String json;
