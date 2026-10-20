@@ -289,9 +289,10 @@ public class ScriptContext {
     public void unregisterAll() {
         cancelAllTasks();
 
+        ArrayList<Module> stale = new ArrayList<>();
         for (Module m : registeredModules) {
-            if (m.isToggled()) m.setToggled(false);
-            ModuleManager.INSTANCE.getModules().remove(m);
+            ModuleManager.INSTANCE.unregister(m);
+            stale.add(m);
         }
         registeredModules.clear();
 
@@ -301,8 +302,9 @@ public class ScriptContext {
         registeredCommands.clear();
 
         for (HudModule h : registeredHudElements) {
-            if (h.isToggled()) h.setToggled(false);
-            ModuleManager.INSTANCE.getModules().remove(h);
+            if (!stale.contains(h)) {
+                ModuleManager.INSTANCE.unregister(h);
+            }
         }
         registeredHudElements.clear();
 

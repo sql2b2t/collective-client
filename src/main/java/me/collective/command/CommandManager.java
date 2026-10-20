@@ -72,16 +72,25 @@ public class CommandManager {
 
         // 1. Check registered commands
         for (Command cmd : commands) {
-            if (cmd.getName().equalsIgnoreCase(name)) {
-                cmd.execute(args);
-                return true;
-            }
-            for (String alias : cmd.getAliases()) {
-                if (alias.equalsIgnoreCase(name)) {
-                    cmd.execute(args);
-                    return true;
+            boolean hit = cmd.getName().equalsIgnoreCase(name);
+            if (!hit) {
+                for (String alias : cmd.getAliases()) {
+                    if (alias.equalsIgnoreCase(name)) {
+                        hit = true;
+                        break;
+                    }
                 }
             }
+            if (!hit) continue;
+
+            try {
+                cmd.execute(args);
+            } catch (Throwable t) {
+                // Команда обязана никогда не ронять клиент: сваливаем в чат.
+                t.printStackTrace();
+                ChatHelper.sendMessage(Text.literal("Ошибка команды: " + t).styled(s -> s.withColor(Formatting.RED)));
+            }
+            return true;
         }
 
         ChatHelper.sendMessage(Text.literal("Unknown command. Type " + prefix + "help for a list of commands.").styled(s -> s.withColor(Formatting.RED)));

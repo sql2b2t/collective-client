@@ -164,10 +164,11 @@ public class ConfigManager {
             }
 
             if (root.has("friends") && root.get("friends").isJsonArray()) {
-                FriendManager.INSTANCE.getFriends().clear();
+                java.util.ArrayList<String> loaded = new java.util.ArrayList<>();
                 for (JsonElement e : root.getAsJsonArray("friends")) {
-                    if (e.isJsonPrimitive()) FriendManager.INSTANCE.addFriend(e.getAsString());
+                    if (e.isJsonPrimitive()) loaded.add(e.getAsString());
                 }
+                FriendManager.INSTANCE.setFriends(loaded);
             }
 
             if (root.has("modules") && root.get("modules").isJsonObject()) {

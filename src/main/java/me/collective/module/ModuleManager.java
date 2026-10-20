@@ -12,6 +12,7 @@ import me.collective.module.render.*;
 import me.collective.module.misc.*;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -186,10 +187,29 @@ public class ModuleManager {
         register(new ImageHUD());
     }
 
-    public void register(Module module) {        modules.add(module);
+    public void register(Module module) {
+        modules.add(module);
         if (module instanceof HudModule) {
             hudModules.add((HudModule) module);
         }
+    }
+
+    /** Полная отмена регистрации: и общий список, и HUD-список (скрипты/аддоны). */
+    public void unregister(Module module) {
+        modules.remove(module);
+        if (module instanceof HudModule) {
+            hudModules.remove(module);
+        }
+        try {
+            me.collective.event.EventBus.INSTANCE.unsubscribe(module);
+            module.setToggled(false);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    public void unregisterAll(Collection<Module> batch) {
+        if (batch == null) return;
+        for (Module m : batch) unregister(m);
     }
 
     public List<Module> getModules() {

@@ -1,5 +1,6 @@
 package me.collective.manager;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -10,12 +11,16 @@ public class FriendManager {
     private FriendManager() {
     }
 
+    private static String norm(String name) {
+        return name == null ? null : name.toLowerCase(java.util.Locale.ROOT);
+    }
+
     public static FriendManager getInstance() {
         return INSTANCE;
     }
 
     public boolean isFriend(String name) {
-        return friends.contains(name.toLowerCase());
+        return friends.contains(norm(name));
     }
 
     public boolean isFriend(net.minecraft.entity.player.PlayerEntity player) {
@@ -24,14 +29,25 @@ public class FriendManager {
     }
 
     public void addFriend(String name) {
-        friends.add(name.toLowerCase());
+        if (name != null) friends.add(norm(name));
     }
 
     public void removeFriend(String name) {
-        friends.remove(name.toLowerCase());
+        friends.remove(norm(name));
     }
 
+    public void clearFriends() {
+        friends.clear();
+    }
+
+    public void setFriends(Collection<String> names) {
+        friends.clear();
+        if (names == null) return;
+        for (String n : names) addFriend(n);
+    }
+
+    /** Защитная копия: внешний код не мутирует внутреннее множество. */
     public Set<String> getFriends() {
-        return friends;
+        return new HashSet<>(friends);
     }
 }
