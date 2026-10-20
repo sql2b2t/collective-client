@@ -161,6 +161,9 @@ public final class ClickGui2Card {
                 if (button == 0) {
                     module.toggle();
                     SoundUtil.playClick(0.2f, module.isToggled() ? 1.2f : 0.85f);
+                } else if (button == 1) {
+                    setExpanded(!expanded);
+                    SoundUtil.playClick(0.16f, expanded ? 1.25f : 0.95f);
                 }
                 return;
             }
@@ -194,7 +197,7 @@ public final class ClickGui2Card {
         for (ClickGui2Rows.Row row : rows) {
             float rowH = ClickGui2Anim.smooth(expandT) * row.height();
             if (rowH < 1f) continue;
-            if (ClickGui2Widgets.inRect(mx, my, x + 12f, rowY, CARD_W - 24f, rowH)) {
+            if (ClickGui2Widgets.inRect(mx, my, x + 14f, rowY, CARD_W - 28f, rowH)) {
                 row.mouseClicked(mx, my, button, popups);
                 return;
             }
@@ -223,7 +226,7 @@ public final class ClickGui2Card {
         ensureRows();
         float rowY = y + HEADER_H;
         for (ClickGui2Rows.Row row : rows) {
-            if (ClickGui2Widgets.inRect(mx, my, x + 12f, rowY, CARD_W - 24f, row.height())) {
+            if (ClickGui2Widgets.inRect(mx, my, x + 14f, rowY, CARD_W - 28f, row.height())) {
                 return row.scrolled(deltaY, ctrl);
             }
             rowY += row.height() + SET_GAP;
