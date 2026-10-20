@@ -46,24 +46,24 @@ public final class ClickGui2Theme {
     static {
         colors.put(Role.MAIN, new Color(189, 153, 255));
         colors.put(Role.MAIN_TWO, new Color(150, 125, 205));
-        colors.put(Role.OUTLINE, new Color(255, 255, 255, 34));
-        colors.put(Role.BACKGROUND, new Color(16, 15, 22, 216));
+        colors.put(Role.OUTLINE, new Color(255, 255, 255, 46));
+        colors.put(Role.BACKGROUND, new Color(30, 26, 40, 216));
         colors.put(Role.SHADOW, new Color(0, 0, 0, 70));
-        colors.put(Role.LINE, new Color(255, 255, 255, 22));
-        colors.put(Role.SCROLL, new Color(255, 255, 255, 55));
+        colors.put(Role.LINE, new Color(255, 255, 255, 32));
+        colors.put(Role.SCROLL, new Color(255, 255, 255, 70));
         colors.put(Role.ACTIVE_STATE, new Color(189, 153, 255));
-        colors.put(Role.DEACTIVE_STATE, new Color(120, 116, 138, 190));
+        colors.put(Role.DEACTIVE_STATE, new Color(138, 134, 158, 190));
         colors.put(Role.CIRCLE, new Color(250, 248, 255));
-        colors.put(Role.SELECTED, new Color(255, 255, 255, 30));
-        colors.put(Role.ACTIVE_TEXT, new Color(238, 240, 250));
-        colors.put(Role.DEACTIVE_TEXT, new Color(134, 132, 152));
-        colors.put(Role.OPEN_SETTING_TEXT, new Color(226, 228, 244));
-        colors.put(Role.DEOPEN_SETTING_TEXT, new Color(158, 156, 178));
-        colors.put(Role.TEXT, new Color(236, 238, 250));
-        colors.put(Role.SUR_TEXT, new Color(148, 152, 168));
-        colors.put(Role.CATEGORY_TEXT, new Color(242, 245, 252));
-        colors.put(Role.CATEGORY_SUR_TEXT, new Color(138, 134, 158));
-        colors.put(Role.DESELECT_CATEGORY_TEXT, new Color(112, 110, 132));
+        colors.put(Role.SELECTED, new Color(255, 255, 255, 38));
+        colors.put(Role.ACTIVE_TEXT, new Color(240, 242, 251));
+        colors.put(Role.DEACTIVE_TEXT, new Color(146, 144, 166));
+        colors.put(Role.OPEN_SETTING_TEXT, new Color(230, 232, 247));
+        colors.put(Role.DEOPEN_SETTING_TEXT, new Color(164, 162, 186));
+        colors.put(Role.TEXT, new Color(238, 240, 251));
+        colors.put(Role.SUR_TEXT, new Color(158, 162, 180));
+        colors.put(Role.CATEGORY_TEXT, new Color(245, 248, 254));
+        colors.put(Role.CATEGORY_SUR_TEXT, new Color(150, 146, 172));
+        colors.put(Role.DESELECT_CATEGORY_TEXT, new Color(122, 120, 146));
     }
 
     private ClickGui2Theme() {

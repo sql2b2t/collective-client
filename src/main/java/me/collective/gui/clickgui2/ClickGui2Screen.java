@@ -241,10 +241,30 @@ public class ClickGui2Screen extends Screen {
             java.awt.Color bg = uiMod.bgColor.getValue();
             if (bg != null) {
                 ClickGui2Theme.setRole(ClickGui2Theme.Role.BACKGROUND,
-                        new java.awt.Color(bg.getRed(), bg.getGreen(), bg.getBlue()));
+                        brightenFloor(bg, 0.20f));
             }
         } catch (RuntimeException ignored) {
         }
+    }
+
+    /**
+     * Повышает яркость фонового цвета до нижнего порога, сохраняя оттенок:
+     * все каналы масштабируются, пока максимум не достигнет
+     * {@code targetFraction * 255}. Светлым цветам ничего не делает.
+     */
+    private static java.awt.Color brightenFloor(java.awt.Color color, float targetFraction) {
+        int max = Math.max(color.getRed(), Math.max(color.getGreen(), color.getBlue()));
+        int target = Math.round(255f * targetFraction);
+        if (max >= target) return color;
+        float k = target / Math.max(1, max);
+        return new java.awt.Color(
+                clamp255(Math.round(color.getRed() * k)),
+                clamp255(Math.round(color.getGreen() * k)),
+                clamp255(Math.round(color.getBlue() * k)));
+    }
+
+    private static int clamp255(int v) {
+        return Math.max(0, Math.min(255, v));
     }
 
     private static int mixe(int rgb, float k) {
@@ -263,7 +283,7 @@ public class ClickGui2Screen extends Screen {
 
         GuiGfx.shadow(ctx, (int) panelX - 4, (int) panelY - 4, (int) PANEL_W + 8, (int) PANEL_H + 8, 12);
         fillRounded(ctx, panelX, panelY, PANEL_W, PANEL_H, 14f,
-                ClickGui2Theme.alpha(ClickGui2Theme.Role.BACKGROUND, 246));
+                ClickGui2Theme.alpha(ClickGui2Theme.Role.BACKGROUND, 202));
         outlineRounded(ctx, panelX, panelY, PANEL_W, PANEL_H, 14f, ClickGui2Theme.rgb(ClickGui2Theme.Role.OUTLINE));
 
         renderRail(ctx, mx, my, dt, navAlpha, interact);
