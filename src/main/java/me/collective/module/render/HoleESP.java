@@ -4,6 +4,7 @@ import me.collective.category.Category;
 import me.collective.event.EventHandler;
 import me.collective.event.events.Render3DEvent;
 import me.collective.module.Module;
+import me.collective.render.ColorUtil;
 import me.collective.render.Renderer3D;
 import me.collective.render.ShapeMode;
 import me.collective.setting.BooleanSetting;
@@ -146,9 +147,16 @@ public class HoleESP extends Module {
             case CubeBoth -> ShapeMode.Both;
         };
 
+        double rangeBlocks = rangeXZ.getValue();
         for (Hole hole : holes) {
-            Color fill = hole.color;
-            Color line = new Color(hole.color.getRed(), hole.color.getGreen(), hole.color.getBlue(), 255);
+            // Мягкое затухание на дальней кромке радиуса вместо мгновенного
+            // исчезновения — дыры не «поп»-ают при движении камеры.
+            double dist = mc.player.squaredDistanceTo(hole.box.getCenter());
+            if (dist > rangeBlocks * rangeBlocks) continue;
+            dist = Math.sqrt(dist);
+            Color base = hole.color;
+            Color fill = ColorUtil.fadeByDistance(dist, rangeBlocks, new Color(base.getRed(), base.getGreen(), base.getBlue(), 110));
+            Color line = ColorUtil.fadeLineByDistance(dist, rangeBlocks, base, 255);
             Renderer3D.box(hole.box, fill, line, sm, xray.getValue());
         }
     }

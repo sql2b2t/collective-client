@@ -4,6 +4,7 @@ import me.collective.category.Category;
 import me.collective.event.EventHandler;
 import me.collective.event.events.Render3DEvent;
 import me.collective.module.Module;
+import me.collective.render.ColorUtil;
 import me.collective.render.Renderer3D;
 import me.collective.render.ShapeMode;
 import me.collective.setting.BlockListSetting;
@@ -101,14 +102,19 @@ public class BlockESP extends Module {
             default -> ShapeMode.Both;
         };
         Vec3d cam = mc.gameRenderer.getCamera().getCameraPos();
+        double rangeBlocks = this.range.getValue();
         // found меняется только в тиковых обработчиках того же потока —
         // обход напрямую, без защитной копии на каждый кадр
         for (BlockPos pos : found) {
             Box box = new Box(pos);
-            Renderer3D.box(box, fill, line, mode, true);
+            double dist = Math.sqrt(mc.player.squaredDistanceTo(
+                pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5));
+            Color fillF = ColorUtil.fadeByDistance(dist, rangeBlocks, fill);
+            Color lineF = ColorUtil.fadeLineByDistance(dist, rangeBlocks, fill, 255);
+            Renderer3D.box(box, fillF, lineF, mode, true);
             if (tracers.getValue()) {
                 Renderer3D.line(cam.x, cam.y, cam.z,
-                    pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, line);
+                    pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, lineF);
             }
         }
     }

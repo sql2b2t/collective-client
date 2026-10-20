@@ -60,4 +60,33 @@ public class ColorUtil {
 
         return toRGBA(r, g, b, a);
     }
+
+    /**
+     * Мягкое затухание подсветки к границе дальности: последние 30% радиуса
+     * плавно гасят непрозрачность вместо резкого исчезрования на кромке.
+     * Минимум 12% непрозрачности, чтобы дальний объект оставался заметным.
+     */
+    public static java.awt.Color fadeByDistance(double dist, double range, java.awt.Color base) {
+        if (range <= 1.0) return base;
+        double start = range * 0.7;
+        if (dist <= start) return base;
+        double t = 1.0 - (dist - start) / Math.max(1.0, range - start);
+        t = Math.max(0.12, Math.min(1.0, t));
+        return new java.awt.Color(
+            base.getRed(), base.getGreen(), base.getBlue(),
+            (int) Math.round(base.getAlpha() * t));
+
+    }
+
+    /** Затухание для контура: контур держится заметнее заливки. */
+    public static java.awt.Color fadeLineByDistance(double dist, double range, java.awt.Color base, int lineAlpha) {
+        if (range <= 1.0) return new java.awt.Color(base.getRed(), base.getGreen(), base.getBlue(), lineAlpha);
+        double start = range * 0.7;
+        if (dist <= start) return new java.awt.Color(base.getRed(), base.getGreen(), base.getBlue(), lineAlpha);
+        double t = 1.0 - (dist - start) / Math.max(1.0, range - start);
+        t = Math.max(0.25, Math.min(1.0, t));
+        return new java.awt.Color(
+            base.getRed(), base.getGreen(), base.getBlue(),
+            (int) Math.round(lineAlpha * t));
+    }
 }

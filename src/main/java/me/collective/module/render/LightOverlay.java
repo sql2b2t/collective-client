@@ -5,6 +5,7 @@ import me.collective.event.EventHandler;
 import me.collective.event.events.Render3DEvent;
 import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
+import me.collective.render.ColorUtil;
 import me.collective.render.Renderer3D;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.ColorSetting;
@@ -43,9 +44,9 @@ public class LightOverlay extends Module {
     public final BooleanSetting seeThroughBlocks = add(new BooleanSetting("SeeThroughBlocks", false));
 
     public final ColorSetting color
-        = add(new ColorSetting("Color", new Color(225, 25, 25, 255)));
+        = add(new ColorSetting("Color", new Color(255, 70, 82, 200)));
     public final ColorSetting potentialColor
-        = add(new ColorSetting("PotentialColor", new Color(225, 225, 25, 255)));
+        = add(new ColorSetting("PotentialColor", new Color(255, 214, 72, 160)));
 
     private final java.util.List<Cross> crosses = new java.util.ArrayList<>();
     private int scanTicks;
@@ -115,9 +116,15 @@ public class LightOverlay extends Module {
 
         Color cSpawn = this.color.getValue();
         Color cPotential = this.potentialColor.getValue();
+        // Крестики у краёв радиуса плавно тают — крайняя кромка не «режет глаз».
+        double rangeBlocks = horizontalRange.getValue();
 
         for (Cross cross : this.crosses) {
-            Color c = cross.potential ? cPotential : cSpawn;
+            Color base = cross.potential ? cPotential : cSpawn;
+            double dist = mc.player.squaredDistanceTo(
+                cross.x + 0.5, cross.y, cross.z + 0.5);
+            dist = Math.sqrt(dist);
+            Color c = ColorUtil.fadeLineByDistance(dist, rangeBlocks, base, base.getAlpha());
 
             drawLine(cross.x, cross.y, cross.z, cross.x + 1, cross.y, cross.z + 1, c);
             drawLine(cross.x + 1, cross.y, cross.z, cross.x, cross.y, cross.z + 1, c);
