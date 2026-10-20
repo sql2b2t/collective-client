@@ -38,17 +38,23 @@ public class MiddleClickExtra extends Module {
     }
 
     private void throwPearl() {
-        FindItemResult pearlResult = InventoryUtil.findInHotbar(Items.ENDER_PEARL);
+        FindItemResult pearlResult = InventoryUtil.findInHotbarOrOffhand(Items.ENDER_PEARL);
         if (!pearlResult.found()) return;
 
+        Hand hand = pearlResult.getHand();
         int prevSlot = mc.player.getInventory().getSelectedSlot();
-        InventoryUtil.swap(pearlResult.slot());
 
-        if (mc.getNetworkHandler() != null) {
-            mc.getNetworkHandler().sendPacket(new PlayerInteractItemC2SPacket(Hand.MAIN_HAND, 0, mc.player.getYaw(), mc.player.getPitch()));
-            mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+        if (!pearlResult.isOffhand()) {
+            InventoryUtil.swap(pearlResult.slot());
         }
 
-        InventoryUtil.swap(prevSlot);
+        if (mc.getNetworkHandler() != null) {
+            mc.getNetworkHandler().sendPacket(new PlayerInteractItemC2SPacket(hand, 0, mc.player.getYaw(), mc.player.getPitch()));
+            mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
+        }
+
+        if (!pearlResult.isOffhand()) {
+            InventoryUtil.swap(prevSlot);
+        }
     }
 }
