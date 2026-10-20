@@ -125,11 +125,16 @@ public class ElytraRecast extends Module {
 
     @EventHandler
     private void onPacketReceive(PacketEvent.Receive event) {
-        if (mc.player == null || mc.world == null) return;
         if (event.packet instanceof DamageTiltS2CPacket packet) {
-            if (packet.id() == mc.player.getId() && this.looksLikeWallHit()) {
-                this.pendingWallHit = true;
-            }
+            // Receive стреляет на нетти-треде: raycast и состояние игрока
+            // разрешено трогать только на основном, планируем через mc.execute.
+            int id = packet.id();
+            mc.execute(() -> {
+                if (mc.player == null || mc.world == null || this.state == null) return;
+                if (id == mc.player.getId() && this.looksLikeWallHit()) {
+                    this.pendingWallHit = true;
+                }
+            });
         }
     }
 

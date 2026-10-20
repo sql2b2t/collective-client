@@ -21,6 +21,8 @@ public class AntiVoid extends Module {
     public final NumberSetting cooldown = add(new NumberSetting("Cooldown", 10.0, 0.0, 40.0, 1.0));
 
     private int cooldownTicks = 0;
+    /** Сколько тиков ещё держать автопрыжок после спасения. */
+    private int rescueJumpTicks = 0;
 
     public AntiVoid() {
         super("AntiVoid", "Спасает от падения в пустоту.", Category.MOVEMENT);
@@ -34,6 +36,18 @@ public class AntiVoid extends Module {
     @Override
     public void onUpdate() {
         if (mc.player == null || mc.world == null) return;
+
+        if (rescueJumpTicks > 0) {
+            // Прыжок случился (оттолкнулись) — отпускаем клавишу, чтобы не
+            // залипнуть в бесконечных прыжках после первого спасения.
+            boolean jumped = mc.player.getVelocity().y > 0.3;
+            rescueJumpTicks--;
+            if (jumped || rescueJumpTicks == 0) {
+                mc.options.jumpKey.setPressed(false);
+                rescueJumpTicks = 0;
+            }
+        }
+
         if (cooldownTicks > 0) {
             cooldownTicks--;
             return;
@@ -49,13 +63,17 @@ public class AntiVoid extends Module {
         // Гасим падение, тянем вверх
         Vec3d vel = mc.player.getVelocity();
         mc.player.setVelocity(vel.x * 0.7, Math.max(vel.y, -0.15), vel.z * 0.7);
-        if (jump.getValue()) mc.options.jumpKey.setPressed(true);
+        if (jump.getValue()) {
+            mc.options.jumpKey.setPressed(true);
+            rescueJumpTicks = 5;
+        }
         cooldownTicks = cooldown.getIntValue();
     }
 
     @Override
     public void onDisable() {
         cooldownTicks = 0;
+        rescueJumpTicks = 0;
         if (mc.options != null) mc.options.jumpKey.setPressed(false);
     }
 

@@ -72,6 +72,8 @@ public class ElytraBounce extends Module {
     private int stuckTimer = 0;
     private int targetY = 120;
     private BlockPos startPos = new BlockPos(0, 0, 0);
+    /** Чанк, прибывший пакетом, для отложенного портального скана (тиковой). */
+    private ChunkPos pendingPortalScan;
     private KillAura killAura;
     private Boolean killAuraUserState = null;
     private float solvedPitch = 90.0F;
@@ -185,6 +187,7 @@ public class ElytraBounce extends Module {
             this.updateAutoPitch();
             this.updateKillAura();
             this.updateJumpKey();
+            this.scanPendingPortalChunk();
 
             if (this.toggleElytra.getValue() && !this.fakeFly.getValue() && !this.elytraToggled) {
                 ItemStack chest = mc.player.getEquippedStack(EquipmentSlot.CHEST);
@@ -370,41 +373,51 @@ public class ElytraBounce extends Module {
         }
 
         if (this.avoidPortalTraps.getValue() && this.highwayObstaclePasser.getValue()) {
-            if (event.getPacket() instanceof ChunkDataS2CPacket chunkPacket && mc.world != null) {
-                ChunkPos pos = new ChunkPos(chunkPacket.getChunkX(), chunkPacket.getChunkZ());
-                BlockPos centerPos = pos.getCenterAtY(this.targetY);
-                Vec3d moveDir = Utils.yawToDirection(this.yaw.getValue());
-                double distanceToHighway = Utils.distancePointToDirection(Vec3d.of(centerPos), moveDir, playerPos());
-                if (distanceToHighway <= 21.0) {
-                    WorldChunk chunk = mc.world.getChunk(pos.x, pos.z);
-                    if (chunk != null) {
-                        for (int x = 0; x < 16; x++) {
-                            for (int z = 0; z < 16; z++) {
-                                for (int y = this.targetY; y < this.targetY + 3; y++) {
-                                    BlockPos position = new BlockPos(pos.getStartX() + x, y, pos.getStartZ() + z);
-                                    if ((Utils.distancePointToDirection(Vec3d.of(position), moveDir, playerPos())
-                                            <= this.portalScanWidth.getValue().intValue())
-                                        && mc.world.getBlockState(position).getBlock().equals(Blocks.NETHER_PORTAL)) {
-                                        BlockPos posBehind = new BlockPos(
-                                            (int) Math.floor(position.getX() + moveDir.getX()),
-                                            position.getY(),
-                                            (int) Math.floor(position.getZ() + moveDir.getZ())
-                                        );
-                                        if ((
-                                                mc.world.getBlockState(posBehind).isSolidBlock(mc.world, posBehind)
-                                                    || mc.world.getBlockState(posBehind).getBlock() == Blocks.NETHER_PORTAL
-                                            )
-                                            && (
-                                                this.portalTrap == null
-                                                    || this.portalTrap.getSquaredDistance(posBehind) > 100.0
-                                                        && mc.player.getBlockPos().getSquaredDistance(posBehind)
-                                                            < mc.player.getBlockPos().getSquaredDistance(this.portalTrap)
-                                            )) {
-                                            this.portalTrap = posBehind;
-                                        }
-                                    }
-                                }
-                            }
+            // Receive стреляет на нетти-треде: чанк ещё не интегрирован в мир
+            // (это делает ванилла позже, на основном треде). Запоминаем чанк и
+            // сканируем его в тике — иначе getChunk всегда null и детект мёртв.
+            if (event.getPacket() instanceof ChunkDataS2CPacket chunkPacket) {
+                this.pendingPortalScan = new ChunkPos(chunkPacket.getChunkX(), chunkPacket.getChunkZ());
+            }
+        }
+    }
+
+    /** Сканирует отложенный чанк на порталы-ловушки; вызывается только из тика. */
+    private void scanPendingPortalChunk() {
+        ChunkPos pos = this.pendingPortalScan;
+        this.pendingPortalScan = null;
+        if (pos == null || mc.world == null || mc.player == null) return;
+
+        Vec3d moveDir = Utils.yawToDirection(this.yaw.getValue());
+        if (Utils.distancePointToDirection(Vec3d.of(pos.getCenterAtY(this.targetY)), moveDir, playerPos()) > 21.0) {
+            return;
+        }
+
+        WorldChunk chunk = mc.world.getChunk(pos.x, pos.z);
+        if (chunk == null) return;
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = this.targetY; y < this.targetY + 3; y++) {
+                    BlockPos position = new BlockPos(pos.getStartX() + x, y, pos.getStartZ() + z);
+                    if ((Utils.distancePointToDirection(Vec3d.of(position), moveDir, playerPos())
+                            <= this.portalScanWidth.getValue().intValue())
+                        && mc.world.getBlockState(position).getBlock().equals(Blocks.NETHER_PORTAL)) {
+                        BlockPos posBehind = new BlockPos(
+                            (int) Math.floor(position.getX() + moveDir.getX()),
+                            position.getY(),
+                            (int) Math.floor(position.getZ() + moveDir.getZ())
+                        );
+                        if ((
+                                mc.world.getBlockState(posBehind).isSolidBlock(mc.world, posBehind)
+                                    || mc.world.getBlockState(posBehind).getBlock() == Blocks.NETHER_PORTAL
+                            )
+                            && (
+                                this.portalTrap == null
+                                    || this.portalTrap.getSquaredDistance(posBehind) > 100.0
+                                        && mc.player.getBlockPos().getSquaredDistance(posBehind)
+                                            < mc.player.getBlockPos().getSquaredDistance(this.portalTrap)
+                            )) {
+                            this.portalTrap = posBehind;
                         }
                     }
                 }

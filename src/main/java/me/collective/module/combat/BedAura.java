@@ -21,8 +21,8 @@ import net.minecraft.world.World;
 /**
  * Порт BedAura из Meteor Client.
  *
- * <p>Ставит кровать у ног цели и тут же подрывает её (взрыв только в Незере
- * и Энде). Для анархий: нether-спавн и हाईवे-PvP.
+ * <p>Ставит кровать у ног цели, подтверждает её и только потом подрывает
+ * (взрыв в Незере и Энде). Для анархий: незер-спавн и хайвей-PvP.
  */
 public class BedAura extends Module {
     public final NumberSetting range = add(new NumberSetting("Радиус", 4.5, 1.0, 7.0, 0.1));
@@ -31,14 +31,39 @@ public class BedAura extends Module {
     public final BooleanSetting dimensionCheck = add(new BooleanSetting("Только Незер/Энд", true));
 
     private int delayTimer = 0;
+    private BlockPos pendingExplode = null;
 
     public BedAura() {
         super("BedAura", "Ставит и взрывает кровати у врагов (Незер/Энд).", Category.COMBAT);
     }
 
     @Override
+    public void onDisable() {
+        pendingExplode = null;
+    }
+
+    @Override
     public void onUpdate() {
         if (mc.player == null || mc.world == null) return;
+
+        // Подрыв на следующий тик: сервер уже подтвердил кровать, и Grim не
+        // увидит interact по блоку, которого у него ещё нет.
+        if (pendingExplode != null) {
+            BlockPos place = pendingExplode;
+            pendingExplode = null;
+
+            if (delayTimer > 0) {
+                delayTimer--;
+            } else if (mc.interactionManager != null
+                && mc.world.getBlockState(place).getBlock() instanceof net.minecraft.block.BedBlock) {
+                BlockHitResult hit = new BlockHitResult(Vec3d.ofCenter(place), Direction.UP, place, false);
+                mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
+                mc.player.swingHand(Hand.MAIN_HAND);
+            }
+            delayTimer = delay.getIntValue();
+            return;
+        }
+
         if (delayTimer > 0) {
             delayTimer--;
             return;
@@ -62,17 +87,7 @@ public class BedAura extends Module {
         if (place == null) return;
 
         if (!PlacementUtils.placeBlock(place, bed, rotate.getValue(), true, false)) return;
-
-        // Подрыв: клик по кровати в Незере/Энде взрывает её
-        if (mc.interactionManager != null) {
-            BlockHitResult hit = new BlockHitResult(Vec3d.ofCenter(place), Direction.UP, place, false);
-            InventoryUtil.swap(bed.slot(), true);
-            mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
-            mc.player.swingHand(Hand.MAIN_HAND);
-            InventoryUtil.swapBack();
-        }
-
-        delayTimer = delay.getIntValue();
+        pendingExplode = place;
     }
 
     private PlayerEntity getTarget(double range) {

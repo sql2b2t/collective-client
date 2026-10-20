@@ -50,6 +50,7 @@ public class AutoCity extends Module {
 
         PlayerEntity target = StreamSupport.stream(mc.world.getPlayers().spliterator(), false)
             .filter(p -> p != mc.player && p.isAlive() && !p.isCreative() && !p.isSpectator())
+            .filter(p -> !me.collective.manager.FriendManager.getInstance().isFriend(p))
             .filter(p -> mc.player.squaredDistanceTo(p) <= rSq)
             .min(Comparator.comparingDouble(p -> mc.player.squaredDistanceTo(p)))
             .orElse(null);

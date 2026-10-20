@@ -41,12 +41,13 @@ public class AutoWalk extends Module {
     }
 
     private void keyWalk() {
-        switch (direction.compute().trim()) {
-            case "Back" -> mc.options.backKey.setPressed(true);
-            case "Left" -> mc.options.leftKey.setPressed(true);
-            case "Right" -> mc.options.rightKey.setPressed(true);
-            default -> mc.options.forwardKey.setPressed(true);
-        }
+        String dir = direction.compute().trim();
+        // Нажимаем только текущее направление: при смене направления старая
+        // клавиша обязана отжаться, иначе игрок поедет двумя клавишами сразу.
+        mc.options.forwardKey.setPressed(dir.equals("Forward"));
+        mc.options.backKey.setPressed(dir.equals("Back"));
+        mc.options.leftKey.setPressed(dir.equals("Left"));
+        mc.options.rightKey.setPressed(dir.equals("Right"));
         mc.player.setSprinting(sprint.getValue());
         if (jump.getValue() && mc.player.isOnGround() && mc.player.horizontalCollision) {
             mc.player.jump();
@@ -56,6 +57,8 @@ public class AutoWalk extends Module {
     private void baritoneWalk() {
         try {
             IBaritone baritone = BaritoneAPI.getProvider().getPrimaryBaritone();
+            baritone.getInputOverrideHandler().clearAllKeys();
+
             Input input = switch (direction.compute().trim()) {
                 case "Back" -> Input.MOVE_BACK;
                 case "Left" -> Input.MOVE_LEFT;
