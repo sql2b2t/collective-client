@@ -92,6 +92,15 @@ public class CollectiveClient implements ClientModInitializer {
             }
         });
 
+        // Сброс клиентских состояний при выходе: углы поворота, серверный слот
+        // и удержанные свапы не должны переезжать в следующую сессию.
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register(
+            (handler, client) -> {
+                me.collective.util.RotationUtils.getInstance().onDisconnect();
+                me.collective.util.InventoryManager.getInstance().onDisconnect();
+                me.collective.util.SwapManager.getInstance().onDisconnect();
+            });
+
         // Register World 3D Render Callback for Modules
         net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents.AFTER_ENTITIES.register(context -> {
             net.minecraft.client.render.Camera camera = context.gameRenderer() != null ? context.gameRenderer().getCamera() : null;

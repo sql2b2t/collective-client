@@ -246,6 +246,16 @@ public class SwapManager {
         if (event.packet instanceof PlayerPositionLookS2CPacket) this.pendingTeleportConfirms++;
     }
 
+    /** Полный сброс при выходе с сервера. */
+    public void onDisconnect() {
+        clearSession();
+        this.actionConflict = false;
+        this.movedSinceTickEnd = false;
+        this.inTickHead = false;
+        this.pendingTeleportConfirms = 0;
+        this.bouncing = false;
+    }
+
     private boolean usingMainHandItem() {
         return mc.player != null
             && mc.player.isUsingItem()
