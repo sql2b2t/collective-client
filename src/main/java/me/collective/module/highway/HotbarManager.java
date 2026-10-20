@@ -52,6 +52,8 @@ public class HotbarManager extends Module {
     private void onTick(TickEvent.Post event) {
         if (mc.player == null || mc.interactionManager == null) return;
         if (mc.currentScreen != null) return;
+        // Занятый курсор может затереть предметы — не раскладываем с ним.
+        if (!mc.player.currentScreenHandler.getCursorStack().isEmpty()) return;
         if (waitTicks > 0) {
             waitTicks--;
             return;
@@ -78,14 +80,19 @@ public class HotbarManager extends Module {
         if (highestSlot == 8 && toggle.getValue()) setToggled(false);
     }
 
-    /** PICKUP-пара: слот инвентаря -> слот хотбара. */
+    /** Тройной клик PICKUP: слот инвентаря -> слот хотбара. */
     private void moveClick(int fromInv, int toHotbar) {
         int from = fromInv < 9 ? 36 + fromInv : fromInv;
         int to = 36 + toHotbar;
         if (from == to) return;
         int syncId = mc.player.currentScreenHandler.syncId;
+        // (1) подняли новый предмет, (2) положили в хотбар — если слот был
+        // занят, прежний предмет оказался в курсоре — (3) возвращаем его в
+        // освободившийся слот. Без третьего клика Replace с занятым слотом
+        // оставляет предмет в курсоре и ломает все дальнейшие клики.
         mc.interactionManager.clickSlot(syncId, from, 0, SlotActionType.PICKUP, mc.player);
         mc.interactionManager.clickSlot(syncId, to, 0, SlotActionType.PICKUP, mc.player);
+        mc.interactionManager.clickSlot(syncId, from, 0, SlotActionType.PICKUP, mc.player);
     }
 
     private static Item parseItem(String raw) {
