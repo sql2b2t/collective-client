@@ -41,6 +41,8 @@ public class AutoCraft extends Module {
         if (mc.player == null || mc.interactionManager == null) return;
         if (!(mc.player.currentScreenHandler instanceof PlayerScreenHandler)) return;
         if (mc.currentScreen != null) return;
+        // Занятый курсор может затереть предметы — не крафтим с ним.
+        if (!mc.player.currentScreenHandler.getCursorStack().isEmpty()) return;
         if (delayTimer > 0) {
             delayTimer--;
             return;
@@ -111,7 +113,7 @@ public class AutoCraft extends Module {
     }
 
     private int findInMain(Item... items) {
-        for (int i = 9; i < 36; i++) {
+        for (int i = 0; i < 36; i++) {
             ItemStack s = mc.player.getInventory().getStack(i);
             for (Item it : items) {
                 if (s.isOf(it) && s.getCount() > 0) return i;
@@ -121,7 +123,7 @@ public class AutoCraft extends Module {
     }
 
     private int findPlanks() {
-        for (int i = 9; i < 36; i++) {
+        for (int i = 0; i < 36; i++) {
             ItemStack s = mc.player.getInventory().getStack(i);
             if (!s.isEmpty() && s.isIn(ItemTags.PLANKS) && s.getCount() > 0) return i;
         }
@@ -131,17 +133,21 @@ public class AutoCraft extends Module {
     /** Кладёт 1 предмет из инвентаря в клетку сетки (1-4). */
     private void putOne(int invSlot, int craftSlot) {
         int sync = mc.player.currentScreenHandler.syncId;
-        mc.interactionManager.clickSlot(sync, invSlot, 0, SlotActionType.PICKUP, mc.player);
+        // Хотбарные слоты в PlayerScreenHandler идут ПОСЛЕ основного
+        // инвентаря: инв. индекс 0-8 = хендлер 36-44, 9-35 = 9-35.
+        int handlerSlot = invSlot < 9 ? 36 + invSlot : invSlot;
+        mc.interactionManager.clickSlot(sync, handlerSlot, 0, SlotActionType.PICKUP, mc.player);
         mc.interactionManager.clickSlot(sync, craftSlot, 1, SlotActionType.PICKUP, mc.player);
         // остаток — обратно
-        mc.interactionManager.clickSlot(sync, invSlot, 0, SlotActionType.PICKUP, mc.player);
+        mc.interactionManager.clickSlot(sync, handlerSlot, 0, SlotActionType.PICKUP, mc.player);
     }
 
     private void clearGrid() {
         int sync = mc.player.currentScreenHandler.syncId;
         for (int c = 1; c <= 4; c++) {
-            mc.interactionManager.clickSlot(sync, c, 0, SlotActionType.PICKUP, mc.player);
-            // выкидываем подобранное обратно в инвентарь первым свободным? проще: shift-клик вернёт
+            if (mc.player.currentScreenHandler.getSlot(c).getStack().isEmpty()) continue;
+            // Shift-клик возвращает крафт-слот прямо в инвентарь: курсор не
+            // трогаем, иначе либо застрянет, либо затрёт поднятый предмет.
             mc.interactionManager.clickSlot(sync, c, 0, SlotActionType.QUICK_MOVE, mc.player);
         }
     }

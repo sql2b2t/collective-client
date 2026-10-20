@@ -28,6 +28,8 @@ public class AutoMend extends Module {
     public final BooleanSetting autoDisable = add(new BooleanSetting("Выкл когда готово", true));
 
     private int delayTimer = 0;
+    /** Предупреждение про бутыльки_Integer один раз, а не каждый тик. */
+    private boolean warnedNoXp = false;
 
     public AutoMend() {
         super("AutoMend", "Чинит броню бутыльками опыта.", Category.PLAYER);
@@ -48,10 +50,14 @@ public class AutoMend extends Module {
 
         FindItemResult xp = InventoryUtil.findInHotbar(Items.EXPERIENCE_BOTTLE);
         if (!xp.found()) {
-            warning("Нет бутыльков опыта в хотбаре!");
+            if (!warnedNoXp) {
+                warnedNoXp = true;
+                warning("Нет бутыльков опыта в хотбаре!");
+            }
             if (autoDisable.getValue()) setToggled(false);
             return;
         }
+        warnedNoXp = false;
 
         if (silentAim.getValue()) {
             RotationUtils.setServerRotation(mc.player.getYaw(), 90f);

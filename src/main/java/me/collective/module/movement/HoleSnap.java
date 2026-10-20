@@ -52,7 +52,7 @@ public class HoleSnap extends Module {
     private final BlockPos.Mutable searchCursor = new BlockPos.Mutable();
 
     private long lastHoleTime = NEVER;
-    private long lastTeleportTime = NEVER;
+    private volatile long lastTeleportTime = NEVER;
     private boolean active;
     private Vec3d target;
 

@@ -85,6 +85,14 @@ public final class ContainerIndexRecorder {
     public static void onInventoryPacket(InventoryS2CPacket packet) {
         if (MC.player == null || MC.world == null) return;
         if (ChestTrackerDataManager.activeCount() <= 0) return;
+        // Прилетает с нетти-треда: состояние мира и стейт хендлера можно
+        // читать только на главном; переносим и ещё раз проверяем syncId —
+        // контейнер мог закрыться, пока задача ждала в очереди.
+        MC.execute(() -> handleInventoryPacketOnMainThread(packet));
+    }
+
+    private static void handleInventoryPacketOnMainThread(InventoryS2CPacket packet) {
+        if (MC.player == null || MC.world == null) return;
 
         ScreenHandler handler = MC.player.currentScreenHandler;
         if (handler == null || handler == MC.player.playerScreenHandler) return;

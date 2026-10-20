@@ -9,7 +9,7 @@ import net.minecraft.client.gui.DrawContext;
 import java.awt.Color;
 
 public class Lag extends HudModule {
-    private static long lastPacketTime = System.currentTimeMillis();
+    private static volatile long lastPacketTime = System.currentTimeMillis();
 
     private final NumberSetting threshold = add(new NumberSetting("Threshold", 2.0, 0.5, 10.0, 0.5));
 
