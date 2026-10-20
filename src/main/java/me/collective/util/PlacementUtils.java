@@ -33,7 +33,7 @@ public class PlacementUtils {
 
     public static FindItemResult findResistantBlock() {
         for (Block block : RESISTANT_BLOCKS) {
-            FindItemResult result = InventoryUtil.findInHotbar(block.asItem());
+            FindItemResult result = InventoryUtil.findInHotbarOrOffhand(block.asItem());
             if (!result.found()) continue;
             return result;
         }

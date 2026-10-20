@@ -75,7 +75,7 @@ public final class Utils {
                 mc.player, net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket.Mode.START_FALL_FLYING));
         }
 
-        FindItemResult rocket = InventoryUtil.findInHotbar(net.minecraft.item.Items.FIREWORK_ROCKET);
+        FindItemResult rocket = InventoryUtil.findInHotbarOrOffhand(net.minecraft.item.Items.FIREWORK_ROCKET);
 
         if (rocket.found()) {
             if (rocket.isOffhand()) {

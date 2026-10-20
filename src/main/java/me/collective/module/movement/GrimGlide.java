@@ -188,7 +188,9 @@ public class GrimGlide extends Module {
             relatives.contains(PositionFlag.Y) ? current.y + change.y : change.y,
             relatives.contains(PositionFlag.Z) ? current.z + change.z : change.z
         );
-        ChatHelper.sendMessage(String.format("Откат #%d — оттянуто на %.2f блоков.", ++setbacks, target.distanceTo(current)));
+        String message = String.format("Откат #%d — оттянуто на %.2f блоков.", ++setbacks, target.distanceTo(current));
+        // Пакеты приходят на netty-треде: чат трогаем только из главного потока.
+        mc.execute(() -> ChatHelper.sendMessage(message));
     }
 
     private double factor() {

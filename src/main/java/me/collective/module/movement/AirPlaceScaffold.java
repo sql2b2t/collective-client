@@ -480,7 +480,7 @@ public class AirPlaceScaffold extends Module {
                     mc.player.getBlockPos().down()));
         };
 
-        return InventoryUtil.findInHotbar(isScaffoldBlock);
+        return InventoryUtil.findInHotbarOrOffhand(isScaffoldBlock);
     }
 
     private boolean checkBlocksRunOut() {

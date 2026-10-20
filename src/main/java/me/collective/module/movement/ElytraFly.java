@@ -66,7 +66,7 @@ public class ElytraFly extends Module {
     }
 
     private boolean useFirework() {
-        FindItemResult hotbar = InventoryUtil.findInHotbar(Items.FIREWORK_ROCKET);
+        FindItemResult hotbar = InventoryUtil.findInHotbarOrOffhand(Items.FIREWORK_ROCKET);
         if (hotbar.isOffhand()) {
             mc.interactionManager.interactItem(mc.player, Hand.OFF_HAND);
             return true;

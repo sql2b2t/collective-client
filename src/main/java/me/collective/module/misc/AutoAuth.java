@@ -13,8 +13,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Pattern;
 
 /**
  * Порт AutoAuth из ThunderHack.
@@ -43,38 +45,70 @@ public class AutoAuth extends Module {
         password.setValue("none");
     }
 
+    private static final Pattern LOGIN_HINT = Pattern.compile("(^|\\s)/l(\\s|$)");
+    private static final long AUTH_COOLDOWN_MS = 3000L;
+
+    private long lastAuthAt;
+    private String lastAuthCommand = "";
+
     @EventHandler
     public void onPacketReceive(PacketEvent.Receive event) {
         if (!(event.packet instanceof GameMessageS2CPacket pac)) return;
-        if (mc.getNetworkHandler() == null) return;
+        if (mc.getNetworkHandler() == null || mc.player == null) return;
 
-        String pass;
-        String accountNick = currentNick();
-        String accountPass = accounts().get(accountNick.toLowerCase());
-        if (accountPass != null) {
-            pass = accountPass;
-        } else switch (authMode.compute().trim()) {
-            case "Qwerty" -> pass = "qwerty123";
-            case "Random" -> pass = randomPassword();
-            default -> {
-                pass = password.getValue();
-                if (pass == null || pass.isEmpty()) {
-                    error("Ошибка регистрации: пароль пуст!");
-                    return;
-                }
-            }
-        }
+        // Пакеты приходят на netty-треде: чтение файла, чат и команды
+        // выполняем в главном потоке игры.
+        mc.execute(() -> handleAuthMessage(pac));
+    }
 
-        String m = pac.content().getString().toLowerCase();
+    private void handleAuthMessage(GameMessageS2CPacket pac) {
+        if (!isToggled() || mc.getNetworkHandler() == null || mc.player == null) return;
 
-        if (m.contains("/reg") || m.contains("/register") || m.contains("зарегистрируйтесь")) {
+        String m = pac.content().getString().toLowerCase(Locale.ROOT);
+
+        boolean register = m.contains("/reg") || m.contains("/register") || m.contains("зарегистрируйтесь");
+        boolean login = m.contains("авторизуйтесь") || m.contains("/login") || LOGIN_HINT.matcher(m).find();
+        if (!register && !login) return;
+
+        // Сервер может продублировать подсказку — не спамим командами.
+        long now = System.currentTimeMillis();
+        String command = register ? "reg" : "login";
+        if (command.equals(this.lastAuthCommand) && now - this.lastAuthAt < AUTH_COOLDOWN_MS) return;
+
+        String pass = resolvePassword();
+        if (pass == null) return;
+
+        this.lastAuthAt = now;
+        this.lastAuthCommand = command;
+
+        if (register) {
             mc.getNetworkHandler().sendChatCommand("reg " + pass + " " + pass);
             if (showPassword.getValue()) info("Твой пароль: " + pass);
             info("Выполнена регистрация!");
-        } else if (m.contains("авторизуйтесь") || m.contains("/l")) {
+        } else {
             mc.getNetworkHandler().sendChatCommand("login " + pass);
             info("Выполнен вход!");
         }
+    }
+
+    /** Пароль из accounts.txt либо из режима настроек. */
+    private String resolvePassword() {
+        String accountNick = currentNick();
+        String accountPass = accounts().get(accountNick.toLowerCase(Locale.ROOT));
+        if (accountPass != null) return accountPass;
+
+        return switch (authMode.compute().trim()) {
+            case "Qwerty" -> "qwerty123";
+            case "Random" -> randomPassword();
+            default -> {
+                String pass = password.getValue();
+                if (pass == null || pass.isEmpty()) {
+                    error("Ошибка регистрации: пароль пуст!");
+                    yield null;
+                }
+                yield pass;
+            }
+        };
     }
 
     private static String randomPassword() {
@@ -115,7 +149,7 @@ public class AutoAuth extends Module {
                 if (line.isEmpty() || line.startsWith("#")) continue;
                 int sep = line.indexOf(':');
                 if (sep <= 0) continue;
-                String nick = line.substring(0, sep).strip().toLowerCase();
+                String nick = line.substring(0, sep).strip().toLowerCase(Locale.ROOT);
                 String pass = line.substring(sep + 1).strip();
                 if (!nick.isEmpty() && !pass.isEmpty()) map.put(nick, pass);
             }

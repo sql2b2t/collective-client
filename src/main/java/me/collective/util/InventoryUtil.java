@@ -35,10 +35,6 @@ public class InventoryUtil {
     public static FindItemResult findInHotbar(Predicate<ItemStack> predicate) {
         if (mc.player == null) return new FindItemResult(-1, 0);
 
-        if (testInOffHand(predicate)) {
-            return new FindItemResult(40, mc.player.getOffHandStack().getCount());
-        }
-
         int bestSlot = -1;
         int count = 0;
 
@@ -51,6 +47,33 @@ public class InventoryUtil {
         }
 
         return new FindItemResult(bestSlot, count);
+    }
+
+    /** Оффхенд как слот 40 — только для модулей, умеющих Hand.OFF_HAND. */
+    public static FindItemResult findInOffhand(Predicate<ItemStack> predicate) {
+        if (mc.player == null) return new FindItemResult(-1, 0);
+        ItemStack stack = mc.player.getOffHandStack();
+        return predicate.test(stack)
+            ? new FindItemResult(40, stack.getCount())
+            : new FindItemResult(-1, 0);
+    }
+
+    /**
+     * Сначала хотбар, если там пусто — оффхенд. Только для модулей, которые
+     * реально умеют ставить/использовать предмет из Off Hand.
+     */
+    public static FindItemResult findInHotbarOrOffhand(Predicate<ItemStack> predicate) {
+        FindItemResult hotbar = findInHotbar(predicate);
+        return hotbar.found() ? hotbar : findInOffhand(predicate);
+    }
+
+    public static FindItemResult findInHotbarOrOffhand(Item... items) {
+        return findInHotbarOrOffhand(stack -> {
+            for (Item item : items) {
+                if (stack.isOf(item)) return true;
+            }
+            return false;
+        });
     }
 
     public static FindItemResult find(Item... items) {
@@ -85,7 +108,9 @@ public class InventoryUtil {
 
     public static boolean swap(int slot, boolean swapBack) {
         if (mc.player == null) return false;
-        if (slot == 40) return true;
+        // Оффхенд нельзя выбрать как слот хотбара: модуль обязан сам
+        // использовать Hand.OFF_HAND.
+        if (slot == 40) return false;
         if (slot < 0 || slot > 8) return false;
 
         if (swapBack && previousSlot == -1) {

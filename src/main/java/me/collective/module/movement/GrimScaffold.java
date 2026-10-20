@@ -407,7 +407,7 @@ public class GrimScaffold extends Module {
                 || !FallingBlock.canFallThrough(mc.world.getBlockState(target.down()));
         };
 
-        return InventoryUtil.findInHotbar(isScaffoldBlock);
+        return InventoryUtil.findInHotbarOrOffhand(isScaffoldBlock);
     }
 
     public boolean isSafeWalking() {
