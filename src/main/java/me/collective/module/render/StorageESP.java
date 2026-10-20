@@ -2,9 +2,15 @@ package me.collective.module.render;
 
 import me.collective.category.Category;
 import me.collective.event.EventHandler;
+import me.collective.event.events.Render3DEvent;
 import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
+import me.collective.render.ColorUtil;
+import me.collective.render.Renderer3D;
+import me.collective.render.ShapeMode;
 import me.collective.setting.BooleanSetting;
+import me.collective.setting.NumberSetting;
+import net.minecraft.util.math.Box;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.ChestBlockEntity;
 import net.minecraft.block.entity.EnderChestBlockEntity;
@@ -12,35 +18,81 @@ import net.minecraft.block.entity.ShulkerBoxBlockEntity;
 import net.minecraft.block.entity.BarrelBlockEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
 
+import java.awt.Color;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
+/**
+ * StorageESP: подсветка контейнеров для розыска баз.
+ *
+ * <p>Контейнеры сканируются раз в секунду (перекладывание в кэш целиком, без
+ * инкрементальных споров с итерацией по кадру) и подсвечиваются рамкой с
+ * мягким затуханием на дальней кромке радиуса — общий язык визуала с
+ * остальными ESP модулями.
+ */
 public class StorageESP extends Module {
+    public static final Color CHEST_TINT = new Color(255, 190, 88);
+    public static final Color SHULKER_TINT = new Color(178, 132, 255);
+    public static final Color ENDER_TINT = new Color(88, 221, 178);
+    public static final Color BARREL_TINT = new Color(226, 172, 104);
+
     public final BooleanSetting chests = add(new BooleanSetting("Chests", true));
     public final BooleanSetting shulkers = add(new BooleanSetting("Shulkers", true));
     public final BooleanSetting enderChests = add(new BooleanSetting("EnderChests", true));
     public final BooleanSetting barrels = add(new BooleanSetting("Barrels", true));
     public final BooleanSetting chatAlert = add(new BooleanSetting("ChatAlert", true));
+    public final BooleanSetting highlight = add(new BooleanSetting("Highlight", true));
+    public final NumberSetting range = add(new NumberSetting("Радиус", 24.0, 8.0, 48.0, 1.0, (v) -> highlight.getValue()));
 
+    /** Подсветки готовятся в тике; в кадре только рисуем без пересчёта. */
+    private final List<PosBox> toRender = new ArrayList<>();
     private final Set<BlockPos> alertedPositions = new HashSet<>();
     private int tickTimer = 0;
 
     public StorageESP() {
-        super("StorageESP", "Detects and highlights nearby storage containers (Chests, Shulkers, Barrels) for base hunting.", Category.RENDER);
+        super("StorageESP", "Подсветка контейнеров и алерты: сундуки, шалкеры, эндер-сундуки и бочки для розыска баз.", Category.RENDER);
     }
 
     @Override
     public void onDisable() {
         alertedPositions.clear();
+        toRender.clear();
     }
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.world == null || mc.player == null) return;
+        if (mc.world == null || mc.player == null) {
+            if (!alertedPositions.isEmpty()) alertedPositions.clear();
+            toRender.clear();
+            return;
+        }
+
+        toRender.clear();
+
+        if (highlight.getValue()) {
+            // Кэш рамок: тип → цвет; итерируем block entities напрямую —
+            // кандидатов немного, полный проход раз в тик безопасен.
+            double rangeSq = this.range.getValue() * this.range.getValue();
+            for (BlockEntity be : mc.world.getBlockEntities()) {
+                BlockPos pos = be.getPos();
+                if (mc.player.squaredDistanceTo(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) > rangeSq) continue;
+
+                Color tint = null;
+                if (chests.getValue() && be instanceof ChestBlockEntity) tint = CHEST_TINT;
+                else if (shulkers.getValue() && be instanceof ShulkerBoxBlockEntity) tint = SHULKER_TINT;
+                else if (enderChests.getValue() && be instanceof EnderChestBlockEntity) tint = ENDER_TINT;
+                else if (barrels.getValue() && be instanceof BarrelBlockEntity) tint = BARREL_TINT;
+
+                if (tint != null) toRender.add(new PosBox(pos, tint));
+            }
+        }
 
         tickTimer++;
-        if (tickTimer < 20) return; // scan once per second
+        if (tickTimer < 20) return; // состояния чата один раз в секунду
         tickTimer = 0;
 
         if (chatAlert.getValue()) {
@@ -65,4 +117,23 @@ public class StorageESP extends Module {
             }
         }
     }
+
+    @EventHandler
+    private void onRender3D(Render3DEvent event) {
+        if (!isToggled() || toRender.isEmpty() || mc.player == null) return;
+
+        double rangeBlocks = this.range.getValue();
+        for (PosBox pb : toRender) {
+            BlockPos pos = pb.pos();
+            double dist = Math.sqrt(mc.player.squaredDistanceTo(
+                pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5));
+            Color tint = pb.color();
+            Color fill = ColorUtil.fadeByDistance(dist, rangeBlocks,
+                new Color(tint.getRed(), tint.getGreen(), tint.getBlue(), 70));
+            Color line = ColorUtil.fadeLineByDistance(dist, rangeBlocks, tint, 220);
+            Renderer3D.box(new Box(pos), fill, line, ShapeMode.Both, true);
+        }
+    }
+
+    private record PosBox(BlockPos pos, Color color) {}
 }
