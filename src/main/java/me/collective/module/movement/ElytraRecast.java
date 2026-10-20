@@ -450,9 +450,4 @@ public class ElytraRecast extends Module {
         Pause,
         Disable
     }
-
-@Override
-    public String getInfoString() {
-        return state == null ? null : state.name().toLowerCase(java.util.Locale.ROOT);
-    }
 }

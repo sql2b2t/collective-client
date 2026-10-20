@@ -299,9 +299,4 @@ public class HoleSnap extends Module {
     }
 
     private record Hole(BlockPos pos, Box box, boolean covered) {}
-
-@Override
-    public String getInfoString() {
-        return this.active ? "snap" : null;
-    }
 }

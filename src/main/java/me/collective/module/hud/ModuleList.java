@@ -29,19 +29,15 @@ public class ModuleList extends HudModule {
 
     /**
      * Готовая строка списка: имя и ширина посчитаны один раз на пересборку,
-     * а не заново меряются у шрифта на каждый кадр. Инфострока модуля — тоже.
+     * а не заново меряются у шрифта на каждый кадр.
      */
     private static final class Entry {
         final Module module;
         final float width;
-        final String info;
-        final float infoWidth;
 
-        Entry(Module module, float width, String info, float infoWidth) {
+        Entry(Module module, float width) {
             this.module = module;
             this.width = width;
-            this.info = info;
-            this.infoWidth = infoWidth;
         }
     }
 
@@ -60,10 +56,7 @@ public class ModuleList extends HudModule {
         for (Module m : ModuleManager.INSTANCE.getModules()) {
             if (!m.isToggled() || m instanceof HudModule) continue;
             if (onlyBound && m.getKeybind().getValue() == -1) continue;
-            String info = m.getInfoString();
-            if (info != null && info.isBlank()) info = null;
-            list.add(new Entry(m, fm.getStringWidth(m.getName()), info,
-                info == null ? 0f : fm.getStringWidth(info)));
+            list.add(new Entry(m, fm.getStringWidth(m.getName())));
         }
 
         if (this.sort.getValue() == SortMode.LENGTH) {
@@ -90,13 +83,10 @@ public class ModuleList extends HudModule {
             float maxWidth = 40;
             int idx = 0;
             for (Entry e : activeModules) {
-                float w = e.width + (e.info != null ? 4f + e.infoWidth : 0f);
+                float w = e.width;
                 maxWidth = Math.max(maxWidth, w);
                 float textX = rightAlign ? (x + maxWidth - w) : x;
                 fm.drawStringWithShadow(context, e.module.getName(), textX, curY, HudTheme.text(idx++));
-                if (e.info != null) {
-                    fm.drawStringWithShadow(context, e.info, textX + e.width + 4f, curY, HudTheme.BORDER.getRGB());
-                }
                 curY += fontH + 1;
             }
             this.width = maxWidth;
@@ -114,26 +104,20 @@ public class ModuleList extends HudModule {
         // Первый проход: колонка = максимальная ширина пилюли.
         float columnW = 40f;
         for (Entry e : activeModules) {
-            float w = padX * 2 + dotR * 2 + dotGap + e.width;
-            if (e.info != null) w += 4f + e.infoWidth;
-            columnW = Math.max(columnW, w);
+            columnW = Math.max(columnW, padX * 2 + dotR * 2 + dotGap + e.width);
         }
 
         float curY = y;
         int idx = 0;
         for (Entry e : activeModules) {
             String name = e.module.getName();
-            float pillW = padX * 2 + dotR * 2 + dotGap + e.width + (e.info != null ? 4f + e.infoWidth : 0f);
+            float pillW = padX * 2 + dotR * 2 + dotGap + e.width;
             float rowX = rightAlign ? (x + columnW - pillW) : x;
 
             GuiGfx.fillRounded(context, rowX, curY, pillW, pillH, 4f, HudTheme.PLATE.getRGB());
             GuiGfx.strokeRounded(context, rowX, curY, pillW, pillH, 4f, 1f, HudTheme.BORDER.getRGB());
             GuiGfx.dot(context, rowX + padX + dotR, curY + pillH / 2f, dotR, HudTheme.accent().getRGB());
-            float nameX = rowX + padX + dotR * 2 + dotGap;
-            fm.drawStringWithShadow(context, name, nameX, curY + padY, HudTheme.text(idx++));
-            if (e.info != null) {
-                fm.drawStringWithShadow(context, e.info, nameX + e.width + 4f, curY + padY, HudTheme.BORDER.getRGB());
-            }
+            fm.drawStringWithShadow(context, name, rowX + padX + dotR * 2 + dotGap, curY + padY, HudTheme.text(idx++));
             curY += pillH + gap;
         }
 

@@ -147,9 +147,4 @@ public class Spammer extends Module {
         ThreadLocalRandom rnd = ThreadLocalRandom.current();
         return " [" + (char) ('a' + rnd.nextInt(26)) + rnd.nextInt(10) + (char) ('a' + rnd.nextInt(26)) + "]";
     }
-
-    @Override
-    public String getInfoString() {
-        return messages.process("CatFacts") ? "Facts" : spamMode.compute();
-    }
 }

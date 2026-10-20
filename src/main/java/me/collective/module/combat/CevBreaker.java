@@ -81,9 +81,4 @@ public class CevBreaker extends Module {
         }
         return best;
     }
-
-@Override
-    public String getInfoString() {
-        return this.delayTimer > 0 ? null : "cev";
-    }
 }

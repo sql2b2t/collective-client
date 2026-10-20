@@ -83,9 +83,4 @@ public class AutoCity extends Module {
     private boolean isBlastResistant(BlockState state) {
         return state.isOf(Blocks.OBSIDIAN) || state.isOf(Blocks.CRYING_OBSIDIAN) || state.isOf(Blocks.NETHERITE_BLOCK) || state.isOf(Blocks.RESPAWN_ANCHOR);
     }
-
-@Override
-    public String getInfoString() {
-        return this.cityPos != null ? "mining" : null;
-    }
 }

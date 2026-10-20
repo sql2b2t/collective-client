@@ -122,14 +122,4 @@ public class Offhand extends Module {
             case GAPPLE -> Items.ENCHANTED_GOLDEN_APPLE;
         };
     }
-
-@Override
-    public String getInfoString() {
-        if (mc.player != null && mc.options.useKey.isPressed() && swordGap.getValue()
-            && (mc.player.getMainHandStack().isIn(net.minecraft.registry.tag.ItemTags.SWORDS)
-                || mc.player.getMainHandStack().isIn(net.minecraft.registry.tag.ItemTags.AXES))) {
-            return "Gapple";
-        }
-        return defaultItem.getValue().name();
-    }
 }

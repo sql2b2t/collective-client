@@ -79,10 +79,4 @@ public class BowAimbot extends Module {
         }
         return best;
     }
-
-    @Override
-    public String getInfoString() {
-        LivingEntity t = getTarget();
-        return t != null && t.isAlive() ? t.getName().getString() : null;
-    }
 }

@@ -565,10 +565,4 @@ public class EchestRebreak extends Module {
             0
         );
     }
-
-@Override
-    public String getInfoString() {
-        int pct = Math.round(this.breakingProgress * 100f);
-        return this.pendingPlaceHit != null ? "place" : (pct > 0 ? pct + "%" : null);
-    }
 }

@@ -104,9 +104,4 @@ public class BedAura extends Module {
         }
         return best;
     }
-
-@Override
-    public String getInfoString() {
-        return this.pendingExplode != null ? "boom" : null;
-    }
 }

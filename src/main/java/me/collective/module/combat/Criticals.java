@@ -77,9 +77,4 @@ public class Criticals extends Module {
         if (mc.player == null) return true;
         return !mc.player.isOnGround() || mc.player.isSubmergedInWater() || mc.player.isInLava() || mc.player.isClimbing();
     }
-
-    @Override
-    public String getInfoString() {
-        return mode.getValue().name();
-    }
 }
