@@ -5,11 +5,11 @@ import java.util.EnumMap;
 import java.util.Map;
 
 /**
- * Ролевая палитра второго стиля — перенос ролей исходника (mod0021):
- * каждая роль задаёт смысл (选中/hover/текст и т.д.), а не конкретный цвет,
+ * Ролевая палитра второго стиля (направление «premium glass»):
+ * каждая роль задаёт смысл (актив/hover/текст и т.д.), а не конкретный цвет,
  * поэтому любую роль можно переопределить через {@link #setRole}.
- * Значения по умолчанию — прошлельная лаванда на глубоком тёмном стекле,
- * совместимая с подписью классического стиля (UI.Color 189,153,255).
+ * Значения по умолчанию — волосатые разделители, глубокое стекло с
+ * лавандовым акцентом (UI.Color 189,153,255), светлые тексты для контраста.
  */
 public final class ClickGui2Theme {
     public enum Role {
@@ -46,25 +46,31 @@ public final class ClickGui2Theme {
     static {
         colors.put(Role.MAIN, new Color(189, 153, 255));
         colors.put(Role.MAIN_TWO, new Color(150, 125, 205));
-        colors.put(Role.OUTLINE, new Color(255, 255, 255, 46));
-        colors.put(Role.BACKGROUND, new Color(30, 26, 40, 216));
+        colors.put(Role.OUTLINE, new Color(255, 255, 255, 40));
+        colors.put(Role.BACKGROUND, new Color(34, 30, 46, 216));
         colors.put(Role.SHADOW, new Color(0, 0, 0, 70));
-        colors.put(Role.LINE, new Color(255, 255, 255, 32));
-        colors.put(Role.SCROLL, new Color(255, 255, 255, 70));
+        colors.put(Role.LINE, new Color(255, 255, 255, 30));
+        colors.put(Role.SCROLL, new Color(255, 255, 255, 80));
         colors.put(Role.ACTIVE_STATE, new Color(189, 153, 255));
-        colors.put(Role.DEACTIVE_STATE, new Color(138, 134, 158, 190));
+        colors.put(Role.DEACTIVE_STATE, new Color(146, 142, 168, 190));
         colors.put(Role.CIRCLE, new Color(250, 248, 255));
-        colors.put(Role.SELECTED, new Color(255, 255, 255, 38));
-        colors.put(Role.ACTIVE_TEXT, new Color(240, 242, 251));
-        colors.put(Role.DEACTIVE_TEXT, new Color(146, 144, 166));
-        colors.put(Role.OPEN_SETTING_TEXT, new Color(230, 232, 247));
-        colors.put(Role.DEOPEN_SETTING_TEXT, new Color(164, 162, 186));
-        colors.put(Role.TEXT, new Color(238, 240, 251));
-        colors.put(Role.SUR_TEXT, new Color(158, 162, 180));
-        colors.put(Role.CATEGORY_TEXT, new Color(245, 248, 254));
-        colors.put(Role.CATEGORY_SUR_TEXT, new Color(150, 146, 172));
-        colors.put(Role.DESELECT_CATEGORY_TEXT, new Color(122, 120, 146));
+        colors.put(Role.SELECTED, new Color(255, 255, 255, 36));
+        colors.put(Role.ACTIVE_TEXT, new Color(242, 244, 252));
+        colors.put(Role.DEACTIVE_TEXT, new Color(150, 148, 172));
+        colors.put(Role.OPEN_SETTING_TEXT, new Color(232, 234, 248));
+        colors.put(Role.DEOPEN_SETTING_TEXT, new Color(168, 166, 192));
+        colors.put(Role.TEXT, new Color(240, 242, 252));
+        colors.put(Role.SUR_TEXT, new Color(160, 164, 184));
+        colors.put(Role.CATEGORY_TEXT, new Color(246, 248, 255));
+        colors.put(Role.CATEGORY_SUR_TEXT, new Color(154, 150, 178));
+        colors.put(Role.DESELECT_CATEGORY_TEXT, new Color(126, 124, 152));
     }
+
+    /** Золотая искра избранного (канарейка) — вне ролей, акцентная деталь. */
+    public static final int SPARK = (255 << 16) | (210 << 8) | 64;
+
+    /** Живой зелёный (статус «в игре») — вне ролей, акцентная деталь. */
+    public static final int ALIVE = (120 << 16) | (255 << 8) | 150;
 
     private ClickGui2Theme() {
     }
@@ -92,7 +98,7 @@ public final class ClickGui2Theme {
         return (clamp8(alpha) << 24) | (base.getRGB() & 0x00FFFFFF);
     }
 
-    /** Прямая интерполяция между двумя int-цветами по t (0..1) — как в исходнике. */
+    /** Прямая интерполяция между двумя int-цветами по t (0..1). */
     public static int blend(int from, int to, float t) {
         t = Math.max(0f, Math.min(1f, t));
         int a = lerp((from >>> 24) & 0xFF, (to >>> 24) & 0xFF, t);
@@ -102,7 +108,7 @@ public final class ClickGui2Theme {
         return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
-    /** Тональное ослабление цвета: умножает альфу на множитель (как mod0692.西). */
+    /** Тональное ослабление цвета: умножает альфу на множитель. */
     public static int fade(int argb, float mul) {
         int a = (int) (((argb >>> 24) & 0xFF) * mul);
         return (clamp8(a) << 24) | (argb & 0x00FFFFFF);

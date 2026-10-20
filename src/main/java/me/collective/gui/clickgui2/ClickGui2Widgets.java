@@ -13,10 +13,9 @@ import static me.collective.gui.GuiGfx.fillRounded;
 import static me.collective.gui.GuiGfx.outlineRounded;
 
 /**
- * Кирпичи второго стиля — перенесённые с исходника размеры и цвета:
- * тумблер 30×18 (радиус 7, бегунок 14×14/шаг 12), звезда избранного 6.2px,
- * бегунок слайдера радиусом 4.5 по тонкому треку, шеврон построчной
- * отрисовкой, курсор-каретка текстовых полей.
+ * Кирпичи второго стиля (направление «premium glass»): стеклянные
+ * подложки с верхним бликом, тумблер 32×18 r9 с аккуратным бегунком,
+ * слайдер с мягким свечением, шевроны, каретка текстовых полей.
  */
 public final class ClickGui2Widgets {
     private ClickGui2Widgets() {
@@ -26,18 +25,30 @@ public final class ClickGui2Widgets {
         return mx >= x && mx <= x + w && my >= y && my <= y + h;
     }
 
-    /**
-     * Тумблер-пилюля как в карточке модуля: 30×18 r7, бегунок 14×14 r6,
-     * ход 12px, цвета через интерполяцию DEACTIVE/ACTIVE_STATE.
-     */
+    /** Внутренний блик по верхней кромке стеклянной плоскости. */
+    public static void edgeHighlight(DrawContext ctx, float x, float y, float w, float alphaMul) {
+        int a = Math.round(26f * Math.max(0f, Math.min(1f, alphaMul)));
+        RenderUtil.drawRect(ctx, x + 8f, y + 1f, x + w - 8f, y + 2f,
+                ClickGui2Theme.alpha(ClickGui2Theme.Role.TEXT, a));
+    }
+
+    /** Тумблер-пилюля 32×18 r9: бегунок белый, включён — акцентная дорожка. */
     public static void togglePill(DrawContext ctx, float x, float y, float t, boolean hovered) {
-        int base = ClickGui2Theme.blend(ClickGui2Theme.rgb(ClickGui2Theme.Role.DEACTIVE_STATE),
-                ClickGui2Theme.rgb(ClickGui2Theme.Role.ACTIVE_STATE), t);
-        int knob = ClickGui2Theme.blend(0xFF8D8791, 0xFFFFFFFF, t);
-        fillRounded(ctx, x, y, 30f, 18f, 7f, base);
-        fillRounded(ctx, x + 2f + 12f * t, y + 2f, 14f, 14f, 6f, knob);
+        fillRounded(ctx, x, y, 32f, 18f, 9f,
+                ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, 120));
+        if (t > 0.01f) {
+            fillRounded(ctx, x + 2f - 1f * (1f - t), y + 2f, 28f + 2f * (1f - t), 14f, 7f,
+                    ClickGui2Theme.fade(ClickGui2Theme.Role.ACTIVE_STATE, 0.92f * t));
+        }
+        int knob = ClickGui2Theme.blend(0xFFB9B4C6, 0xFFFFFFFF, t);
+        fillRounded(ctx, x + 2.5f + 15f * t, y + 2.5f, 13f, 13f, 6.5f, knob);
+        if (t > 0.05f) {
+            dotRing(ctx, x + 2.5f + 15f * t + 6.5f, y + 2.5f + 6.5f, 4.4f,
+                    ClickGui2Theme.fade(ClickGui2Theme.Role.ACTIVE_STATE, 0.5f * t));
+        }
         if (hovered) {
-            outlineRounded(ctx, x, y, 30f, 18f, 7f, ClickGui2Theme.alpha(ClickGui2Theme.Role.MAIN, 90));
+            outlineRounded(ctx, x - 1f, y - 1f, 34f, 20f, 10f,
+                    ClickGui2Theme.alpha(ClickGui2Theme.Role.MAIN, 100));
         }
     }
 
@@ -60,15 +71,15 @@ public final class ClickGui2Widgets {
 
     /**
      * Слайдер числа: тонкий трек 5px r2.5 + заполнение + круг радиусом 4.5
-     * (+1.5 на драге/ховере) — по мотивам mod0367.
+     * (+1.5 на драге/ховере) со свечением.
      */
     public static void sliderTrack(DrawContext ctx, float x, float y, float w, float t,
                                    boolean hovered, boolean dragging) {
         float trackH = 5f;
-        fillRounded(ctx, x, y, w, trackH, trackH / 2f, ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, 70));
+        fillRounded(ctx, x, y, w, trackH, trackH / 2f, ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, 80));
         float fillW = Math.max(trackH, w * Math.max(0f, Math.min(1f, t)));
         fillRounded(ctx, x, y, fillW, trackH, trackH / 2f,
-                ClickGui2Theme.fade(ClickGui2Theme.Role.ACTIVE_STATE, 0.9f));
+                ClickGui2Theme.fade(ClickGui2Theme.Role.ACTIVE_STATE, 0.95f));
         float knobR = dragging ? 6f : hovered ? 5.2f : 4.5f;
         if (dragging || hovered) {
             GuiGfx.softGlow(ctx, (int) (x + fillW - knobR), (int) (y - (knobR - trackH / 2f)),
@@ -87,7 +98,7 @@ public final class ClickGui2Widgets {
         }
     }
 
-    /** Боковой шеврон (вправо сложен, влево раскрыт): понятийный индикатор раскрытия карточки. */
+    /** Боковой шеврон (вправо сложен, влево раскрыт): индикатор раскрытия карточки. */
     public static void chevronSide(DrawContext ctx, float cx, float cy, boolean right, int color, float strength) {
         if (strength <= 0.02f) return;
         color = ClickGui2Theme.fade(color, Math.min(1f, strength));
@@ -112,6 +123,11 @@ public final class ClickGui2Widgets {
     /** Тонкая линия-разделитель. */
     public static void hairline(DrawContext ctx, float x, float y, float w) {
         RenderUtil.drawRect(ctx, x, y, x + w, y + 1f, ClickGui2Theme.rgb(ClickGui2Theme.Role.LINE));
+    }
+
+    /** Круглый чип-подложка (для шеврона/звезды ховера). */
+    public static void circleChip(DrawContext ctx, float cx, float cy, float r, int color) {
+        fillRounded(ctx, cx - r, cy - r, r * 2f, r * 2f, r, color);
     }
 
     /** Свотч цвета 14×14 с мягким кольцом при открытии. */

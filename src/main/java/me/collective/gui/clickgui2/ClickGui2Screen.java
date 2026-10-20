@@ -28,12 +28,12 @@ import static me.collective.gui.GuiGfx.fillRounded;
 import static me.collective.gui.GuiGfx.outlineRounded;
 
 /**
- * Второй стиль клик-гуи — перенос панели исходника (mod0165): панель
- * 800×504 с мягким введением, слева рельс категорий 148px с активной
- * подсветкой и избранным, справа breadcrumb + поиск с выпадающими
- * результатами, портал модулей — две колонки карточек 296px с каскадным
- * появлением, плавный скролл и полоса прокрутки; всплывашки настроек
- * закрываются при сильном прокручивании (порог 0.25, как в источнике).
+ * Второй стиль клик-гуи — «premium glass»: мерцающие ambient-свечения за
+ * стеклянной панелью 820×524, рельс категорий 172px с пилюлями, акцентной
+ * полоской и счётчиками, шапка с breadcrumb/поиском-стеклом и выпадающими
+ * результатами, портал модулей — две колонки стеклянных карточек 296px с
+ * каскадным появлением, масками затухания по краям и мягкой полосой
+ * прокрутки. Все роли — через {@link ClickGui2Theme}, акцент — настройка UI.
  */
 public class ClickGui2Screen extends Screen {
     private static ClickGui2Screen instance;
@@ -45,17 +45,17 @@ public class ClickGui2Screen extends Screen {
         return instance;
     }
 
-    // ── Геометрия панели (логические размеры исходника) ──
+    // ── Геометрия панели (логические размеры) ──
 
-    private static final float PANEL_W = 800f;
-    private static final float PANEL_H = 504f;
-    private static final float RAIL_W = 148f;
-    private static final float VIEW_Y = 74f;
-    private static final float CARD_GAP = 8f;
-    private static final float COL_STEP = ClickGui2Card.CARD_W + 16f;
-    private static final float COL_STAGGER = 10f;
-    private static final float SCROLL_W = 3f;
-    private static final float VIEW_PAD = 12f;
+    private static final float PANEL_W = 820f;
+    private static final float PANEL_H = 524f;
+    private static final float RAIL_W = 172f;
+    private static final float VIEW_Y = 84f;
+    private static final float CARD_GAP = 10f;
+    private static final float COL_STEP = ClickGui2Card.CARD_W + 12f;
+    private static final float COL_STAGGER = 12f;
+    private static final float SCROLL_W = 5f;
+    private static final float VIEW_PAD = 14f;
 
     private static final Category[] ORDER = new Category[] {
         Category.COMBAT, Category.MOVEMENT, Category.RENDER, Category.PLAYER,
@@ -110,8 +110,8 @@ public class ClickGui2Screen extends Screen {
         final Category category;
         final boolean favorites;
         float x, y;
-        final float w = RAIL_W - 26f;
-        final float h = 30f;
+        final float w = RAIL_W - 28f;
+        final float h = 34f;
 
         RailButton(Category category, boolean favorites) {
             this.category = category;
@@ -170,16 +170,18 @@ public class ClickGui2Screen extends Screen {
         introT = ClickGui2Anim.to01(introT, true, dt, 6f);
         syncTheme();
 
-        // фон: затемнение + мягкие свечения (аппроксимация шейдеров исходника)
+        // фон: затемнение + два дышащих ambient-свечения по диагонали
         RenderUtil.drawRect(context, 0f, 0f, (float) width, (float) height,
                 Math.round(150f * introT) << 24);
         int mainRgb = ClickGui2Theme.rgb(ClickGui2Theme.Role.MAIN) & 0xFFFFFF;
         int twoRgb = ClickGui2Theme.rgb(ClickGui2Theme.Role.MAIN_TWO) & 0xFFFFFF;
-        float glowA = 0.10f * introT;
-        GuiGfx.softGlow(context, (int) (width * 0.18f) - 320, (int) (height * 0.9f) - 260, 640, 520, 240,
-                mainRgb, Math.round(30f * glowA * 4f), 2, 0);
-        GuiGfx.softGlow(context, (int) (width * 0.85f) - 300, (int) (height * 0.12f) - 220, 600, 440, 220,
-                twoRgb, Math.round(22f * glowA * 4f), 2, 0);
+        // «дыхание»: медленная пульсация яркости — панельFeels alive, но тихо
+        float breathe = 0.72f + 0.28f * (float) Math.sin(now / 900.0);
+        float glowA = 0.12f * introT * breathe;
+        GuiGfx.softGlow(context, (int) (width * 0.18f) - 340, (int) (height * 0.9f) - 270, 680, 540, 260,
+                mainRgb, Math.round(34f * glowA * 4f), 2, 0);
+        GuiGfx.softGlow(context, (int) (width * 0.86f) - 310, (int) (height * 0.1f) - 230, 620, 460, 240,
+                twoRgb, Math.round(26f * glowA * 4f), 2, 0);
 
         // мышь и геометрия в логических координатах панели
         float centerX = width / 2f;
@@ -190,7 +192,7 @@ public class ClickGui2Screen extends Screen {
             uiScale = uiMod.gui2Scale.getFloatValue();
         }
         fitScale = Math.max(0.5f, Math.min(1.15f,
-                Math.min(width * 0.84f / PANEL_W, height * 0.74f / PANEL_H) * uiScale));
+                Math.min(width * 0.84f / PANEL_W, height * 0.76f / PANEL_H) * uiScale));
         drawnScale = fitScale * (0.94f + 0.06f * ClickGui2Anim.spring(introT));
         panelX = (width - PANEL_W) / 2f;
         panelY = (height - PANEL_H) / 2f;
@@ -202,7 +204,7 @@ public class ClickGui2Screen extends Screen {
 
         // блюр — ровно по области панели (в реальных координатах), не весь экран
         if (Blur.INSTANCE != null && Blur.INSTANCE.isToggled() && Blur.INSTANCE.clickGui.getValue()) {
-            float pad = 10f * drawnScale;
+            float pad = 12f * drawnScale;
             float bw = PANEL_W * drawnScale + pad * 2f;
             float bh = PANEL_H * drawnScale + pad * 2f;
             List<float[]> regions = new ArrayList<>();
@@ -216,7 +218,7 @@ public class ClickGui2Screen extends Screen {
         context.getMatrices().scale(drawnScale, drawnScale);
         context.getMatrices().translate(-centerX, -centerY);
 
-        renderPanel(context, mx, my, dt, navAlpha);
+        renderPanel(context, mx, my, dt, navAlpha, breathe);
 
         context.getMatrices().popMatrix();
         super.render(context, mouseX, mouseY, delta);
@@ -224,6 +226,10 @@ public class ClickGui2Screen extends Screen {
 
     private float toPanelX(float raw) {
         return width / 2f + (raw - width / 2f) / Math.max(0.05f, drawnScale);
+    }
+
+    private float toPanelY(float raw) {
+        return height / 2f + (raw - height / 2f) / Math.max(0.05f, drawnScale);
     }
 
     /** Общий акцент/фон берём из настроек UI — оба стиля держат одну палитру. */
@@ -249,7 +255,7 @@ public class ClickGui2Screen extends Screen {
 
     /**
      * Повышает яркость фонового цвета до нижнего порога, сохраняя оттенок:
-     * все каналы масштабируются, пока максимум не достигнет
+     * каналы масштабируются, пока максимум не достигнет
      * {@code targetFraction * 255}. Светлым цветам ничего не делает.
      */
     private static java.awt.Color brightenFloor(java.awt.Color color, float targetFraction) {
@@ -274,23 +280,37 @@ public class ClickGui2Screen extends Screen {
         return (r << 16) | (g << 8) | b;
     }
 
-    private float toPanelY(float raw) {
-        return height / 2f + (raw - height / 2f) / Math.max(0.05f, drawnScale);
-    }
+    // ── Панель ──
 
-    private void renderPanel(DrawContext ctx, float mx, float my, float dt, float navAlpha) {
+    private void renderPanel(DrawContext ctx, float mx, float my, float dt, float navAlpha, float breathe) {
         boolean interact = introT > 0.92f;
 
-        GuiGfx.shadow(ctx, (int) panelX - 4, (int) panelY - 4, (int) PANEL_W + 8, (int) PANEL_H + 8, 12);
-        fillRounded(ctx, panelX, panelY, PANEL_W, PANEL_H, 14f,
-                ClickGui2Theme.alpha(ClickGui2Theme.Role.BACKGROUND, 202));
-        outlineRounded(ctx, panelX, panelY, PANEL_W, PANEL_H, 14f, ClickGui2Theme.rgb(ClickGui2Theme.Role.OUTLINE));
+        // глубина: мягкая тень + узкий акцентный ореол за панелью
+        GuiGfx.shadow(ctx, (int) panelX - 6, (int) panelY - 6, (int) PANEL_W + 12, (int) PANEL_H + 12, 14);
+        if (breathe > 0f) {
+            GuiGfx.softGlow(ctx, (int) panelX + 6, (int) panelY + 6,
+                    (int) PANEL_W - 12, (int) PANEL_H - 12, 12,
+                    ClickGui2Theme.rgb(ClickGui2Theme.Role.MAIN) & 0xFFFFFF,
+                    Math.round(7f * navAlpha * breathe), 2, 0);
+        }
+
+        // стеклянная плоскость: заливка, верхний блик, двойная обводка
+        fillRounded(ctx, panelX, panelY, PANEL_W, PANEL_H, 18f,
+                ClickGui2Theme.alpha(ClickGui2Theme.Role.BACKGROUND, 196));
+        ctx.enableScissor((int) panelX, (int) panelY, (int) (panelX + PANEL_W), (int) (panelY + 44));
+        fillRounded(ctx, panelX, panelY, PANEL_W, 44f, 18f,
+                ClickGui2Theme.alpha(ClickGui2Theme.Role.TEXT, Math.round(9f * navAlpha)));
+        ctx.disableScissor();
+        outlineRounded(ctx, panelX, panelY, PANEL_W, PANEL_H, 18f,
+                ClickGui2Theme.rgb(ClickGui2Theme.Role.OUTLINE));
+        outlineRounded(ctx, panelX + 2f, panelY + 2f, PANEL_W - 4f, PANEL_H - 4f, 16f,
+                ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, Math.round(60f * navAlpha)));
 
         renderRail(ctx, mx, my, dt, navAlpha, interact);
         renderHeaderRow(ctx, mx, my, navAlpha, interact);
         // разделитель шапки и портала
-        RenderUtil.drawRect(ctx, panelX + RAIL_W + 12f, panelY + 70f, panelX + PANEL_W - 16f, panelY + 71f,
-                ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, Math.round(90f * navAlpha)));
+        RenderUtil.drawRect(ctx, panelX + RAIL_W + 14f, panelY + 74f, panelX + PANEL_W - 14f, panelY + 75f,
+                ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, Math.round(100f * navAlpha)));
         renderModules(ctx, mx, my, dt, navAlpha, interact);
         renderSearchDropdown(ctx, navAlpha, interact);
         popups.render(ctx, mx, my, dt,
@@ -302,22 +322,29 @@ public class ClickGui2Screen extends Screen {
     private void renderRail(DrawContext ctx, float mx, float my, float dt, float navAlpha, boolean interact) {
         FontManager fm = FontManager.INSTANCE;
 
-        RenderUtil.drawRect(ctx, panelX + RAIL_W, panelY + 18f, panelX + RAIL_W + 1f, panelY + PANEL_H - 18f,
+        RenderUtil.drawRect(ctx, panelX + RAIL_W, panelY + 20f, panelX + RAIL_W + 1f, panelY + PANEL_H - 20f,
                 ClickGui2Theme.fade(ClickGui2Theme.Role.LINE, navAlpha));
 
-        int brandTone = ClickGui2Theme.blend(
-                ClickGui2Theme.rgb(ClickGui2Theme.Role.CATEGORY_TEXT),
-                ClickGui2Theme.rgb(ClickGui2Theme.Role.MAIN), 0.4f);
-        fm.drawStringScaled(ctx, "Collective", panelX + 16f, panelY + 15f,
-                ClickGui2Theme.fade(brandTone, navAlpha), 1.22f);
-        fm.drawStringScaled(ctx, "GUI / v1.2", panelX + 16f, panelY + 30f,
-                ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), 0.9f * navAlpha), 1f);
-        ClickGui2Widgets.hairline(ctx, panelX + 12f, panelY + 48f, RAIL_W - 24f);
+        // бренд: искра с мягким ореолом + имя
+        float brandX = panelX + 18f;
+        float brandY = panelY + 18f;
+        ClickGui2Widgets.starIcon(ctx, brandX + 5f, brandY + 6f, 11f,
+                ClickGui2Theme.fade(ClickGui2Theme.Role.MAIN, navAlpha));
+        GuiGfx.softGlow(ctx, (int) brandX - 6, (int) brandY - 7, 22, 22, 8,
+                ClickGui2Theme.rgb(ClickGui2Theme.Role.MAIN) & 0xFFFFFF,
+                Math.round(26f * navAlpha), 2, 0);
+        fm.drawStringScaled(ctx, "Collective", brandX + 16f, brandY,
+                ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.CATEGORY_TEXT), navAlpha), 1.22f);
+        fm.drawStringScaled(ctx, "premium glass", brandX + 17f, brandY + 15f,
+                ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), 0.85f * navAlpha), 1f);
+        ClickGui2Widgets.hairline(ctx, panelX + 14f, panelY + 50f, RAIL_W - 28f);
 
         favoritesAnim = ClickGui2Anim.to01(favoritesAnim, favoritesView, dt, 10f);
-        float by = panelY + 60f;
-        for (RailButton button : railButtons) {
-            button.x = panelX + 12f;
+        float by = panelY + 58f;
+        float revealBase = ClickGui2Anim.easeOut(Math.min(1f, introT * 1.5f));
+        for (int buttonIndex = 0; buttonIndex < railButtons.size(); buttonIndex++) {
+            RailButton button = railButtons.get(buttonIndex);
+            button.x = panelX + 14f;
             button.y = by;
             float anim;
             if (button.favorites) {
@@ -325,9 +352,19 @@ public class ClickGui2Screen extends Screen {
             } else {
                 float target = (!favoritesView && button.category == category) ? 1f : 0f;
                 float prev = catAnims.get(button.category);
-                anim = ClickGui2Anim.to01(prev, target > 0.5f, dt, 10f);
+                anim = ClickGui2Anim.to01(prev, target > 0.5f, dt, 11f);
                 catAnims.put(button.category, anim);
             }
+
+            // каскадное появление пунктов рельса
+            float entrance = ClickGui2Anim.stagger(revealBase, buttonIndex, railButtons.size());
+            float slideX = (1f - entrance) * 10f;
+            float alpha = navAlpha * entrance;
+            if (alpha < 0.02f) {
+                by += button.h + 6f;
+                continue;
+            }
+            float bx = button.x + slideX;
 
             boolean hover = interact && ClickGui2Widgets.inRect(mx, my, button.x, button.y, button.w, button.h);
             if (hover) {
@@ -335,20 +372,40 @@ public class ClickGui2Screen extends Screen {
             }
             float reaction = Math.max(anim, hover ? 0.55f : 0f);
 
-            // счётчик модулей на ховере
-            if (hover && !button.favorites) {
+            // подложка-пилюля
+            if (reaction > 0.02f) {
+                fillRounded(ctx, bx, button.y, button.w, button.h, 10f,
+                        ClickGui2Theme.alpha(ClickGui2Theme.Role.SELECTED,
+                                Math.round(reaction
+                                        * (ClickGui2Theme.c(ClickGui2Theme.Role.SELECTED).getAlpha() * 2.3f)
+                                        * alpha)));
+            }
+            // активной — акцентная полоска + мягкое свечение внутри
+            if (anim > 0.02f) {
+                if (!button.favorites) {
+                    GuiGfx.softGlow(ctx, (int) bx, (int) button.y, (int) button.w, (int) button.h, 9,
+                            ClickGui2Theme.rgb(ClickGui2Theme.Role.MAIN) & 0xFFFFFF,
+                            Math.round(11f * anim * alpha), 2, 0);
+                }
+                float barX = bx - 5f;
+                float barH = 6f + 10f * anim;
+                fillRounded(ctx, barX, button.y + button.h / 2f - barH / 2f, 3f, barH, 1.5f,
+                        ClickGui2Theme.fade(ClickGui2Theme.Role.MAIN, 0.95f * anim * alpha));
+            }
+
+            // счётчик модулей (постоянно, ненавязчиво)
+            if (!button.favorites) {
                 int n = cardCache.get(button.category).size();
                 String num = String.valueOf(n);
                 float nw = fm.getStringWidthScaled(num, 8f);
-                fm.drawStringScaled(ctx, num, button.x + button.w - nw - 10f,
+                int tone = anim > 0.05f
+                        ? ClickGui2Theme.blend(
+                                ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT),
+                                ClickGui2Theme.rgb(ClickGui2Theme.Role.MAIN), anim)
+                        : ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT);
+                fm.drawStringScaled(ctx, num, bx + button.w - nw - 12f,
                         button.y + button.h / 2f - 4f,
-                        ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), 0.7f * navAlpha), 1f);
-            }
-
-            if (reaction > 0.02f) {
-                fillRounded(ctx, button.x, button.y, button.w, button.h, 8f,
-                        ClickGui2Theme.alpha(ClickGui2Theme.Role.SELECTED,
-                                Math.round(reaction * (ClickGui2Theme.c(ClickGui2Theme.Role.SELECTED).getAlpha() * 2.4f))));
+                        ClickGui2Theme.fade(tone, 0.8f * alpha), 1f);
             }
 
             int label = ClickGui2Theme.blend(
@@ -359,31 +416,33 @@ public class ClickGui2Screen extends Screen {
             if (button.favorites) {
                 int starColor = ClickGui2Theme.blend(
                         ClickGui2Theme.rgb(ClickGui2Theme.Role.DESELECT_CATEGORY_TEXT),
-                        (255 << 16) | (210 << 8) | 64, anim);
-                ClickGui2Widgets.starIcon(ctx, button.x + 14f, button.y + button.h / 2f,
-                        7f + anim * 1.5f, ClickGui2Theme.fade(starColor, navAlpha));
-                fm.drawStringScaled(ctx, "Избранное", button.x + 26f, button.y + button.h / 2f - 5f,
-                        ClickGui2Theme.fade(label, navAlpha), 1f);
+                        ClickGui2Theme.SPARK, anim);
+                ClickGui2Widgets.starIcon(ctx, bx + 15f, button.y + button.h / 2f,
+                        7f + anim * 1.5f, ClickGui2Theme.fade(starColor, alpha));
+                fm.drawStringScaled(ctx, "Избранное", bx + 27f, button.y + button.h / 2f - 5f,
+                        ClickGui2Theme.fade(label, alpha), 1.05f);
             } else {
-                if (anim > 0.02f) {
-                    fillRounded(ctx, button.x - 5f, button.y + button.h / 2f - 7f, 2.5f, 14f, 1.2f,
-                            ClickGui2Theme.fade(ClickGui2Theme.Role.MAIN, 0.95f * anim * navAlpha));
-                }
-                fm.drawStringScaled(ctx, button.category.getName(), button.x + 12f,
-                        button.y + button.h / 2f - 5f, ClickGui2Theme.fade(label, navAlpha), 1f);
+                fm.drawStringScaled(ctx, button.category.getName(), bx + 13f,
+                        button.y + button.h / 2f - 5f, ClickGui2Theme.fade(label, alpha), 1.05f);
             }
             by += button.h + 6f;
         }
 
-        // подвал рельса: имя игрока (как блок профиля исходника, без портрета)
-        float footerY = panelY + PANEL_H - 44f;
-        ClickGui2Widgets.hairline(ctx, panelX + 12f, footerY, RAIL_W - 24f);
+        // подвал рельса: статус игры + ник в стеклянном чипе
+        float footerY = panelY + PANEL_H - 50f;
+        RenderUtil.drawRect(ctx, panelX + 14f, footerY, panelX + RAIL_W - 14f, footerY + 1f,
+                ClickGui2Theme.fade(ClickGui2Theme.Role.LINE, navAlpha));
         MinecraftClient mc = MinecraftClient.getInstance();
         String player = mc != null && mc.getSession() != null
                 ? mc.getSession().getUsername() : "-";
-        fm.drawStringScaled(ctx, player, panelX + 16f, footerY + 10f,
-                ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.TEXT), navAlpha), 1f);
-        fm.drawStringScaled(ctx, "sql build", panelX + 16f, footerY + 22f,
+        boolean inGame = mc != null && mc.player != null;
+        int statusColor = inGame
+                ? ClickGui2Theme.ALIVE
+                : ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT) | (150 << 24);
+        GuiGfx.dot(ctx, panelX + 20f, footerY + 14f, 2.6f, (statusColor & 0xFFFFFF) | (Math.round(190f * navAlpha) << 24));
+        fm.drawStringScaled(ctx, player, panelX + 28f, footerY + 9f,
+                ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.TEXT), navAlpha), 1.05f);
+        fm.drawStringScaled(ctx, inGame ? "в игре" : "в меню", panelX + 28f, footerY + 22f,
                 ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), 0.85f * navAlpha), 1f);
     }
 
@@ -400,20 +459,31 @@ public class ClickGui2Screen extends Screen {
 
     // ── Шапка: breadcrumb + поиск + дропдаун результатов ──
 
+    private static final float SEARCH_W = 240f;
+    private static final float SEARCH_H = 26f;
+
     private float searchBoxX() {
-        return panelX + PANEL_W - 226f;
+        return panelX + PANEL_W - SEARCH_W - 22f;
     }
 
     private float searchBoxY() {
-        return panelY + 44f;
+        return panelY + 40f;
     }
 
-    private void renderHeaderRow(DrawContext ctx, float mx, float my, float navAlpha, boolean interact) {
+    private void renderHeaderRow(DrawContext ctx, float mx, float my,
+                                 float navAlpha, boolean interact) {
         FontManager fm = FontManager.INSTANCE;
 
+        // breadcrumb: акцентная искра + путь
+        float crumbX = panelX + RAIL_W + 16f;
+        if (navAlpha > 0.05f) {
+            int crumbSpark = favoritesView ? ClickGui2Theme.SPARK : ClickGui2Theme.rgb(ClickGui2Theme.Role.MAIN);
+            ClickGui2Widgets.starIcon(ctx, crumbX + 3f, panelY + 40f, 6f,
+                    ClickGui2Theme.fade(crumbSpark, navAlpha));
+        }
         String crumbs = favoritesView ? "Избранное" : category.getName();
-        fm.drawStringScaled(ctx, crumbs, panelX + RAIL_W + 16f, panelY + 18f,
-                ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.CATEGORY_TEXT), navAlpha), 1.28f);
+        fm.drawStringWithShadowScaled(ctx, crumbs, crumbX + 10f, panelY + 19f,
+                ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.CATEGORY_TEXT), navAlpha), 1.3f);
 
         // пересканирование только при изменении запроса (без аллокаций в кадре)
         if (!searchQuery.equals(scannedQuery)) {
@@ -421,7 +491,7 @@ public class ClickGui2Screen extends Screen {
             scannedQuery = searchQuery;
             if (!searchQuery.isEmpty()) {
                 String q = searchQuery.toLowerCase();
-                float resultY = searchBoxY() + 24f + 36f;
+                float resultY = searchBoxY() + SEARCH_H + 6f + 36f;
                 outer:
                 for (Category cat : ORDER) {
                     for (ClickGui2Card card : cardCache.get(cat)) {
@@ -438,30 +508,29 @@ public class ClickGui2Screen extends Screen {
         int count = favoritesView ? countFavorites() : cardCache.get(category).size();
         String sub = count + pluralModules(count);
         float sw = fm.getStringWidthScaled(sub, 8f);
-        fm.drawStringScaled(ctx, sub, panelX + PANEL_W - 16f - sw, panelY + 22f,
+        fm.drawStringScaled(ctx, sub, searchBoxX() - 12f - sw, panelY + 25f,
                 ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), 0.9f * navAlpha), 1f);
 
-        // бокс поиска
-        float boxW = 210f;
-        float boxH = 24f;
+        // бокс поиска — стеклянное поле
         float boxX = searchBoxX();
         float boxY = searchBoxY();
         int border = searchActive
                 ? ClickGui2Theme.alpha(ClickGui2Theme.Role.MAIN, 170)
                 : ClickGui2Theme.rgb(ClickGui2Theme.Role.OUTLINE);
-        fillRounded(ctx, boxX, boxY, boxW, boxH, 8f,
-                ClickGui2Theme.alpha(ClickGui2Theme.Role.BACKGROUND, 255));
-        outlineRounded(ctx, boxX, boxY, boxW, boxH, 8f, border);
+        fillRounded(ctx, boxX, boxY, SEARCH_W, SEARCH_H, 9f,
+                ClickGui2Theme.alpha(ClickGui2Theme.Role.BACKGROUND, 235));
+        outlineRounded(ctx, boxX, boxY, SEARCH_W, SEARCH_H, 9f, border);
+        ClickGui2Widgets.edgeHighlight(ctx, boxX, boxY, SEARCH_W, navAlpha);
 
         if (!searchActive && searchQuery.isEmpty()) {
             float hw = fm.getStringWidthScaled("CTRL + F", 8f);
-            fm.drawStringScaled(ctx, "CTRL + F", boxX + boxW - hw - 10f, boxY + boxH / 2f - 4f,
-                    ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), 0.65f * navAlpha), 1f);
+            fm.drawStringScaled(ctx, "CTRL + F", boxX + SEARCH_W - hw - 10f, boxY + SEARCH_H / 2f - 4f,
+                    ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), 0.6f * navAlpha), 1f);
         }
         String display = searchQuery.isEmpty()
                 ? "Поиск..."
                 : searchQuery + (searchActive && ClickGui2Anim.caretBlink() ? "|" : "");
-        fm.drawStringScaled(ctx, display, boxX + 10f, boxY + boxH / 2f - 4f,
+        fm.drawStringScaled(ctx, display, boxX + 11f, boxY + SEARCH_H / 2f - 4f,
                 ClickGui2Theme.fade(searchQuery.isEmpty()
                         ? ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT)
                         : ClickGui2Theme.rgb(ClickGui2Theme.Role.TEXT), navAlpha), 1f);
@@ -469,50 +538,56 @@ public class ClickGui2Screen extends Screen {
 
     private void renderSearchDropdown(DrawContext ctx, float navAlpha, boolean interact) {
         FontManager fm = FontManager.INSTANCE;
-        float boxW = 210f;
-        float boxH = 24f;
         float boxX = searchBoxX();
-        float dropY = searchBoxY() + boxH + 6f;
+        float dropY = searchBoxY() + SEARCH_H + 6f;
         if (searchResults.isEmpty()) {
             // после сканирования с пустым результатом — вежливая заглушка
             if (!searchQuery.isEmpty() && searchQuery.equals(scannedQuery)) {
-                float dropH = 28f;
-                GuiGfx.shadow(ctx, (int) boxX, (int) dropY, (int) boxW, (int) dropH, 8);
-                fillRounded(ctx, boxX, dropY, boxW, dropH, 9f,
+                float dropH = 30f;
+                GuiGfx.shadow(ctx, (int) boxX, (int) dropY, (int) SEARCH_W, (int) dropH, 10);
+                fillRounded(ctx, boxX, dropY, SEARCH_W, dropH, 10f,
                         ClickGui2Theme.rgb(ClickGui2Theme.Role.BACKGROUND));
-                outlineRounded(ctx, boxX, dropY, boxW, dropH, 9f,
+                outlineRounded(ctx, boxX, dropY, SEARCH_W, dropH, 10f,
                         ClickGui2Theme.rgb(ClickGui2Theme.Role.OUTLINE));
                 String stub = "Ничего не найдено";
                 int tone = ClickGui2Theme.blend(
                         ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT),
                         ClickGui2Theme.rgb(ClickGui2Theme.Role.DEACTIVE_TEXT), 0.45f);
-                fm.drawStringScaled(ctx, stub, boxX + 10f, dropY + 10f,
+                fm.drawStringScaled(ctx, stub, boxX + 12f, dropY + 10f,
                         ClickGui2Theme.fade(tone, 0.9f * navAlpha), 1f);
             }
             return;
         }
         float dropH = 26f + searchResults.size() * 20f;
 
-        GuiGfx.shadow(ctx, (int) boxX, (int) dropY, (int) boxW, (int) dropH, 8);
-        fillRounded(ctx, boxX, dropY, boxW, dropH, 9f, ClickGui2Theme.rgb(ClickGui2Theme.Role.BACKGROUND));
-        outlineRounded(ctx, boxX, dropY, boxW, dropH, 9f, ClickGui2Theme.rgb(ClickGui2Theme.Role.OUTLINE));
-        fm.drawStringScaled(ctx, "Результаты поиска", boxX + 10f, dropY + 6f,
+        GuiGfx.shadow(ctx, (int) boxX, (int) dropY, (int) SEARCH_W, (int) dropH, 10);
+        fillRounded(ctx, boxX, dropY, SEARCH_W, dropH, 10f, ClickGui2Theme.rgb(ClickGui2Theme.Role.BACKGROUND));
+        outlineRounded(ctx, boxX, dropY, SEARCH_W, dropH, 10f, ClickGui2Theme.rgb(ClickGui2Theme.Role.OUTLINE));
+        ClickGui2Widgets.edgeHighlight(ctx, boxX, dropY, SEARCH_W, navAlpha);
+        fm.drawStringScaled(ctx, "Результаты поиска", boxX + 12f, dropY + 7f,
                 ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), 0.85f * navAlpha), 1f);
+        RenderUtil.drawRect(ctx, boxX + 12f, dropY + 23f, boxX + SEARCH_W - 12f, dropY + 24f,
+                ClickGui2Theme.fade(ClickGui2Theme.Role.LINE, 0.8f * navAlpha));
 
         for (SearchResult result : searchResults) {
             boolean hoverRow = interact
-                    && ClickGui2Widgets.inRect(lastMouseX, lastMouseY, boxX + 6f, result.rowY() - 1f, boxW - 12f, 18f);
+                    && ClickGui2Widgets.inRect(lastMouseX, lastMouseY, boxX + 6f, result.rowY() - 1f, SEARCH_W - 12f, 18f);
             if (hoverRow) {
-                fillRounded(ctx, boxX + 6f, result.rowY() - 1f, boxW - 12f, 18f, 5f,
+                fillRounded(ctx, boxX + 6f, result.rowY() - 1f, SEARCH_W - 12f, 18f, 5f,
                         ClickGui2Theme.rgb(ClickGui2Theme.Role.SELECTED));
             }
-            fm.drawStringScaled(ctx, result.card().module().getName(), boxX + 14f, result.rowY() + 3f,
+            boolean on = result.card().module().isToggled();
+            float dotX = boxX + 13f;
+            GuiGfx.dot(ctx, dotX, result.rowY() + 8f, on ? 2.4f : 1.8f,
+                    ClickGui2Theme.fade(on ? ClickGui2Theme.Role.ACTIVE_STATE : ClickGui2Theme.Role.DEACTIVE_TEXT,
+                            navAlpha));
+            fm.drawStringScaled(ctx, result.card().module().getName(), dotX + 7f, result.rowY() + 3f,
                     ClickGui2Theme.fade(hoverRow
                             ? ClickGui2Theme.rgb(ClickGui2Theme.Role.ACTIVE_TEXT)
                             : ClickGui2Theme.rgb(ClickGui2Theme.Role.OPEN_SETTING_TEXT), navAlpha), 1f);
             String catName = result.card().category().getName();
             float cw = fm.getStringWidthScaled(catName, 8f);
-            fm.drawStringScaled(ctx, catName, boxX + boxW - 14f - cw, result.rowY() + 4f,
+            fm.drawStringScaled(ctx, catName, boxX + SEARCH_W - 12f - cw, result.rowY() + 4f,
                     ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), 0.8f * navAlpha), 1f);
         }
     }
@@ -562,11 +637,11 @@ public class ClickGui2Screen extends Screen {
     }
 
     private float viewportW() {
-        return PANEL_W - RAIL_W - 8f;
+        return PANEL_W - RAIL_W - 6f;
     }
 
     private float viewportH() {
-        return PANEL_H - VIEW_Y - 14f;
+        return PANEL_H - VIEW_Y - 16f;
     }
 
     private void renderModules(DrawContext ctx, float mx, float my, float dt, float navAlpha, boolean interact) {
@@ -590,7 +665,7 @@ public class ClickGui2Screen extends Screen {
         }
         contentHeight = Math.max(0f, Math.max(colA, colB) - viewportY() - CARD_GAP);
 
-        // скролл с плавным ходом; сильный сдвиг гасит всплывашки (как в исходнике)
+        // скролл с плавным ходом; сильный сдвиг гасит всплывашки
         float minScroll = Math.min(0f, viewportH() - contentHeight);
         scrollTarget = Math.max(minScroll, Math.min(0f, scrollTarget));
         float before = scrollCurrent;
@@ -612,7 +687,7 @@ public class ClickGui2Screen extends Screen {
             float baseY = left ? colA : colB;
             float baseX = left ? cx0 : cx1;
             float entrance = interact ? ClickGui2Anim.stagger(revealBase, i, Math.max(1, visible.size())) : 0f;
-            float slide = (1f - entrance) * 10f;
+            float slide = (1f - entrance) * 12f;
             float jitter = (left ? -COL_STAGGER : COL_STAGGER) * (1f - entrance);
             card.layout(baseX + jitter, baseY + offset + slide);
 
@@ -626,35 +701,58 @@ public class ClickGui2Screen extends Screen {
         }
         ctx.disableScissor();
 
+        // маски затухания по краям портала (стекло «уходит» в панель)
+        fadeBand(ctx, viewportY(), 1f, navAlpha);
+        fadeBand(ctx, viewportY() + viewportH() - 14f, -1f, navAlpha);
+
         // пустое состояние избранного: искра + подсказка
         if (visible.isEmpty()) {
             float midX = viewportX() + viewportW() / 2f;
-            ClickGui2Widgets.starIcon(ctx, midX, viewportY() + viewportH() / 2f - 12f, 14f,
-                    ClickGui2Theme.fade((255 << 16) | (210 << 8) | 64, 0.45f * navAlpha));
+            float midY = viewportY() + viewportH() / 2f;
+            float bob = 2.5f * (float) Math.sin(System.currentTimeMillis() / 600.0);
+            ClickGui2Widgets.starIcon(ctx, midX, midY - 12f + bob, 15f,
+                    ClickGui2Theme.fade(ClickGui2Theme.SPARK, 0.5f * navAlpha));
+            GuiGfx.softGlow(ctx, (int) midX - 16, (int) midY - 28 + (int) bob, 32, 32, 10,
+                    (255 << 16) | (210 << 8) | 64, Math.round(22f * navAlpha), 2, 0);
             String empty = "Нет избранных. Нажми на звезду на карточке модуля.";
             float ew = fm.getStringWidthScaled(empty, 9f);
-            fm.drawStringScaled(ctx, empty, midX - ew / 2f, viewportY() + viewportH() / 2f + 6f,
+            fm.drawStringScaled(ctx, empty, midX - ew / 2f, midY + 8f,
                     ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT), 0.9f * navAlpha), 1f);
         }
 
-        // полоса прокрутки: тонкий трек + бегунок
+        // полоса прокрутки: тонкий трек + мягкий бегунок
         if (contentHeight > viewportH()) {
-            RenderUtil.drawRect(ctx, viewportX() + viewportW() - SCROLL_W - 2f, viewportY(),
-                    viewportX() + viewportW() - 2f, viewportY() + viewportH(),
-                    ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, Math.round(55f * navAlpha)));
+            float trackX = viewportX() + viewportW() - SCROLL_W - 3f;
+            RenderUtil.drawRect(ctx, trackX, viewportY(),
+                    trackX + SCROLL_W, viewportY() + viewportH(),
+                    ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE,
+                            Math.round((draggingThumb ? 90f : 50f) * navAlpha)));
             float trackH = viewportH();
-            float th = Math.max(22f, trackH * trackH / contentHeight);
+            float th = Math.max(26f, trackH * trackH / contentHeight);
             float trackRun = trackH - th;
             float progress = -scrollCurrent / Math.max(1f, contentHeight - trackH);
-            thumbX = viewportX() + viewportW() - SCROLL_W - 2f;
+            thumbX = trackX - 6f;
             thumbY = viewportY() + trackRun * progress;
-            thumbW = SCROLL_W;
+            thumbW = SCROLL_W + 12f;
             thumbH = th;
-            fillRounded(ctx, thumbX, thumbY, thumbW, thumbH, 1.5f,
-                    ClickGui2Theme.alpha(ClickGui2Theme.Role.SCROLL,
-                            Math.round(255 * (draggingThumb ? 1f : 0.55f) * navAlpha)));
+            boolean thumbHover = ClickGui2Widgets.inRect(mx, my, thumbX, thumbY, thumbW, thumbH);
+            int scrollAlpha = Math.round(navAlpha * (draggingThumb ? 255f : thumbHover ? 170f : 110f));
+            fillRounded(ctx, trackX, thumbY, SCROLL_W, thumbH, SCROLL_W / 2f,
+                    ClickGui2Theme.alpha(ClickGui2Theme.Role.SCROLL, scrollAlpha));
         } else {
             thumbH = 0f; // вне экрана — не кликабельно
+        }
+    }
+
+    /** Маска затухания: три полосы цвета фона с гаснущей альфой. */
+    private void fadeBand(DrawContext ctx, float y, float dir, float navAlpha) {
+        if (navAlpha < 0.02f) return;
+        for (int i = 0; i < 3; i++) {
+            float a = (i == 0 ? 110f : i == 1 ? 70f : 34f) * navAlpha;
+            float bandY = y + dir * i * 5f;
+            if (bandY < viewportY() - 1f || bandY > viewportY() + viewportH()) continue;
+            RenderUtil.drawRect(ctx, viewportX(), bandY, viewportX() + viewportW(), bandY + 5f,
+                    ClickGui2Theme.alpha(ClickGui2Theme.Role.BACKGROUND, Math.round(a)));
         }
     }
 
@@ -690,7 +788,7 @@ public class ClickGui2Screen extends Screen {
         // поле поиска
         float boxX = searchBoxX();
         float boxY = searchBoxY();
-        if (button == 0 && ClickGui2Widgets.inRect(mx, my, boxX, boxY, 210f, 24f)) {
+        if (button == 0 && ClickGui2Widgets.inRect(mx, my, boxX, boxY, SEARCH_W, SEARCH_H)) {
             searchActive = true;
             SoundUtil.playClick(0.18f, 1.3f);
             return true;
@@ -702,7 +800,7 @@ public class ClickGui2Screen extends Screen {
         // дропдаун результатов
         if (!searchResults.isEmpty()) {
             for (SearchResult result : searchResults) {
-                if (ClickGui2Widgets.inRect(mx, my, boxX + 6f, result.rowY() - 1f, 210f - 12f, 18f)) {
+                if (ClickGui2Widgets.inRect(mx, my, boxX + 6f, result.rowY() - 1f, SEARCH_W - 12f, 18f)) {
                     favoritesView = false;
                     category = result.card().category();
                     scrollTarget = 0f;
@@ -737,8 +835,8 @@ public class ClickGui2Screen extends Screen {
             }
         }
 
-        // полоса прокрутки
-        if (thumbH > 0f && ClickGui2Widgets.inRect(mx, my, thumbX, thumbY, thumbW, Math.max(14f, thumbH + 14f))) {
+        // полоса прокрутки (увеличенная зона клика)
+        if (thumbH > 0f && ClickGui2Widgets.inRect(mx, my, thumbX, thumbY - 6f, thumbW, thumbH + 12f)) {
             draggingThumb = true;
             dragGrabOffset = my - thumbY;
             return true;
@@ -848,7 +946,7 @@ public class ClickGui2Screen extends Screen {
             float trackH = viewportH();
             float minScroll = Math.min(0f, trackH - contentHeight);
             float content = Math.max(1f, contentHeight - trackH);
-            float th = Math.max(22f, trackH * trackH / Math.max(1f, contentHeight));
+            float th = Math.max(26f, trackH * trackH / Math.max(1f, contentHeight));
             float usable = Math.max(1f, trackH - th);
             float progress = (my - dragGrabOffset - viewportY()) / usable;
             scrollTarget = Math.max(minScroll, Math.min(0f, -progress * content));

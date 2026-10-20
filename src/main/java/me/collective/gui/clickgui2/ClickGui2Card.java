@@ -17,14 +17,14 @@ import static me.collective.gui.GuiGfx.fillRounded;
 import static me.collective.gui.GuiGfx.outlineRounded;
 
 /**
- * Карточка модуля — перенос mod0093: шапка (имя + описание бегущей
- * строкой), звезда избранного (восьмиконечная искра, зона 20×22 у правого
- * края, канарейный цвет 255,210,64), тумблер-пилюля 30×18, раскрытие
- * настроек правым кликом со ступенчатым проявлением строк, плавная высота.
+ * Карточка модуля — «premium glass»: стеклянная подложка с бликом,
+ * включённое состояние ловит акцентный ореол с медленным дыханием,
+ * тумблер 32×18, звезда избранного, шеврон в круглой подложке,
+ * раскрытие строк правым кликом со ступенчатым проявлением.
  */
 public final class ClickGui2Card {
     static final float CARD_W = 296f;
-    static final float HEADER_H = 40f;
+    static final float HEADER_H = 44f;
     static final float SET_GAP = 5f;
     static final float BOTTOM_PAD = 8f;
 
@@ -157,11 +157,23 @@ public final class ClickGui2Card {
     public void mouseClicked(float mx, float my, int button, ClickGui2Popups popups) {
         boolean header = mx >= x && mx <= x + CARD_W && my >= y && my <= y + HEADER_H;
         if (header) {
+            if (toggleZone(mx, my)) {
+                if (button == 0) {
+                    module.toggle();
+                    SoundUtil.playClick(0.2f, module.isToggled() ? 1.2f : 0.85f);
+                }
+                return;
+            }
             if (starZone(mx, my)) {
                 if (button == 0) {
                     FavoriteStore.toggle(module.getName());
                     SoundUtil.playClick(0.2f, 1.35f);
                 }
+                return;
+            }
+            if (button == 0 && expandChipZone(mx, my)) {
+                setExpanded(!expanded);
+                SoundUtil.playClick(0.16f, expanded ? 1.25f : 0.95f);
                 return;
             }
             if (button == 0) {
@@ -180,11 +192,13 @@ public final class ClickGui2Card {
         ensureRows();
         float rowY = y + HEADER_H;
         for (ClickGui2Rows.Row row : rows) {
-            if (ClickGui2Widgets.inRect(mx, my, x + 12f, rowY, CARD_W - 24f, row.height())) {
+            float rowH = ClickGui2Anim.smooth(expandT) * row.height();
+            if (rowH < 1f) continue;
+            if (ClickGui2Widgets.inRect(mx, my, x + 12f, rowY, CARD_W - 24f, rowH)) {
                 row.mouseClicked(mx, my, button, popups);
                 return;
             }
-            rowY += row.height() + SET_GAP;
+            rowY += rowH + SET_GAP;
         }
     }
 
@@ -248,9 +262,16 @@ public final class ClickGui2Card {
         }
     }
 
+    private boolean toggleZone(float mx, float my) {
+        return ClickGui2Widgets.inRect(mx, my, x + CARD_W - 44f, y + 11f, 36f, 22f);
+    }
+
     private boolean starZone(float mx, float my) {
-        return mx >= x + CARD_W - 68f && mx <= x + CARD_W - 48f
-                && my >= y + 8f && my <= y + 30f;
+        return ClickGui2Widgets.inRect(mx, my, x + CARD_W - 64f, y + 8f, 20f, 28f);
+    }
+
+    private boolean expandChipZone(float mx, float my) {
+        return ClickGui2Widgets.inRect(mx, my, x + CARD_W - 88f, y + 8f, 20f, 28f);
     }
 
     // ── Рендер ──
@@ -276,49 +297,56 @@ public final class ClickGui2Card {
         expandT = ClickGui2Anim.to01(expandT, expanded, dt, expanded ? 14f : 18f);
         focusFlash = Math.max(0f, focusFlash - dt * 0.8f);
 
-        // подложка: тень, свечение включённого, вспышка фокуса, заливка, обводки
-        GuiGfx.shadow(ctx, (int) x + 1, (int) y + 2, (int) CARD_W - 2, (int) h, 7);
+        // подложка: глубина → свечение включённого (с дыханием) → вспышка → стекло
+        GuiGfx.shadow(ctx, (int) x + 2, (int) y + 3, (int) CARD_W - 4, (int) h - 6, 8);
         if (toggleT > 0.02f) {
+            float breathe = 0.75f + 0.25f * (float) Math.sin(System.currentTimeMillis() / 700.0);
             GuiGfx.softGlow(ctx, (int) x + 1, (int) y + 1, (int) CARD_W - 2, (int) h - 2, 10,
                     ClickGui2Theme.rgb(ClickGui2Theme.Role.MAIN) & 0xFFFFFF,
-                    Math.round(16f * toggleT), 1, 0);
+                    Math.round((13f + 4f * breathe) * toggleT), 1, 0);
         }
         if (focusFlash > 0.01f) {
             float pulse = (float) Math.sin(Math.min(1f, focusFlash) * Math.PI);
-            fillRounded(ctx, x, y, CARD_W, h, 12f,
+            fillRounded(ctx, x, y, CARD_W, h, 14f,
                     ClickGui2Theme.alpha(ClickGui2Theme.Role.MAIN, Math.round(pulse * 70)));
         }
-        int fillAlpha = Math.round(60 + 36 * headerHoverT);
-        fillRounded(ctx, x, y, CARD_W, h, 12f,
+        float expandSmooth = ClickGui2Anim.smooth(expandT);
+        int fillAlpha = Math.round(62 + 30 * headerHoverT + 30 * expandSmooth);
+        fillRounded(ctx, x, y, CARD_W, h, 14f,
                 ClickGui2Theme.alpha(ClickGui2Theme.Role.BACKGROUND, fillAlpha));
-        outlineRounded(ctx, x, y, CARD_W, h, 12f, ClickGui2Theme.rgb(ClickGui2Theme.Role.OUTLINE));
+        ClickGui2Widgets.edgeHighlight(ctx, x, y, CARD_W, navOf(hover));
+        outlineRounded(ctx, x, y, CARD_W, h, 14f, ClickGui2Theme.rgb(ClickGui2Theme.Role.OUTLINE));
         if (toggleT > 0.02f) {
-            outlineRounded(ctx, x, y, CARD_W, h, 12f,
-                    ClickGui2Theme.alpha(ClickGui2Theme.Role.MAIN, Math.round(70f * toggleT)));
+            outlineRounded(ctx, x, y, CARD_W, h, 14f,
+                    ClickGui2Theme.alpha(ClickGui2Theme.Role.MAIN, Math.round(85f * toggleT)));
         }
 
         renderHeader(ctx, favorite);
 
-        float revealBase = ClickGui2Anim.smooth(expandT);
-        if (revealBase > 0.05f) {
+        if (expandSmooth > 0.05f) {
             // разделитель шапки и строк
-            RenderUtil.drawRect(ctx, x + 12f, y + HEADER_H - 3f, x + CARD_W - 12f, y + HEADER_H - 2f,
-                    ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, Math.round(80f * revealBase)));
+            RenderUtil.drawRect(ctx, x + 14f, y + HEADER_H - 3f, x + CARD_W - 14f, y + HEADER_H - 2f,
+                    ClickGui2Theme.alpha(ClickGui2Theme.Role.LINE, Math.round(90f * expandSmooth)));
         }
-        if (revealBase > 0.01f) {
+        if (expandSmooth > 0.01f) {
             ensureRows();
             ctx.enableScissor((int) x, (int) (y + HEADER_H - 2f), (int) (x + CARD_W), (int) (y + h + 2f));
-            float rowY = y + HEADER_H + 4f * (1f - revealBase);
+            float rowY = y + HEADER_H + 5f * (1f - expandSmooth);
             int idx = 0;
             for (ClickGui2Rows.Row row : rows) {
-                float reveal = ClickGui2Anim.stagger(revealBase, idx, Math.max(1, rows.size()));
-                row.layout(x + 12f, rowY + (1f - reveal) * 6f, CARD_W - 24f);
+                float reveal = ClickGui2Anim.stagger(expandSmooth, idx, Math.max(1, rows.size()));
+                float rowH = reveal * row.height();
+                row.layout(x + 14f, rowY + (1f - reveal) * 6f, CARD_W - 28f);
                 row.render(ctx, mx, my, dt, reveal);
-                rowY += row.height() + SET_GAP;
+                rowY += rowH + SET_GAP;
                 idx++;
             }
             ctx.disableScissor();
         }
+    }
+
+    private float navOf(boolean hovered) {
+        return hovered ? Math.max(0.55f, headerHoverT) : headerHoverT * 0.6f;
     }
 
     private void renderHeader(DrawContext ctx, boolean favorite) {
@@ -327,31 +355,42 @@ public final class ClickGui2Card {
         int nameColor = ClickGui2Theme.blend(
                 ClickGui2Theme.rgb(ClickGui2Theme.Role.DEACTIVE_TEXT),
                 ClickGui2Theme.rgb(ClickGui2Theme.Role.TEXT), toggleT);
-        fm.drawStringScaled(ctx, module.getName(), x + 12f, y + 7f, nameColor, 12f / 9f);
+        fm.drawStringWithShadowScaled(ctx, module.getName(), x + 14f, y + 8f, nameColor, 1.2f);
 
         String desc = module.getDescription() == null ? "" : module.getDescription();
         if (!desc.isEmpty()) {
-            renderMarquee(ctx, desc, x + 12f, y + 24f, CARD_W - 100f);
+            renderMarquee(ctx, desc, x + 14f, y + 26f, CARD_W - 116f);
         }
 
-        // индикатор наличия настроек: шеврон (вправо сложен, влево раскрыт)
+        // индикатор настроек: шеврон в круглой подложке (пойнтер раскрытия)
         if (rowsHeight() > 0f) {
-            float cxv = x + CARD_W - 74f;
-            float strength = Math.max(0.45f * headerHoverT, expandT * 0.9f);
+            float cxv = x + CARD_W - 78f;
+            float cyv = y + 22f;
+            float chipA = Math.max(0.35f * headerHoverT, expandT * 0.85f);
+            if (chipA > 0.02f) {
+                ClickGui2Widgets.circleChip(ctx, cxv, cyv, 9.5f,
+                        ClickGui2Theme.alpha(ClickGui2Theme.Role.SELECTED,
+                                Math.round(chipA * (ClickGui2Theme.c(ClickGui2Theme.Role.SELECTED).getAlpha() * 2.6f))));
+            }
             int chevCol = ClickGui2Theme.blend(
                     ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT),
                     ClickGui2Theme.rgb(ClickGui2Theme.Role.MAIN), expandT);
-            ClickGui2Widgets.chevronSide(ctx, cxv, y + 19f, expandT < 0.5f, chevCol, strength);
+            ClickGui2Widgets.chevronSide(ctx, cxv, cyv, expandT < 0.5f, chevCol,
+                    Math.max(0.45f * headerHoverT, expandT * 0.9f));
         }
 
-        float starX = x + CARD_W - 58f;
-        float starY = y + 19f;
+        float starX = x + CARD_W - 54f;
+        float starY = y + 22f;
         int starColor = ClickGui2Theme.blend(
                 ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT),
-                (255 << 16) | (210 << 8) | 64, favoriteT);
+                ClickGui2Theme.SPARK, favoriteT);
         if (favorite || favoriteT > 0.01f) {
-            ClickGui2Widgets.starIcon(ctx, starX, starY, 6.2f + favoriteT * 1.8f,
+            ClickGui2Widgets.starIcon(ctx, starX, starY, 6.2f + favoriteT * 2f,
                     ClickGui2Theme.fade(starColor, 0.4f + 0.6f * favoriteT));
+            if (favoriteT > 0.6f) {
+                GuiGfx.softGlow(ctx, (int) starX - 8, (int) starY - 8, 16, 16, 6,
+                        ClickGui2Theme.SPARK, Math.round(14f * favoriteT), 2, 0);
+            }
         } else {
             int ghost = ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT),
                     0.55f * headerHoverT);
@@ -360,7 +399,7 @@ public final class ClickGui2Card {
             }
         }
 
-        ClickGui2Widgets.togglePill(ctx, x + CARD_W - 42f, y + 11f, toggleT, headerHoverT > 0.5f);
+        ClickGui2Widgets.togglePill(ctx, x + CARD_W - 42f, y + 13f, toggleT, headerHoverT > 0.5f);
     }
 
     private void renderMarquee(DrawContext ctx, String text, float px, float py, float maxW) {
@@ -368,7 +407,7 @@ public final class ClickGui2Card {
         float textW = fm.getStringWidthScaled(text, 8f);
         ctx.enableScissor((int) px, (int) py - 2, (int) (px + maxW), (int) py + 12);
         int color = ClickGui2Theme.fade(ClickGui2Theme.rgb(ClickGui2Theme.Role.SUR_TEXT),
-                0.7f + 0.3f * headerHoverT);
+                (0.7f + 0.3f * headerHoverT));
         if (textW <= maxW) {
             fm.drawStringScaled(ctx, text, px, py, color, 8f / 9f);
         } else {
