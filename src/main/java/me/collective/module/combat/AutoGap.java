@@ -71,4 +71,9 @@ public class AutoGap extends Module {
             eating = false;
         }
     }
+
+@Override
+    public String getInfoString() {
+        return eating ? "eats" : String.format("%.0f hp", health.getValue());
+    }
 }

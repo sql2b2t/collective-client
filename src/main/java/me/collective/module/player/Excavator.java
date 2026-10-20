@@ -166,4 +166,15 @@ public class Excavator extends Module {
             } catch (Throwable ignored) {}
         }
     }
+
+@Override
+    public String getInfoString() {
+        if (this.status == Status.WORKING) {
+            return "dig";
+        } else if (this.status == Status.SEL_END) {
+            return "corner 1/2";
+        } else {
+            return null;
+        }
+    }
 }
