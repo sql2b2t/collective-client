@@ -160,6 +160,7 @@ public class AutoWither extends Module {
                 placeBlock(pos, Items.WITHER_SKELETON_SKULL);
             }
             mc.player.getInventory().selectedSlot = originalSlot;
+            if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
             onComplete.run();
         });
     }
@@ -229,6 +230,7 @@ public class AutoWither extends Module {
         int slot = findHotbarSlot(item);
         if (slot == -1) return;
         mc.player.getInventory().selectedSlot = slot;
+        mc.interactionManager.syncSelectedSlot();
         mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, new BlockHitResult(Vec3d.ofCenter(pos), Direction.UP, pos, false));
         if (!swingHand.getValue()) return;
         mc.player.swingHand(Hand.MAIN_HAND);

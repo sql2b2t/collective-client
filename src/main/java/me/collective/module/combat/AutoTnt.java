@@ -112,6 +112,7 @@ public class AutoTnt extends Module {
             }
 
             mc.player.getInventory().selectedSlot = flintSlot;
+            if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
             return;
         }
 
@@ -123,6 +124,7 @@ public class AutoTnt extends Module {
             mc.player.swingHand(Hand.MAIN_HAND);
 
             mc.player.getInventory().selectedSlot = originalSlot;
+            if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
             ignitePos = null;
             flintSlot = -1;
             originalSlot = -1;
@@ -168,6 +170,7 @@ public class AutoTnt extends Module {
         igniting = true;
         int prevSlot = mc.player.getInventory().selectedSlot;
         mc.player.getInventory().selectedSlot = flint;
+        if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
 
         Vec3d hitVec = Vec3d.ofCenter(pos);
         BlockHitResult hit = new BlockHitResult(hitVec, Direction.UP, pos, false);
@@ -175,6 +178,7 @@ public class AutoTnt extends Module {
         mc.player.swingHand(Hand.MAIN_HAND);
 
         mc.player.getInventory().selectedSlot = prevSlot;
+        if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
         igniting = false;
     }
 

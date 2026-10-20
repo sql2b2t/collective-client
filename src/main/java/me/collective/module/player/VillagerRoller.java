@@ -371,6 +371,7 @@ public class VillagerRoller extends Module {
 
         if (slot != mc.player.getInventory().getSelectedSlot()) {
             mc.player.getInventory().setSelectedSlot(slot);
+            if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
         }
 
         // Хит-пойнт — центр ВЕРХНЕЙ грани блока (ofCenter уже даёт +0.5;
