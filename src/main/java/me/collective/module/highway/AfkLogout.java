@@ -10,9 +10,12 @@ import me.collective.setting.NumberSetting;
 import net.minecraft.network.packet.s2c.common.DisconnectS2CPacket;
 import net.minecraft.text.Text;
 
+import me.collective.module.misc.AutoReconnect;
+
 /**
  * Порт AfkLogout: выходит с сервера у заданных координат.
- * (Без отключения AutoReconnect — такого модуля в клиенте нет.)
+ * (AutoReconnect не переподключается после этого выхода — модуль
+ * помечается через markAfkLogout.)
  */
 public class AfkLogout extends Module {
     public enum Dim {
@@ -37,6 +40,7 @@ public class AfkLogout extends Module {
 
         if (xCoordsMatch() && zCoordsMatch() && dimensionMatches()) {
             if (autoToggle.getValue()) setToggled(false);
+            AutoReconnect.markAfkLogout();
             if (mc.getNetworkHandler() != null) {
                 mc.getNetworkHandler().onDisconnect(new DisconnectS2CPacket(Text.literal("[AfkLogout] Arrived at destination.")));
             }

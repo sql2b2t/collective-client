@@ -163,6 +163,7 @@ public class ModuleManager {
         register(new FakePlayer());
         register(new AutoAuth());
         register(new Spammer());
+        register(new AutoReconnect());
         register(new EmotesModule());
 
         // HUD Modules
