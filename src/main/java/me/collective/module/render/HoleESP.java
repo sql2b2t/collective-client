@@ -155,7 +155,7 @@ public class HoleESP extends Module {
             if (dist > rangeBlocks * rangeBlocks) continue;
             dist = Math.sqrt(dist);
             Color base = hole.color;
-            Color fill = ColorUtil.fadeByDistance(dist, rangeBlocks, new Color(base.getRed(), base.getGreen(), base.getBlue(), 110));
+            Color fill = ColorUtil.fadeByDistance(dist, rangeBlocks, base);
             Color line = ColorUtil.fadeLineByDistance(dist, rangeBlocks, base, 255);
             Renderer3D.box(hole.box, fill, line, sm, xray.getValue());
         }
