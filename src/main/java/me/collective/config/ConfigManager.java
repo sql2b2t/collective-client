@@ -229,10 +229,16 @@ public class ConfigManager {
             Object v = es.getValue();
             return v == null ? null : new JsonPrimitive(v.toString());
         }
-        if (s instanceof ColorSetting) {
+        if (s instanceof ColorSetting cs) {
             Object v = s.getValue();
-            if (v instanceof Color c) return new JsonPrimitive(c.getRGB());
-            return null;
+            if (!(v instanceof Color c)) return null;
+            // Радуга и синхронизация с темой — часть настройки цвета.
+            com.google.gson.JsonObject co = new com.google.gson.JsonObject();
+            co.addProperty("color", c.getRGB());
+            if (cs.isRainbow()) co.addProperty("rainbow", true);
+            if (cs.isSync()) co.addProperty("sync", true);
+            if (cs.getRainbowSpeed() != 1.0f) co.addProperty("speed", cs.getRainbowSpeed());
+            return co;
         }
         if (s instanceof BlockListSetting bls) {
             com.google.gson.JsonArray arr = new com.google.gson.JsonArray();
@@ -316,6 +322,14 @@ public class ConfigManager {
                 }
             }
             ((Setting<List<?>>) s).setValue(list);
+            return;
+        }
+        if (s instanceof ColorSetting cs && el.isJsonObject()) {
+            com.google.gson.JsonObject co = el.getAsJsonObject();
+            if (co.has("color")) cs.setValue(new Color(co.get("color").getAsInt(), true));
+            cs.setRainbow(co.has("rainbow") && co.get("rainbow").getAsBoolean());
+            cs.setSync(co.has("sync") && co.get("sync").getAsBoolean());
+            if (co.has("speed")) cs.setRainbowSpeed(co.get("speed").getAsFloat());
             return;
         }
         if (!el.isJsonPrimitive()) return;
