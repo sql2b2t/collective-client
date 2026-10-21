@@ -1,9 +1,7 @@
 package me.collective.module.movement;
 
-import me.collective.module.ModuleManager;
 import me.collective.module.movement.RocketBoost;
 import me.collective.module.player.SpeedMine;
-import me.collective.module.render.Freecam;
 
 import me.collective.setting.Setting;
 import me.collective.setting.SettingGroup;
@@ -128,15 +126,17 @@ public class ControlFly extends Module {
     private int swapBackTicks;
 
     // ── Парковка FREEZE ──
-    private boolean frozen;
-    private Vec3d wirePos;
-    private int pinArmTick;
-    private int keepaliveTicks;
-    private int lastWirePosTick;
-    private int rotOnlyRun;
-    private boolean stepDue;
-    private Vec3d pendingStep;
-    private boolean parkedWithRocket;
+    // Часть этих полей читается в пакетных хендлерах (PacketEvent.Send может идти
+    // не из игрового потока), поэтому всё, что видно с обеих сторон, volatile.
+    private volatile boolean frozen;
+    private volatile Vec3d wirePos;
+    private volatile int pinArmTick;
+    private volatile int keepaliveTicks;
+    private volatile int lastWirePosTick;
+    private volatile int rotOnlyRun;
+    private volatile boolean stepDue;
+    private volatile Vec3d pendingStep;
+    private volatile boolean parkedWithRocket;
     private String parkBlocked;
 
     private final AtomicInteger passMovePackets = new AtomicInteger();
@@ -160,7 +160,8 @@ public class ControlFly extends Module {
     private int ticksSinceFirework;
 
     // ── Сглаживание камеры ──
-    private boolean idleHovering;
+    // idleHovering читается и из пакетных хендлеров (parkPinned) — volatile.
+    private volatile boolean idleHovering;
     private double prevActualX;
     private double prevActualZ;
     private double smoothX;
