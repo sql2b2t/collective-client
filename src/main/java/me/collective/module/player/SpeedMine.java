@@ -173,17 +173,9 @@ public class SpeedMine extends Module {
         .build());
     private final Setting<Boolean> persistentConfig = this.sgGeneral.add(new BoolSetting.Builder()
         .name("постоянный")
-        .description("Держит packet-mine-эксплойт активным даже при выключенном модуле (не даёт эксплойту сломаться).")
-        .defaultValue(true)
+        .description("При выключении модуля не отправлять ABORT активному майну (сервер прервёт копание сам — удобно для полураскопанных эндер-сундуков). По умолчанию модуль выключается чисто: ABORT уходит, всё состояние сбрасывается.")
+        .defaultValue(false)
         .visible(() -> this.modeConfig.get() == SpeedmineMode.PACKET)
-        .onChanged(enabled -> {
-            if (enabled && this.mc.player != null) {
-                this.mc.player.sendMessage(
-                    Text.literal("§7[§bFast Mine§7] §aПостоянный режим включён! Модуль нельзя выключить, пока не отключишь это или не выйдешь с сервера."),
-                    false
-                );
-            }
-        })
         .build());
     private final Setting<Swap> swapConfig = this.sgGeneral.add(new EnumSetting.Builder<Swap>()
         .name("авто-смена")
@@ -402,35 +394,23 @@ public class SpeedMine extends Module {
     }
 
     @Override
-    public void toggle() {
-        if (this.isActive() && this.persistentConfig.get() && this.mc.getNetworkHandler() != null) {
-            if (this.mc.player != null) {
-                this.mc.player.sendMessage(
-                    Text.literal("§7[§bFast Mine§7] §cНельзя выключить, пока активен постоянный режим! Отключи «постоянный» или выйди с сервера."),
-                    false
-                );
-            }
-        } else {
-            super.toggle();
-        }
-    }
-
-    @Override
     public void onActivate() {
         this.resetState();
     }
 
     @Override
     public void onDeactivate() {
-        if (!this.persistentConfig.get() || this.mc.getNetworkHandler() == null) {
-            if (this.activeMine != null && this.activeMine.started && this.mc.player != null && this.mc.getNetworkHandler() != null) {
-                this.sendAbort(this.activeMine.pos);
-            }
-
-            this.resetState();
-            SwapManager.getInstance().releaseNow(this);
-            RotationUtils.getInstance().release(this);
+        // Выключение всегда чистое: ABORT активному майну, полный сброс состояния.
+        // «Постоянный» означает лишь отказ от ABORT-пакета (сервер прервёт копание сам,
+        // например, чтобы полураскопанный эндер-сундук продолжил жить), а не удержание модуля.
+        if (!this.persistentConfig.get() && this.activeMine != null && this.activeMine.started
+                && this.mc.player != null && this.mc.getNetworkHandler() != null) {
+            this.sendAbort(this.activeMine.pos);
         }
+
+        this.resetState();
+        SwapManager.getInstance().releaseNow(this);
+        RotationUtils.getInstance().release(this);
     }
 
     // State reset on disconnect / world change
