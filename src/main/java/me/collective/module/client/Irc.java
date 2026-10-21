@@ -440,6 +440,22 @@ public class Irc extends Module {
         return sanitizeName(custom.isEmpty() ? baseName() : custom);
     }
 
+    /** Публичный нормализатор (команда .irc nick): к правилам релея; < 3
+     * валидных символов = "" → смысл "авто, ник аккаунта". */
+    public String normalizeNick(String raw) {
+        String trimmed = raw == null ? "" : raw.trim();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < trimmed.length() && sb.length() < 16; i++) {
+            char c = trimmed.charAt(i);
+            boolean ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+                || (c >= '0' && c <= '9') || c == '_';
+            if (ok) {
+                sb.append(c);
+            }
+        }
+        return sb.length() >= 3 ? sb.toString() : "";
+    }
+
     /** Ник под правила релея [A-Za-z0-9_]{3,16}; кириллица вырезается. */
     private static String sanitizeName(String raw) {
         StringBuilder sb = new StringBuilder();

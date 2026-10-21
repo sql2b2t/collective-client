@@ -1496,7 +1496,9 @@ final class ClickGui2Rows {
                 return false;
             }
             if (button == 0) {
-                editing = ClickGui2Widgets.inRect(mx, my, x + w - BOX_W, y + 3f, BOX_W, 16f);
+                // Ввод по всей строке: и по подписи, и по боксу справа —
+                // так поле не приходится искать по точному клику в бокс.
+                editing = true;
                 return true;
             }
             return false;
