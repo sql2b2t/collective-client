@@ -16,6 +16,8 @@ import java.util.List;
 public class ModuleButton extends Component {
     private final Module module;
     private final List<Component> components = new ArrayList<>();
+    /** Настройка[i] соответствует компоненту[i] — для проверки видимости. */
+    private final List<Setting<?>> settings = new ArrayList<>();
     private boolean open;
     private float toggleProgress;
 
@@ -28,35 +30,55 @@ public class ModuleButton extends Component {
         float curY = y + height;
 
         for (Setting<?> setting : module.getSettings()) {
-            if (setting instanceof BooleanSetting) {
-                components.add(new BooleanComponent((BooleanSetting) setting, x, curY, width, settingH));
-            } else if (setting instanceof NumberSetting) {
-                components.add(new SliderComponent((NumberSetting) setting, x, curY, width, settingH));
-            } else if (setting instanceof IntegerSetting) {
-                components.add(new IntegerComponent((IntegerSetting) setting, x, curY, width, settingH));
-            } else if (setting instanceof StringSetting) {
-                components.add(new TextComponent((StringSetting) setting, x, curY, width, settingH));
-            } else if (setting instanceof EnumSetting) {
-                components.add(new EnumComponent((EnumSetting<?>) setting, x, curY, width, settingH));
-            } else if (setting instanceof ModeSetting) {
-                components.add(new ModeComponent((ModeSetting) setting, x, curY, width, settingH));
-            } else if (setting instanceof ChoiceSetting) {
-                components.add(new ChoiceComponent((ChoiceSetting) setting, x, curY, width, settingH));
-            } else if (setting instanceof ColorSetting) {
-                components.add(new ColorComponent((ColorSetting) setting, x, curY, width, settingH));
-            } else if (setting instanceof KeybindSetting) {
-                components.add(new KeybindComponent((KeybindSetting) setting, x, curY, width, settingH));
-            } else if (setting instanceof ActionSetting) {
-                components.add(new ActionComponent((ActionSetting) setting, x, curY, width, settingH));
-            } else if (setting instanceof BlockListSetting) {
-                components.add(new BlockListComponent((BlockListSetting) setting, x, curY, width, settingH));
-            } else if (setting instanceof EntityListSetting) {
-                components.add(new EntityListComponent((EntityListSetting) setting, x, curY, width, settingH));
-            } else if (setting instanceof ItemListSetting) {
-                components.add(new ItemListComponent((ItemListSetting) setting, x, curY, width, settingH));
-            }
+            Component c = makeComponent(setting, x, curY, width, settingH);
+            if (c == null) continue; // тип не поддерживается — строк без дыр
+            components.add(c);
+            settings.add(setting);
             curY += settingH;
         }
+    }
+
+    private static Component makeComponent(Setting<?> setting, float x, float y, float width, float height) {
+        if (setting instanceof BooleanSetting) {
+            return new BooleanComponent((BooleanSetting) setting, x, y, width, height);
+        }
+        if (setting instanceof NumberSetting) {
+            return new SliderComponent((NumberSetting) setting, x, y, width, height);
+        }
+        if (setting instanceof IntegerSetting) {
+            return new IntegerComponent((IntegerSetting) setting, x, y, width, height);
+        }
+        if (setting instanceof StringSetting) {
+            return new TextComponent((StringSetting) setting, x, y, width, height);
+        }
+        if (setting instanceof EnumSetting) {
+            return new EnumComponent((EnumSetting<?>) setting, x, y, width, height);
+        }
+        if (setting instanceof ModeSetting) {
+            return new ModeComponent((ModeSetting) setting, x, y, width, height);
+        }
+        if (setting instanceof ChoiceSetting) {
+            return new ChoiceComponent((ChoiceSetting) setting, x, y, width, height);
+        }
+        if (setting instanceof ColorSetting) {
+            return new ColorComponent((ColorSetting) setting, x, y, width, height);
+        }
+        if (setting instanceof KeybindSetting) {
+            return new KeybindComponent((KeybindSetting) setting, x, y, width, height);
+        }
+        if (setting instanceof ActionSetting) {
+            return new ActionComponent((ActionSetting) setting, x, y, width, height);
+        }
+        if (setting instanceof BlockListSetting) {
+            return new BlockListComponent((BlockListSetting) setting, x, y, width, height);
+        }
+        if (setting instanceof EntityListSetting) {
+            return new EntityListComponent((EntityListSetting) setting, x, y, width, height);
+        }
+        if (setting instanceof ItemListSetting) {
+            return new ItemListComponent((ItemListSetting) setting, x, y, width, height);
+        }
+        return null;
     }
 
     @Override
@@ -102,29 +124,48 @@ public class ModuleButton extends Component {
 
         // Render sub-settings when open
         if (open && !components.isEmpty()) {
+            // Высота строки тянется за высотой шрифта настроек: захардкоженные
+            // 11 не вмещали крупный SettingsFontSize/кастомные шрифты — текст
+            // соседних строк наезжал друг на друга.
+            float rowH = adaptiveRowHeight();
             float curY = y + height;
-            float sH = getSettingsHeight();
+            float sH = getSettingsHeight(rowH);
 
             // Distinct settings container background (frosted glass backing)
             RenderUtil.drawRect(context, x, curY, x + width, curY + sH, new Color(14, 14, 18, 180));
             // Left accent line
             RenderUtil.drawRect(context, x, curY, x + 2.0f, curY + sH, UI.INSTANCE.color.getValue());
 
-            for (Component c : components) {
+            for (int i = 0; i < components.size(); i++) {
+                Setting<?> setting = settings.get(i);
+                if (!setting.isVisible()) continue; // невидимка не занимает строку
+                Component c = components.get(i);
                 c.setX(x);
                 c.setY(curY);
                 c.setWidth(width);
+                c.setHeight(rowH);
                 c.render(context, mouseX, mouseY, delta);
-                curY += c.getHeight();
+                curY += rowH;
             }
         }
     }
 
+    /** Строка настроек: минимум 11 px, или высота шрифта настроек + отступ. */
+    private float adaptiveRowHeight() {
+        float textH = FontManager.INSTANCE.getFontHeightScaled(FontManager.settingsScale());
+        return Math.max(11f, textH + 4f);
+    }
+
     public float getSettingsHeight() {
+        return getSettingsHeight(adaptiveRowHeight());
+    }
+
+    private float getSettingsHeight(float rowH) {
         if (!open) return 0;
         float h = 0;
-        for (Component c : components) {
-            h += c.getHeight();
+        for (int i = 0; i < components.size(); i++) {
+            if (!settings.get(i).isVisible()) continue;
+            h += rowH;
         }
         return h;
     }
