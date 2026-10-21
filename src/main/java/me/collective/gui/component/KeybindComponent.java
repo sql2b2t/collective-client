@@ -24,7 +24,7 @@ public class KeybindComponent extends Component {
         RenderUtil.drawRect(context, x, y, x + width, y + height, UI.INSTANCE.bgColor.getValue());
 
         String keyName = binding ? "..." : setting.getKeyName().toUpperCase();
-        String text = "Key: " + keyName;
+        String text = setting.getName() + ": " + keyName;
 
         int col = binding ? Color.YELLOW.getRGB() : UI.INSTANCE.textColor.getValue().getRGB();
         float fs = FontManager.settingsScale();
