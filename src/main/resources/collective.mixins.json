@@ -53,8 +53,7 @@
     "MixinMinecraftClientTick",
     "ScreenAccessor",
     "MixinTitleScreen",
-    "MixinMultiplayerScreen",
-    "MixinClientConnection"
+    "MixinMultiplayerScreen"
   ],
   "injectors": {
     "defaultRequire": 1
