@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 /**
  * Общий чат и эмоуты пользователей Collective Client.
@@ -39,6 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class Irc extends Module {
     public static Irc INSTANCE;
 
+    public final StringSetting nickname = add(new StringSetting("Nickname", ""));
     public final StringSetting host = add(new StringSetting("Host", "31.77.19.160"));
     public final IntegerSetting port = add(new IntegerSetting("Port", 29900, 1, 65535));
     public final StringSetting token = add(new StringSetting("Token", "collective"));
@@ -67,8 +69,16 @@ public class Irc extends Module {
     private final Set<String> users = ConcurrentHashMap.newKeySet();
 
     public Irc() {
-        super("IRC", "Общий чат и эмоуты пользователей чита через релей на VPS.", Category.CLIENT);
+        super("IRC", "Общий чат и эмоуты пользователей чита через релей на VPS. "
+            + "Ник задаётся в Nickname (пусто = имя аккаунта).", Category.CLIENT);
         INSTANCE = this;
+        // Смена ника на лету: рвём соединение, run() сам перелогинится
+        // (backoff сброшен, т.к. прошлые сессии были успешными).
+        this.nickname.setChangeListener(v -> {
+            if (this.connected) {
+                closeQuietly();
+            }
+        });
     }
 
     @Override
@@ -76,7 +86,7 @@ public class Irc extends Module {
         this.connected = false;
         this.users.clear();
         this.lastError = "";
-        this.usedName = sanitizeName(baseName());
+        this.usedName = currentName();
 
         EmoteEngine.setSyncListener(new EmoteEngine.PlaybackSync() {
             @Override
@@ -184,7 +194,7 @@ public class Irc extends Module {
             OutputStreamWriter out = new OutputStreamWriter(sock.getOutputStream(), StandardCharsets.UTF_8);
             this.writer = out;
 
-            String name = sanitizeName(baseName());
+            String name = currentName();
             String greeting = "LOGIN " + name + " " + this.token.getValue().trim();
             synchronized (this.sendLock) {
                 out.write(greeting);
@@ -387,15 +397,15 @@ public class Irc extends Module {
         return true;
     }
 
-    /** Статус для команды .irc без аргументов. */
+    /** Статус для команды .irc без аргументов (адрес релея в чат не светим). */
     public String statusText() {
         if (this.connected) {
-            return "IRC на связи: имя §b" + usedName + "§f, в канале §b" + users.size()
-                + "§f (§7" + host.getValue() + ":" + port.getValue() + "§f).";
+            return "IRC на связи: ник §b" + trimDisplay(usedName, 16)
+                + "§f, в канале §b" + users.size() + "§f.";
         }
         if (this.thread != null && isToggled()) {
-            return "IRC подбирает связь, крайний сбой: §7" + trimDisplay(lastError, 90)
-                + "§f (адрес §7" + host.getValue() + ":" + port.getValue() + "§f).";
+            return "IRC подбирает связь, крайний сбой: §7"
+                + hideAddress(trimDisplay(lastError, 90)) + "§f.";
         }
         return "IRC выключен.";
     }
@@ -404,7 +414,7 @@ public class Irc extends Module {
 
     private void announceConnect() {
         mc.execute(() -> ChatHelper.sendMessage(
-            "§8[§bIRC§8] §aСвязь с релеем установлена, имя канала: §b" + usedName));
+            "§8[§bIRC§8] §aСвязь с релеем установлена, ник: §b" + usedName));
     }
 
     private static String trimDisplay(String source, int limit) {
@@ -424,17 +434,38 @@ public class Irc extends Module {
         return name;
     }
 
-    /** Имя под правила релея: [A-Za-z0-9_]{3,16}. */
+    /** Ник для релея: настройка Nickname, иначе имя аккаунта Minecraft. */
+    private String currentName() {
+        String custom = this.nickname.getValue().trim();
+        return sanitizeName(custom.isEmpty() ? baseName() : custom);
+    }
+
+    /** Ник под правила релея [A-Za-z0-9_]{3,16}; кириллица вырезается. */
     private static String sanitizeName(String raw) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < raw.length() && sb.length() < 16; i++) {
             char c = raw.charAt(i);
-            if (Character.isLetterOrDigit(c) || c == '_') {
-                sb.append(Character.toLowerCase(c));
+            boolean ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+                || (c >= '0' && c <= '9') || c == '_';
+            if (ok) {
+                sb.append(c);
             }
         }
         String name = sb.toString();
         return name.length() >= 3 ? name : "user" + name;
+    }
+
+    /** Замазать IP/адрес релея в тексте, уходящем в видимый чат. */
+    private static final Pattern IPV4_PATTERN = Pattern.compile(
+        "\\b\\d{1,3}(?:\\.\\d{1,3}){3}(?::\\d+)?\\b");
+
+    private String hideAddress(String text) {
+        String result = IPV4_PATTERN.matcher(text).replaceAll("*.*.*.*");
+        String hostValue = this.host.getValue().trim();
+        if (!hostValue.isEmpty()) {
+            result = result.replace(hostValue, "***");
+        }
+        return result;
     }
 
     private static String describe(Throwable t) {
