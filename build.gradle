@@ -32,7 +32,9 @@ dependencies {
     modImplementation "meteordevelopment:baritone:1.21.11-SNAPSHOT"
     implementation files("libs/nether-pathfinder-1.4.1.jar")
 
-    include(implementation(annotationProcessor("io.github.llamalad7:mixinextras-fabric:0.4.1")))
+    // MixinExtras 0.5.4 (в loader 0.19.2 у TLauncher) падает ClassCastException на @Redirect
+    // при трансформации Minecraft — фикс там появился в 0.5.5; запекаем, loader выберет новейший
+    include(implementation(annotationProcessor("io.github.llamalad7:mixinextras-fabric:0.5.5")))
 
     // Kotlin scripting engine for .kts scripts (JSR-223)
     // Без этого ScriptEngineManager не находит движок и падает с
