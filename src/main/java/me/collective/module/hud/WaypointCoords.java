@@ -9,6 +9,7 @@ import net.minecraft.client.gui.DrawContext;
 
 import java.awt.Color;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -37,62 +38,59 @@ public class WaypointCoords extends HudModule {
         if (exploit == null || !exploit.isToggled()) return;
 
         Map<UUID, WaypointCoordExploit.TriangulationResult> results = WaypointCoordExploit.getLastResults();
-        if (results.isEmpty()) return;
+        Map<UUID, WaypointCoordExploit.PendingAzimuth> azimuths = WaypointCoordExploit.getLastAzimuths();
+        if (results.isEmpty() && azimuths.isEmpty()) return;
 
         double px = mc.player.getX();
         double pz = mc.player.getZ();
 
-        List<WaypointCoordExploit.TriangulationResult> list = new ArrayList<>();
-        for (WaypointCoordExploit.TriangulationResult r : results.values()) {
-            if (!r.hasCoords && Float.isNaN(r.currentAzimuth)) {
-                // нет ни пеленга, ни координат — пропускаем
-                continue;
-            }
-            if (!r.hasCoords && !showPending.getValue()) continue;
-            list.add(r);
-        }
-
-        if (list.isEmpty()) return;
-
-        list.sort((a, b) -> {
-            double da = a.hasCoords ? (a.wx - px) * (a.wx - px) + (a.wz - pz) * (a.wz - pz) : Double.MAX_VALUE;
-            double db = b.hasCoords ? (b.wx - px) * (b.wx - px) + (b.wz - pz) * (b.wz - pz) : Double.MAX_VALUE;
-            int c = Double.compare(da, db);
-            if (c != 0) return c;
-            return Long.compare(b.lastUpdated, a.lastUpdated);
-        });
-
-        if (list.size() > MAX_ROWS) list = list.subList(0, MAX_ROWS);
-
-        int fh = FontManager.INSTANCE.getFontHeight();
-        int lineH = fh + 2;
+        // строки по игрокам: точные/расчётные координаты + пеленги без расчёта
+        Map<UUID, String> coordLines = new LinkedHashMap<>();
         List<String> lines = new ArrayList<>();
-        float textWidth = 0;
-
-        if (showHeader.getValue()) {
-            String header = String.format("§d%s §8[%d]", getName(), list.size());
-            lines.add(header);
-            textWidth = FontManager.INSTANCE.getStringWidth(header);
-        }
-
-        for (WaypointCoordExploit.TriangulationResult r : list) {
-            double dist = r.hasCoords ? Math.hypot(r.wx - px, r.wz - pz) : Double.MAX_VALUE;
-            String distText = showDistance.getValue() && dist != Double.MAX_VALUE
+        for (WaypointCoordExploit.TriangulationResult r : results.values()) {
+            double dist = Math.hypot(r.wx - px, r.wz - pz);
+            String distText = showDistance.getValue()
                 ? String.format(" §8[§f%dм§8]", (int) Math.round(dist))
                 : "";
             String line;
-            if (r.hasCoords && r.isDirect) {
+            if (r.isDirect) {
                 line = String.format("§a%s §7: §f%d§7, §f%d%s", r.playerName, (int) r.wx, (int) r.wz, distText);
-            } else if (r.hasCoords) {
-                line = String.format("§e%s §7: §f~%d§7, §f~%d%s", r.playerName, (int) Math.round(r.wx), (int) Math.round(r.wz), distText);
             } else {
-                float deg = (float) Math.toDegrees(r.currentAzimuth);
-                deg = (deg % 360 + 360) % 360;
-                line = String.format("§7%s §fпеленг §7%.0f°", r.playerName, deg);
+                line = String.format("§e%s §7: §f~%d§7, §f~%d%s", r.playerName, (int) Math.round(r.wx), (int) Math.round(r.wz), distText);
             }
+            coordLines.put(r.uuid, line);
+        }
+
+        List<Map.Entry<UUID, String>> coordEntries = new ArrayList<>(coordLines.entrySet());
+        coordEntries.sort((a, b) -> {
+            double da = distanceOf(results.get(a.getKey()), px, pz);
+            double db = distanceOf(results.get(b.getKey()), px, pz);
+            return Double.compare(da, db);
+        });
+
+        if (showHeader.getValue()) {
+            lines.add(String.format("§d%s §8[%d]", getName(), coordEntries.size() + azimuths.size()));
+        }
+        for (Map.Entry<UUID, String> e : coordEntries) {
+            lines.add(e.getValue());
+        }
+
+        if (showPending.getValue()) {
+            for (WaypointCoordExploit.PendingAzimuth az : azimuths.values()) {
+                if (results.containsKey(az.uuid)) continue; // уже есть координаты
+                lines.add(String.format("§7%s §fпеленг §7%.0f°", az.playerName, az.azimuthDeg));
+            }
+        }
+
+        if (lines.isEmpty()) return;
+        if (lines.size() > MAX_ROWS + 1) lines = lines.subList(0, MAX_ROWS + 1);
+
+        int fh = FontManager.INSTANCE.getFontHeight();
+        int lineH = fh + 2;
+        float textWidth = 0;
+        for (String line : lines) {
             float w = FontManager.INSTANCE.getStringWidth(line);
             if (w > textWidth) textWidth = w;
-            lines.add(line);
         }
 
         this.width = textWidth + 6;
@@ -107,5 +105,10 @@ public class WaypointCoords extends HudModule {
             FontManager.INSTANCE.drawStringWithShadow(context, line, x + 3, curY, HUD.INSTANCE.getHudColor(0));
             curY += lineH;
         }
+    }
+
+    private double distanceOf(WaypointCoordExploit.TriangulationResult r, double px, double pz) {
+        if (r == null) return Double.MAX_VALUE;
+        return (r.wx - px) * (r.wx - px) + (r.wz - pz) * (r.wz - pz);
     }
 }
