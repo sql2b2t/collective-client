@@ -1,10 +1,13 @@
 package me.collective.module.hud;
 
 import me.collective.font.FontManager;
-import me.collective.gui.GuiGfx;
+import me.collective.module.client.HUD;
+import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.StringSetting;
 import net.minecraft.client.gui.DrawContext;
+
+import java.awt.Color;
 
 public class Watermark extends HudModule {
     public final StringSetting text = add(new StringSetting("Text", "Collective"));
@@ -12,41 +15,30 @@ public class Watermark extends HudModule {
 
     public Watermark() {
         super("Watermark", "Displays the client watermark.", 4, 4);
-        background.setValue(true);
     }
 
     @Override
     public void render(DrawContext context, float delta) {
         if (!isToggled()) return;
 
-        FontManager fm = FontManager.INSTANCE;
-        String logo = text.getValue();
-        String ver = version.getValue() ? "v1.1" : "";
-
-        float logoW = fm.getStringWidth(logo);
-        float verW = ver.isEmpty() ? 0f : fm.getStringWidth(ver);
-        int fontH = fm.getFontHeight();
-        float accentW = 2.5f;
+        // Версия — из метаданных мода (fabric.mod.json), чтобы не врать в релизах
+        String modVersion = "1.3";
+        try {
+            modVersion = net.fabricmc.loader.api.FabricLoader.getInstance()
+                .getModContainer("collective")
+                .map(c -> c.getMetadata().getVersion().getFriendlyString())
+                .orElse(modVersion);
+        } catch (Throwable ignored) {
+        }
+        String title = text.getValue() + (version.getValue() ? " §fv" + modVersion : "");
+        this.width = FontManager.INSTANCE.getStringWidth(title) + 6;
+        this.height = FontManager.INSTANCE.getFontHeight() + 4;
 
         if (background.getValue()) {
-            float padY = 4f;
-            float textLeft = x + 1.5f + accentW + 4.5f;
-            float textRight = textLeft + logoW + (verW > 0 ? 4f : 0f) + verW;
-            this.width = textRight - x + 6f;
-            this.height = fontH + padY * 2;
-
-            HudTheme.plate(context, x, y, width, height, 5f);
-            GuiGfx.fillRounded(context, x + 1.5f, y + 4f, accentW, height - 8f, accentW / 2f, HudTheme.accent().getRGB());
-
-            float ty = y + padY;
-            fm.drawStringWithShadow(context, logo, textLeft, ty, HudTheme.text());
-            if (verW > 0) fm.drawStringWithShadow(context, ver, textLeft + logoW + 4f, ty, HudTheme.MUTED);
-            return;
+            RenderUtil.drawRect(context, x, y, x + width, y + height, new Color(20, 20, 20, 180));
+            RenderUtil.drawOutline(context, x, y, width, height, 1, HUD.INSTANCE.getHudColor(0).getRGB());
         }
 
-        this.width = logoW + (verW > 0 ? 4f : 0f) + verW;
-        this.height = fontH + 2f;
-        fm.drawStringWithShadow(context, logo, x, y, HudTheme.text());
-        if (verW > 0) fm.drawStringWithShadow(context, ver, x + logoW + 4f, y, HudTheme.MUTED);
+        FontManager.INSTANCE.drawStringWithShadow(context, title, x + 3, y + 2, HUD.INSTANCE.getHudColor(0));
     }
 }
