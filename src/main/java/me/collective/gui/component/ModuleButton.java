@@ -32,6 +32,10 @@ public class ModuleButton extends Component {
                 components.add(new BooleanComponent((BooleanSetting) setting, x, curY, width, settingH));
             } else if (setting instanceof NumberSetting) {
                 components.add(new SliderComponent((NumberSetting) setting, x, curY, width, settingH));
+            } else if (setting instanceof IntegerSetting) {
+                components.add(new IntegerComponent((IntegerSetting) setting, x, curY, width, settingH));
+            } else if (setting instanceof StringSetting) {
+                components.add(new TextComponent((StringSetting) setting, x, curY, width, settingH));
             } else if (setting instanceof EnumSetting) {
                 components.add(new EnumComponent((EnumSetting<?>) setting, x, curY, width, settingH));
             } else if (setting instanceof ModeSetting) {
@@ -158,6 +162,13 @@ public class ModuleButton extends Component {
         }
 
         return false;
+    }
+
+    /** Разворачивает режим ввода у всех текстовых строк модуля. */
+    public void clearFocusFromTextInputs() {
+        for (Component c : components) {
+            c.clearFocus();
+        }
     }
 
     @Override

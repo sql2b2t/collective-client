@@ -209,6 +209,13 @@ public class Panel {
         return false;
     }
 
+    /** Разворачивает редактирование во всех строках-настройках (текст/целые). */
+    public void clearFocusFromTextInputs() {
+        for (ModuleButton btn : buttons) {
+            btn.clearFocusFromTextInputs();
+        }
+    }
+
     public void mouseReleased(double mouseX, double mouseY, int button) {
         if (button == 0) {
             this.dragging = false;

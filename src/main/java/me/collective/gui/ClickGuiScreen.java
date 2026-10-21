@@ -171,6 +171,11 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     public boolean mouseClicked(Click click, boolean bl) {
+        // Любой клик вне текстовой строки снимает режим ввода: иначе editing
+        // остаётся в «протухшей» строке и печать уходит мимо целевого поля.
+        for (Panel panel : panels) {
+            panel.clearFocusFromTextInputs();
+        }
         for (int i = panels.size() - 1; i >= 0; i--) {
             Panel panel = panels.get(i);
             if (panel.mouseClicked(click.x(), click.y(), click.button())) {

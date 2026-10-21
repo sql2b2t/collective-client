@@ -42,6 +42,10 @@ public abstract class Component {
         return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
     }
 
+    /** Наследники с режимом ввода (текстовые поля) сбрасывают его здесь. */
+    public void clearFocus() {
+    }
+
     public float getX() { return x; }
     public void setX(float x) { this.x = x; }
     public float getY() { return y; }
