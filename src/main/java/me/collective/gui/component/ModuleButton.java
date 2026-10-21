@@ -145,7 +145,10 @@ public class ModuleButton extends Component {
                 c.setWidth(width);
                 c.setHeight(rowH);
                 c.render(context, mouseX, mouseY, delta);
-                curY += rowH;
+                // Раскрытый дропдаун режимов занимает больше строки — сдвигаем
+                // последующие настройки на его реальную высоту, иначе список
+                // рисуется поверх них и клики попадают не в него.
+                curY += Math.max(rowH, c.getHeight());
             }
         }
     }
@@ -165,7 +168,9 @@ public class ModuleButton extends Component {
         float h = 0;
         for (int i = 0; i < components.size(); i++) {
             if (!settings.get(i).isVisible()) continue;
-            h += rowH;
+            // Раскрытый дропдаун режимов выше обычной строки — контейнер и
+            // общая высота панели должны учитывать его реальную высоту.
+            h += Math.max(rowH, components.get(i).getHeight());
         }
         return h;
     }

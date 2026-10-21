@@ -63,7 +63,7 @@ public class AirPlaceScaffold extends Module {
     public final NumberSetting rotationSpeed = add(new NumberSetting(
         "RotationSpeed", 120.0, 10.0, 360.0, 10.0,
         (v) -> rotationMode.getValue() != RotationMode.None));
-    public final NumberSetting radius = add(new NumberSetting("Radius", 0.0, 0.0, 4.0, 0.5));
+    public final NumberSetting radius = add(new NumberSetting("Radius", 0.0, 0.0, 6.0, 0.5));
     public final BooleanSetting velocityPredict = add(new BooleanSetting("VelocityPredict", true));
     public final NumberSetting velocityMultiplier
         = add(new NumberSetting("VelocityMultiplier", 1.0, 0.5, 5.0, 0.1, (v) -> velocityPredict.getValue()));
@@ -537,6 +537,15 @@ public class AirPlaceScaffold extends Module {
 
     public boolean isSafeWalking() {
         return this.isToggled() && this.safeWalk.getValue();
+    }
+
+    /**
+     * Занят ли модуль активной постановкой прямо сейчас: включён и имеет
+     * текущую цель под игроком. Используется OffhandManager, чтобы не трогать
+     * офхенд, пока скаффолд работает.
+     */
+    public boolean isBusy() {
+        return this.isToggled() && this.aimPos != null;
     }
 
     public enum RotationMode {

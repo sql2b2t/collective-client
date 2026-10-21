@@ -60,7 +60,6 @@ public class ModuleManager {
         register(new TNTAura());
 
         // Movement Modules
-        register(new GrimScaffold());
         register(new AirPlaceScaffold());
         register(new Sprint());
         register(new Speed());
@@ -88,7 +87,6 @@ public class ModuleManager {
         // Highway Modules
         register(new HighwayBuilderHIG());
         register(new HighwayTools());
-        register(new ScaffoldHIG());
         register(new LiquidFillerHIG());
         register(new HotbarManager());
         register(new OffhandManager());

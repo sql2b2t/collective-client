@@ -55,7 +55,6 @@ public class ScriptManager {
 
     public void init() {
         this.engineManager = new ScriptEngineManager(getClass().getClassLoader());
-        writeExamplesOnFirstRun();
         subscribeTick();
         loadAllScripts();
     }
@@ -82,40 +81,7 @@ public class ScriptManager {
         }
     }
 
-    // --- Примеры и README ---
-
-    private void writeExamplesOnFirstRun() {
-        try {
-            Path marker = scriptsFolder.resolve(EXAMPLES_MARKER);
-            if (Files.exists(marker)) return;
-            migrateBrokenExamples();
-            writeMissingExamples();
-        } catch (Exception ignored) {}
-    }
-
-    /**
-     * Заменяет ранние версии наших примеров, которые не компилировались или писали в stdout:
-     * голые вызовы (module(...), every(...), print(...)) не работают — нужен префикс ctx.
-     * Пользовательские скрипты с этими признаками также обновляются только один раз (до маркера).
-     */
-    private void migrateBrokenExamples() {
-        try {
-            Path file = scriptsFolder.resolve("AutoJump.kts");
-            if (!Files.exists(file)) return;
-
-            String content = Files.readString(file);
-            boolean ours = content.contains("Автоматически прыгает")
-                    || content.contains("Автоматический прыжок")
-                    || content.contains("Прыгает при беге")
-                    || content.contains("Быстрое создание модуля");
-            if (ours && !content.contains("ctx.print")) {
-                Files.writeString(file, EXAMPLE_AUTOJUMP);
-                System.out.println("[Collective-Scripting] Обновлён устаревший пример AutoJump.kts (ctx-стиль)");
-            }
-        } catch (Exception e) {
-            System.err.println("[Collective-Scripting] Не удалось обновить AutoJump.kts: " + e);
-        }
-    }
+    // --- Примеры и README (создаются только командой .scripts examples) ---
 
     /** Создаёт отсутствующие примеры и README. Возвращает число созданных файлов. */
     public int writeMissingExamples() {

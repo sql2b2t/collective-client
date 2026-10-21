@@ -7,6 +7,7 @@ import me.collective.module.Module;
 import me.collective.module.ModuleManager;
 import me.collective.module.combat.AutoLog;
 import me.collective.module.movement.SafeWalk;
+import me.collective.module.movement.AirPlaceScaffold;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
@@ -47,7 +48,7 @@ public class HighwayTools extends Module {
         HotbarManager.class,
         LiquidFillerHIG.class,
         SafeWalk.class,
-        ScaffoldHIG.class
+        AirPlaceScaffold.class
     );
 
     private double originX;

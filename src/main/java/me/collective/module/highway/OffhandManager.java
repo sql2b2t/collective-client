@@ -6,6 +6,7 @@ import me.collective.event.events.PacketEvent;
 import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.module.ModuleManager;
+import me.collective.module.movement.AirPlaceScaffold;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.FindItemResult;
@@ -84,8 +85,8 @@ public class OffhandManager extends Module {
             moved = false;
         }
 
-        ScaffoldHIG scaffold = ModuleManager.INSTANCE.getModule(ScaffoldHIG.class);
-        boolean scaffolding = scaffold != null && scaffold.isToggled() && scaffold.hasWorked();
+        AirPlaceScaffold scaffold = ModuleManager.INSTANCE.getModule(AirPlaceScaffold.class);
+        boolean scaffolding = scaffold != null && scaffold.isBusy();
         if (scaffolding) return;
 
         // Switch back if swap key has been used
