@@ -31,6 +31,7 @@ public class CommandManager {
         register(new IrcCommand());
         register(new FolderCommand());
         register(new DisconnectCommand());
+        register(new DigLogCommand());
         register(new SorterCommand());
         register(new MoverCommand());
         register(new ElytraFlyCommand());

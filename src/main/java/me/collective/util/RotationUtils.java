@@ -597,6 +597,11 @@ public class RotationUtils {
     @EventHandler(priority = -100)
     public void onPacketSendLookGuard(PacketEvent.Send event) {
         if (event.isCancelled()) return;
+        // Ваниль-паритет: пока ни один модуль не держит тихую ротацию, досылать
+        // Look перед действием нельзя — клиент уходит с обычным тик-пакетом, и
+        // ванильный клиент никогда не шлёт Look прямо перед криком/копанием.
+        if (!this.isRotating() && !this.isWireFresh()) return;
+
         Packet<?> packet = event.packet;
 
         boolean needsLook;
