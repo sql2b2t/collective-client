@@ -72,7 +72,10 @@ public class AutoCity extends Module {
                 mc.player.sendMessage(Text.literal("§7[§cAutoCity§7] §aMining city block at: §e" + pos.toShortString()), false);
 
                 if (SpeedMine.INSTANCE != null) {
-                    if (!SpeedMine.INSTANCE.isToggled()) SpeedMine.INSTANCE.setToggled(true);
+                    if (!SpeedMine.INSTANCE.isToggled()) {
+                        SpeedMine.INSTANCE.setToggled(true);
+                        mc.player.sendMessage(Text.literal("§7[§cAutoCity§7] §6Сам включил SpeedMine — её настройки (скорость/обход/дальность) теперь копают твои блоки и могут флагать Grim."), false);
+                    }
                     SpeedMine.INSTANCE.mineBlock(cityPos, Direction.UP);
                 }
                 break;

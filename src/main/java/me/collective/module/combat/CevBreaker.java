@@ -9,6 +9,7 @@ import me.collective.manager.FriendManager;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.decoration.EndCrystalEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.text.Text;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
@@ -41,6 +42,7 @@ public class CevBreaker extends Module {
 
         if (SpeedMine.INSTANCE != null && !SpeedMine.INSTANCE.isToggled()) {
             SpeedMine.INSTANCE.setToggled(true);
+            mc.player.sendMessage(Text.literal("§7[§dCevBreaker§7] §6Сам включил SpeedMine — её настройки (скорость/обход/дальность) теперь копают твои блоки и могут флагать Grim."), false);
         }
 
         // Ломаем блок над головой цели
