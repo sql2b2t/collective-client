@@ -173,6 +173,7 @@ public class ModuleManager {
         register(new ModuleList());
         register(new Armor());
         register(new Position());
+        register(new WaypointCoords());
         register(new Direction());
         register(new Metrics());
         register(new Inventory());
