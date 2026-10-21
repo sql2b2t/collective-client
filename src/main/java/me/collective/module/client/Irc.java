@@ -5,7 +5,6 @@ import me.collective.command.ChatHelper;
 import me.collective.emotes.EmoteEngine;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
-import me.collective.setting.IntegerSetting;
 import me.collective.setting.StringSetting;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.PlayerListEntry;
@@ -41,9 +40,6 @@ public class Irc extends Module {
     public static Irc INSTANCE;
 
     public final StringSetting nickname = add(new StringSetting("Nickname", ""));
-    public final StringSetting host = add(new StringSetting("Host", "31.77.19.160"));
-    public final IntegerSetting port = add(new IntegerSetting("Port", 29900, 1, 65535));
-    public final StringSetting token = add(new StringSetting("Token", "collective"));
     public final BooleanSetting autoConnect = add(new BooleanSetting("AutoConnect", true));
     public final BooleanSetting showChat = add(new BooleanSetting("Chat", true));
     public final BooleanSetting shareEmotes = add(new BooleanSetting("Emotes", true));
@@ -57,6 +53,14 @@ public class Irc extends Module {
     private static final int MAX_LINE = 2040;
     private static final int BACKOFF_STEP_MS = 5_000;
     private static final int BACKOFF_MAX_MS = 30_000;
+
+    /**
+     * Релей вшит в клиент: адрес, порт и ключ не настраиваются — юзер задаёт
+     * только ник (Nickname). Ключ ниже держит рандомных зрителей подальше.
+     */
+    public static final String RELAY_HOST = "31.77.19.160";
+    public static final int RELAY_PORT = 29900;
+    public static final String RELAY_TOKEN = "collective";
 
     // ── Состояние сети ──
     private Thread thread;
@@ -142,7 +146,6 @@ public class Irc extends Module {
                 sleepSmall();
                 continue;
             }
-
             boolean wasConnected = false;
             try {
                 wasConnected = session();
@@ -169,8 +172,6 @@ public class Irc extends Module {
             }
             long delay = Math.min(BACKOFF_MAX_MS, (long) BACKOFF_STEP_MS * (1 << backoff));
             nextAttempt = System.currentTimeMillis() + delay;
-
-            if (this.host.getValue().isBlank()) break;
         }
     }
 
@@ -182,8 +183,8 @@ public class Irc extends Module {
     private boolean session() {
         Socket sock = null;
         try {
-            String host = this.host.getValue().trim();
-            int port = this.port.getValue();
+            String host = RELAY_HOST;
+            int port = RELAY_PORT;
 
             sock = new Socket();
             this.socket = sock;
@@ -195,7 +196,7 @@ public class Irc extends Module {
             this.writer = out;
 
             String name = currentName();
-            String greeting = "LOGIN " + name + " " + this.token.getValue().trim();
+            String greeting = "LOGIN " + name + " " + RELAY_TOKEN;
             synchronized (this.sendLock) {
                 out.write(greeting);
                 out.write('\n');
@@ -477,7 +478,7 @@ public class Irc extends Module {
 
     private String hideAddress(String text) {
         String result = IPV4_PATTERN.matcher(text).replaceAll("*.*.*.*");
-        String hostValue = this.host.getValue().trim();
+        String hostValue = RELAY_HOST;
         if (!hostValue.isEmpty()) {
             result = result.replace(hostValue, "***");
         }

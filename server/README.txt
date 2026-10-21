@@ -38,7 +38,7 @@ Manually (without systemd):
   # no token = open access: pass an empty string as the token arg
 
 Client side:
-  Module list -> Client -> "IRC": set Host / Port / Token, toggle on.
+  Module list -> Client -> "IRC": set your Nickname, toggle on (relay address/token are built into the client).
   ".irc <text>"  - send to the channel
   ".irc"         - status (connected, nick, user count)
   Server restarts are-safe: the module reconnects itself (5s..30s backoff).
