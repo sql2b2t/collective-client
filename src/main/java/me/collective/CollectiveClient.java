@@ -121,9 +121,11 @@ public class CollectiveClient implements ClientModInitializer {
         });
 
         // Initialize Baritone Overworld Elytra Process
-        try {
-            me.collective.baritone.OverworldElytraProcess.init();
-        } catch (Throwable ignored) {
+        if (me.collective.util.BaritoneHelper.isAvailable()) {
+            try {
+                me.collective.baritone.OverworldElytraProcess.init();
+            } catch (Throwable ignored) {
+            }
         }
 
         // Initialize Addon & Scripting Systems

@@ -5,6 +5,7 @@ import baritone.api.pathing.goals.Goal;
 import me.collective.baritone.OverworldElytraProcess;
 import me.collective.command.ChatHelper;
 import me.collective.command.Command;
+import me.collective.util.BaritoneHelper;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
@@ -17,6 +18,12 @@ public class ElytraFlyCommand extends Command {
 
     @Override
     public void execute(String[] args) {
+        // Класс OverworldElytraProcess недогружаем без Baritone (его интерфейсы
+        // — из baritone.api) — сначала проверка доступности.
+        if (!BaritoneHelper.isAvailable()) {
+            ChatHelper.sendMessage(Text.literal("Baritone не установлен - команда недоступна").styled(s -> s.withColor(Formatting.RED)));
+            return;
+        }
         OverworldElytraProcess.init();
         OverworldElytraProcess process = OverworldElytraProcess.getInstance();
 

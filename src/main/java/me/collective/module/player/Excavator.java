@@ -15,6 +15,7 @@ import me.collective.setting.EnumSetting;
 import me.collective.setting.KeybindSetting;
 import me.collective.setting.SettingColorSetting;
 import me.collective.util.SettingColor;
+import me.collective.util.BaritoneHelper;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.Vec3d;
 import org.lwjgl.glfw.GLFW;
@@ -22,7 +23,13 @@ import org.lwjgl.glfw.GLFW;
 import java.awt.Color;
 
 public class Excavator extends Module {
-    private final IBaritone baritone = BaritoneAPI.getProvider().getPrimaryBaritone();
+    // Baritone может быть не установлен: жадная инициализация поля падала
+    // NoClassDefFoundError'ом при старте (ModuleManager: new Excavator()).
+    // Доступ — ленивый и только после проверки доступности.
+    private IBaritone baritone() {
+        if (!BaritoneHelper.isAvailable()) return null;
+        return BaritoneAPI.getProvider() == null ? null : BaritoneAPI.getProvider().getPrimaryBaritone();
+    }
 
     // Keybindings: right click by default (-101)
     public final KeybindSetting selectionBind = add(new KeybindSetting("SelectionBind", -101));
@@ -51,6 +58,13 @@ public class Excavator extends Module {
 
     @Override
     public void onEnable() {
+        // Без установленного Baritone все функции Excavator недоступны:
+        // выключаем себя, чтобы не ронять классы baritone.api по цепочке.
+        if (!BaritoneHelper.isAvailable()) {
+            error("Baritone is not installed - Excavator disabled");
+            toggle();
+            return;
+        }
         status = Status.SEL_START;
         start = null;
         end = null;
@@ -59,13 +73,14 @@ public class Excavator extends Module {
     @Override
     public void onDisable() {
         try {
-            if (baritone != null) {
-                var lastSel = baritone.getSelectionManager().getLastSelection();
+            IBaritone active = baritone();
+            if (active != null) {
+                var lastSel = active.getSelectionManager().getLastSelection();
                 if (lastSel != null) {
-                    baritone.getSelectionManager().removeSelection(lastSel);
+                    active.getSelectionManager().removeSelection(lastSel);
                 }
-                if (baritone.getBuilderProcess().isActive()) {
-                    baritone.getCommandManager().execute("stop");
+                if (active.getBuilderProcess().isActive()) {
+                    active.getCommandManager().execute("stop");
                 }
             }
         } catch (Throwable ignored) {}
@@ -109,8 +124,11 @@ public class Excavator extends Module {
                 info("End corner set: (%d, %d, %d)", end.getX(), end.getY(), end.getZ());
             }
             try {
-                baritone.getSelectionManager().addSelection(start, end);
-                baritone.getBuilderProcess().clearArea(start, end);
+                IBaritone active = baritone();
+                if (active != null) {
+                    active.getSelectionManager().addSelection(start, end);
+                    active.getBuilderProcess().clearArea(start, end);
+                }
             } catch (Throwable t) {
                 error("Baritone clearArea failed: " + t.getMessage());
             }
@@ -151,12 +169,19 @@ public class Excavator extends Module {
                         lineColor.getValue(), mode, 0);
             }
 
+            IBaritone active = baritone();
+            if (active == null) {
+                if (!isToggled()) return;
+                error("Baritone is not installed");
+                toggle();
+                return;
+            }
             try {
-                if (!baritone.getBuilderProcess().isActive()) {
+                if (!active.getBuilderProcess().isActive()) {
                     if (keepActive.getValue()) {
-                        var lastSel = baritone.getSelectionManager().getLastSelection();
+                        var lastSel = active.getSelectionManager().getLastSelection();
                         if (lastSel != null) {
-                            baritone.getSelectionManager().removeSelection(lastSel);
+                            active.getSelectionManager().removeSelection(lastSel);
                         }
                         status = Status.SEL_START;
                     } else {

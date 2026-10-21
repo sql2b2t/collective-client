@@ -63,6 +63,11 @@ public final class ChestNavigator {
     }
 
     public Status travelTo(BlockPos canonical) {
+        // Без Baritone путь построить нечем: честно завершаемся с причиной.
+        if (!me.collective.util.BaritoneHelper.isAvailable()) {
+            failure = "Baritone не установлен";
+            return Status.UNREACHABLE;
+        }
         if (net.minecraft.client.MinecraftClient.getInstance().player == null || net.minecraft.client.MinecraftClient.getInstance().world == null || canonical == null) {
             failure = "не в мире";
             return Status.UNREACHABLE;

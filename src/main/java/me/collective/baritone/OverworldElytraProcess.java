@@ -16,6 +16,7 @@ import baritone.api.utils.Rotation;
 import baritone.api.utils.input.Input;
 import baritone.utils.PathRenderer;
 import me.collective.command.ChatHelper;
+import me.collective.util.BaritoneHelper;
 import me.collective.module.ModuleManager;
 import me.collective.module.movement.Pitch40;
 import me.collective.util.InventoryUtil;
@@ -95,6 +96,8 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
     }
 
     public static void init() {
+        // Без установленного Baritone любые упоминания baritone.api уронят загрузку класса.
+        if (!BaritoneHelper.isAvailable()) return;
         if (INSTANCE == null && BaritoneAPI.getProvider() != null) {
             IBaritone primary = BaritoneAPI.getProvider().getPrimaryBaritone();
             if (primary != null) {
