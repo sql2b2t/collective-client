@@ -70,6 +70,7 @@ public class ModuleManager {
         register(new RocketBoost());
         register(new NoJumpDelay());
         register(new GrimGlide());
+        register(new ElytraProbe());
         register(new NoWeb());
         register(new ElytraSwap());
         register(new ElytraRecast());
