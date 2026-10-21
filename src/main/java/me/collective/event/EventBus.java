@@ -92,9 +92,22 @@ public class EventBus {
                     EventHandler annotation = method.getAnnotation(EventHandler.class);
                     Listener listener = new Listener(object, method, annotation.priority());
 
-                    listenersMap.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>()).add(listener);
-                    // Sort descending by priority
-                    sortListeners(eventType);
+                    List<Listener> list = listenersMap.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>());
+                    // Повторный subscribe того же (target, method) не должен удваивать
+                    // вызовы: аддоны и перезагрузка модулей могут подписать объект второй раз.
+                    boolean present = false;
+                    for (Listener l : list) {
+                        if (l.target == object && l.method == method) {
+                            present = true;
+                            break;
+                        }
+                    }
+
+                    if (!present) {
+                        list.add(listener);
+                        // Sort descending by priority
+                        sortListeners(eventType);
+                    }
                 }
             }
             clazz = clazz.getSuperclass();
