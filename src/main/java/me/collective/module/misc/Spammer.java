@@ -32,7 +32,7 @@ public class Spammer extends Module {
     public final NumberSetting delay = add(new NumberSetting("Delay", 5.0, 1.0, 30.0, 0.5));
 
     private final List<String> spamList = new ArrayList<>();
-    private String fact = null;
+    private volatile String fact = null;
     private long lastSend = 0L;
     private long lastFactAttempt = 0L;
 
@@ -129,7 +129,9 @@ public class Spammer extends Module {
 
     private void fetchFact() {
         lastFactAttempt = System.currentTimeMillis();
-        new Thread(() -> {
+        // Поток-разовая выгрузка факта: именуем и делаем демоном, чтобы игра
+        // не ждала сеть при выходе; fact читается из главного потока — volatile.
+        Thread fetcher = new Thread(() -> {
             try {
                 String json;
                 try (var in = new java.net.URL("https://catfact.ninja/fact?max_length=200").openStream()) {
@@ -140,7 +142,9 @@ public class Spammer extends Module {
             } catch (Exception e) {
                 fact = null;
             }
-        }).start();
+        }, "Collective-Spammer-Fact");
+        fetcher.setDaemon(true);
+        fetcher.start();
     }
 
     private static String randomSuffix() {
