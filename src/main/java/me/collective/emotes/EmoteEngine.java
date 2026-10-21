@@ -11,9 +11,13 @@ import net.minecraft.util.math.RotationAxis;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Движок эмоутов: проигрывание, тайминг, наложение поз на модель,
@@ -38,6 +42,32 @@ public final class EmoteEngine {
     private static boolean originsLogged = false;
     /** Был активен на прошлом кадре — нужен разовый сброс поворотов при стопе. */
     private static boolean wasActive = false;
+
+    /**
+     * Эмоуты, запущенные другими пользователями чита: UUID игрока -> запущенная
+     * анимация. Наполняется от релея (модуль IRC), проигрывается поверх чужих
+     * моделей тем же кодом наложения.
+     */
+    private static final Map<UUID, ActiveEmote> REMOTES = new ConcurrentHashMap<>();
+    /** Кто-то закончил играть — разовый сброс пивотов в его кадре. */
+    private static final Set<UUID> remoteWasActive = ConcurrentHashMap.newKeySet();
+    private static int remoteSweepTicks;
+
+    /**
+     * Мост на сеть: когда локально стартует/останавливается эмоут, слушатель
+     * (модуль IRC) рассылает это остальным пользователям чита.
+     */
+    public interface PlaybackSync {
+        void onLocalStart(String emoteId);
+
+        void onLocalStop(String emoteId);
+    }
+
+    private static volatile PlaybackSync syncListener;
+
+    public static void setSyncListener(PlaybackSync listener) {
+        syncListener = listener;
+    }
 
     private EmoteEngine() {
     }
@@ -83,6 +113,8 @@ public final class EmoteEngine {
         }
         active = new ActiveEmote(emote, data, anim, new EmoteTiming(System.nanoTime()));
         lastPlayMs = System.currentTimeMillis();
+        PlaybackSync listener = syncListener;
+        if (listener != null) listener.onLocalStart(emote.id());
         if (debug()) {
             String[] bones = {"head", "body", "right_arm", "left_arm", "right_leg", "left_leg", "torso"};
             StringBuilder audit = new StringBuilder();
@@ -107,7 +139,11 @@ public final class EmoteEngine {
     }
 
     public static void stop() {
-        if (active != null) log("stop id=" + active.emote.id());
+        if (active != null) {
+            log("stop id=" + active.emote().id());
+            PlaybackSync listener = syncListener;
+            if (listener != null) listener.onLocalStop(active.emote().id());
+        }
         active = null;
     }
 
@@ -123,19 +159,50 @@ public final class EmoteEngine {
     /** Тик движка: автостоп при движении и в конце не-лупа. */
     public static void tick() {
         ActiveEmote a = active;
-        if (a == null || mc.player == null) return;
-        EmotesModule mod = EmotesModule.INSTANCE;
-        boolean keep = mod != null && mod.keepWhileMoving();
-        if (!keep && isMoving()) {
-            log("autostop: movement");
-            stop();
+        if (a == null || mc.player == null) {
+            /* локального драматурга нет — удалённые живут своей жизнью */
+        } else {
+            EmotesModule mod = EmotesModule.INSTANCE;
+            boolean keep = mod != null && mod.keepWhileMoving();
+            if (!keep && isMoving()) {
+                log("autostop: movement");
+                stop();
+                return;
+            }
+            long now = System.nanoTime();
+            float t = a.timing.animTime(now);
+            if (!a.emote.loop() && t >= a.data.duration()) {
+                log("autostop: end t=" + t + " dur=" + a.data.duration());
+                stop();
+                return;
+            }
+        }
+
+        if (mc.world == null) {
+            if (!REMOTES.isEmpty()) {
+                log("world gone: clear " + REMOTES.size() + " remote emotes");
+                REMOTES.clear();
+                remoteWasActive.clear();
+            }
             return;
         }
-        long now = System.nanoTime();
-        float t = a.timing.animTime(now);
-        if (!a.emote.loop() && t >= a.data.duration()) {
-            log("autostop: end t=" + t + " dur=" + a.data.duration());
-            stop();
+
+        // Автостоп не-лупа у удалённых (по длительности самой анимации).
+        if (!REMOTES.isEmpty()) {
+            long now = System.nanoTime();
+            REMOTES.values().removeIf(remote -> !remote.emote.loop()
+                && remote.data.duration() <= remote.timing.animTime(now));
+        }
+
+        // Разыгрывающие, ушедшие из мира, подметаются редко: раз в 100 тиков.
+        if (++remoteSweepTicks >= 100) {
+            remoteSweepTicks = 0;
+            HashSet<UUID> present = new HashSet<>();
+            for (var player : mc.world.getPlayers()) {
+                present.add(player.getUuid());
+            }
+            REMOTES.keySet().retainAll(present);
+            remoteWasActive.retainAll(present);
         }
     }
 
@@ -198,19 +265,35 @@ public final class EmoteEngine {
             log(sb.toString());
         }
 
-        ActiveEmote a = active;
+        ActiveEmote a;
         boolean local = isLocal(state);
-        if (a == null || !local) {
-            // Переход "играло -> стоп": разово сбросить замороженные повороты
-            if (a == null && local && wasActive) {
-                wasActive = false;
-                for (ModelPart p : parts) {
-                    if (p != null) PivotStore.restoreAll(p);
+        if (local) {
+            a = active;
+            if (a == null) {
+                // Переход "играло -> стоп": разово сбросить замороженные повороты
+                if (wasActive) {
+                    wasActive = false;
+                    for (ModelPart p : parts) {
+                        if (p != null) PivotStore.restoreAll(p);
+                    }
                 }
+                return;
             }
-            return;
+        } else {
+            UUID stateUuid = STATE_UUID.get(state);
+            a = stateUuid == null ? null : REMOTES.get(stateUuid);
+            if (a == null) {
+                // Чей-то эмоут кончился: разово вернуть пивоты
+                if (stateUuid != null && remoteWasActive.remove(stateUuid)) {
+                    for (ModelPart p : parts) {
+                        if (p != null) PivotStore.restoreAll(p);
+                    }
+                }
+                return;
+            }
+            remoteWasActive.add(stateUuid);
         }
-        wasActive = true;
+        if (local) wasActive = true;
 
         long now = System.nanoTime();
         float t = a.data.mapTime(a.timing.animTime(now), a.emote.loop());
@@ -249,6 +332,60 @@ public final class EmoteEngine {
         model.hat.roll = head.roll;
     }
 
+    /**
+     * Запустить эмоут на другом игроке (UUID + id эмоута из релея IRC).
+     * Если эмоут такой у этого клиента не описан — тихо игнорируется.
+     */
+    public static void playRemote(UUID uuid, String emoteId) {
+        if (uuid == null || emoteId == null) return;
+        if (mc.player != null && uuid.equals(mc.player.getUuid())) return;
+
+        Emote emote = null;
+        for (Emote candidate : Emote.ALL) {
+            if (candidate.id().equals(emoteId)) {
+                emote = candidate;
+                break;
+            }
+        }
+        if (emote == null || emote.animations().isEmpty()) {
+            log("remote: unknown emote '" + emoteId + "'");
+            return;
+        }
+
+        String anim = emote.animations().get(
+            ThreadLocalRandom.current().nextInt(emote.animations().size()));
+        EmoteData data;
+        try {
+            data = EmoteData.load(emote, anim);
+        } catch (Exception e) {
+            log("remote load FAILED " + emoteId + "/" + anim + ": " + e);
+            return;
+        }
+        if (data == null) {
+            log("remote load FAILED: no data for " + emoteId + "/" + anim);
+            return;
+        }
+
+        REMOTES.put(uuid, new ActiveEmote(emote, data, anim, new EmoteTiming(System.nanoTime())));
+    }
+
+    /** Остановить эмоут другого игрока (из релея IRC). */
+    public static void stopRemote(UUID uuid) {
+        if (uuid != null) REMOTES.remove(uuid);
+    }
+
+    /** Полная чистка удалённых эмоутов (отключение сети, выход из мира). */
+    public static void clearRemote() {
+        if (!REMOTES.isEmpty()) {
+            REMOTES.clear();
+            remoteWasActive.clear();
+        }
+    }
+
+    public static boolean isRemoteActive(UUID uuid) {
+        return uuid != null && REMOTES.containsKey(uuid);
+    }
+
     // Запасные базы на случай отсутствия снапшота (обычно снапшот есть всегда)
     private static final float[] HEAD_BASE = {0f, 0f, 0f};
     private static final float[] BODY_BASE = {0f, 0f, 0f};
@@ -282,8 +419,10 @@ public final class EmoteEngine {
 
     /** Сдвиг/поворот всего тела (после ванильных трансформов). */
     public static void applyBodyTransform(Object state, MatrixStack matrices) {
-        ActiveEmote a = active;
-        if (a == null || !isLocal(state)) return;
+        boolean local = isLocal(state);
+        UUID stateUuid = local ? null : STATE_UUID.get(state);
+        ActiveEmote a = local ? active : (stateUuid == null ? null : REMOTES.get(stateUuid));
+        if (a == null) return;
 
         long now = System.nanoTime();
         float t = a.data.mapTime(a.timing.animTime(now), a.emote.loop());

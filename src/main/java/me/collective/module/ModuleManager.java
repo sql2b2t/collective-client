@@ -31,6 +31,7 @@ public class ModuleManager {
         register(new Notifications());
         register(new AntiCheat());
         register(new Discord());
+        register(new Irc());
         register(new Baritone());
         register(new McpModule());
         register(new AutoSaveCfg());

@@ -1,0 +1,12 @@
+[Unit]
+Description=Collective IRC (chat + emotes relay for Collective Client)
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/collective-irc
+ExecStart=/usr/bin/java CollectiveIRCServer 29900 collective
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

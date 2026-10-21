@@ -28,6 +28,7 @@ public class CommandManager {
         register(new YawCommand());
         register(new DrawnCommand());
         register(new SayCommand());
+        register(new IrcCommand());
         register(new FolderCommand());
         register(new DisconnectCommand());
         register(new SorterCommand());
