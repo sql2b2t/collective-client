@@ -76,7 +76,7 @@ public class SpeedMine extends Module {
     private final Setting<Boolean> multitaskConfig = this.sgGeneral.add(new BoolSetting.Builder()
         .name("мультизадачность")
         .description("Продолжать копать во время использования предметов. Флагует проверку MultiActions Grim на обновлённых серверах — для 2b2t оставь выключенным.")
-        .defaultValue(false)
+        .defaultValue(true)
         .visible(() -> this.modeConfig.get() == SpeedmineMode.PACKET)
         .build());
     public final Setting<Boolean> doubleBreakConfig = this.sgGeneral.add(new BoolSetting.Builder()
