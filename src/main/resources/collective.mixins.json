@@ -51,6 +51,8 @@
     "MixinEmoteBody",
     "MixinMinecraftClient",
     "MixinMinecraftClientTick",
+    "MixinMinecraftClientScreen",
+    "AbstractSignEditScreenAccessor",
     "ScreenAccessor",
     "MixinTitleScreen",
     "MixinMultiplayerScreen",

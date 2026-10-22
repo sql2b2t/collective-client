@@ -109,6 +109,7 @@ public class ModuleManager {
         register(new GrimAirPlace());
         register(new EchestRebreak());
         register(new SpeedMine());
+        register(new AutoSign());
         register(new AntiAFK());
         register(new AutoRespawn());
         register(new MiddleClickExtra());
