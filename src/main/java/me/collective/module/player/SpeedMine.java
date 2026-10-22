@@ -94,10 +94,10 @@ public class SpeedMine extends Module {
     private final Setting<Integer> queueLimitConfig = this.sgGeneral.add(new IntSetting.Builder()
         .name("лимит-очереди")
         .description("Максимум блоков в очереди кликов; лишние клики игнорируются.")
-        .defaultValue(10)
+        .defaultValue(100)
         .min(1)
         .max(200)
-        .sliderRange(1, 20)
+        .sliderRange(1, 200)
         .visible(() -> this.modeConfig.get() == SpeedmineMode.PACKET && this.clickQueueConfig.get())
         .build());
     private final Setting<Keybind> clearQueueKey = this.sgGeneral.add(new KeybindSetting.Builder()
