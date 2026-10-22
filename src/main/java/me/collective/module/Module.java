@@ -102,6 +102,7 @@ public abstract class Module {
     public void onActivate() {}
     public void onDeactivate() {}
     public void onUpdate() {}
+    public void onWorldChange() {}
     public void onRender2D(DrawContext context, float delta) {}
     public String getInfoString() { return null; }
 

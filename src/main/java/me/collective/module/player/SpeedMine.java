@@ -413,10 +413,18 @@ public class SpeedMine extends Module {
         RotationUtils.getInstance().release(this);
     }
 
-    // State reset on disconnect / world change
+    // No packets here: the old operation must never be aborted in the new world.
+    @Override
     public void onWorldChange() {
         this.resetState();
         this.resetGrimMirrors();
+        this.digPacketTimes.clear();
+        this.digSentThisTick = false;
+        this.timePacketCount = 0;
+        this.instantTogglePressed = false;
+        this.autoMineTogglePressed = false;
+        this.clearQueuePressed = false;
+        RotationUtils.getInstance().release(this);
     }
 
     private void resetState() {

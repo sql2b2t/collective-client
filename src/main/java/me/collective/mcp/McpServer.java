@@ -73,6 +73,9 @@ public class McpServer {
     private volatile int port;
     private volatile boolean running;
     private HttpServer server;
+    private java.util.concurrent.ExecutorService executor;
+    private McpSecurity security;
+    private volatile boolean codeExecutionAllowed;
     private volatile Consumer<String> callLogger;
 
     public McpServer(int port) {
@@ -83,19 +86,22 @@ public class McpServer {
     /** Запускает сервер, при занятом порте перебирает следующие 10 портов. */
     public synchronized void start() throws IOException {
         if (running) return;
+        security = McpSecurity.load();
+        codeExecutionAllowed = false;
         IOException lastError = null;
-        int maxPort = Math.min(65535, requestedPort + 10);
+        int maxPort = Math.min(65535, requestedPort + 9);
 
-        for (int candidate = requestedPort; candidate < maxPort; candidate++) {
+        for (int candidate = requestedPort; candidate <= maxPort; candidate++) {
             try {
                 HttpServer s = HttpServer.create(new InetSocketAddress("127.0.0.1", candidate), 0);
                 s.createContext("/", new McpHttpHandler());
                 s.createContext("/mcp", new McpHttpHandler());
-                s.setExecutor(Executors.newCachedThreadPool(r -> {
+                executor = Executors.newFixedThreadPool(4, r -> {
                     Thread t = new Thread(r, "Collective-MCP-Worker");
                     t.setDaemon(true);
                     return t;
-                }));
+                });
+                s.setExecutor(executor);
                 s.start();
 
                 this.server = s;
@@ -117,6 +123,11 @@ public class McpServer {
             server = null;
         }
         running = false;
+        codeExecutionAllowed = false;
+        if (executor != null) {
+            executor.shutdownNow();
+            executor = null;
+        }
         System.out.println("[Collective-MCP] Server stopped.");
     }
 
@@ -138,12 +149,22 @@ public class McpServer {
         this.callLogger = logger;
     }
 
-    /** Готовый JSON-конфиг для Claude Desktop / Cursor / opencode. */
+    public boolean isCodeExecutionAllowed() {
+        return codeExecutionAllowed;
+    }
+
+    /** Local UI/command opt-in, deliberately not a persisted module setting. */
+    public void setCodeExecutionAllowed(boolean allowed) {
+        codeExecutionAllowed = running && allowed;
+    }
+
+    /** Template only: the real bearer is never copied to chat, clipboard, or game config. */
     public static String buildClientConfig(int port) {
         return "{\n"
                 + "  \"mcpServers\": {\n"
                 + "    \"collective\": {\n"
-                + "      \"url\": \"http://127.0.0.1:" + port + "/mcp\"\n"
+                + "      \"url\": \"http://127.0.0.1:" + port + "/mcp\",\n"
+                + "      \"headers\": {\"Authorization\": \"Bearer <LOCAL_MCP_TOKEN>\"}\n"
                 + "    }\n"
                 + "  }\n"
                 + "}";
@@ -199,14 +220,31 @@ public class McpServer {
     private class McpHttpHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
-            exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-            exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type, Mcp-Session-Id, Authorization");
-
             String method = exchange.getRequestMethod();
             try {
+                String host = firstHeader(exchange, "Host");
+                String origin = firstHeader(exchange, "Origin");
+                if (exchange.getRequestHeaders().getOrDefault("Host", List.of()).size() != 1
+                        || exchange.getRequestHeaders().getOrDefault("Origin", List.of()).size() > 1
+                        || !McpSecurity.acceptsHost(host, port) || !McpSecurity.acceptsOrigin(origin, port)) {
+                    exchange.sendResponseHeaders(403, -1);
+                    return;
+                }
+                if (origin != null) {
+                    exchange.getResponseHeaders().set("Access-Control-Allow-Origin", origin);
+                    exchange.getResponseHeaders().set("Vary", "Origin");
+                    exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+                    exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Mcp-Session-Id, Authorization");
+                }
                 if ("OPTIONS".equalsIgnoreCase(method)) {
                     exchange.sendResponseHeaders(204, -1);
+                    return;
+                }
+
+                if (exchange.getRequestHeaders().getOrDefault("Authorization", List.of()).size() != 1
+                        || !security.authenticates(firstHeader(exchange, "Authorization"))) {
+                    exchange.getResponseHeaders().set("WWW-Authenticate", "Bearer");
+                    exchange.sendResponseHeaders(401, -1);
                     return;
                 }
 
@@ -226,7 +264,12 @@ public class McpServer {
                     return;
                 }
 
-                String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                byte[] requestBytes = exchange.getRequestBody().readNBytes(1_048_577);
+                if (requestBytes.length > 1_048_576) {
+                    exchange.sendResponseHeaders(413, -1);
+                    return;
+                }
+                String body = new String(requestBytes, StandardCharsets.UTF_8);
                 JsonElement parsed;
                 try {
                     parsed = JsonParser.parseString(body);
@@ -323,7 +366,13 @@ public class McpServer {
             if (callLogger != null) callLogger.accept(toolName);
 
             try {
-                String text = callSync(() -> performTool(toolName, args));
+                String text = callSync(() -> {
+                    // Recheck on the game thread so queued requests cannot outlive revocation.
+                    if (!codeExecutionAllowed && McpSecurity.requiresCodePermission(toolName)) {
+                        throw new IllegalStateException("Code execution is disabled. Enable locally with .mcp code on for this session.");
+                    }
+                    return performTool(toolName, args);
+                });
                 return toolResult(text, false);
             } catch (Throwable t) {
                 String message = t.getMessage() == null ? t.toString() : t.getMessage();
@@ -862,6 +911,9 @@ public class McpServer {
         Module m = findModule(moduleName);
         if (m == null) throw new IllegalArgumentException("Модуль '" + moduleName + "' не найден");
 
+        if (m instanceof me.collective.module.client.McpModule) {
+            throw new IllegalArgumentException("MCP security/settings can only be changed locally");
+        }
         Setting<?> target = null;
         for (Setting<?> s : m.getSettings()) {
             if (s.getName().equalsIgnoreCase(settingName.trim())) {

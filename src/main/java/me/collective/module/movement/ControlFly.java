@@ -397,6 +397,7 @@ public class ControlFly extends Module {
 
     @Override
     public void onDeactivate() {
+        restorePreviousSlot();
         this.idleHovering = false;
 
         clearPark();
@@ -408,6 +409,28 @@ public class ControlFly extends Module {
     }
 
     
+
+    private void restorePreviousSlot() {
+        if (this.previousSlot >= 0 && this.previousSlot < 9 && this.mc.player != null) {
+            InvUtils.swap(this.previousSlot, false);
+        }
+        this.previousSlot = -1;
+        this.swapBackTicks = 0;
+    }
+
+    @Override
+    public void onWorldChange() {
+        // Never apply an old player's temporary slot to a new connection.
+        this.previousSlot = -1;
+        this.swapBackTicks = 0;
+        this.idleHovering = false;
+        this.glideSwap.reset();
+        clearPark();
+        this.parkBlocked = null;
+        this.recentSetbacks = 0;
+        this.lastWirePosTick = -1;
+        RotationUtils.getInstance().clearRotations();
+    }
 
     /** ElytraBounce тоже умеет вести полёт — тогда он владеет флагом. */
     private boolean bounceOwnsGlide() {
@@ -445,6 +468,7 @@ public class ControlFly extends Module {
         }
 
         if (!this.mc.player.isGliding()) {
+            restorePreviousSlot();
             this.idleHovering = false;
             clearPark();
             this.glideSwap.tick(false);

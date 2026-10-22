@@ -23,6 +23,7 @@ public class FontManager {
     }
 
     public void reloadFont() {
+        CFont replacement;
         try {
             int supersampledSize = Math.max(12, (int) Math.round(currentFontSize * 2.0f));
             Font font = null;
@@ -39,9 +40,20 @@ public class FontManager {
                 font = new Font(currentFontName, currentFontStyle, supersampledSize);
             }
 
-            currentFont = new CFont(font, currentAntiAlias, true);
+            replacement = new CFont(font, currentAntiAlias, true);
         } catch (Exception e) {
-            currentFont = new CFont(new Font(Font.SANS_SERIF, Font.PLAIN, 18), true, true);
+            replacement = new CFont(new Font(Font.SANS_SERIF, Font.PLAIN, 18), true, true);
+        }
+        CFont previous = currentFont;
+        currentFont = replacement;
+        if (previous != null) previous.close();
+    }
+
+    /** Called on the client thread during shutdown. */
+    public void close() {
+        if (currentFont != null) {
+            currentFont.close();
+            currentFont = null;
         }
     }
 

@@ -10,7 +10,7 @@ import me.collective.module.tooltips.ContainerTooltipComponent;
 import me.collective.module.tooltips.CountingDataOutput;
 import me.collective.module.tooltips.DominantStacks;
 import me.collective.module.tooltips.MapTooltipComponent;
-import me.collective.event.events.PacketEvent;
+import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.category.Category;
 import me.collective.event.EventHandler;
@@ -113,13 +113,9 @@ public class Tooltips extends Module {
             .defaultValue(false)
             .build());
 
-    /**
-     * Список контейнеров с доминирующими предметами.
-     *
-     * <p>Копия {@code Tooltips.list}: синхронизированный список, который
-     * наполняется из сетевых пакетов.
-     */
-    private final List<DominantStacks.Entry> list = Collections.synchronizedList(new ArrayList<>());
+    /** Immutable render snapshot, built only after client-side inventory updates. */
+    private List<DominantStacks.Entry> list = List.of();
+    private List<ItemStack> previousStacks = List.of();
 
     /** Цвет рамки для текущего тултипа; {@code null} — рамка не красится. */
     private Integer color;
@@ -134,37 +130,48 @@ public class Tooltips extends Module {
 
     // ── Накопление списка по пакетам ──
 
-    /**
-     * Обработка входящих пакетов.
-     *
-     * <p>Перенос обработчиков {@code ChannelRead0Event}: полный инвентарь
-     * пересчитывает список, обновление одного слота — тоже полностью, как в
-     * оригинале.
-     */
     @EventHandler
-    public void onPacket(PacketEvent.Receive event) {
-        if (!majorityItem.get()) return;
-
-        MinecraftClient mc = MinecraftClient.getInstance();
-
-        if (event.packet instanceof InventoryS2CPacket packet) {
-            list.clear();
-            for (ItemStack stack : packet.contents()) {
-                DominantStacks.Entry entry = DominantStacks.of(stack);
-                if (entry != null) list.add(entry);
-            }
+    public void onTick(TickEvent.Post event) {
+        if (!majorityItem.get() || mc.player == null) {
+            clearSnapshot();
             return;
         }
-
-        if (event.packet instanceof ScreenHandlerSlotUpdateS2CPacket) {
-            if (mc.player == null || mc.player.currentScreenHandler == null) return;
-
-            list.clear();
-            for (Slot slot : mc.player.currentScreenHandler.slots) {
-                DominantStacks.Entry entry = DominantStacks.of(slot.getStack());
-                if (entry != null) list.add(entry);
+        var slots = mc.player.currentScreenHandler.slots;
+        boolean changed = slots.size() != previousStacks.size();
+        if (!changed) {
+            for (int i = 0; i < slots.size(); i++) {
+                if (!ItemStack.areEqual(slots.get(i).getStack(), previousStacks.get(i))) {
+                    changed = true;
+                    break;
+                }
             }
         }
+        if (!changed) return;
+        List<ItemStack> stacks = new ArrayList<>(slots.size());
+        List<DominantStacks.Entry> next = new ArrayList<>();
+        for (Slot slot : slots) {
+            ItemStack copy = slot.getStack().copy();
+            stacks.add(copy);
+            DominantStacks.Entry entry = DominantStacks.of(copy);
+            if (entry != null) next.add(entry);
+        }
+        previousStacks = List.copyOf(stacks);
+        list = List.copyOf(next);
+    }
+
+    @Override
+    public void onDisable() {
+        clearSnapshot();
+    }
+
+    @Override
+    public void onWorldChange() {
+        clearSnapshot();
+    }
+
+    private void clearSnapshot() {
+        list = List.of();
+        previousStacks = List.of();
     }
 
     /** Список для подмены иконок; используется миксином отрисовки слотов. */
@@ -211,7 +218,7 @@ public class Tooltips extends Module {
         List<ItemStack> slots = null;
         boolean hasContents = false;
 
-        if (shulkerContent.get() && stack.get(DataComponentTypes.CONTAINER) != null) {
+        if (shulkerContent.get()) {
             slots = ContainerContents.read(stack);
             hasContents = ContainerContents.hasContents(slots);
         }

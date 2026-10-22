@@ -61,16 +61,18 @@ public class NumberSetting extends Setting<Double> {
     }
 
     public NumberSetting handle(java.util.function.Supplier<Boolean> hiddenSupplier) {
+        setVisibilityCondition(hiddenSupplier);
         return this;
     }
 
     @Override
     public void setValue(Double value) {
+        if (value == null || !Double.isFinite(value)) return;
         double clamped = Math.max(min, Math.min(max, value));
         if (increment > 0) {
             double precision = 1.0 / increment;
             clamped = Math.round(clamped * precision) / precision;
         }
-        super.setValue(clamped);
+        super.setValue(Math.max(min, Math.min(max, clamped)));
     }
 }

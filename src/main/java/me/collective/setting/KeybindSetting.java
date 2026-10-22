@@ -62,6 +62,7 @@ public class KeybindSetting extends Setting<Integer> {
     }
 
     public KeybindSetting handle(java.util.function.Supplier<Boolean> hiddenSupplier) {
+        setVisibilityCondition(hiddenSupplier);
         return this;
     }
 }

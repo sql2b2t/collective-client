@@ -36,7 +36,7 @@ public class Search extends Module {
     public final BooleanSetting tracers = add(new BooleanSetting("Линии", false));
 
     private final List<BlockPos> found = new ArrayList<>();
-    private long lastScan = 0L;
+    private final BlockScan scan = new BlockScan();
 
     private static final Set<Block> ORES = Set.of(
         Blocks.DIAMOND_ORE, Blocks.DEEPSLATE_DIAMOND_ORE,
@@ -65,14 +65,16 @@ public class Search extends Module {
     @Override
     public void onDisable() {
         found.clear();
+        scan.clear();
     }
 
     @Override
     public void onUpdate() {
-        if (mc.player == null || mc.world == null) return;
-        long now = System.currentTimeMillis();
-        if (now - lastScan < 500) return;
-        lastScan = now;
+        if (mc.player == null || mc.world == null) {
+            found.clear();
+            scan.clear();
+            return;
+        }
 
         Set<Block> targets = new HashSet<>();
         String p = preset.compute().trim();
@@ -83,20 +85,10 @@ public class Search extends Module {
             targets.add(Blocks.TRIAL_SPAWNER);
         }
 
+        List<BlockPos> scanned = scan.tick(mc.world, mc.player.getBlockPos(), range.getIntValue(),
+            targets, System.currentTimeMillis());
         found.clear();
-        BlockPos center = mc.player.getBlockPos();
-        int r = range.getIntValue();
-        for (int x = -r; x <= r; x++) {
-            for (int y = -r; y <= r; y++) {
-                for (int z = -r; z <= r; z++) {
-                    BlockPos pos = center.add(x, y, z);
-                    if (targets.contains(mc.world.getBlockState(pos).getBlock())) {
-                        found.add(pos.toImmutable());
-                        if (found.size() >= 1000) return;
-                    }
-                }
-            }
-        }
+        found.addAll(scanned);
     }
 
     @EventHandler

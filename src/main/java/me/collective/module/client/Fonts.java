@@ -11,6 +11,8 @@ import java.awt.Font;
 
 public class Fonts extends Module {
     public static Fonts INSTANCE;
+    private long fontChangeAt;
+    private boolean fontPending;
 
     public enum FontType {
         Arial,
@@ -37,14 +39,25 @@ public class Fonts extends Module {
         INSTANCE = this;
         setToggled(true);
 
-        fontType.setChangeListener(s -> updateFont());
-        size.setChangeListener(s -> updateFont());
-        bold.setChangeListener(s -> updateFont());
-        italic.setChangeListener(s -> updateFont());
-        antiAlias.setChangeListener(s -> updateFont());
+        fontType.setChangeListener(s -> requestFontUpdate());
+        size.setChangeListener(s -> requestFontUpdate());
+        bold.setChangeListener(s -> requestFontUpdate());
+        italic.setChangeListener(s -> requestFontUpdate());
+        antiAlias.setChangeListener(s -> requestFontUpdate());
+    }
+
+    private void requestFontUpdate() {
+        fontPending = true;
+        fontChangeAt = System.nanoTime();
+    }
+
+    @Override
+    public void onUpdate() {
+        if (fontPending && System.nanoTime() - fontChangeAt >= 150_000_000L) updateFont();
     }
 
     public void updateFont() {
+        fontPending = false;
         int style = Font.PLAIN;
         if (bold.getValue() && italic.getValue()) {
             style = Font.BOLD | Font.ITALIC;

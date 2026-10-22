@@ -12,7 +12,7 @@ import net.minecraft.enchantment.Enchantments;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.RegistryKeys;
-import net.minecraft.screen.slot.SlotActionType;
+import me.collective.util.InventoryUtil;
 
 public class AutoArmor extends Module {
     public final NumberSetting delay = add(new NumberSetting("Delay", 1.0, 0.0, 5.0, 1.0));
@@ -28,7 +28,7 @@ public class AutoArmor extends Module {
     @EventHandler
     private void onTick(TickEvent.Pre event) {
         if (mc.player == null || mc.world == null || mc.interactionManager == null) return;
-        if (mc.currentScreen != null) return;
+        if (mc.currentScreen != null || !InventoryUtil.canUsePlayerInventory()) return;
 
         if (delayTimer > 0) {
             delayTimer--;
@@ -68,11 +68,8 @@ public class AutoArmor extends Module {
             }
 
             if (bestInvSlot != -1) {
-                int fromSlot = bestInvSlot < 9 ? 36 + bestInvSlot : bestInvSlot;
-
-                mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, fromSlot, 0, SlotActionType.PICKUP, mc.player);
-                mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, screenSlot, 0, SlotActionType.PICKUP, mc.player);
-                mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, fromSlot, 0, SlotActionType.PICKUP, mc.player);
+                if (!current.isEmpty() && !mc.player.playerScreenHandler.getSlot(screenSlot).canTakeItems(mc.player)) continue;
+                InventoryUtil.move().from(bestInvSlot).to(39 - i);
 
                 delayTimer = delay.getValue().intValue();
                 return;

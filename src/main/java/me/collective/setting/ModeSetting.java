@@ -41,6 +41,7 @@ public class ModeSetting extends Setting<String> {
     }
 
     public ModeSetting handle(Supplier<Boolean> hiddenSupplier) {
+        setVisibilityCondition(hiddenSupplier);
         return this;
     }
 

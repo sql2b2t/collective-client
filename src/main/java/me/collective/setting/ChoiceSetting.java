@@ -30,6 +30,7 @@ public class ChoiceSetting extends Setting<String> {
     }
 
     public ChoiceSetting handle(java.util.function.Supplier<Boolean> hiddenSupplier) {
+        setVisibilityCondition(hiddenSupplier);
         return this;
     }
 }

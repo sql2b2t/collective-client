@@ -18,7 +18,10 @@ public class EmotesModule extends Module {
 
     public final KeybindSetting emoteMenu = add(new KeybindSetting("Emote menu", -1));
     public final BooleanSetting keepWhileMoving = add(new BooleanSetting("Keep While Moving", false));
-    public final BooleanSetting debugLog = add(new BooleanSetting("Debug", true));
+    public final BooleanSetting debugLog = add(new BooleanSetting("Debug", false));
+    private Object playbackWorld;
+    private boolean keyWasPressed;
+    private EmoteWheelScreen ownedWheel;
 
     public EmotesModule() {
         super("Emotes", "Колесо эмоций: зажми бинд, выбери эмоут и отпусти.", Category.MISC);
@@ -26,30 +29,45 @@ public class EmotesModule extends Module {
     }
 
     @Override
+    public void onEnable() {
+        playbackWorld = mc.world;
+        keyWasPressed = emoteMenu.isPressed();
+        ownedWheel = null;
+    }
+
+    @Override
     public void onUpdate() {
-        if (mc.player == null) return;
-        me.collective.emotes.EmoteEngine.tick();
-        if (emoteMenu.isPressed()) {
-            if (mc.currentScreen == null
-                && me.collective.emotes.EmoteEngine.millisSincePlay() > 500) {
-                mc.setScreen(new EmoteWheelScreen());
-            }
-        } else {
-            // Отпустил бинд — играем подсвеченный эмоут (как в оригинале)
-            if (mc.currentScreen instanceof EmoteWheelScreen wheel) {
-                me.collective.emotes.Emote selected = wheel.getSelectedEmote();
-                mc.setScreen(null);
-                if (selected != null) me.collective.emotes.EmoteEngine.play(selected);
-            }
+        if (mc.world != playbackWorld || mc.player == null) {
+            EmoteEngine.stop();
+            if (ownedWheel != null && mc.currentScreen == ownedWheel) mc.setScreen(null);
+            ownedWheel = null;
+            playbackWorld = mc.world;
+            keyWasPressed = emoteMenu.isPressed();
         }
+        if (mc.player == null || mc.world == null) return;
+        EmoteEngine.tick();
+        boolean pressed = emoteMenu.isPressed();
+        if (pressed && !keyWasPressed && mc.currentScreen == null && EmoteEngine.millisSincePlay() > 500) {
+            ownedWheel = new EmoteWheelScreen();
+            mc.setScreen(ownedWheel);
+        } else if (!pressed && keyWasPressed && ownedWheel != null && mc.currentScreen == ownedWheel) {
+            me.collective.emotes.Emote selected = ownedWheel.getSelectedEmote();
+            mc.setScreen(null);
+            ownedWheel = null;
+            if (selected != null) EmoteEngine.play(selected);
+        }
+        // Escape or another screen cancels selection; holding the bind must not reopen it.
+        if (mc.currentScreen != ownedWheel) ownedWheel = null;
+        keyWasPressed = pressed;
     }
 
     @Override
     public void onDisable() {
         EmoteEngine.stop();
-        if (mc.currentScreen instanceof EmoteWheelScreen) {
-            mc.setScreen(null);
-        }
+        if (ownedWheel != null && mc.currentScreen == ownedWheel) mc.setScreen(null);
+        ownedWheel = null;
+        playbackWorld = null;
+        keyWasPressed = false;
     }
 
     public boolean keepWhileMoving() {

@@ -30,6 +30,7 @@ public class Pitch40 extends Module {
     public final BooleanSetting useBoost = add(new BooleanSetting("UseBoost", false));
 
     private boolean boostToggledByUs = false;
+    private boolean recastToggledByUs = false;
     private int fireworkCooldown = 0;
     private boolean goingUp = false;
     private int elytraSwapSlot = -1;
@@ -85,14 +86,17 @@ public class Pitch40 extends Module {
         }
         if (this.autoRecast.getValue() && this.elytraRecast != null && !this.elytraRecast.isToggled()) {
             this.elytraRecast.toggle();
+            this.recastToggledByUs = true;
         }
     }
 
     @Override
     public void onDisable() {
-        if (this.autoRecast.getValue() && this.elytraRecast != null && this.elytraRecast.isToggled()) {
+        if (this.recastToggledByUs && this.elytraRecast != null && this.elytraRecast.isToggled()) {
             this.elytraRecast.toggle();
         }
+        this.recastToggledByUs = false;
+        this.elytraSwapSlot = -1;
         this.disableBoost();
     }
 
@@ -100,6 +104,15 @@ public class Pitch40 extends Module {
     private void onTick(TickEvent.Pre event) {
         if (mc.player == null || mc.world == null) return;
 
+        if (this.useBoost.getValue()) this.enableBoost();
+        else this.disableBoost();
+        if (!this.autoRecast.getValue() && this.recastToggledByUs) {
+            if (this.elytraRecast != null && this.elytraRecast.isToggled()) this.elytraRecast.toggle();
+            this.recastToggledByUs = false;
+        } else if (this.autoRecast.getValue() && this.elytraRecast != null && !this.elytraRecast.isToggled()) {
+            this.elytraRecast.toggle();
+            this.recastToggledByUs = true;
+        }
         this.driveBoost();
         RegistryKey<World> currentDimension = mc.world.getRegistryKey();
         if (this.lastDimension != null && !this.lastDimension.equals(currentDimension)) {

@@ -14,6 +14,19 @@ public class CollectiveClient implements ClientModInitializer {
     public static final String MOD_NAME = "Collective Client";
     public static final String MOD_VERSION = "1.1";
 
+    /**
+     * Вызывается при смене игрового мира (вход на сервер, респавн, смена измерения).
+     * Модули используют для сброса таймеров и выдачи только что применённых состояний.
+     */
+    public static void onWorldChange() {
+        for (me.collective.module.Module module : ModuleManager.INSTANCE.getModules()) {
+            try {
+                module.onWorldChange();
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
     @Override
     public void onInitializeClient() {
         System.out.println("[" + MOD_NAME + "] Initializing for Minecraft 1.21.11...");

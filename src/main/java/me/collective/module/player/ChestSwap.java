@@ -9,7 +9,7 @@ import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.network.packet.c2s.play.CloseHandledScreenC2SPacket;
+import me.collective.util.InventoryUtil;
 import net.minecraft.screen.slot.SlotActionType;
 
 public class ChestSwap extends Module {
@@ -31,7 +31,7 @@ public class ChestSwap extends Module {
     }
 
     public void swap() {
-        if (mc.player == null || mc.interactionManager == null) return;
+        if (!InventoryUtil.canUsePlayerInventory()) return;
 
         ItemStack current = mc.player.getEquippedStack(EquipmentSlot.CHEST);
         if (current.contains(DataComponentTypes.GLIDER)) {
@@ -88,19 +88,16 @@ public class ChestSwap extends Module {
     }
 
     private void equip(int slot) {
-        if (mc.player == null || mc.interactionManager == null || mc.currentScreen != null) return;
+        if (!InventoryUtil.canUsePlayerInventory() || mc.currentScreen != null) return;
+        if (!mc.player.playerScreenHandler.getSlot(6).getStack().isEmpty()
+            && !mc.player.playerScreenHandler.getSlot(6).canTakeItems(mc.player)) return;
         if (slot >= 0 && slot < 9) {
             // Хотбар: один атомарный SWAP вместо трёх PICKUP (меньше флагов)
             mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, 6, slot, SlotActionType.SWAP, mc.player);
         } else {
-            int screenSlot = slot;
-            mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, screenSlot, 0, SlotActionType.PICKUP, mc.player);
-            mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, 6, 0, SlotActionType.PICKUP, mc.player);
-            mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, screenSlot, 0, SlotActionType.PICKUP, mc.player);
+            InventoryUtil.move().from(slot).to(38);
         }
 
-        if (closeScreen.getValue()) {
-            mc.getNetworkHandler().sendPacket(new CloseHandledScreenC2SPacket(0));
-        }
+        // No synthetic close packet: the player's handler remains open locally too.
     }
 }

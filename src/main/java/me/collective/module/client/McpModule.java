@@ -37,7 +37,8 @@ public class McpModule extends Module {
             if (actualPort != port.getIntValue()) {
                 warning("Порт " + port.getIntValue() + " был занят — использован " + actualPort);
             }
-            info("Подключение: .mcp config (или кнопка «Копировать» в настройках модуля)");
+            info("Подключение: .mcp config (шаблон). Bearer-токен хранится отдельно в ~/.config/collective-private/mcp.token (0600).");
+            warning("Выполнение кода выключено. Только для доверенного AI-клиента: .mcp code on (до перезапуска MCP).");
         } catch (Exception e) {
             error("Не удалось запустить MCP-сервер: " + e.getMessage());
             setToggled(false);
@@ -60,6 +61,6 @@ public class McpModule extends Module {
     private void copyConfigToClipboard() {
         int currentPort = server != null ? server.getPort() : port.getIntValue();
         mc.keyboard.setClipboard(McpServer.buildClientConfig(currentPort));
-        info("Конфиг MCP скопирован в буфер обмена — вставьте его в настройки вашего AI-клиента (Claude Desktop, Cursor, opencode).");
+        info("Шаблон MCP скопирован (без секрета). Подставьте локальный токен из ~/.config/collective-private/mcp.token только в защищённой конфигурации AI-клиента.");
     }
 }

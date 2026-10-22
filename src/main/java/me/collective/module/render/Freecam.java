@@ -13,6 +13,8 @@ public class Freecam extends Module {
 
     public final NumberSetting speed = add(new NumberSetting("Speed", 1.0, 0.1, 5.0, 0.1));
 
+    private net.minecraft.client.world.ClientWorld cameraWorld;
+    private net.minecraft.client.network.ClientPlayerEntity cameraPlayer;
     private Vec3d pos = Vec3d.ZERO;
     private Vec3d prevPos = Vec3d.ZERO;
     private float yaw = 0f;
@@ -27,7 +29,24 @@ public class Freecam extends Module {
 
     @Override
     public void onEnable() {
-        if (mc.player != null) {
+        synchronizeCamera();
+    }
+
+    @Override
+    public void onWorldChange() {
+        cameraWorld = null;
+        cameraPlayer = null;
+        synchronizeCamera();
+    }
+
+    private void synchronizeCamera() {
+        if (mc.world != cameraWorld || mc.player != cameraPlayer) {
+            cameraWorld = mc.world;
+            cameraPlayer = mc.player;
+        } else {
+            return;
+        }
+        if (mc.world != null && mc.player != null) {
             Vec3d eyePos = mc.player.getEyePos();
             pos = eyePos;
             prevPos = eyePos;
@@ -40,13 +59,16 @@ public class Freecam extends Module {
 
     @Override
     public void onDisable() {
+        cameraWorld = null;
+        cameraPlayer = null;
         pos = Vec3d.ZERO;
         prevPos = Vec3d.ZERO;
     }
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null) return;
+        synchronizeCamera();
+        if (mc.player == null || mc.world == null) return;
 
         prevPos = pos;
         prevYaw = yaw;
@@ -68,7 +90,8 @@ public class Freecam extends Module {
     }
 
     public Vec3d getInterpolatedPos(float tickProgress) {
-        if (pos == null || prevPos == null) {
+        synchronizeCamera();
+        if (mc.player == null || mc.world == null) {
             return mc.player != null ? mc.player.getEyePos() : Vec3d.ZERO;
         }
         double x = MathHelper.lerp(tickProgress, prevPos.x, pos.x);
@@ -78,15 +101,19 @@ public class Freecam extends Module {
     }
 
     public float getYaw() {
+        synchronizeCamera();
         return yaw;
     }
 
     public float getPitch() {
+        synchronizeCamera();
         return pitch;
     }
 
     /** Поворот от мыши (вызывается из миксина вместо игрока). */
     public void turn(double cursorDeltaX, double cursorDeltaY) {
+        synchronizeCamera();
+        if (mc.player == null || mc.world == null) return;
         // Знаки как в ванильном Entity.changeLookDirection, иначе оси
         // мыши оказываются инвертированными.
         yaw += (float) cursorDeltaX * 0.15F;
@@ -94,10 +121,12 @@ public class Freecam extends Module {
     }
 
     public float getInterpolatedYaw(float tickProgress) {
+        synchronizeCamera();
         return prevYaw + MathHelper.wrapDegrees(yaw - prevYaw) * tickProgress;
     }
 
     public float getInterpolatedPitch(float tickProgress) {
+        synchronizeCamera();
         return prevPitch + MathHelper.wrapDegrees(pitch - prevPitch) * tickProgress;
     }
 }

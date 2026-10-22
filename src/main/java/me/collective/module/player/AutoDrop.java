@@ -4,6 +4,8 @@ import me.collective.category.Category;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
+import me.collective.util.InventoryUtil;
+import net.minecraft.component.DataComponentTypes;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
@@ -35,7 +37,7 @@ public class AutoDrop extends Module {
     @Override
     public void onUpdate() {
         if (mc.player == null || mc.interactionManager == null) return;
-        if (mc.currentScreen != null) return;
+        if (mc.currentScreen != null || !InventoryUtil.canUsePlayerInventory()) return;
         if (delayTimer > 0) {
             delayTimer--;
             return;
@@ -43,7 +45,8 @@ public class AutoDrop extends Module {
 
         for (int i = 9; i < 36; i++) {
             ItemStack s = mc.player.getInventory().getStack(i);
-            if (s.isEmpty()) continue;
+            if (s.isEmpty() || s.contains(DataComponentTypes.CUSTOM_NAME)
+                || s.contains(DataComponentTypes.CUSTOM_DATA)) continue;
             if (isTrash(s.getItem())) {
                 mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, i, 1, SlotActionType.THROW, mc.player);
                 delayTimer = delay.getIntValue();

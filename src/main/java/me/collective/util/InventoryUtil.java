@@ -11,7 +11,12 @@ import java.util.function.Predicate;
 public class InventoryUtil {
     private static final MinecraftClient mc = MinecraftClient.getInstance();
     public static int previousSlot = -1;
-    private static final Action ACTION = new Action();
+    /** Inventory-index helpers deliberately skip foreign containers and user cursors. */
+    public static boolean canUsePlayerInventory() {
+        return mc.player != null && mc.interactionManager != null
+            && mc.player.currentScreenHandler == mc.player.playerScreenHandler
+            && mc.player.currentScreenHandler.getCursorStack().isEmpty();
+    }
 
     public static boolean testInMainHand(Predicate<ItemStack> predicate) {
         if (mc.player == null) return false;
@@ -95,7 +100,7 @@ public class InventoryUtil {
         int bestSlot = -1;
         int count = 0;
 
-        for (int i = start; i <= end && i < mc.player.getInventory().size(); i++) {
+        for (int i = Math.max(0, start); i <= end && i < mc.player.getInventory().size(); i++) {
             ItemStack stack = mc.player.getInventory().getStack(i);
             if (predicate.test(stack)) {
                 if (bestSlot == -1) bestSlot = i;
@@ -138,14 +143,14 @@ public class InventoryUtil {
     }
 
     public static void moveToOffhand(int slot) {
-        if (mc.player == null || mc.interactionManager == null || slot < 0) return;
-        int screenSlot = slot < 9 ? 36 + slot : slot;
+        if (!canUsePlayerInventory() || slot < 0 || slot > 35) return;
+        int screenSlot = indexToId(slot);
         mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, screenSlot, 40, SlotActionType.SWAP, mc.player);
     }
 
     public static void quickMove(int slot) {
-        if (mc.player == null || mc.interactionManager == null || slot < 0) return;
-        int screenSlot = slot < 9 ? 36 + slot : slot;
+        if (!canUsePlayerInventory() || slot < 0 || slot > 35) return;
+        int screenSlot = indexToId(slot);
         mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, screenSlot, 0, SlotActionType.QUICK_MOVE, mc.player);
     }
 
@@ -157,30 +162,25 @@ public class InventoryUtil {
         // Offhand 40 -> 45
         // Main inventory (9..35) -> 9..35
         if (index >= 0 && index <= 8) return 36 + index;
-        if (index >= 36 && index <= 39) return 5 + (index - 36);
+        if (index >= 36 && index <= 39) return 44 - index;
         if (index == 40) return 45;
-        return index;
+        return index >= 9 && index <= 35 ? index : -1;
     }
 
     public static Action move() {
-        ACTION.type = SlotActionType.PICKUP;
-        ACTION.two = true;
-        return ACTION;
+        return new Action(SlotActionType.PICKUP, true);
     }
 
     public static Action click() {
-        ACTION.type = SlotActionType.PICKUP;
-        return ACTION;
+        return new Action(SlotActionType.PICKUP, false);
     }
 
     public static Action quickSwap() {
-        ACTION.type = SlotActionType.SWAP;
-        return ACTION;
+        return new Action(SlotActionType.SWAP, false);
     }
 
     public static Action shiftClick() {
-        ACTION.type = SlotActionType.QUICK_MOVE;
-        return ACTION;
+        return new Action(SlotActionType.QUICK_MOVE, false);
     }
 
     public static class Action {
@@ -189,7 +189,10 @@ public class InventoryUtil {
         private int from = -1;
         private int to = -1;
         private int data = 0;
-        private boolean isRecursive = false;
+        private Action(SlotActionType type, boolean two) {
+            this.type = type;
+            this.two = two;
+        }
 
         public Action fromId(int id) {
             this.from = id;
@@ -228,35 +231,28 @@ public class InventoryUtil {
         }
 
         private void run() {
-            if (mc.player == null || mc.interactionManager == null) return;
-            boolean hadEmptyCursor = mc.player.currentScreenHandler.getCursorStack().isEmpty();
+            if (!canUsePlayerInventory() || type == null) return;
+            var handler = mc.player.playerScreenHandler;
+            if (from < 0 || to < 0 || from >= handler.slots.size() || to >= handler.slots.size()) return;
+            if (two && from == to) return;
+            if (!handler.getSlot(from).canTakeItems(mc.player)) return;
+            if (two && (!handler.getSlot(to).canInsert(handler.getSlot(from).getStack())
+                || (!handler.getSlot(to).getStack().isEmpty() && !handler.getSlot(to).canTakeItems(mc.player)))) return;
 
             if (type == SlotActionType.SWAP) {
-                data = from;
+                // SWAP's button is a hotbar inventory index, never a screen slot id.
+                data = from >= 36 && from <= 44 ? from - 36 : from == 45 ? 40 : -1;
+                if (data == -1) return;
                 from = to;
             }
-
-            if (type != null && from != -1 && to != -1) {
-                clickSlotDirect(from);
-                if (two) clickSlotDirect(to);
+            int source = from;
+            clickSlotDirect(source);
+            if (two) {
+                clickSlotDirect(to);
+                // Return displaced items/merge overflow to the source in the same transaction.
+                if (!handler.getCursorStack().isEmpty()) clickSlotDirect(source);
             }
-
-            SlotActionType preType = type;
-            boolean preTwo = two;
-            int preFrom = from;
-            int preTo = to;
-
             type = null;
-            two = false;
-            from = -1;
-            to = -1;
-            data = 0;
-
-            if (!isRecursive && hadEmptyCursor && preType == SlotActionType.PICKUP && preTwo && (preFrom != -1 && preTo != -1) && !mc.player.currentScreenHandler.getCursorStack().isEmpty()) {
-                isRecursive = true;
-                click().slotId(preFrom);
-                isRecursive = false;
-            }
         }
 
         private void clickSlotDirect(int id) {

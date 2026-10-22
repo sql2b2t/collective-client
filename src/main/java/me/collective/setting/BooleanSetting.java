@@ -20,6 +20,7 @@ public class BooleanSetting extends Setting<Boolean> {
     }
 
     public BooleanSetting handle(java.util.function.Supplier<Boolean> hiddenSupplier) {
+        setVisibilityCondition(hiddenSupplier);
         return this;
     }
 }

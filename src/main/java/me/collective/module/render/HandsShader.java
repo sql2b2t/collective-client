@@ -82,6 +82,6 @@ public class HandsShader extends Module {
             }
         }
 
-        return ((alpha & 0xFF) << 24) | rgb;
+        return ((alpha & 0xFF) << 24) | (rgb & 0xFFFFFF);
     }
 }

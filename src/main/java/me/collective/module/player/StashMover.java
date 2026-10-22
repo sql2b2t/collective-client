@@ -100,19 +100,12 @@ public class StashMover extends Module {
         .description("Если инвентарь полон, сложить груз в эндер-сундук и продолжить через него.")
         .defaultValue(true).build());
 
-    private final Setting<Integer> inputAreaPos1 = sgInput.add(new IntSetting.Builder()
-        .name("вход-угол-1").description("Первый угол зоны входа — по этому блоку: .перенос вход 1")
-        .defaultValue(0).min(-30000000).max(30000000).build());
-
-    private final Setting<Integer> inputAreaPos2 = sgInput.add(new IntSetting.Builder()
-        .name("вход-угол-2").defaultValue(0).min(-30000000).max(30000000).build());
-
-    private final Setting<Integer> outputAreaPos1 = sgInput.add(new IntSetting.Builder()
-        .name("выход-угол-1").description("Первый угол зоны выхода: .перенос выход 1")
-        .defaultValue(0).min(-30000000).max(30000000).build());
-
-    private final Setting<Integer> outputAreaPos2 = sgInput.add(new IntSetting.Builder()
-        .name("выход-угол-2").defaultValue(0).min(-30000000).max(30000000).build());
+    // Plain triples are lossless, editable and keep (0, 0, 0) distinct from unset.
+    // Old packed integers cannot be recovered reliably and are rejected by decode.
+    private final Setting<String> inputAreaPos1 = sgInput.add(new StringSetting("вход-угол-1", ""));
+    private final Setting<String> inputAreaPos2 = sgInput.add(new StringSetting("вход-угол-2", ""));
+    private final Setting<String> outputAreaPos1 = sgInput.add(new StringSetting("выход-угол-1", ""));
+    private final Setting<String> outputAreaPos2 = sgInput.add(new StringSetting("выход-угол-2", ""));
 
     private final Setting<TransportMethod> forwardMethod = sgForward.add(new EnumSetting.Builder<TransportMethod>()
         .name("способ-туда")
@@ -186,6 +179,7 @@ public class StashMover extends Module {
     private ProcessState lastState = ProcessState.IDLE;
     private int stateTimer;
     private int ticks;
+    private boolean runRequested;
 
     private final List<ContainerInfo> inputContainers = new ArrayList<>();
     private final List<ContainerInfo> outputContainers = new ArrayList<>();
@@ -214,6 +208,7 @@ public class StashMover extends Module {
     public void onActivate() {
         nav = new ChestNavigator();
         resetRun();
+        runRequested = true;
     }
 
     @Override
@@ -223,8 +218,18 @@ public class StashMover extends Module {
             nav.stop();
         }
         closeContainer();
-        awaitingEnderChest = false;
-        state = ProcessState.IDLE;
+        onWorldChange();
+    }
+
+    @Override
+    public void onWorldChange() {
+        if (nav != null) {
+            nav.stop();
+            nav.restorePathing();
+            nav = null;
+        }
+        resetRun();
+        runRequested = false;
     }
 
     private void resetRun() {
@@ -233,6 +238,11 @@ public class StashMover extends Module {
         stateTimer = 0;
         ticks = 0;
         currentContainer = null;
+        inputContainers.clear();
+        outputContainers.clear();
+        awaitingEnderChest = false;
+        settleTicks = 0;
+        alignTicks = 0;
         goingToInput = false;
         transportRetries = 0;
         awaitingRespawn = false;
@@ -247,7 +257,7 @@ public class StashMover extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        if (mc.player == null || mc.world == null || mc.interactionManager == null) return;
+        if (!runRequested || mc.player == null || mc.world == null || mc.interactionManager == null) return;
         ticks++;
 
         if (!hasValidAreas()) {
@@ -270,7 +280,7 @@ public class StashMover extends Module {
         }
 
         switch (state) {
-            case IDLE -> stateTimer += 20;   // ждём, пока игрок дойдёт до зоны
+            case IDLE -> state = ProcessState.CHECKING_LOCATION;
             case CHECKING_LOCATION -> checkLocation();
             case INPUT_PROCESS -> handleInputProcess();
             case OUTPUT_PROCESS -> handleOutputProcess();
@@ -296,6 +306,7 @@ public class StashMover extends Module {
     // ------------------------------------------------------------------
 
     public boolean setAreaCorner(boolean input, int corner, BlockPos pos) {
+        if (pos == null || (corner != 1 && corner != 2)) return false;
         if (input && corner == 1) {
             inputAreaPos1.set(encode(pos));
         } else if (input) {
@@ -305,6 +316,8 @@ public class StashMover extends Module {
         } else {
             outputAreaPos2.set(encode(pos));
         }
+        if (nav != null) nav.stop();
+        resetRun();
         return true;
     }
 
@@ -317,27 +330,35 @@ public class StashMover extends Module {
     }
 
     public int clearAreas() {
-        inputAreaPos1.set(0);
-        inputAreaPos2.set(0);
-        outputAreaPos1.set(0);
-        outputAreaPos2.set(0);
-        inputContainers.clear();
-        outputContainers.clear();
+        inputAreaPos1.set("");
+        inputAreaPos2.set("");
+        outputAreaPos1.set("");
+        outputAreaPos2.set("");
+        if (nav != null) nav.stop();
+        resetRun();
         return 1;
     }
 
-    /** Три координаты в одну настройку: старшие 32 бита — z, средние — y, младшие — x. */
-    private static int encode(BlockPos pos) {
-        return (pos.getZ() & 0xFFFF) << 48 | (pos.getY() & 0xFFFFFF) << 24 | (pos.getX() & 0xFFFFFF);
+    private static String encode(BlockPos pos) {
+        return pos.getX() + "," + pos.getY() + "," + pos.getZ();
     }
 
-    private static BlockPos decode(int v) {
-        return new BlockPos(v & 0xFFFFFF, (v >> 24) & 0xFFFFFF, (v >> 48) & 0xFFFF);
+    @Nullable
+    private static BlockPos decode(String value) {
+        if (value == null) return null;
+        String[] coordinates = value.split(",", -1);
+        if (coordinates.length != 3) return null;
+        try {
+            return new BlockPos(Integer.parseInt(coordinates[0].trim()),
+                Integer.parseInt(coordinates[1].trim()), Integer.parseInt(coordinates[2].trim()));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     private boolean hasValidAreas() {
-        return inputAreaPos1.get() != 0 && inputAreaPos2.get() != 0
-            && outputAreaPos1.get() != 0 && outputAreaPos2.get() != 0;
+        return inputCorner1() != null && inputCorner2() != null
+            && outputCorner1() != null && outputCorner2() != null;
     }
 
     private BlockPos inputCorner1() {
@@ -421,10 +442,12 @@ public class StashMover extends Module {
 
     private void checkLocation() {
         if (nearInput()) {
+            goingToInput = true;
             detectContainers(true);
             info("У входа найдено сундуков: §f" + inputContainers.size());
             state = ProcessState.INPUT_PROCESS;
         } else if (nearOutput()) {
+            goingToInput = false;
             detectContainers(false);
             info("У выхода найдено сундуков: §f" + outputContainers.size());
             state = ProcessState.OUTPUT_PROCESS;

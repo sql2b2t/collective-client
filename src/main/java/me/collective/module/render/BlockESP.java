@@ -21,6 +21,7 @@ import net.minecraft.util.math.Vec3d;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashSet;
 
 /**
  * Порт BlockESP из Meteor Client.
@@ -45,8 +46,7 @@ public class BlockESP extends Module {
     public final BooleanSetting tracers = add(new BooleanSetting("Линии", false));
 
     private final List<BlockPos> found = new ArrayList<>();
-    private final List<Block> targets = new ArrayList<>();
-    private long lastScan = 0L;
+    private final BlockScan scan = new BlockScan();
 
     public BlockESP() {
         super("BlockESP", "Подсветка выбранных блоков сквозь стены.", Category.RENDER);
@@ -55,40 +55,20 @@ public class BlockESP extends Module {
     @Override
     public void onDisable() {
         found.clear();
-    }
-
-    private void parseBlocks() {
-        targets.clear();
-        targets.addAll(blocks.getValue());
+        scan.clear();
     }
 
     @Override
     public void onUpdate() {
-        if (mc.player == null || mc.world == null) return;
-        long now = System.currentTimeMillis();
-        if (now - lastScan < 500) return;
-        lastScan = now;
-
-        parseBlocks();
-        if (targets.isEmpty()) {
+        if (mc.player == null || mc.world == null) {
             found.clear();
+            scan.clear();
             return;
         }
-
+        List<BlockPos> scanned = scan.tick(mc.world, mc.player.getBlockPos(), range.getIntValue(),
+            new HashSet<>(blocks.getValue()), System.currentTimeMillis());
         found.clear();
-        BlockPos center = mc.player.getBlockPos();
-        int r = range.getIntValue();
-        for (int x = -r; x <= r; x++) {
-            for (int y = -r; y <= r; y++) {
-                for (int z = -r; z <= r; z++) {
-                    BlockPos pos = center.add(x, y, z);
-                    if (targets.contains(mc.world.getBlockState(pos).getBlock())) {
-                        found.add(pos.toImmutable());
-                        if (found.size() >= 1000) return;
-                    }
-                }
-            }
-        }
+        found.addAll(scanned);
     }
 
     @EventHandler

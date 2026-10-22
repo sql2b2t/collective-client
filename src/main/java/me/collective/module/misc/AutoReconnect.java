@@ -3,7 +3,6 @@ package me.collective.module.misc;
 import me.collective.category.Category;
 import me.collective.event.EventHandler;
 import me.collective.event.events.PacketEvent;
-import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.render.SoundUtil;
 import me.collective.setting.BooleanSetting;
@@ -64,8 +63,9 @@ public class AutoReconnect extends Module {
         lastReason = "";
     }
 
-    @EventHandler
-    private void onTick(TickEvent.Pre event) {
+    /** Called by the client lifecycle even while no world/player exists. */
+    public void onClientTick() {
+        if (!isToggled()) return;
         MinecraftClient client = mc;
 
         // одобряющее соединение в игре: запоминаем сервер и обнуляем счётчик
@@ -80,11 +80,14 @@ public class AutoReconnect extends Module {
         }
 
         if (lastServer == null) return;
-        if (!(client.currentScreen instanceof DisconnectedScreen)) return;
+        if (!(client.currentScreen instanceof DisconnectedScreen)) {
+            countsActive = false;
+            return;
+        }
 
         boolean afkByReason = lastReason.contains("[AfkLogout]");
         if (skipAfkLogout.getValue() && (afkMarked || afkByReason)) {
-            afkMarked = false; // одноразовая пометка — без гонок
+            // Keep suppression for the whole disconnect, not just its first tick.
             return;
         }
 

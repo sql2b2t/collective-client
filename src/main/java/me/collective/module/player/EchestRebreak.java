@@ -199,6 +199,15 @@ public class EchestRebreak extends Module {
         this.initialMiningStarted = false;
     }
 
+    @Override
+    public void onWorldChange() {
+        // Drop the old coordinates/priming without sending digs to a new world.
+        this.onDeactivate();
+        this.actionTimer = 0;
+        this.breakingProgress = 0.0f;
+        this.staleTicks = 0;
+    }
+
     @EventHandler
     private void onStartBreakingBlock(StartBreakingBlockEvent event) {
         if (this.posMode.get() != PosMode.Click) return;
@@ -217,7 +226,14 @@ public class EchestRebreak extends Module {
 
     @EventHandler
     private void onTickPre(TickEvent.Pre event) {
-        if (this.mc.player == null || this.mc.world == null) return;
+        if (this.mc.player == null || this.mc.world == null || this.mc.getNetworkHandler() == null) return;
+        // Player-inventory indices are only valid in the player's own handler.
+        if (this.mc.player.currentScreenHandler != this.mc.player.playerScreenHandler
+            || !this.mc.player.currentScreenHandler.getCursorStack().isEmpty()) {
+            this.pendingPlaceHit = null;
+            RotationUtils.getInstance().clearRotations(this);
+            return;
+        }
 
         if (this.placedWaitTimer > 0) {
             this.placedWaitTimer--;
@@ -338,10 +354,12 @@ public class EchestRebreak extends Module {
             SpeedMine speedMine = ModuleManager.INSTANCE.getModule(SpeedMine.class);
             if (speedMine != null) {
                 if (!speedMine.isActive()) speedMine.toggle();
-                if (!speedMine.isMiningBlock(this.targetPos)) {
-                    speedMine.mineBlock(this.targetPos, Direction.UP);
+                if (speedMine.canDelegateMining()) {
+                    if (!speedMine.isMiningBlock(this.targetPos)) {
+                        speedMine.mineBlock(this.targetPos, Direction.UP);
+                    }
+                    return;
                 }
-                return;
             }
         }
 
@@ -505,9 +523,11 @@ public class EchestRebreak extends Module {
         FindItemResult hotbar = InvUtils.find(stack -> stack.isOf(Items.ENDER_CHEST), 0, 8);
         if (hotbar.found()) return hotbar;
 
-        if (this.replenish.get()) {
+        if (this.replenish.get()
+            && this.mc.player.currentScreenHandler == this.mc.player.playerScreenHandler
+            && this.mc.player.currentScreenHandler.getCursorStack().isEmpty()) {
             FindItemResult inv = InvUtils.find(Items.ENDER_CHEST);
-            if (inv.found() && inv.slot() >= 9) {
+            if (inv.found() && inv.slot() >= 9 && inv.slot() < 36) {
                 InvUtils.move().from(inv.slot()).toHotbar(this.mc.player.getInventory().selectedSlot);
                 return InvUtils.find(stack -> stack.isOf(Items.ENDER_CHEST), 0, 8);
             }
@@ -536,7 +556,7 @@ public class EchestRebreak extends Module {
     }
 
     private BlockPos determineAutoPosition() {
-        if (this.mc.player == null) return null;
+        if (this.mc.player == null || this.mc.world == null) return null;
 
         Direction facing = this.mc.player.getHorizontalFacing();
         BlockPos front = this.mc.player.getBlockPos().offset(facing);

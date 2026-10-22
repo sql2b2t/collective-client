@@ -7,6 +7,7 @@ public class Setting<T> {
     private final String name;
     private T value;
     private final Predicate<Boolean> visible;
+    private java.util.function.Supplier<Boolean> visibilityCondition;
     private Consumer<T> changeListener;
 
     public Setting(String name, T defaultValue) {
@@ -55,7 +56,12 @@ public class Setting<T> {
     }
 
     public boolean isVisible() {
-        return visible == null || visible.test(true);
+        return (visible == null || visible.test(true))
+            && (visibilityCondition == null || Boolean.TRUE.equals(visibilityCondition.get()));
+    }
+
+    protected void setVisibilityCondition(java.util.function.Supplier<Boolean> condition) {
+        this.visibilityCondition = condition;
     }
 
     public Setting<T> setChangeListener(Consumer<T> listener) {

@@ -7,7 +7,7 @@ import me.collective.module.Module;
 import me.collective.setting.*;
 import me.collective.util.InvUtils;
 import net.minecraft.component.DataComponentTypes;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.client.gui.screen.ingame.InventoryScreen;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.BowItem;
 import net.minecraft.item.CrossbowItem;
@@ -16,10 +16,8 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.item.PotionItem;
 import net.minecraft.item.TridentItem;
-import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.text.Text;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -154,7 +152,7 @@ public class Replenish extends Module {
 
     private final Setting<Boolean> useShiftClick = sgAdvanced.add(new BoolSetting.Builder()
         .name("через-shift-клик")
-        .description("Добивать shift-кликом по пакету — быстрее обычного перетаскивания.")
+        .description("Совместимость со старым конфигом: пополнение всегда адресное, с возвратом остатка.")
         .defaultValue(true)
         .build());
 
@@ -194,7 +192,6 @@ public class Replenish extends Module {
 
     private int delayTicks;
     private final Map<Integer, Integer> lastStackSizes = new HashMap<>();
-    private final List<RefillOperation> pendingRefills = new ArrayList<>();
     private final Map<Integer, String> hotbarItemNames = new HashMap<>();
 
     public static Replenish INSTANCE;
@@ -208,26 +205,23 @@ public class Replenish extends Module {
     public void onActivate() {
         this.delayTicks = 0;
         this.lastStackSizes.clear();
-        this.pendingRefills.clear();
         this.hotbarItemNames.clear();
     }
 
     @Override
     public void onDeactivate() {
-        this.lastStackSizes.clear();
-        this.pendingRefills.clear();
-        this.hotbarItemNames.clear();
+        onActivate();
     }
 
     @Override
-    public String getInfoString() {
-        if (!this.pendingRefills.isEmpty()) return "восполнение (" + this.pendingRefills.size() + ")";
-        return null;
+    public void onWorldChange() {
+        onActivate();
     }
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (this.mc.player == null || this.mc.world == null) return;
+        if (this.mc.player == null || this.mc.world == null || !InvUtils.canUsePlayerInventory()) return;
+        if (!this.silentRefill.get() && !(this.mc.currentScreen instanceof InventoryScreen)) return;
 
         if (this.delayTicks > 0) {
             this.delayTicks--;
@@ -235,11 +229,6 @@ public class Replenish extends Module {
         }
 
         if (this.pauseOnUse.get() && this.mc.player.isUsingItem()) return;
-
-        if (!this.pendingRefills.isEmpty()) {
-            processPendingRefills();
-            return;
-        }
 
         checkHotbar();
     }
@@ -333,10 +322,9 @@ public class Replenish extends Module {
         int sourceSlot = findSourceSlot(hotbarStack);
         if (sourceSlot == -1) return false;
 
-        RefillOperation operation = new RefillOperation(sourceSlot, hotbarSlot);
-        if (this.useShiftClick.get()) performShiftClickRefill(operation);
-        else performNormalRefill(operation);
-
+        // Complete pickup, targeted merge and overflow return synchronously. No queued
+        // inventory indices survive a screen change or consume a later user's stack.
+        InvUtils.move().from(sourceSlot).to(hotbarSlot);
         return true;
     }
 
@@ -377,37 +365,8 @@ public class Replenish extends Module {
     }
 
     private boolean canStack(ItemStack a, ItemStack b) {
-        if (a.getItem() != b.getItem()) return false;
-        if (a.getMaxCount() == 1) return true;
-        if (this.respectCustomNames.get()) return ItemStack.areItemsAndComponentsEqual(a, b);
-        return ItemStack.areItemsEqual(a, b);
-    }
-
-    private void performShiftClickRefill(RefillOperation operation) {
-        if (this.silentRefill.get()) {
-            int syncId = this.mc.player.currentScreenHandler.syncId;
-            this.mc.interactionManager.clickSlot(syncId, operation.sourceSlot, 0, SlotActionType.PICKUP, (PlayerEntity) this.mc.player);
-        } else {
-            this.pendingRefills.add(operation);
-        }
-    }
-
-    private void performNormalRefill(RefillOperation operation) {
-        InvUtils.move().from(operation.sourceSlot).to(operation.targetSlot);
-    }
-
-    private void processPendingRefills() {
-        if (this.mc.player.currentScreenHandler != this.mc.player.playerScreenHandler) return;
-
-        int processed = 0;
-        while (!this.pendingRefills.isEmpty() && processed < this.maxRefillsPerTick.get()) {
-            RefillOperation operation = this.pendingRefills.remove(0);
-            int syncId = this.mc.player.currentScreenHandler.syncId;
-            this.mc.interactionManager.clickSlot(syncId, operation.sourceSlot, 0, SlotActionType.PICKUP, (PlayerEntity) this.mc.player);
-            processed++;
-        }
-
-        if (processed > 0) this.delayTicks = this.tickDelay.get();
+        // Vanilla only merges identical components; ignoring names cannot change that.
+        return a.getMaxCount() > 1 && ItemStack.areItemsAndComponentsEqual(a, b);
     }
 
     /** Константы по-русски — EnumSetting показывает toString(). */
@@ -417,13 +376,4 @@ public class Replenish extends Module {
         Маленькие
     }
 
-    private static class RefillOperation {
-        final int sourceSlot;
-        final int targetSlot;
-
-        RefillOperation(int sourceSlot, int targetSlot) {
-            this.sourceSlot = sourceSlot;
-            this.targetSlot = targetSlot;
-        }
-    }
 }

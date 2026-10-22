@@ -17,6 +17,7 @@ import net.minecraft.item.Item;
 import net.minecraft.item.Items;
 import net.minecraft.registry.tag.ItemTags;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 
 public class Offhand extends Module {
     public enum Mode {
@@ -40,7 +41,7 @@ public class Offhand extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.world == null || !InventoryUtil.canUsePlayerInventory()) return;
 
         if (timer > 0) {
             timer--;
@@ -62,6 +63,16 @@ public class Offhand extends Module {
                 timer = delay.getValue().intValue();
             }
         }
+    }
+
+    @Override
+    public void onActivate() {
+        timer = 0;
+    }
+
+    @Override
+    public void onWorldChange() {
+        timer = 0;
     }
 
     private Item getTargetItem() {
@@ -88,7 +99,7 @@ public class Offhand extends Module {
 
         // Заряженный якорь поблизости
         boolean anchorNear = false;
-        if (anchorCheck.getValue()) {
+        if (anchorCheck.getValue() && mc.world.getRegistryKey() != World.NETHER) {
             BlockPos pPos = mc.player.getBlockPos();
             outer:
             for (int x = -5; x <= 5; x++) {

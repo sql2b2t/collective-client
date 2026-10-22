@@ -8,6 +8,9 @@ import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 
 public class Fullbright extends Module {
+    private net.minecraft.client.network.ClientPlayerEntity owner;
+    private StatusEffectInstance ownedEffect;
+
     public Fullbright() {
         super("Fullbright", "Grants client-side night vision for maximum visibility in dark areas.", Category.RENDER);
     }
@@ -19,9 +22,14 @@ public class Fullbright extends Module {
 
     @Override
     public void onDisable() {
-        if (mc.player != null) {
-            mc.player.removeStatusEffect(StatusEffects.NIGHT_VISION);
+        // Never remove a server effect that replaced our instance.
+        if (owner != null && ownedEffect != null
+                && owner.getStatusEffect(StatusEffects.NIGHT_VISION) == ownedEffect
+                && !ownedEffect.shouldShowIcon() && !ownedEffect.shouldShowParticles()) {
+            owner.removeStatusEffect(StatusEffects.NIGHT_VISION);
         }
+        owner = null;
+        ownedEffect = null;
     }
 
     @EventHandler
@@ -30,9 +38,19 @@ public class Fullbright extends Module {
     }
 
     private void applyNightVision() {
-        if (mc.player == null) return;
-        if (!mc.player.hasStatusEffect(StatusEffects.NIGHT_VISION)) {
-            mc.player.addStatusEffect(new StatusEffectInstance(StatusEffects.NIGHT_VISION, 1000, 0, false, false));
+        if (mc.player != owner) {
+            owner = mc.player;
+            ownedEffect = null;
+        }
+        if (owner == null) return;
+        StatusEffectInstance current = owner.getStatusEffect(StatusEffects.NIGHT_VISION);
+        if (current == null) {
+            StatusEffectInstance effect = new StatusEffectInstance(StatusEffects.NIGHT_VISION, 1000, 0, false, false, false);
+            owner.addStatusEffect(effect);
+            ownedEffect = owner.getStatusEffect(StatusEffects.NIGHT_VISION);
+        } else if (current != ownedEffect || current.shouldShowIcon() || current.shouldShowParticles()) {
+            // A visible/server-supplied effect is not ours to clear.
+            ownedEffect = null;
         }
     }
 }

@@ -29,6 +29,11 @@ public class AntiBot extends Module {
     }
 
     @Override
+    public void onEnable() {
+        lastCheck = System.currentTimeMillis();
+    }
+
+    @Override
     public void onUpdate() {
         if (mc.player == null || mc.world == null || mc.getNetworkHandler() == null) return;
         long now = System.currentTimeMillis();
@@ -43,7 +48,9 @@ public class AntiBot extends Module {
         }
 
         for (PlayerEntity p : new java.util.ArrayList<>(mc.world.getPlayers())) {
-            if (p == mc.player || !p.isAlive()) continue;
+            // Player-list packets can arrive after entity spawn; never delete a fresh
+            // real player or our explicit test dummy based on that transient absence.
+            if (p == mc.player || !p.isAlive() || p.age < 100 || FakePlayer.isLocalFake(p)) continue;
             if (FriendManager.getInstance().isFriend(p)) continue;
 
             if (tabList.getValue() && !tabIds.contains(p.getUuid())) {

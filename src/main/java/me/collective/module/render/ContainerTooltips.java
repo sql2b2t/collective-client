@@ -11,6 +11,12 @@ import me.collective.setting.KeybindSetting;
 import me.collective.util.sort.ShulkerDataParser;
 import me.collective.util.tracker.ChestTrackerDataManager;
 import me.collective.util.tracker.TrackedContainer;
+import me.collective.util.tracker.ContainerIndexRecorder;
+import me.collective.module.ModuleManager;
+import me.collective.event.events.TickEvent;
+import me.collective.event.events.PacketEvent;
+import net.minecraft.network.packet.s2c.play.InventoryS2CPacket;
+import net.minecraft.block.EnderChestBlock;
 import me.collective.module.Module;
 import me.collective.category.Category;
 import me.collective.setting.Keybind;
@@ -157,7 +163,9 @@ public class ContainerTooltips extends Module {
     @Override
     public void onActivate() {
         ChestTrackerDataManager.onModuleActivate();
+        if (ownsRecorder()) ContainerIndexRecorder.setOptions(true, true, true);
         currentTooltip = null;
+        lastUpdateTime = 0L;
     }
 
     @Override
@@ -183,9 +191,26 @@ public class ContainerTooltips extends Module {
         ChestTrackerDataManager.tickAutosave();
     }
 
-    
+    // ContainerIndex owns its options and recording when enabled. Otherwise the
+    // tooltip is a standalone recorder, including ender chests it can preview.
+    private boolean ownsRecorder() {
+        ContainerIndex index = ModuleManager.INSTANCE.getModule(ContainerIndex.class);
+        return index == null || !index.isToggled();
+    }
 
-    
+    @EventHandler
+    private void onTick(TickEvent.Post event) {
+        if (!ownsRecorder()) return;
+        ContainerIndexRecorder.setOptions(true, true, true);
+        ContainerIndexRecorder.onTick();
+    }
+
+    @EventHandler
+    private void onPacketReceive(PacketEvent.Receive event) {
+        if (ownsRecorder() && event.getPacket() instanceof InventoryS2CPacket packet) {
+            ContainerIndexRecorder.onInventoryPacket(packet);
+        }
+    }
 
     public void onRender2D(DrawContext drawContext, float tickDelta) {
         if (mc.player == null || mc.world == null) return;
@@ -247,7 +272,9 @@ public class ContainerTooltips extends Module {
             if (other != null) container = ChestTrackerDataManager.getData().getContainer(other, dimension);
         }
         // Содержимое эндер-сундука общее — подойдёт любая его запись
-        if (container == null) container = anyEnderChest(dimension);
+        if (container == null && state.getBlock() instanceof EnderChestBlock) {
+            container = anyEnderChest(dimension);
+        }
 
         if (container == null) return null;
 

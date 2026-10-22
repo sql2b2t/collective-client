@@ -107,7 +107,22 @@ public class ElytraBounce extends Module {
     }
 
     @Override
+    public void onWorldChange() {
+        this.restoreKillAura();
+        this.lastUnstuckPos = null;
+        this.tempPath = null;
+        this.portalTrap = null;
+        this.pendingPortalScan = null;
+        this.lastNavGoal = null;
+        this.elytraToggled = false;
+        this.stuckTimer = 0;
+        this.cameraSmoothY = Double.NaN;
+        RotationUtils.getInstance().clearRotations(this);
+    }
+
+    @Override
     public void onEnable() {
+        this.lastUnstuckPos = null;
         if (mc.player != null && !mc.player.getAbilities().allowFlying) {
             this.startSprinting = mc.player.isSprinting();
             this.jumpKeyDown = false;
@@ -180,6 +195,7 @@ public class ElytraBounce extends Module {
     @EventHandler
     private void onTick(TickEvent.Pre event) {
         if (mc.player != null && !mc.player.getAbilities().allowFlying) {
+            if (this.lastUnstuckPos == null) onEnable();
             if (this.setbackTicks > 0) {
                 this.setbackTicks--;
             }

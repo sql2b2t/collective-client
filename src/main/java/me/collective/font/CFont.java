@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class CFont {
+public class CFont implements AutoCloseable {
     private static final AtomicInteger ID_COUNTER = new AtomicInteger(0);
 
     protected final Font font;
@@ -35,6 +35,7 @@ public class CFont {
     protected Identifier textureId;
     protected NativeImageBackedTexture nativeTexture;
     protected NativeImage nativeImage;
+    private boolean closed;
 
     public static class CharData {
         public int x;
@@ -137,6 +138,7 @@ public class CFont {
     }
 
     private synchronized boolean tryUploadTexture() {
+        if (closed) return false;
         if (textureId != null) return true;
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc == null || mc.getTextureManager() == null || nativeImage == null) return false;
@@ -155,8 +157,33 @@ public class CFont {
             mc.getTextureManager().registerTexture(textureId, nativeTexture);
             return true;
         } catch (Exception e) {
+            // A failed upload must not retain a half-created GPU texture.
+            if (nativeTexture != null) {
+                nativeTexture.close();
+                nativeTexture = null;
+                nativeImage = null;
+            }
+            textureId = null;
             return false;
         }
+    }
+
+    /** Releases only this font's atlas; glyph layout and rendering are unchanged. */
+    @Override
+    public synchronized void close() {
+        if (closed) return;
+        closed = true;
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (textureId != null && client != null && client.getTextureManager() != null) {
+            client.getTextureManager().destroyTexture(textureId);
+        } else if (nativeTexture != null) {
+            nativeTexture.close();
+        } else if (nativeImage != null) {
+            nativeImage.close();
+        }
+        textureId = null;
+        nativeTexture = null;
+        nativeImage = null;
     }
 
     private void setupHints(Graphics2D g) {

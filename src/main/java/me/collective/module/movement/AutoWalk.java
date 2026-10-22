@@ -21,6 +21,8 @@ public class AutoWalk extends Module {
     public final BooleanSetting sprint = add(new BooleanSetting("Спринт", true));
     public final BooleanSetting jump = add(new BooleanSetting("Прыжки", false));
 
+    private boolean ownsBaritoneInput;
+
     public AutoWalk() {
         super("AutoWalk", "Автоматическая ходьба (обычно или через Baritone).", Category.MOVEMENT);
     }
@@ -58,6 +60,7 @@ public class AutoWalk extends Module {
         try {
             IBaritone baritone = BaritoneAPI.getProvider().getPrimaryBaritone();
             baritone.getInputOverrideHandler().clearAllKeys();
+            ownsBaritoneInput = true;
 
             Input input = switch (direction.compute().trim()) {
                 case "Back" -> Input.MOVE_BACK;
@@ -83,13 +86,16 @@ public class AutoWalk extends Module {
     @Override
     public void onDisable() {
         releaseAll();
-        try {
-            BaritoneAPI.getProvider().getPrimaryBaritone().getInputOverrideHandler().clearAllKeys();
-        } catch (Throwable ignored) {
-        }
     }
 
     private void releaseAll() {
+        if (ownsBaritoneInput) {
+            try {
+                BaritoneAPI.getProvider().getPrimaryBaritone().getInputOverrideHandler().clearAllKeys();
+            } catch (Throwable ignored) {
+            }
+            ownsBaritoneInput = false;
+        }
         if (mc.options == null) return;
         mc.options.forwardKey.setPressed(false);
         mc.options.backKey.setPressed(false);

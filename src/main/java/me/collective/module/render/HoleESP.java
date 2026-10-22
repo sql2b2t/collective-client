@@ -88,10 +88,9 @@ public class HoleESP extends Module {
 
     private Hole checkHole(BlockPos pos) {
         if (isSolid(pos) || isSolid(pos.up()) || isSolid(pos.up(2))) return null;
-        if (!isSolid(pos.down())) return null;
+        if (!isSafe(pos.down())) return null;
 
-        boolean bedrock = true;
-        boolean obsidian = true;
+        boolean bedrock = mc.world.getBlockState(pos.down()).isOf(Blocks.BEDROCK);
         BlockPos secondPos = null;
 
         for (Direction dir : Direction.Type.HORIZONTAL) {
@@ -102,11 +101,24 @@ public class HoleESP extends Module {
                 // Safe bedrock
             } else if (sideState.isOf(Blocks.OBSIDIAN) || sideState.isOf(Blocks.CRYING_OBSIDIAN) || sideState.isOf(Blocks.ANVIL)) {
                 bedrock = false;
-            } else if (doubleHoles.getValue() && !isSolid(side) && !isSolid(side.up()) && isSolid(side.down()) && secondPos == null) {
+            } else if (doubleHoles.getValue() && !isSolid(side) && !isSolid(side.up())
+                && !isSolid(side.up(2)) && isSafe(side.down()) && secondPos == null) {
                 // Potential 2x1 hole
                 secondPos = side;
             } else {
                 return null;
+            }
+        }
+
+        if (secondPos != null) {
+            bedrock &= mc.world.getBlockState(secondPos.down()).isOf(Blocks.BEDROCK);
+            // The shared edge is internal; every other side of the second cell
+            // must be protected just like the sides of the first one.
+            for (Direction dir : Direction.Type.HORIZONTAL) {
+                BlockPos side = secondPos.offset(dir);
+                if (side.equals(pos)) continue;
+                if (!isSafe(side)) return null;
+                bedrock &= mc.world.getBlockState(side).isOf(Blocks.BEDROCK);
             }
         }
 
@@ -126,6 +138,12 @@ public class HoleESP extends Module {
         }
     }
 
+    private boolean isSafe(BlockPos pos) {
+        BlockState state = mc.world.getBlockState(pos);
+        return state.isOf(Blocks.BEDROCK) || state.isOf(Blocks.OBSIDIAN)
+            || state.isOf(Blocks.CRYING_OBSIDIAN) || state.isOf(Blocks.ANVIL);
+    }
+
     private boolean isSolid(BlockPos pos) {
         BlockState state = mc.world.getBlockState(pos);
         return !state.isAir()
@@ -139,7 +157,7 @@ public class HoleESP extends Module {
 
     @EventHandler
     public void onRender3D(Render3DEvent event) {
-        if (!isToggled() || holes.isEmpty()) return;
+        if (!isToggled() || holes.isEmpty() || mc.player == null || mc.world == null) return;
 
         ShapeMode sm = switch (mode.getValue()) {
             case CubeFill -> ShapeMode.Sides;

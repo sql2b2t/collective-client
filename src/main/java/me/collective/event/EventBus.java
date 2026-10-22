@@ -81,7 +81,7 @@ public class EventBus {
 
     private final Map<Class<?>, List<Listener>> listenersMap = new ConcurrentHashMap<>();
 
-    public void subscribe(Object object) {
+    public synchronized void subscribe(Object object) {
         if (object == null) return;
 
         Class<?> clazz = object.getClass();
@@ -97,7 +97,7 @@ public class EventBus {
                     // вызовы: аддоны и перезагрузка модулей могут подписать объект второй раз.
                     boolean present = false;
                     for (Listener l : list) {
-                        if (l.target == object && l.method == method) {
+                        if (l.target == object && l.method.equals(method)) {
                             present = true;
                             break;
                         }
@@ -114,7 +114,7 @@ public class EventBus {
         }
     }
 
-    public void unsubscribe(Object object) {
+    public synchronized void unsubscribe(Object object) {
         if (object == null) return;
 
         for (List<Listener> listeners : listenersMap.values()) {

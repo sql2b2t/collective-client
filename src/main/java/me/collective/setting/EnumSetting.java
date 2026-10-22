@@ -31,6 +31,13 @@ public class EnumSetting<T extends Enum<T>> extends Setting<T> {
                 return true;
             }
         }
+        // Older profiles stored the displayed (possibly localized) label.
+        for (T val : values) {
+            if (val.toString().equalsIgnoreCase(name)) {
+                setValue(val);
+                return true;
+            }
+        }
         return false;
     }
 
