@@ -57,6 +57,13 @@ public final class DigLog {
             return;
         }
 
+        if (packet instanceof net.minecraft.network.packet.c2s.play.HandSwingC2SPacket) {
+            ChatHelper.sendMessage(String.format(
+                "[DigLog] SWING %s",
+                this.lookSeenThisTick ? "§e(look-пакет был до свинга)" : "§f(без look)"));
+            return;
+        }
+
         if (packet instanceof PlayerActionC2SPacket action) {
             PlayerActionC2SPacket.Action type = action.getAction();
             if (type == PlayerActionC2SPacket.Action.START_DESTROY_BLOCK

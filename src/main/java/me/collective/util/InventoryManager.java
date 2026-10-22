@@ -10,10 +10,7 @@ import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.c2s.play.ClickSlotC2SPacket;
 import net.minecraft.network.packet.c2s.play.CloseHandledScreenC2SPacket;
 import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
-import net.minecraft.network.packet.s2c.common.CommonPingS2CPacket;
 import net.minecraft.network.packet.s2c.play.UpdateSelectedSlotS2CPacket;
-
-import java.util.Arrays;
 
 /**
  * Серверный менеджер слота: отделяет серверный слот от клиентского,
@@ -27,16 +24,10 @@ public class InventoryManager {
     private int lastSentSlot = -1;
     private boolean sendingPacket;
     private boolean isEating;
-
-    private final int[] transactions = new int[4];
-    private int transactionIndex;
-
-    private boolean isGrim;
     private int currentPriority;
 
     private InventoryManager() {
         EventBus.INSTANCE.subscribe(this);
-        Arrays.fill(this.transactions, -1);
     }
 
     public static InventoryManager getInstance() {
@@ -48,6 +39,12 @@ public class InventoryManager {
     public void onPacketSend(PacketEvent.Send event) {
         if (this.sendingPacket) return;
         if (event.isCancelled()) return;
+
+        // Пока ни один модуль не держит свап (currentPriority == 0) менеджер
+        // полностью прозрачен: ванильные пакеты слота проходят как есть, без
+        // дедупликации по локальному зеркалу — при разъезде зеркала с сервером
+        // (смерть/респавн/сброс слота) это давало десинк инвентаря на копании.
+        if (this.currentPriority <= 0) return;
 
         Packet<?> packet = event.packet;
         if (packet instanceof ClickSlotC2SPacket || packet instanceof CloseHandledScreenC2SPacket) {
@@ -78,18 +75,9 @@ public class InventoryManager {
 
     @EventHandler(priority = 200)
     public void onPacketReceive(PacketEvent.Receive event) {
-        Packet<?> packet = event.packet;
-
-        if (packet instanceof UpdateSelectedSlotS2CPacket update) {
+        // зеркало обновляем всегда — иначе после простоя свап стартует с устаревшего слота
+        if (event.packet instanceof UpdateSelectedSlotS2CPacket update) {
             this.serverSlot = update.slot();
-            return;
-        }
-
-        if (packet instanceof CommonPingS2CPacket ping && this.transactionIndex <= 3) {
-            this.transactions[this.transactionIndex] = ping.getParameter();
-            this.transactionIndex++;
-
-            if (this.transactionIndex == 4) grimCheck();
         }
     }
 
@@ -103,24 +91,10 @@ public class InventoryManager {
     }
 
     public void onDisconnect() {
-        Arrays.fill(this.transactions, -1);
-        this.transactionIndex = 0;
-        this.isGrim = false;
         this.serverSlot = -1;
         this.lastSentSlot = -1;
         this.currentPriority = 0;
         this.isEating = false;
-    }
-
-    private void grimCheck() {
-        for (int i = 0; i < 4; i++) {
-            if (this.transactions[i] != -i) return;
-        }
-        this.isGrim = true;
-    }
-
-    public boolean isGrim() {
-        return this.isGrim;
     }
 
     public void setSlot(int barSlot) {
