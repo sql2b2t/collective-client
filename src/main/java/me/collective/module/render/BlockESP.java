@@ -40,7 +40,7 @@ public class BlockESP extends Module {
             Blocks.ENDER_CHEST,
             Blocks.SPAWNER))
         .build());
-    public final NumberSetting range = add(new NumberSetting("Радиус", 32.0, 8.0, 64.0, 1.0));
+    public final NumberSetting range = add(new NumberSetting("Радиус", 32.0, 8.0, 256.0, 1.0));
     public final ColorSetting color = add(new ColorSetting("Цвет", new Color(255, 80, 80, 120)));
     public final ModeSetting shape = add(new ModeSetting("Форма", "Both", "Both", "Sides", "Lines"));
     public final BooleanSetting tracers = add(new BooleanSetting("Линии", false));
