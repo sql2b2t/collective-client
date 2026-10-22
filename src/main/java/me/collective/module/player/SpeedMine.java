@@ -117,7 +117,7 @@ public class SpeedMine extends Module {
     private final Setting<Double> speedConfig = this.sgGeneral.add(new DoubleSetting.Builder()
         .name("скорость")
         .description("Прогресс разрушения, на котором отправляется пакет разрушения. 0.7 — собственная линия мгновенного разрушения сервера (быстрее блока легально не сломать), требует grim-bypass. 1.0 = точная ванильная скорость.")
-        .defaultValue(0.7)
+        .defaultValue(1.0)
         .min(0.01)
         .max(2.0)
         .sliderRange(0.1, 1.5)
