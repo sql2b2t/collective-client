@@ -69,7 +69,7 @@ public class GrimGlide extends Module {
     public void onEnable() {
         setbacks = 0;
         bps = 0.0;
-        lastPos = mc.player == null ? null : mc.player.getEntityPos();
+        lastPos = mc.player == null ? null : mc.player.position();
         if (mode.getValue() == Mode.Envelope) {
             reportEnvelope();
         }
@@ -115,32 +115,32 @@ public class GrimGlide extends Module {
     }
 
     private double gravity() {
-        double cos = Math.cos(Math.toRadians(mc.player.getPitch()));
+        double cos = Math.cos(Math.toRadians(mc.player.getXRot()));
         double vertCosRotation = cos * cos;
         return 0.08 * (-1.0 + vertCosRotation * 0.75);
     }
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
         if (lastPos != null) {
-            Vec3 delta = mc.player.getEntityPos().subtract(lastPos);
+            Vec3 delta = mc.player.position().subtract(lastPos);
             bps = Math.sqrt(delta.x * delta.x + delta.z * delta.z) * 20.0;
         }
-        lastPos = mc.player.getEntityPos();
-        if (!mc.player.isGliding()) return;
+        lastPos = mc.player.position();
+        if (!mc.player.isFallFlying()) return;
 
         if (mode.getValue() == Mode.Report) {
             tickReport();
         } else {
-            mc.player.setVelocity(envelope());
+            mc.player.setDeltaMovement(envelope());
         }
     }
 
     @EventHandler
     private void onPlayerMove(PlayerMoveEvent event) {
-        if (mode.getValue() != Mode.Envelope || mc.player == null || mc.world == null) return;
-        if (event.type != MovementType.SELF || !mc.player.isGliding()) return;
+        if (mode.getValue() != Mode.Envelope || mc.player == null || mc.level == null) return;
+        if (event.type != MoverType.SELF || !mc.player.isFallFlying()) return;
         event.movement = envelope();
     }
 
@@ -152,41 +152,41 @@ public class GrimGlide extends Module {
         if (steer.getValue() && !isMoveKeyDown()) {
             return new Vec3(0.0, y, 0.0);
         }
-        double yawRad = Math.toRadians(mc.player.getYaw());
+        double yawRad = Math.toRadians(mc.player.getYRot());
         return new Vec3(-Math.sin(yawRad) * h, y, Math.cos(yawRad) * h);
     }
 
     private boolean isMoveKeyDown() {
-        return mc.options.forwardKey.isPressed() || mc.options.backKey.isPressed() || mc.options.leftKey.isPressed() || mc.options.rightKey.isPressed();
+        return mc.options.keyUp.isDown() || mc.options.keyDown.isDown() || mc.options.keyLeft.isDown() || mc.options.keyRight.isDown();
     }
 
     private void tickReport() {
         double step = bps >= speedLimit.getValue() ? 0.0 : forward.getValue();
-        double yawRad = Math.toRadians(mc.player.getYaw());
+        double yawRad = Math.toRadians(mc.player.getYRot());
         double dx = -Math.sin(yawRad) * step;
         double dz = Math.cos(yawRad) * step;
-        Vec3 velocity = mc.player.getVelocity();
-        mc.player.setVelocity(dx * factor(), velocity.y - fall.getValue(), dz * factor());
+        Vec3 velocity = mc.player.getDeltaMovement();
+        mc.player.setDeltaMovement(dx * factor(), velocity.y - fall.getValue(), dz * factor());
         if (teleport.getValue()) {
-            mc.player.setPosition(mc.player.getX() + dx, mc.player.getY(), mc.player.getZ() + dz);
+            mc.player.setPos(mc.player.getX() + dx, mc.player.getY(), mc.player.getZ() + dz);
         }
-        mc.player.setVelocity(dx * factor(), mc.player.getVelocity().y + lift.getValue(), dz * factor());
+        mc.player.setDeltaMovement(dx * factor(), mc.player.getDeltaMovement().y + lift.getValue(), dz * factor());
     }
 
     @EventHandler
     private void onPacketReceive(PacketEvent.Receive event) {
         if (!reportSetbacks.getValue() || mc.player == null) return;
         Packet<?> packet = event.getPacket();
-        if (!(packet instanceof PlayerPositionLookS2CPacket positionLook)) return;
+        if (!(packet instanceof ClientboundPlayerPositionPacket positionLook)) return;
 
-        EntityPosition changePacket = positionLook.change();
+        net.minecraft.world.entity.PositionMoveRotation changePacket = positionLook.change();
         Vec3 change = changePacket.position();
-        Vec3 current = mc.player.getEntityPos();
-        Set<PositionFlag> relatives = positionLook.relatives();
+        Vec3 current = mc.player.position();
+        Set<Relative> relatives = positionLook.relatives();
         Vec3 target = new Vec3(
-            relatives.contains(PositionFlag.X) ? current.x + change.x : change.x,
-            relatives.contains(PositionFlag.Y) ? current.y + change.y : change.y,
-            relatives.contains(PositionFlag.Z) ? current.z + change.z : change.z
+            relatives.contains(Relative.X) ? current.x + change.x : change.x,
+            relatives.contains(Relative.Y) ? current.y + change.y : change.y,
+            relatives.contains(Relative.Z) ? current.z + change.z : change.z
         );
         String message = String.format("Откат #%d — оттянуто на %.2f блоков.", ++setbacks, target.distanceTo(current));
         // Пакеты приходят на netty-треде: чат трогаем только из главного потока.

@@ -12,6 +12,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.network.chat.Component;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -35,10 +36,10 @@ public class AutoCity extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         if (cityPos != null) {
-            BlockState state = mc.world.getBlockState(cityPos);
+            BlockState state = mc.level.getBlockState(cityPos);
             if (state.isAir() || !isBlastResistant(state)) {
                 cityPos = null;
                 setToggled(false);
@@ -50,25 +51,25 @@ public class AutoCity extends Module {
         double r = targetRange.getValue();
         double rSq = r * r;
 
-        Player target = StreamSupport.stream(mc.world.getPlayers().spliterator(), false)
+        Player target = StreamSupport.stream(mc.level.players().spliterator(), false)
             .filter(p -> p != mc.player && p.isAlive() && !p.isCreative() && !p.isSpectator())
             .filter(p -> !me.collective.manager.FriendManager.getInstance().isFriend(p))
-            .filter(p -> mc.player.squaredDistanceTo(p) <= rSq)
-            .min(Comparator.comparingDouble(p -> mc.player.squaredDistanceTo(p)))
+            .filter(p -> mc.player.distanceToSqr(p) <= rSq)
+            .min(Comparator.comparingDouble(p -> mc.player.distanceToSqr(p)))
             .orElse(null);
 
         if (target == null) return;
 
-        BlockPos targetPos = target.getBlockPos();
+        BlockPos targetPos = target.blockPosition();
         Direction[] sides = { Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST };
 
         double maxReachSq = breakRange.getValue() * breakRange.getValue();
 
         List<BlockPos> candidates = new ArrayList<>();
         for (Direction side : sides) {
-            BlockPos pos = targetPos.offset(side);
-            if (mc.player.squaredDistanceTo(pos.toCenterPos()) > maxReachSq) continue;
-            BlockState state = mc.world.getBlockState(pos);
+            BlockPos pos = targetPos.relative(side);
+            if (mc.player.distanceToSqr(Vec3.atCenterOf(pos)) > maxReachSq) continue;
+            BlockState state = mc.level.getBlockState(pos);
             if (isBlastResistant(state)) {
                 candidates.add(pos);
             }
@@ -76,21 +77,21 @@ public class AutoCity extends Module {
 
         // Приоритет блокам, над которыми воздух (чтобы сразу поставить кристалл)
         candidates.sort((a, b) -> {
-            boolean aAir = mc.world.getBlockState(a.up()).isAir();
-            boolean bAir = mc.world.getBlockState(b.up()).isAir();
+            boolean aAir = mc.level.getBlockState(a.above()).isAir();
+            boolean bAir = mc.level.getBlockState(b.above()).isAir();
             if (aAir != bAir) return aAir ? -1 : 1;
-            return Double.compare(mc.player.squaredDistanceTo(a.toCenterPos()), mc.player.squaredDistanceTo(b.toCenterPos()));
+            return Double.compare(mc.player.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(a)), mc.player.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(b)));
         });
 
         if (!candidates.isEmpty()) {
             BlockPos pos = candidates.get(0);
             cityPos = pos;
-            mc.player.sendMessage(Component.literal("§7[§cAutoCity§7] §aMining city block at: §e" + pos.toShortString()), false);
+            mc.player.sendSystemMessage(Component.literal("§7[§cAutoCity§7] §aMining city block at: §e" + pos.toShortString()));
 
             if (SpeedMine.INSTANCE != null) {
                 if (!SpeedMine.INSTANCE.isToggled()) {
                     SpeedMine.INSTANCE.setToggled(true);
-                    mc.player.sendMessage(Component.literal("§7[§cAutoCity§7] §6Сам включил SpeedMine — её настройки (скорость/обход/дальность) теперь копают твои блоки и могут флагать Grim."), false);
+                    mc.player.sendSystemMessage(Component.literal("§7[§cAutoCity§7] §6Сам включил SpeedMine — её настройки (скорость/обход/дальность) теперь копают твои блоки и могут флагать Grim."));
                 }
                 SpeedMine.INSTANCE.mineBlock(cityPos, Direction.UP);
             }
@@ -98,8 +99,8 @@ public class AutoCity extends Module {
     }
 
     private boolean isBlastResistant(BlockState state) {
-        return state.isOf(Blocks.OBSIDIAN) || state.isOf(Blocks.CRYING_OBSIDIAN)
-            || state.isOf(Blocks.NETHERITE_BLOCK) || state.isOf(Blocks.RESPAWN_ANCHOR)
-            || state.isOf(Blocks.ENDER_CHEST);
+        return state.is(Blocks.OBSIDIAN) || state.is(Blocks.CRYING_OBSIDIAN)
+            || state.is(Blocks.NETHERITE_BLOCK) || state.is(Blocks.RESPAWN_ANCHOR)
+            || state.is(Blocks.ENDER_CHEST);
     }
 }

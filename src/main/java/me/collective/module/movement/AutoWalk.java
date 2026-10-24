@@ -46,13 +46,13 @@ public class AutoWalk extends Module {
         String dir = direction.compute().trim();
         // Нажимаем только текущее направление: при смене направления старая
         // клавиша обязана отжаться, иначе игрок поедет двумя клавишами сразу.
-        mc.options.forwardKey.setPressed(dir.equals("Forward"));
-        mc.options.backKey.setPressed(dir.equals("Back"));
-        mc.options.leftKey.setPressed(dir.equals("Left"));
-        mc.options.rightKey.setPressed(dir.equals("Right"));
+        mc.options.keyUp.setDown(dir.equals("Forward"));
+        mc.options.keyDown.setDown(dir.equals("Back"));
+        mc.options.keyLeft.setDown(dir.equals("Left"));
+        mc.options.keyRight.setDown(dir.equals("Right"));
         mc.player.setSprinting(sprint.getValue());
-        if (jump.getValue() && mc.player.isOnGround() && mc.player.horizontalCollision) {
-            mc.player.jump();
+        if (jump.getValue() && mc.player.onGround() && mc.player.horizontalCollision) {
+            mc.player.jumpFromGround();
         }
     }
 
@@ -75,7 +75,7 @@ public class AutoWalk extends Module {
             }
 
             // При упоре в стену — баритонов принудительный прыжок
-            if (jump.getValue() && mc.player.isOnGround() && mc.player.horizontalCollision) {
+            if (jump.getValue() && mc.player.onGround() && mc.player.horizontalCollision) {
                 baritone.getInputOverrideHandler().setInputForceState(Input.JUMP, true);
             }
         } catch (Throwable ignored) {
@@ -97,9 +97,9 @@ public class AutoWalk extends Module {
             ownsBaritoneInput = false;
         }
         if (mc.options == null) return;
-        mc.options.forwardKey.setPressed(false);
-        mc.options.backKey.setPressed(false);
-        mc.options.leftKey.setPressed(false);
-        mc.options.rightKey.setPressed(false);
+        mc.options.keyUp.setDown(false);
+        mc.options.keyDown.setDown(false);
+        mc.options.keyLeft.setDown(false);
+        mc.options.keyRight.setDown(false);
     }
 }

@@ -1,6 +1,8 @@
 package me.collective.render;
 
-import net.minecraft.client.Camera;
+import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector2f;
@@ -8,37 +10,26 @@ import org.joml.Vector4f;
 
 /**
  * Кадровый кэш матриц рендера мира.
- *
- * <p>Миксин сохраняет ровно те view/projection матрицы, которыми игра рисует
- * мир в текущем кадре: поворот камеры, FOV с множителем спринта/зума,
- * view-bobbing, hurt-tilt и эффект тошноты. Благодаря этому 2D-элементы
- * (NameTags, ItemESP) проецируются пиксель-в-пиксель с картинкой и не
- * дрожат при движении.
  */
 public final class RenderFrame {
     private static final Matrix4f VIEW_PROJ = new Matrix4f();
     private static Vec3 cameraPos = Vec3.ZERO;
-    private static net.minecraft.client.render.Frustum frustum;
+    private static Frustum frustum;
     private static boolean valid;
 
     private RenderFrame() {
     }
 
     /** Вызывается из MixinWorldRenderer в начале каждого рендера мира. */
-    public static void capture(Camera camera, Matrix4f positionMatrix, Matrix4f projectionMatrix) {
-        if (camera == null || positionMatrix == null || projectionMatrix == null) return;
-        VIEW_PROJ.set(projectionMatrix).mul(positionMatrix);
-        cameraPos = camera.getCameraPos();
-        try {
-            frustum = new net.minecraft.client.render.Frustum(positionMatrix, projectionMatrix);
-            frustum.setPosition(cameraPos.x, cameraPos.y, cameraPos.z);
-        } catch (Throwable ignored) {
-            frustum = null;
-        }
+    public static void capture(CameraRenderState state) {
+        if (state == null || state.viewRotationMatrix == null || state.projectionMatrix == null) return;
+        VIEW_PROJ.set(state.projectionMatrix).mul(state.viewRotationMatrix);
+        cameraPos = state.pos != null ? state.pos : Vec3.ZERO;
+        frustum = state.cullFrustum;
         valid = true;
     }
 
-    public static boolean isVisible(net.minecraft.util.math.AABB box) {
+    public static boolean isVisible(AABB box) {
         if (box == null) return false;
         return frustum == null || frustum.isVisible(box);
     }

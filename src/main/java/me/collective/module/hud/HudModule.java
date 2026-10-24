@@ -6,7 +6,7 @@ import me.collective.module.Module;
 import me.collective.module.client.HUD;
 import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.awt.Color;
 
@@ -38,9 +38,9 @@ public abstract class HudModule extends Module {
         setToggled(true);
     }
 
-    public abstract void render(GuiGraphics context, float delta);
+    public abstract void render(GuiGraphicsExtractor context, float delta);
 
-    public void renderEditor(GuiGraphics context, float delta, double mouseX, double mouseY) {
+    public void renderEditor(GuiGraphicsExtractor context, float delta, double mouseX, double mouseY) {
         if (!isToggled()) return;
 
         render(context, delta);
@@ -77,8 +77,8 @@ public abstract class HudModule extends Module {
             this.x = (float) (mouseX - dragX);
             this.y = (float) (mouseY - dragY);
 
-            int screenW = mc.getWindow().getScaledWidth();
-            int screenH = mc.getWindow().getScaledHeight();
+            int screenW = mc.getWindow().getGuiScaledWidth();
+            int screenH = mc.getWindow().getGuiScaledHeight();
 
             this.x = Math.max(2, Math.min(screenW - width - 2, this.x));
             this.y = Math.max(2, Math.min(screenH - height - 2, this.y));

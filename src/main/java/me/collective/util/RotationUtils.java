@@ -114,12 +114,12 @@ public class RotationUtils {
     @EventHandler(priority = -200)
     public void onPacketSend(PacketEvent.Send event) {
         if (event.isCancelled()) return;
-        if (Minecraft.getInstance().player == null || Minecraft.getInstance().world == null) return;
+        if (Minecraft.getInstance().player == null || Minecraft.getInstance().level == null) return;
 
         Packet<?> packet = event.packet;
-        if (packet instanceof PlayerMoveC2SPacket move && move.changesLook()) {
-            this.serverYaw = move.getYaw(this.serverYaw);
-            this.serverPitch = move.getPitch(this.serverPitch);
+        if (packet instanceof ServerboundMovePlayerPacket move && move.hasRotation()) {
+            this.serverYaw = move.getYRot(this.serverYaw);
+            this.serverPitch = move.getXRot(this.serverPitch);
         }
     }
 
@@ -140,13 +140,13 @@ public class RotationUtils {
     @EventHandler(priority = 200)
     public void onPacketReceive(PacketEvent.Receive event) {
         Packet<?> packet = event.packet;
-        if (!(packet instanceof PlayerPositionLookS2CPacket teleport)) return;
+        if (!(packet instanceof ClientboundPlayerPositionPacket teleport)) return;
 
-        EntityPosition change = teleport.change();
-        Set<PositionFlag> relatives = teleport.relatives();
+        net.minecraft.world.entity.PositionMoveRotation change = teleport.change();
+        Set<Relative> relatives = teleport.relatives();
 
-        this.serverYaw = relatives.contains(PositionFlag.Y_ROT) ? this.serverYaw + change.yaw() : change.yaw();
-        this.serverPitch = relatives.contains(PositionFlag.X_ROT) ? this.serverPitch + change.pitch() : change.pitch();
+        this.serverYaw = relatives.contains(Relative.Y_ROT) ? this.serverYaw + change.yRot() : change.yRot();
+        this.serverPitch = relatives.contains(Relative.X_ROT) ? this.serverPitch + change.xRot() : change.xRot();
 
         this.currentYaw = this.serverYaw;
         this.currentPitch = this.serverPitch;
@@ -160,7 +160,7 @@ public class RotationUtils {
     public void onTickPre(TickEvent.Pre event) {
         this.inputStepsValid = false;
 
-        if (Minecraft.getInstance().player == null || Minecraft.getInstance().world == null) return;
+        if (Minecraft.getInstance().player == null || Minecraft.getInstance().level == null) return;
 
         if (this.wireFreshTicks > 0) {
             this.wireFreshTicks--;
@@ -168,8 +168,8 @@ public class RotationUtils {
         this.wireNudge = 0.0f;
 
         if (!this.initialized) {
-            this.serverYaw = Minecraft.getInstance().player.getYaw();
-            this.serverPitch = Minecraft.getInstance().player.getPitch();
+            this.serverYaw = Minecraft.getInstance().player.getYRot();
+            this.serverPitch = Minecraft.getInstance().player.getXRot();
             this.currentYaw = this.serverYaw;
             this.currentPitch = this.serverPitch;
             this.prevCurrentYaw = this.currentYaw;
@@ -184,20 +184,20 @@ public class RotationUtils {
 
         // в этих состояниях поворот нельзя удерживать: сервер всё равно пришлёт
         // свою позицию и углы
-        if (!this.syncMovement && (Minecraft.getInstance().player.isGliding()
+        if (!this.syncMovement && (Minecraft.getInstance().player.isFallFlying()
             || Minecraft.getInstance().player.isSwimming()
-            || Minecraft.getInstance().player.hasVehicle())) {
+            || Minecraft.getInstance().player.isPassenger())) {
             clearAll();
             return;
         }
 
         // на возврате цель — это текущий угол игрока, а не заказанный
         if (this.decaying) {
-            this.finalYaw = Minecraft.getInstance().player.getYaw();
-            this.finalPitch = Minecraft.getInstance().player.getPitch();
+            this.finalYaw = Minecraft.getInstance().player.getYRot();
+            this.finalPitch = Minecraft.getInstance().player.getXRot();
         }
 
-        double yawRemaining = MathHelper.wrapDegrees(this.finalYaw - this.currentYaw);
+        double yawRemaining = Mth.wrapDegrees(this.finalYaw - this.currentYaw);
         double pitchRemaining = this.finalPitch - this.currentPitch;
         double totalDist = Math.hypot(yawRemaining, pitchRemaining);
 
@@ -237,12 +237,12 @@ public class RotationUtils {
         }
 
         this.currentYaw += yawDots * q;
-        this.currentPitch = MathHelper.clamp(this.currentPitch + pitchDots * q, -90.0f, 90.0f);
+        this.currentPitch = Mth.clamp(this.currentPitch + pitchDots * q, -90.0f, 90.0f);
     }
 
     private float getQuantum() {
         if (Minecraft.getInstance() != null && Minecraft.getInstance().options != null) {
-            double sens = Minecraft.getInstance().options.getMouseSensitivity().getValue();
+            double sens = Minecraft.getInstance().options.sensitivity().get();
             double f = sens * 0.6 + 0.2;
             double q = f * f * f * 8.0 * 0.15;
             if (q > 0.0001) return (float) q;
@@ -252,7 +252,7 @@ public class RotationUtils {
 
     @EventHandler(priority = -200)
     public void onTickPost(TickEvent.Post event) {
-        if (Minecraft.getInstance().player == null || Minecraft.getInstance().world == null) return;
+        if (Minecraft.getInstance().player == null || Minecraft.getInstance().level == null) return;
 
         if (this.offsetK != null && this.offsetKeepTicks-- <= 0) this.offsetK = null;
 
@@ -356,7 +356,7 @@ public class RotationUtils {
         yaw = shortestYaw(yaw);
 
         this.finalYaw = yaw;
-        this.finalPitch = MathHelper.clamp(pitch, -90.0f, 90.0f);
+        this.finalPitch = Mth.clamp(pitch, -90.0f, 90.0f);
         this.currentYaw = yaw;
         this.currentPitch = this.finalPitch;
         this.turnSpeed = DEFAULT_TURN_SPEED;
@@ -377,7 +377,7 @@ public class RotationUtils {
         this.finalYaw = yaw;
         this.finalPitch = pitch;
         this.currentYaw = yaw;
-        this.currentPitch = MathHelper.clamp(pitch, -90.0f, 90.0f);
+        this.currentPitch = Mth.clamp(pitch, -90.0f, 90.0f);
         this.turnSpeed = DEFAULT_TURN_SPEED;
         this.syncMovement = true;
         this.keepTicks = 2;
@@ -403,7 +403,7 @@ public class RotationUtils {
         this.finalYaw = yaw;
         this.finalPitch = pitch;
         this.currentYaw = yaw;
-        this.currentPitch = MathHelper.clamp(pitch, -90.0f, 90.0f);
+        this.currentPitch = Mth.clamp(pitch, -90.0f, 90.0f);
         this.turnSpeed = DEFAULT_TURN_SPEED;
         this.syncMovement = true;
         this.keepTicks = 2;
@@ -415,7 +415,7 @@ public class RotationUtils {
 
     /** Ближайший эквивалент угла к серверному, чтобы не уехать на пол-оборота. */
     private float shortestYaw(float yaw) {
-        return this.serverYaw + MathHelper.wrapDegrees(yaw - this.serverYaw);
+        return this.serverYaw + Mth.wrapDegrees(yaw - this.serverYaw);
     }
 
     public boolean setRotationSmooth(float yaw, float pitch, double turnSpeed, boolean sync) {
@@ -451,7 +451,7 @@ public class RotationUtils {
         if (!claim(owner, priority)) return false;
 
         this.offsetK = k45;
-        this.offsetPitch = MathHelper.clamp(pitch, -90.0f, 90.0f);
+        this.offsetPitch = Mth.clamp(pitch, -90.0f, 90.0f);
         this.offsetKeepTicks = 2;
         this.finalYaw = null;
         this.finalPitch = null;
@@ -469,7 +469,7 @@ public class RotationUtils {
     public void setRotationSilentSync() {
         if (Minecraft.getInstance().player == null) return;
 
-        setRotationSilent(Minecraft.getInstance().player.getYaw(), Minecraft.getInstance().player.getPitch());
+        setRotationSilent(Minecraft.getInstance().player.getYRot(), Minecraft.getInstance().player.getXRot());
     }
 
     public void clearRotations() {
@@ -503,19 +503,19 @@ public class RotationUtils {
 
     public float getRotationYaw() {
         if (this.offsetK != null && Minecraft.getInstance().player != null) {
-            return Minecraft.getInstance().player.getYaw() + this.offsetK * 45.0f;
+            return Minecraft.getInstance().player.getYRot() + this.offsetK * 45.0f;
         }
 
         if (this.finalYaw != null || this.finalPitch != null) return this.currentYaw;
 
-        return Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getYaw() : 0.0f;
+        return Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getYRot() : 0.0f;
     }
 
     public float getRotationPitch() {
         if (this.offsetK != null) return this.offsetPitch;
         if (this.finalYaw != null || this.finalPitch != null) return this.currentPitch;
 
-        return Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getPitch() : 0.0f;
+        return Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getXRot() : 0.0f;
     }
 
     /** Угол, который реально уходит в пакет. */
@@ -529,18 +529,18 @@ public class RotationUtils {
 
     public float getPrevSentYaw() {
         if (this.offsetK != null && Minecraft.getInstance().player != null) {
-            return shortestYaw(Minecraft.getInstance().player.getYaw() + this.offsetK * 45.0f);
+            return shortestYaw(Minecraft.getInstance().player.getYRot() + this.offsetK * 45.0f);
         }
         if (this.finalYaw != null || this.finalPitch != null) {
             return shortestYaw(this.prevCurrentYaw);
         }
-        return Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getYaw() : 0.0f;
+        return Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getYRot() : 0.0f;
     }
 
     public float getPrevSentPitch() {
         if (this.offsetK != null) return this.offsetPitch;
         if (this.finalYaw != null || this.finalPitch != null) return this.prevCurrentPitch;
-        return Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getPitch() : 0.0f;
+        return Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getXRot() : 0.0f;
     }
 
     public void keepWireFresh() {
@@ -592,7 +592,7 @@ public class RotationUtils {
         if (this.offsetK != null) return true;
         if (!isRotating()) return true;
 
-        double dy = this.finalYaw == null ? 0.0 : Math.abs(MathHelper.wrapDegrees(this.finalYaw - this.currentYaw));
+        double dy = this.finalYaw == null ? 0.0 : Math.abs(Mth.wrapDegrees(this.finalYaw - this.currentYaw));
         double dp = this.finalPitch == null ? 0.0 : Math.abs(this.finalPitch - this.currentPitch);
 
         return dy <= eps && dp <= eps;
@@ -622,12 +622,12 @@ public class RotationUtils {
         if (this.finalYaw == null && this.finalPitch == null) return 0;
         if (this.syncMovement) return 0;
 
-        float delta = MathHelper.wrapDegrees(Minecraft.getInstance().player.getYaw() - this.currentYaw);
+        float delta = Mth.wrapDegrees(Minecraft.getInstance().player.getYRot() - this.currentYaw);
 
         // сидя или с предметом в руке порог смещения другой
         boolean scaled = Minecraft.getInstance().player.isUsingItem()
-            || Minecraft.getInstance().player.isInSneakingPose()
-            || Minecraft.getInstance().player.isCrawling();
+            || Minecraft.getInstance().player.isCrouching()
+            || Minecraft.getInstance().player.isVisuallyCrawling();
 
         return scaled ? 2 * Math.round(delta / 90.0f) : Math.round(delta / 45.0f);
     }
@@ -643,7 +643,7 @@ public class RotationUtils {
     }
 
     /** Пересобирает ввод под серверный угол, чтобы движение считалось точно и без флагов. */
-    public PlayerInput rotateDeclaredInput(PlayerInput in) {
+    public Input rotateDeclaredInput(Input in) {
         if (Minecraft.getInstance().player == null || !isRotating()) return in;
         if (this.syncMovement) return in;
 
@@ -651,9 +651,9 @@ public class RotationUtils {
         int f = (in.forward() ? 1 : 0) - (in.backward() ? 1 : 0);
         if (s == 0 && f == 0) return in;
 
-        float cameraYaw = Minecraft.getInstance().player.getYaw();
+        float cameraYaw = Minecraft.getInstance().player.getYRot();
         float serverYaw = this.currentYaw;
-        float delta = MathHelper.wrapDegrees(cameraYaw - serverYaw);
+        float delta = Mth.wrapDegrees(cameraYaw - serverYaw);
         double phi = Math.toRadians(delta);
 
         double sIdeal = s * Math.cos(phi) - f * Math.sin(phi);
@@ -677,7 +677,7 @@ public class RotationUtils {
         }
 
         boolean canSprint = in.sprint() && bestF > 0;
-        return new PlayerInput(bestF > 0, bestF < 0, bestS > 0, bestS < 0, in.jump(), in.sneak(), canSprint);
+        return new Input(bestF > 0, bestF < 0, bestS > 0, bestS < 0, in.jump(), in.shift(), canSprint);
     }
 
     public float getMoveSpeedScale() {
@@ -688,7 +688,7 @@ public class RotationUtils {
         if (Minecraft.getInstance().player == null || this.offsetK != null || this.syncMovement) return false;
         if (this.finalYaw == null && this.finalPitch == null) return false;
 
-        return !rotateDeclaredInput(Minecraft.getInstance().player.input.playerInput).forward();
+        return !rotateDeclaredInput(Minecraft.getInstance().player.input.keyPresses).forward();
     }
 
     public float getServerYaw() {
@@ -704,7 +704,7 @@ public class RotationUtils {
     }
 
     public float getWrappedYaw() {
-        return MathHelper.wrapDegrees(this.serverYaw);
+        return Mth.wrapDegrees(this.serverYaw);
     }
 
     public static float[] getRotationsTo(Vec3 src, Vec3 dest) {
@@ -715,13 +715,13 @@ public class RotationUtils {
         double yaw = Math.toDegrees(Math.atan2(diffZ, diffX)) - 90.0;
         double pitch = -Math.toDegrees(Math.atan2(diffY, Math.hypot(diffX, diffZ)));
 
-        return new float[]{MathHelper.wrapDegrees((float) yaw), MathHelper.wrapDegrees((float) pitch)};
+        return new float[]{Mth.wrapDegrees((float) yaw), Mth.wrapDegrees((float) pitch)};
     }
 
     public static float[] getLegitRotations(Vec3 dest) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return new float[]{0, 0};
-        Vec3 eyes = mc.player.getEyePos();
+        Vec3 eyes = mc.player.getEyePosition();
         return getRotationsTo(eyes, dest);
     }
 
@@ -733,10 +733,10 @@ public class RotationUtils {
         float pitchRad = pitch * ((float) Math.PI / 180);
         float yawRad = -yaw * ((float) Math.PI / 180);
 
-        float cosPitch = MathHelper.cos(pitchRad);
-        float sinPitch = MathHelper.sin(pitchRad);
-        float cosYaw = MathHelper.cos(yawRad);
-        float sinYaw = MathHelper.sin(yawRad);
+        float cosPitch = Mth.cos(pitchRad);
+        float sinPitch = Mth.sin(pitchRad);
+        float cosYaw = Mth.cos(yawRad);
+        float sinYaw = Mth.sin(yawRad);
 
         return new Vec3(sinYaw * cosPitch, -sinPitch, cosYaw * cosPitch);
     }

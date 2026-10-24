@@ -92,7 +92,7 @@ public final class EmoteEngine {
     public static boolean isLocal(Object state) {
         if (mc.player == null) return false;
         UUID uuid = STATE_UUID.get(state);
-        return uuid != null && uuid.equals(mc.player.getUuid());
+        return uuid != null && uuid.equals(mc.player.getUUID());
     }
 
     public static void play(Emote emote) {
@@ -129,10 +129,10 @@ public final class EmoteEngine {
     }
 
     public static void playSelected() {
-        if (mc.currentScreen instanceof EmoteWheelScreen wheel) {
+        if (mc.gui.screen() instanceof EmoteWheelScreen wheel) {
             Emote selected = wheel.getSelectedEmote();
             if (selected != null) {
-                mc.setScreen(null);
+                mc.gui.setScreen(null);
                 play(selected);
             }
         }
@@ -178,7 +178,7 @@ public final class EmoteEngine {
             }
         }
 
-        if (mc.world == null) {
+        if (mc.level == null) {
             if (!REMOTES.isEmpty()) {
                 log("world gone: clear " + REMOTES.size() + " remote emotes");
                 REMOTES.clear();
@@ -198,8 +198,8 @@ public final class EmoteEngine {
         if (++remoteSweepTicks >= 100) {
             remoteSweepTicks = 0;
             HashSet<UUID> present = new HashSet<>();
-            for (var player : mc.world.getPlayers()) {
-                present.add(player.getUuid());
+            for (var player : mc.level.players()) {
+                present.add(player.getUUID());
             }
             REMOTES.keySet().retainAll(present);
             remoteWasActive.retainAll(present);
@@ -208,13 +208,13 @@ public final class EmoteEngine {
 
     private static boolean isMoving() {
         if (mc.player == null || mc.options == null) return false;
-        return mc.options.forwardKey.isPressed()
-            || mc.options.backKey.isPressed()
-            || mc.options.leftKey.isPressed()
-            || mc.options.rightKey.isPressed()
-            || mc.options.jumpKey.isPressed()
-            || mc.options.sneakKey.isPressed()
-            || mc.player.isGliding()
+        return mc.options.keyUp.isDown()
+            || mc.options.keyDown.isDown()
+            || mc.options.keyLeft.isDown()
+            || mc.options.keyRight.isDown()
+            || mc.options.keyJump.isDown()
+            || mc.options.keyShift.isDown()
+            || mc.player.isFallFlying()
             || mc.player.isSwimming();
     }
 
@@ -222,7 +222,7 @@ public final class EmoteEngine {
      * Наложение позы на модель. Вызывается из setAngles TAIL для ВСЕХ
      * двуногих — чужим только сбрасываем пивоты, себе накладываем эмоут.
      */
-    public static void applyToModel(BipedEntityModel model, Object state) {
+    public static void applyToModel(HumanoidModel model, Object state) {
         ModelPart head = model.head;
         ModelPart body = model.body;
         ModelPart rightArm = model.rightArm;
@@ -235,7 +235,7 @@ public final class EmoteEngine {
         ModelPart leftSleeve = null;
         ModelPart rightPants = null;
         ModelPart leftPants = null;
-        if (model instanceof PlayerEntityModel pm) {
+        if (model instanceof net.minecraft.client.model.player.PlayerModel pm) {
             jacket = pm.jacket;
             rightSleeve = pm.rightSleeve;
             leftSleeve = pm.leftSleeve;
@@ -258,9 +258,9 @@ public final class EmoteEngine {
             for (int i = 0; i < parts.length; i++) {
                 if (parts[i] == null) continue;
                 sb.append(' ').append(names[i]).append("=(")
-                    .append(parts[i].originX).append(',')
-                    .append(parts[i].originY).append(',')
-                    .append(parts[i].originZ).append(')');
+                    .append(parts[i].x).append(',')
+                    .append(parts[i].y).append(',')
+                    .append(parts[i].z).append(')');
             }
             log(sb.toString());
         }
@@ -327,9 +327,9 @@ public final class EmoteEngine {
         applyPart(leftPants, a.data.sample("left_leg", t), blend, LEG_L_BASE);
 
         // Шапка следует за головой
-        model.hat.pitch = head.pitch;
-        model.hat.yaw = head.yaw;
-        model.hat.roll = head.roll;
+        model.hat.xRot = head.xRot;
+        model.hat.yRot = head.yRot;
+        model.hat.zRot = head.zRot;
     }
 
     /**
@@ -338,7 +338,7 @@ public final class EmoteEngine {
      */
     public static void playRemote(UUID uuid, String emoteId) {
         if (uuid == null || emoteId == null) return;
-        if (mc.player != null && uuid.equals(mc.player.getUuid())) return;
+        if (mc.player != null && uuid.equals(mc.player.getUUID())) return;
 
         Emote emote = null;
         for (Emote candidate : Emote.ALL) {
@@ -402,14 +402,14 @@ public final class EmoteEngine {
         float by = snap != null ? snap[4] : fallbackBase[1];
         float bz = snap != null ? snap[5] : fallbackBase[2];
         if (s.hasRotation() && valid(s.rotation().x) && valid(s.rotation().y) && valid(s.rotation().z)) {
-            part.pitch = MathHelper.lerp(blend, part.pitch, s.rotation().x * DEG);
-            part.yaw = MathHelper.lerp(blend, part.yaw, s.rotation().y * DEG);
-            part.roll = MathHelper.lerp(blend, part.roll, s.rotation().z * DEG);
+            part.xRot = Mth.lerp(blend, part.xRot, s.rotation().x * DEG);
+            part.yRot = Mth.lerp(blend, part.yRot, s.rotation().y * DEG);
+            part.zRot = Mth.lerp(blend, part.zRot, s.rotation().z * DEG);
         }
         if (s.hasPosition() && valid(s.position().x) && valid(s.position().y) && valid(s.position().z)) {
-            part.originX = MathHelper.lerp(blend, part.originX, bx + s.position().x);
-            part.originY = MathHelper.lerp(blend, part.originY, by - s.position().y);
-            part.originZ = MathHelper.lerp(blend, part.originZ, bz + s.position().z);
+            part.x = Mth.lerp(blend, part.x, bx + s.position().x);
+            part.y = Mth.lerp(blend, part.y, by - s.position().y);
+            part.z = Mth.lerp(blend, part.z, bz + s.position().z);
         }
     }
 
@@ -437,9 +437,9 @@ public final class EmoteEngine {
         float rz = s.hasRotation() ? s.rotation().z * blend : 0f;
 
         matrices.translate(dx, dy + 0.7f, dz);
-        matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(rz));
-        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(ry));
-        matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(rx));
+        matrices.rotate(Axis.ZP.rotationDegrees(rz));
+        matrices.rotate(Axis.YP.rotationDegrees(ry));
+        matrices.rotate(Axis.XP.rotationDegrees(rx));
         matrices.translate(0f, -0.7f, 0f);
     }
 }

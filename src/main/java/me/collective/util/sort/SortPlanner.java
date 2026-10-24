@@ -280,7 +280,7 @@ public final class SortPlanner {
         BlockPos best = null;
         double bestDist = Double.MAX_VALUE;
         for (BlockPos p : pool) {
-            double d = anchor.getSquaredDistance(p);
+            double d = anchor.distSqr(p);
             if (d < bestDist) {
                 best = p;
                 bestDist = d;
@@ -291,7 +291,7 @@ public final class SortPlanner {
 
     private static List<ContainerSnapshot> byDistance(List<ContainerSnapshot> containers, BlockPos origin) {
         List<ContainerSnapshot> ordered = new ArrayList<>(containers);
-        ordered.sort(Comparator.<ContainerSnapshot>comparingDouble(c -> origin.getSquaredDistance(c.pos())).thenComparing(ContainerSnapshot::pos));
+        ordered.sort(Comparator.<ContainerSnapshot>comparingDouble(c -> origin.distSqr(c.pos())).thenComparing(ContainerSnapshot::pos));
         return ordered;
     }
 

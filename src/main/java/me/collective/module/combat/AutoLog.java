@@ -27,7 +27,7 @@ public class AutoLog extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null || mc.getNetworkHandler() == null) return;
+        if (mc.player == null || mc.level == null || mc.getConnection() == null) return;
 
         float hp = mc.player.getHealth() + mc.player.getAbsorptionAmount();
 
@@ -40,7 +40,7 @@ public class AutoLog extends Module {
         // 2. Проверка тотемов
         if (noTotems.getValue()) {
             int totems = InventoryUtil.find(Items.TOTEM_OF_UNDYING).count();
-            if (mc.player.getOffHandStack().isOf(Items.TOTEM_OF_UNDYING)) totems++;
+            if (mc.player.getOffhandItem().is(Items.TOTEM_OF_UNDYING)) totems++;
             if (totems <= minTotems.getValue().intValue()) {
                 disconnect(String.format("Totems remaining (%d) <= threshold (%d)!", totems, minTotems.getValue().intValue()));
                 return;
@@ -49,8 +49,8 @@ public class AutoLog extends Module {
 
         // 3. Опасность от кристаллов при неполном HP
         if (crystalDanger.getValue() && hp <= 16.0f) {
-            for (var entity : mc.world.getEntities()) {
-                if (entity instanceof EndCrystalEntity crystal) {
+            for (var entity : mc.level.entitiesForRendering()) {
+                if (entity instanceof EndCrystal crystal) {
                     if (crystal.distanceTo(mc.player) <= 4.0f) {
                         disconnect(String.format("Lethal crystal nearby (%.1fm) with HP %.1f!", crystal.distanceTo(mc.player), hp));
                         return;
@@ -62,11 +62,11 @@ public class AutoLog extends Module {
         // 4. Защита от врагов (AFK Log)
         if (playerNear.getValue()) {
             double rangeSq = playerRange.getValue() * playerRange.getValue();
-            for (Player player : mc.world.getPlayers()) {
+            for (Player player : mc.level.players()) {
                 if (player == mc.player || player.isSpectator() || player.isCreative()) continue;
                 if (FriendManager.getInstance().isFriend(player)) continue;
 
-                if (mc.player.squaredDistanceTo(player) <= rangeSq) {
+                if (mc.player.distanceToSqr(player) <= rangeSq) {
                     disconnect(String.format("Hostile player %s detected within %.1fm!", player.getName().getString(), mc.player.distanceTo(player)));
                     return;
                 }
@@ -77,8 +77,8 @@ public class AutoLog extends Module {
     private void disconnect(String reason) {
         setToggled(false);
         me.collective.module.misc.AutoReconnect.markAfkLogout();
-        if (mc.getNetworkHandler() != null && mc.getNetworkHandler().getConnection() != null) {
-            mc.getNetworkHandler().getConnection().disconnect(Component.literal("§c[AutoLog] §f" + reason));
+        if (mc.getConnection() != null && mc.getConnection().getConnection() != null) {
+            mc.getConnection().getConnection().disconnect(Component.literal("§c[AutoLog] §f" + reason));
         }
     }
 }

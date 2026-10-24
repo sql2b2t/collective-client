@@ -57,7 +57,7 @@ public class HoleESP extends Module {
 
     @Override
     public void onUpdate() {
-        if (!isToggled() || mc.player == null || mc.world == null) return;
+        if (!isToggled() || mc.player == null || mc.level == null) return;
         long now = System.currentTimeMillis();
         if (now - lastScanTime >= 250L) {
             lastScanTime = now;
@@ -67,14 +67,14 @@ public class HoleESP extends Module {
 
     private void scanHoles() {
         List<Hole> detected = new ArrayList<>();
-        BlockPos playerPos = mc.player.getBlockPos();
+        BlockPos playerPos = mc.player.blockPosition();
         int rX = rangeXZ.getIntValue();
         int rY = rangeY.getIntValue();
 
         for (int x = -rX; x <= rX; x++) {
             for (int y = -rY; y <= rY; y++) {
                 for (int z = -rX; z <= rX; z++) {
-                    BlockPos pos = playerPos.add(x, y, z);
+                    BlockPos pos = playerPos.offset(x, y, z);
                     Hole hole = checkHole(pos);
                     if (hole != null) {
                         detected.add(hole);
@@ -87,22 +87,22 @@ public class HoleESP extends Module {
     }
 
     private Hole checkHole(BlockPos pos) {
-        if (isSolid(pos) || isSolid(pos.up()) || isSolid(pos.up(2))) return null;
-        if (!isSafe(pos.down())) return null;
+        if (isSolid(pos) || isSolid(pos.above()) || isSolid(pos.above(2))) return null;
+        if (!isSafe(pos.below())) return null;
 
-        boolean bedrock = mc.world.getBlockState(pos.down()).isOf(Blocks.BEDROCK);
+        boolean bedrock = mc.level.getBlockState(pos.below()).is(Blocks.BEDROCK);
         BlockPos secondPos = null;
 
-        for (Direction dir : Direction.Type.HORIZONTAL) {
-            BlockPos side = pos.offset(dir);
-            BlockState sideState = mc.world.getBlockState(side);
+        for (Direction dir : Direction.Plane.HORIZONTAL) {
+            BlockPos side = pos.relative(dir);
+            BlockState sideState = mc.level.getBlockState(side);
 
-            if (sideState.isOf(Blocks.BEDROCK)) {
+            if (sideState.is(Blocks.BEDROCK)) {
                 // Safe bedrock
-            } else if (sideState.isOf(Blocks.OBSIDIAN) || sideState.isOf(Blocks.CRYING_OBSIDIAN) || sideState.isOf(Blocks.ANVIL)) {
+            } else if (sideState.is(Blocks.OBSIDIAN) || sideState.is(Blocks.CRYING_OBSIDIAN) || sideState.is(Blocks.ANVIL)) {
                 bedrock = false;
-            } else if (doubleHoles.getValue() && !isSolid(side) && !isSolid(side.up())
-                && !isSolid(side.up(2)) && isSafe(side.down()) && secondPos == null) {
+            } else if (doubleHoles.getValue() && !isSolid(side) && !isSolid(side.above())
+                && !isSolid(side.above(2)) && isSafe(side.below()) && secondPos == null) {
                 // Potential 2x1 hole
                 secondPos = side;
             } else {
@@ -111,14 +111,14 @@ public class HoleESP extends Module {
         }
 
         if (secondPos != null) {
-            bedrock &= mc.world.getBlockState(secondPos.down()).isOf(Blocks.BEDROCK);
+            bedrock &= mc.level.getBlockState(secondPos.below()).is(Blocks.BEDROCK);
             // The shared edge is internal; every other side of the second cell
             // must be protected just like the sides of the first one.
-            for (Direction dir : Direction.Type.HORIZONTAL) {
-                BlockPos side = secondPos.offset(dir);
+            for (Direction dir : Direction.Plane.HORIZONTAL) {
+                BlockPos side = secondPos.relative(dir);
                 if (side.equals(pos)) continue;
                 if (!isSafe(side)) return null;
-                bedrock &= mc.world.getBlockState(side).isOf(Blocks.BEDROCK);
+                bedrock &= mc.level.getBlockState(side).is(Blocks.BEDROCK);
             }
         }
 
@@ -139,26 +139,26 @@ public class HoleESP extends Module {
     }
 
     private boolean isSafe(BlockPos pos) {
-        BlockState state = mc.world.getBlockState(pos);
-        return state.isOf(Blocks.BEDROCK) || state.isOf(Blocks.OBSIDIAN)
-            || state.isOf(Blocks.CRYING_OBSIDIAN) || state.isOf(Blocks.ANVIL)
-            || state.isOf(Blocks.RESPAWN_ANCHOR) || state.isOf(Blocks.NETHERITE_BLOCK);
+        BlockState state = mc.level.getBlockState(pos);
+        return state.is(Blocks.BEDROCK) || state.is(Blocks.OBSIDIAN)
+            || state.is(Blocks.CRYING_OBSIDIAN) || state.is(Blocks.ANVIL)
+            || state.is(Blocks.RESPAWN_ANCHOR) || state.is(Blocks.NETHERITE_BLOCK);
     }
 
     private boolean isSolid(BlockPos pos) {
-        BlockState state = mc.world.getBlockState(pos);
+        BlockState state = mc.level.getBlockState(pos);
         return !state.isAir()
-                && !state.isOf(Blocks.FIRE)
-                && !state.isOf(Blocks.SOUL_FIRE)
+                && !state.is(Blocks.FIRE)
+                && !state.is(Blocks.SOUL_FIRE)
                 && !(state.getBlock() instanceof ButtonBlock)
                 && !(state.getBlock() instanceof TorchBlock)
                 && !(state.getBlock() instanceof RailBlock)
-                && !state.isOf(Blocks.LIGHT);
+                && !state.is(Blocks.LIGHT);
     }
 
     @EventHandler
     public void onRender3D(Render3DEvent event) {
-        if (!isToggled() || holes.isEmpty() || mc.player == null || mc.world == null) return;
+        if (!isToggled() || holes.isEmpty() || mc.player == null || mc.level == null) return;
 
         ShapeMode sm = switch (mode.getValue()) {
             case CubeFill -> ShapeMode.Sides;
@@ -170,7 +170,7 @@ public class HoleESP extends Module {
         for (Hole hole : holes) {
             // Мягкое затухание на дальней кромке радиуса вместо мгновенного
             // исчезновения — дыры не «поп»-ают при движении камеры.
-            double dist = mc.player.squaredDistanceTo(hole.box.getCenter());
+            double dist = mc.player.distanceToSqr(hole.box.getCenter());
             if (dist > rangeBlocks * rangeBlocks) continue;
             dist = Math.sqrt(dist);
             Color base = hole.color;

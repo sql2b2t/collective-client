@@ -18,8 +18,8 @@ public abstract class MixinTitleScreen {
     @Inject(method = "init", at = @At("TAIL"))
     private void addAltsButton(CallbackInfo ci) {
         Screen self = (Screen) (Object) this;
-        ((ScreenAccessor) self).invokeAddDrawableChild(ButtonWidget.builder(Component.literal("Alts"), button ->
-            Minecraft.getInstance().setScreen(new AltManagerScreen(self))
-        ).dimensions(self.width - 108, self.height - 28, 100, 20).build());
+        ((ScreenAccessor) self).invokeAddRenderableWidget(Button.builder(Component.literal("Alts"), button ->
+            Minecraft.getInstance().gui.setScreen(new AltManagerScreen(self))
+        ).bounds(self.width - 108, self.height - 28, 100, 20).build());
     }
 }

@@ -74,7 +74,7 @@ public class ContainerIndex extends Module {
 
     @EventHandler
     private void onPacketReceive(me.collective.event.events.PacketEvent.Receive event) {
-        if (event.getPacket() instanceof net.minecraft.network.packet.s2c.play.InventoryS2CPacket invPacket) {
+        if (event.getPacket() instanceof net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket invPacket) {
             ContainerIndexRecorder.onInventoryPacket(invPacket);
         }
     }

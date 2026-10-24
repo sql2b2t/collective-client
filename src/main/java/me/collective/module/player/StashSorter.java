@@ -37,7 +37,7 @@ import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.phys.BlockHitResult;
@@ -385,12 +385,12 @@ public class StashSorter extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        if (mc.player == null || mc.world == null || mc.interactionManager == null) return;
+        if (mc.player == null || mc.level == null || mc.gameMode == null) return;
 
         ChestTrackerDataManager.tickAutosave();
         if (nav != null) nav.setSafePathing(safePathing.get());
 
-        if (mc.player.isDead()) {
+        if (mc.player.isDeadOrDying()) {
             warning("Игрок умер — сортировка остановлена.");
             toggle();
             return;
@@ -424,7 +424,7 @@ public class StashSorter extends Module {
         if (state == SortState.IDLE) return;
 
         // Вещи, которые уже разложены, сами собой исчезают из слотов переноски
-        keepSlots.removeIf(i -> mc.player.getInventory().getStack(i).isEmpty());
+        keepSlots.removeIf(i -> mc.player.getInventory().getItem(i).isEmpty());
 
         if (timer > 0) {
             timer--;
@@ -467,14 +467,14 @@ public class StashSorter extends Module {
             keepSlotsCaptured = true;
             if (!depositInventoryFirst.get()) {
                 for (int i = reservedHotbarSlots.get(); i < 36; i++) {
-                    if (!mc.player.getInventory().getStack(i).isEmpty()) keepSlots.add(i);
+                    if (!mc.player.getInventory().getItem(i).isEmpty()) keepSlots.add(i);
                 }
             }
         }
 
         Map<String, List<BlockPos>> pins = buildPinMap(dim);
         List<SortPlanner.ContainerSnapshot> snapshots = buildSnapshots(dim, pins.keySet());
-        BlockPos origin = mc.player.getBlockPos();
+        BlockPos origin = mc.player.blockPosition();
         List<BlockPos> unknown = unknownContainers();
 
         if (snapshots.isEmpty()) {
@@ -518,7 +518,7 @@ public class StashSorter extends Module {
             // Первый проход — осмотр всего: так расхождения индекса всплывают сразу
             jobs = new ArrayList<>();
             List<SortPlanner.ContainerSnapshot> ordered = new ArrayList<>(snapshots);
-            ordered.sort(Comparator.<SortPlanner.ContainerSnapshot>comparingDouble(c -> origin.getSquaredDistance(c.pos()))
+            ordered.sort(Comparator.<SortPlanner.ContainerSnapshot>comparingDouble(c -> origin.distSqr(c.pos()))
                 .thenComparing(SortPlanner.ContainerSnapshot::pos));
             for (SortPlanner.ContainerSnapshot c : ordered) {
                 if (c.usedSlots() > 0) jobs.add(new SortPlanner.SweepJob(c.pos(), null));
@@ -553,7 +553,7 @@ public class StashSorter extends Module {
                 if (!plan.claimedEmpties().contains(c.pos())) spareEmpties.add(c.pos());
             }
         }
-        spareEmpties.sort(Comparator.comparingDouble((BlockPos p) -> origin.getSquaredDistance(p)).thenComparing(p -> p));
+        spareEmpties.sort(Comparator.comparingDouble((BlockPos p) -> origin.distSqr(p)).thenComparing(p -> p));
 
         info("План готов" + (pass > 1 ? " (проход " + pass + ")" : "") + ": сундуков в зоне "
             + snapshots.size() + " (пустых " + emptyIndexed
@@ -620,7 +620,7 @@ public class StashSorter extends Module {
 
     private void handleVerifySource() {
         if (currentJob == null) return;
-        GenericContainerScreenHandler menu = openContainerMenu();
+        ChestMenu menu = openContainerMenu();
         if (menu == null) {
             if (wrongMenuOpen()) {
                 closeOpenContainer();
@@ -663,7 +663,7 @@ public class StashSorter extends Module {
             return;
         }
 
-        GenericContainerScreenHandler menu = openContainerMenu();
+        ChestMenu menu = openContainerMenu();
         if (menu == null) {
             if (++openRetries >= MAX_RETRIES) skipJob("сундук закрывается в середине выдачи");
             else {
@@ -695,10 +695,10 @@ public class StashSorter extends Module {
         int clicks = 0;
         for (int slotId : slots) {
             if (clicks >= clicksPerTick.get() || clicks >= free) break;
-            ItemStack stack = menu.slots.get(slotId).getStack();
+            ItemStack stack = menu.slots.get(slotId).getItem();
             if (ContainerGeometry.isShulkerItem(stack)) shulkersMoved++;
             else stacksMoved++;
-            mc.interactionManager.clickSlot(menu.syncId, slotId, 0, SlotActionType.QUICK_MOVE, mc.player);
+            mc.gameMode.handleContainerInput(menu.containerId, slotId, 0, ContainerInput.QUICK_MOVE, mc.player);
             clicks++;
         }
     }
@@ -717,7 +717,7 @@ public class StashSorter extends Module {
             return;
         }
 
-        BlockPos me = mc.player.getBlockPos();
+        BlockPos me = mc.player.blockPosition();
         String bestKey = null;
         BlockPos bestDest = null;
         double bestDist = Double.MAX_VALUE;
@@ -726,7 +726,7 @@ public class StashSorter extends Module {
         for (String key : cargo.keySet()) {
             BlockPos d = destFor(key);
             if (d == null) continue;
-            double dist = me.getSquaredDistance(d);
+            double dist = me.distSqr(d);
             if (dist < bestDist) {
                 bestDist = dist;
                 bestDest = d;
@@ -805,7 +805,7 @@ public class StashSorter extends Module {
 
     private void handleVerifyDest() {
         if (currentDest == null || currentRouteKey == null) return;
-        GenericContainerScreenHandler menu = openContainerMenu();
+        ChestMenu menu = openContainerMenu();
         if (menu == null) {
             if (wrongMenuOpen()) {
                 closeOpenContainer();
@@ -833,14 +833,14 @@ public class StashSorter extends Module {
         }
 
         openRetries = 0;
-        int containerSlots = menu.getRows() * 9;
+        int containerSlots = menu.getRowCount() * 9;
         int empty = freeSlotsIn(menu);
         knownFree.put(currentDest, empty);
 
         // Сундук брали как пустой под новую категорию, а он оказался занятым
         if (emptyClaims.contains(currentDest)) {
             for (int i = 0; i < containerSlots; i++) {
-                ItemStack s = menu.slots.get(i).getStack();
+                ItemStack s = menu.slots.get(i).getItem();
                 if (s.isEmpty() || matchesRoute(SortGroupKey.of(s), currentRouteKey)) continue;
 
                 reindexOpenContainer(currentDest);
@@ -874,7 +874,7 @@ public class StashSorter extends Module {
             return;
         }
 
-        GenericContainerScreenHandler menu = openContainerMenu();
+        ChestMenu menu = openContainerMenu();
         if (menu == null) {
             if (++openRetries >= MAX_RETRIES) {
                 markFull(currentDest);
@@ -897,7 +897,7 @@ public class StashSorter extends Module {
 
         // Количество не меняется при кликах — сундук не принимает, не долбимся
         int count = 0;
-        for (int i : slots) count += mc.player.getInventory().getStack(i).getCount();
+        for (int i : slots) count += mc.player.getInventory().getItem(i).getCount();
         if (count == depositLastCount) {
             markFull(currentDest);
             reindexOpenContainer(currentDest);
@@ -909,8 +909,8 @@ public class StashSorter extends Module {
         int clicks = 0;
         for (int invSlot : slots) {
             if (clicks >= clicksPerTick.get()) break;
-            mc.interactionManager.clickSlot(menu.syncId, invIndexToMenuId(menu, invSlot), 0,
-                SlotActionType.QUICK_MOVE, mc.player);
+            mc.gameMode.handleContainerInput(menu.containerId, invIndexToMenuId(menu, invSlot), 0,
+                ContainerInput.QUICK_MOVE, mc.player);
             clicks++;
         }
     }
@@ -941,7 +941,7 @@ public class StashSorter extends Module {
             pass > 1 ? " (" + pass + " проходов)" : ""));
 
         for (int i : cargoSlots()) {
-            ItemStack s = mc.player.getInventory().getStack(i);
+            ItemStack s = mc.player.getInventory().getItem(i);
             if (s.isEmpty()) continue;
             String key = routeKeyOf(s, true);
             if (key != null && deadRoutes.contains(key)) {
@@ -1022,12 +1022,12 @@ public class StashSorter extends Module {
     //  Что и куда
     // ------------------------------------------------------------------
 
-    private List<Integer> computeWithdrawSlots(GenericContainerScreenHandler menu) {
-        int containerSlots = menu.getRows() * 9;
+    private List<Integer> computeWithdrawSlots(ChestMenu menu) {
+        int containerSlots = menu.getRowCount() * 9;
         List<Integer> out = new ArrayList<>();
 
         for (int i = 0; i < containerSlots; i++) {
-            ItemStack s = menu.slots.get(i).getStack();
+            ItemStack s = menu.slots.get(i).getItem();
             if (s.isEmpty()) continue;
 
             String key = routeKeyOf(s, false);
@@ -1052,7 +1052,7 @@ public class StashSorter extends Module {
         if (mc.player == null) return out;
 
         for (int i : cargoSlots()) {
-            ItemStack s = mc.player.getInventory().getStack(i);
+            ItemStack s = mc.player.getInventory().getItem(i);
             if (s.isEmpty()) continue;
             String key = routeKeyOf(s, true);
             if (key != null && !deadRoutes.contains(key)) out.computeIfAbsent(key, k -> new ArrayList<>()).add(i);
@@ -1108,7 +1108,7 @@ public class StashSorter extends Module {
 
     private int ferryFreeSlots() {
         int free = 0;
-        for (int i : cargoSlots()) if (mc.player.getInventory().getStack(i).isEmpty()) free++;
+        for (int i : cargoSlots()) if (mc.player.getInventory().getItem(i).isEmpty()) free++;
         return free;
     }
 
@@ -1123,17 +1123,17 @@ public class StashSorter extends Module {
         return out;
     }
 
-    private static int freeSlotsIn(GenericContainerScreenHandler menu) {
+    private static int freeSlotsIn(ChestMenu menu) {
         int free = 0;
-        int containerSlots = menu.getRows() * 9;
-        for (int i = 0; i < containerSlots; i++) if (menu.slots.get(i).getStack().isEmpty()) free++;
+        int containerSlots = menu.getRowCount() * 9;
+        for (int i = 0; i < containerSlots; i++) if (menu.slots.get(i).getItem().isEmpty()) free++;
         return free;
     }
 
-    private void noteIfEmptied(GenericContainerScreenHandler menu, BlockPos pos) {
-        int containerSlots = menu.getRows() * 9;
+    private void noteIfEmptied(ChestMenu menu, BlockPos pos) {
+        int containerSlots = menu.getRowCount() * 9;
         for (int i = 0; i < containerSlots; i++) {
-            if (!menu.slots.get(i).getStack().isEmpty()) return;
+            if (!menu.slots.get(i).getItem().isEmpty()) return;
         }
 
         knownFree.put(pos, containerSlots);
@@ -1144,16 +1144,16 @@ public class StashSorter extends Module {
     }
 
     private void markFull(@Nullable BlockPos pos) {
-        if (pos == null || mc.world == null) return;
+        if (pos == null || mc.level == null) return;
         markedFull.add(pos);
-        BlockPos other = ContainerGeometry.otherHalf(mc.world, pos);
+        BlockPos other = ContainerGeometry.otherHalf(mc.level, pos);
         if (other != null) markedFull.add(other);
     }
 
     private void claimEmpty(@Nullable BlockPos pos) {
-        if (pos == null || mc.world == null) return;
+        if (pos == null || mc.level == null) return;
         emptyClaims.add(pos);
-        BlockPos other = ContainerGeometry.otherHalf(mc.world, pos);
+        BlockPos other = ContainerGeometry.otherHalf(mc.level, pos);
         if (other != null) emptyClaims.add(other);
     }
 
@@ -1198,7 +1198,7 @@ public class StashSorter extends Module {
         for (int i = jobIdx; i < jobs.size(); i++) queued.add(jobs.get(i).pos());
 
         Set<BlockPos> pinned = new HashSet<>();
-        for (var pin : store().pinsFor(dimension())) pinned.add(ContainerGeometry.canonical(mc.world, pin.pos()));
+        for (var pin : store().pinsFor(dimension())) pinned.add(ContainerGeometry.canonical(mc.level, pin.pos()));
 
         BlockPos best = pickOverflowChest(owned, queued, pinned, true);
         if (best == null) best = pickOverflowChest(owned, queued, pinned, false);
@@ -1212,7 +1212,7 @@ public class StashSorter extends Module {
 
     @Nullable
     private BlockPos pickOverflowChest(Set<BlockPos> owned, Set<BlockPos> queued, Set<BlockPos> pinned, boolean skipOwned) {
-        BlockPos me = mc.player.getBlockPos();
+        BlockPos me = mc.player.blockPosition();
         BlockPos best = null;
         int bestFree = 0;
         double bestDist = Double.MAX_VALUE;
@@ -1224,7 +1224,7 @@ public class StashSorter extends Module {
                 || queued.contains(pos) || emptyClaims.contains(pos)) continue;
             if (skipOwned && owned.contains(pos)) continue;
 
-            double dist = me.getSquaredDistance(pos);
+            double dist = me.distSqr(pos);
             // Сначала самый пустой, при равенстве — ближайший
             if (free > bestFree || (free == bestFree && (dist < bestDist || (dist == bestDist && best != null && pos.compareTo(best) < 0)))) {
                 best = pos;
@@ -1251,7 +1251,7 @@ public class StashSorter extends Module {
             return unknownCache;
         }
 
-        BlockPos me = mc.player.getBlockPos();
+        BlockPos me = mc.player.blockPosition();
         Set<BlockPos> seen = new HashSet<>();
         List<BlockPos> out = new ArrayList<>();
 
@@ -1263,27 +1263,27 @@ public class StashSorter extends Module {
 
         for (int cx = meChunkX - chunkRadius; cx <= meChunkX + chunkRadius; cx++) {
             for (int cz = meChunkZ - chunkRadius; cz <= meChunkZ + chunkRadius; cz++) {
-                if (!mc.world.getChunkManager().isChunkLoaded(cx, cz)) continue;
-                var chunk = mc.world.getChunkManager().getChunk(cx, cz, net.minecraft.world.chunk.ChunkStatus.FULL, false);
+                if (!mc.level.hasChunk(cx, cz)) continue;
+                var chunk = mc.level.getChunkSource().getChunk(cx, cz, net.minecraft.world.level.chunk.status.ChunkStatus.FULL, false);
                 if (chunk == null) continue;
 
                 for (var blockEntity : chunk.getBlockEntities().values()) {
-                    if (!ContainerGeometry.isContainerBlock(blockEntity.getCachedState())) continue;
+                    if (!ContainerGeometry.isContainerBlock(blockEntity.getBlockState())) continue;
 
-                    BlockPos raw = blockEntity.getPos();
-                    BlockPos canonical = ContainerGeometry.canonical(mc.world, raw);
+                    BlockPos raw = blockEntity.getBlockPos();
+                    BlockPos canonical = ContainerGeometry.canonical(mc.level, raw);
                     if (!seen.add(canonical) || !inArea(areas, raw, canonical)) continue;
 
                     if (data.getContainer(canonical, dim) != null) continue;
-                    BlockPos other = ContainerGeometry.otherHalf(mc.world, canonical);
+                    BlockPos other = ContainerGeometry.otherHalf(mc.level, canonical);
                     if (other != null && data.getContainer(other, dim) != null) continue;
 
-                    out.add(canonical.toImmutable());
+                    out.add(canonical.immutable());
                 }
             }
         }
 
-        out.sort(Comparator.comparingDouble((BlockPos p) -> me.getSquaredDistance(p)).thenComparing(p -> p));
+        out.sort(Comparator.comparingDouble((BlockPos p) -> me.distSqr(p)).thenComparing(p -> p));
         unknownCache = out;
         return unknownCache;
     }
@@ -1292,14 +1292,14 @@ public class StashSorter extends Module {
         if (SortGroupKey.isShulkerKey(sig) || SortGroupKey.MIXED_ITEMS.equals(sig)) return 1;
         String id = SortGroupKey.looseItemId(sig);
         Identifier ident = Identifier.tryParse(id);
-        return ident != null && Registries.ITEM.containsId(ident)
-            ? new ItemStack((ItemConvertible) Registries.ITEM.get(ident)).getMaxCount()
+        return ident != null && BuiltInRegistries.ITEM.containsKey(ident)
+            ? new ItemStack((net.minecraft.world.level.ItemLike) BuiltInRegistries.ITEM.getValue(ident)).getMaxStackSize()
             : 64;
     }
 
     private boolean inArea(List<SortZone> areas, BlockPos raw, BlockPos canonical) {
         if (containsAny(areas, raw) || containsAny(areas, canonical)) return true;
-        BlockPos other = ContainerGeometry.otherHalf(mc.world, canonical);
+        BlockPos other = ContainerGeometry.otherHalf(mc.level, canonical);
         return other != null && containsAny(areas, other);
     }
 
@@ -1321,7 +1321,7 @@ public class StashSorter extends Module {
         Map<String, List<BlockPos>> out = new LinkedHashMap<>();
         Set<BlockPos> seen = new HashSet<>();
         for (var p : store().pinsFor(dim)) {
-            BlockPos canonical = ContainerGeometry.canonical(mc.world, p.pos());
+            BlockPos canonical = ContainerGeometry.canonical(mc.level, p.pos());
             if (seen.add(canonical)) out.computeIfAbsent(p.groupKey, k -> new ArrayList<>()).add(canonical);
         }
         return out;
@@ -1340,7 +1340,7 @@ public class StashSorter extends Module {
             if (!"chest".equals(type) && !"copper_chest".equals(type) && !"barrel".equals(type)) continue;
 
             BlockPos raw = tc.getPosition();
-            BlockPos canonical = ContainerGeometry.canonical(mc.world, raw);
+            BlockPos canonical = ContainerGeometry.canonical(mc.level, raw);
             if (!inArea(areas, raw, canonical)) continue;
 
             Long prev = newest.get(canonical);
@@ -1420,7 +1420,7 @@ public class StashSorter extends Module {
     }
 
     private int slotCountOf(BlockPos canonical, String type, int used) {
-        return ContainerGeometry.slotCount(mc.world, canonical, type, used);
+        return ContainerGeometry.slotCount(mc.level, canonical, type, used);
     }
 
     // ------------------------------------------------------------------
@@ -1436,15 +1436,15 @@ public class StashSorter extends Module {
             return OpenStep.WAITING;
         }
 
-        if (!turnTowards(hit.getPos())) {
+        if (!turnTowards(hit.getLocation())) {
             alignTicks = 0;
             return OpenStep.WAITING;
         }
 
         if (alignTicks++ < AIM_HOLD_TICKS) return OpenStep.WAITING;
 
-        mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND, hit);
-        mc.player.swingHand(InteractionHand.MAIN_HAND);
+        mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, hit);
+        me.collective.util.Utils.swingHand(InteractionHand.MAIN_HAND);
         return OpenStep.CLICKED;
     }
 
@@ -1457,18 +1457,18 @@ public class StashSorter extends Module {
 
     private void releaseMovement() {
         nav().stop();
-        mc.options.forwardKey.setPressed(false);
-        mc.options.backKey.setPressed(false);
-        mc.options.leftKey.setPressed(false);
-        mc.options.rightKey.setPressed(false);
-        mc.options.jumpKey.setPressed(false);
-        mc.options.sneakKey.setPressed(false);
-        mc.options.sprintKey.setPressed(false);
+        mc.options.keyUp.setDown(false);
+        mc.options.keyDown.setDown(false);
+        mc.options.keyLeft.setDown(false);
+        mc.options.keyRight.setDown(false);
+        mc.options.keyJump.setDown(false);
+        mc.options.keyShift.setDown(false);
+        mc.options.keySprint.setDown(false);
     }
 
     /** Доворачивает взгляд на точку и говорит, попал ли. */
     private boolean turnTowards(Vec3 point) {
-        Vec3 eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePosition();
         double dx = point.x - eye.x;
         double dy = point.y - eye.y;
         double dz = point.z - eye.z;
@@ -1478,42 +1478,42 @@ public class StashSorter extends Module {
 
         float maxStep = turnSpeed.get();
         if (maxStep <= 0) {
-            mc.player.setYaw(targetYaw);
-            mc.player.setHeadYaw(targetYaw);
-            mc.player.setPitch(MathHelper.clamp(targetPitch, -90.0F, 90.0F));
+            mc.player.setYRot(targetYaw);
+            mc.player.setYHeadRot(targetYaw);
+            mc.player.setXRot(Mth.clamp(targetPitch, -90.0F, 90.0F));
             return true;
         }
 
-        float dYaw = MathHelper.wrapDegrees(targetYaw - mc.player.getYaw());
-        float dPitch = targetPitch - mc.player.getPitch();
+        float dYaw = Mth.wrapDegrees(targetYaw - mc.player.getYRot());
+        float dPitch = targetPitch - mc.player.getXRot();
 
-        float yaw = mc.player.getYaw() + MathHelper.clamp(dYaw, -maxStep, maxStep);
-        mc.player.setYaw(yaw);
-        mc.player.setHeadYaw(yaw);
-        mc.player.setPitch(MathHelper.clamp(mc.player.getPitch() + MathHelper.clamp(dPitch, -maxStep, maxStep), -90.0F, 90.0F));
+        float yaw = mc.player.getYRot() + Mth.clamp(dYaw, -maxStep, maxStep);
+        mc.player.setYRot(yaw);
+        mc.player.setYHeadRot(yaw);
+        mc.player.setXRot(Mth.clamp(mc.player.getXRot() + Mth.clamp(dPitch, -maxStep, maxStep), -90.0F, 90.0F));
 
         return Math.abs(dYaw) <= AIM_EPSILON && Math.abs(dPitch) <= AIM_EPSILON;
     }
 
     @Nullable
-    private GenericContainerScreenHandler openContainerMenu() {
-        if (!(mc.currentScreen instanceof HandledScreen)) return null;
-        return mc.player.currentScreenHandler instanceof GenericContainerScreenHandler menu ? menu : null;
+    private ChestMenu openContainerMenu() {
+        if (!(mc.gui.screen() instanceof AbstractContainerScreen)) return null;
+        return mc.player.containerMenu instanceof ChestMenu menu ? menu : null;
     }
 
     private boolean wrongMenuOpen() {
-        return mc.currentScreen instanceof HandledScreen
-            && mc.player.currentScreenHandler != mc.player.playerScreenHandler
-            && !(mc.player.currentScreenHandler instanceof GenericContainerScreenHandler);
+        return mc.gui.screen() instanceof AbstractContainerScreen
+            && mc.player.containerMenu != mc.player.inventoryMenu
+            && !(mc.player.containerMenu instanceof ChestMenu);
     }
 
     private boolean containerGone(BlockPos pos) {
-        return mc.world.isPosLoaded(pos) && !ContainerGeometry.isContainerBlock(mc.world.getBlockState(pos));
+        return mc.level.isLoaded(pos) && !ContainerGeometry.isContainerBlock(mc.level.getBlockState(pos));
     }
 
     /** Индекс слота инвентаря в номере слотов экрана: у контейнера сверху, у игрока снизу. */
-    private static int invIndexToMenuId(GenericContainerScreenHandler menu, int invIndex) {
-        int rows = menu.getRows();
+    private static int invIndexToMenuId(ChestMenu menu, int invIndex) {
+        int rows = menu.getRowCount();
         return rows * 9 + (invIndex < 9 ? invIndex + 27 : invIndex - 9);
     }
 
@@ -1522,44 +1522,44 @@ public class StashSorter extends Module {
      * protected, поэтому закрываем экран — он сам отправит пакет закрытия.
      */
     private void closeOpenContainer() {
-        if (mc.player == null || mc.currentScreen == null) return;
-        boolean serverContainer = mc.player.currentScreenHandler != mc.player.playerScreenHandler;
-        boolean containerScreen = mc.currentScreen instanceof HandledScreen && !(mc.currentScreen instanceof InventoryScreen);
-        if (serverContainer || containerScreen) mc.currentScreen.close();
+        if (mc.player == null || mc.gui == null || mc.gui.screen() == null) return;
+        boolean serverContainer = mc.player.containerMenu != mc.player.inventoryMenu;
+        boolean containerScreen = mc.gui.screen() instanceof AbstractContainerScreen && !(mc.gui.screen() instanceof InventoryScreen);
+        if (serverContainer || containerScreen) mc.gui.screen().onClose();
     }
 
     /** Перезаписывает запись индекса тем, что прямо сейчас в сундуке. */
     private void reindexOpenContainer(@Nullable BlockPos pos) {
-        if (pos == null || mc.player == null || mc.world == null) return;
+        if (pos == null || mc.player == null || mc.level == null) return;
 
         ChestTrackerDataV2 data = ChestTrackerDataManager.getData();
-        ScreenHandler h = mc.player.currentScreenHandler;
+        AbstractContainerMenu h = mc.player.containerMenu;
         if (h == null || h.slots.size() < 37) return;
 
         int cont = h.slots.size() - 36;
         List<ItemStack> contents = new ArrayList<>();
         for (int i = 0; i < cont; i++) {
-            ItemStack s = h.slots.get(i).getStack();
+            ItemStack s = h.slots.get(i).getItem();
             if (!s.isEmpty()) contents.add(s.copy());
         }
 
-        knownFree.put(ContainerGeometry.canonical(mc.world, pos), cont - contents.size());
+        knownFree.put(ContainerGeometry.canonical(mc.level, pos), cont - contents.size());
 
         String dim = dimension();
         BlockPos key = pos;
         if (data.getContainer(pos, dim) == null) {
-            BlockPos other = ContainerGeometry.otherHalf(mc.world, pos);
+            BlockPos other = ContainerGeometry.otherHalf(mc.level, pos);
             if (other != null && data.getContainer(other, dim) != null) key = other;
         }
         data.trackContainer(key, dim, containerTypeAt(key), contents);
     }
 
     private String containerTypeAt(BlockPos pos) {
-        return mc.world.getBlockState(pos).getBlock() instanceof BarrelBlock ? "barrel" : "chest";
+        return mc.level.getBlockState(pos).getBlock() instanceof BarrelBlock ? "barrel" : "chest";
     }
 
     private String dimension() {
-        return mc.world == null ? "unknown" : mc.world.getRegistryKey().getValue().toString();
+        return mc.level == null ? "unknown" : mc.level.dimension().identifier().toString();
     }
 
     private ChestNavigator nav() {
@@ -1584,11 +1584,11 @@ public class StashSorter extends Module {
     }
 
     private boolean strangerNearby() {
-        if (mc.player == null || mc.world == null) return false;
-        for (Player player : mc.world.getPlayers()) {
+        if (mc.player == null || mc.level == null) return false;
+        for (Player player : mc.level.players()) {
             if (player == mc.player || player.isSpectator()) continue;
-            if (FriendManager.INSTANCE.isFriend(player.getNameForScoreboard())) continue;
-            if (player.squaredDistanceTo(mc.player) < 64) return true;
+            if (FriendManager.INSTANCE.isFriend(player.getScoreboardName())) continue;
+            if (player.distanceToSqr(mc.player) < 64) return true;
         }
         return false;
     }
@@ -1627,16 +1627,16 @@ public class StashSorter extends Module {
     /** Помечает сундук как дом для того, чего в нём больше всего. */
     public boolean pinLookedChest() {
         BlockPos looked = lookedAtBlock();
-        if (looked == null || mc.world == null) {
+        if (looked == null || mc.level == null) {
             info("Посмотри на сундук и повтори.");
             return false;
         }
 
-        BlockPos canonical = ContainerGeometry.canonical(mc.world, looked);
+        BlockPos canonical = ContainerGeometry.canonical(mc.level, looked);
         ChestTrackerDataV2 data = ChestTrackerDataManager.getData();
         TrackedContainer tc = data.getContainer(canonical, dimension());
         if (tc == null) {
-            BlockPos other = ContainerGeometry.otherHalf(mc.world, canonical);
+            BlockPos other = ContainerGeometry.otherHalf(mc.level, canonical);
             if (other != null) tc = data.getContainer(other, dimension());
         }
         if (tc == null) {
@@ -1652,8 +1652,8 @@ public class StashSorter extends Module {
 
     public boolean clearLookedPin() {
         BlockPos looked = lookedAtBlock();
-        if (looked == null || mc.world == null) return false;
-        BlockPos canonical = ContainerGeometry.canonical(mc.world, looked);
+        if (looked == null || mc.level == null) return false;
+        BlockPos canonical = ContainerGeometry.canonical(mc.level, looked);
         if (!store().clearPin(canonical, dimension())) {
             info("Метки на этом сундуке нет.");
             return false;
@@ -1676,9 +1676,9 @@ public class StashSorter extends Module {
 
     @Nullable
     public BlockPos lookedAtBlock() {
-        if (mc.player == null || mc.crosshairTarget == null) return null;
-        if (mc.crosshairTarget.getType() != HitResult.Type.BLOCK) return null;
-        return ((BlockHitResult) mc.crosshairTarget).getBlockPos();
+        if (mc.player == null || mc.hitResult == null) return null;
+        if (mc.hitResult.getType() != HitResult.Type.BLOCK) return null;
+        return ((BlockHitResult) mc.hitResult).getBlockPos();
     }
 
     // ------------------------------------------------------------------
@@ -1759,7 +1759,7 @@ public class StashSorter extends Module {
 
     @EventHandler
     private void onRender3D(Render3DEvent event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         if (showZones.get()) {
             SettingColor c = zoneColor.get();
@@ -1780,7 +1780,7 @@ public class StashSorter extends Module {
         updateOverlayCache();
 
         for (OverlayEntry entry : overlayCache) {
-            double dist = entry.pos().getSquaredDistance(mc.player.getEntityPos());
+            double dist = entry.pos().distToCenterSqr(mc.player.position());
             if (dist > rangeSq) continue;
 
             SettingColor color = entry.pinned() ? pinnedColor.get() : labelColor.get();
@@ -1807,7 +1807,7 @@ public class StashSorter extends Module {
         if (areas.isEmpty()) return;
 
         for (TrackedContainer tc : data.getAllContainers(dim)) {
-            BlockPos canonical = ContainerGeometry.canonical(mc.world, tc.getPosition());
+            BlockPos canonical = ContainerGeometry.canonical(mc.level, tc.getPosition());
             String pinKey = store().pinFor(canonical, dim);
             boolean inArea = inArea(areas, tc.getPosition(), canonical);
 

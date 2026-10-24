@@ -40,13 +40,13 @@ public record Emote(String id, String title, String file, java.util.List<String>
             variants("lean_to_left", "Наклон", "lean", true, "lean_to_left", "lean_to_right", "lean_to_back")
     );
 
-    public net.minecraft.util.Identifier icon() {
+    public net.minecraft.resources.Identifier icon() {
         String mapped = switch (this.id) {
             case "twerk" -> "buttsit";
             case "take_the_l" -> "robot_dance";
             default -> this.id;
         };
-        return Identifier.of("collective", "textures/gui/emotes/" + mapped + ".png");
+        return net.minecraft.resources.Identifier.fromNamespaceAndPath("collective", "textures/gui/emotes/" + mapped + ".png");
     }
 
     private static Emote variants(String id, String title, String file, boolean loop, String... animations) {

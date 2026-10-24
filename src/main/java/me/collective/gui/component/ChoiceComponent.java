@@ -6,7 +6,7 @@ import me.collective.module.client.UI;
 import me.collective.render.SoundUtil;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.ChoiceSetting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,7 +37,7 @@ public class ChoiceComponent extends Component {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         if (!setting.isVisible()) return;
 
         boolean hov = isHovered(mouseX, mouseY);

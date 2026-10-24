@@ -11,7 +11,7 @@ import me.collective.module.render.Blur;
 import me.collective.render.BlurEngine;
 import me.collective.render.RenderUtil;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
@@ -74,7 +74,7 @@ public class ClickGuiScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         // Detect hovered module first
         hoveredModule = null;
         String query = searchActive ? searchQuery : "";
@@ -173,11 +173,11 @@ public class ClickGuiScreen extends Screen {
             renderModuleTooltip(context, hoveredModule, mouseX, mouseY);
         }
 
-        super.render(context, mouseX, mouseY, delta);
+        super.extractRenderState(context, mouseX, mouseY, delta);
     }
 
     @Override
-    public boolean mouseClicked(Click click, boolean bl) {
+    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent click, boolean bl) {
         // Любой клик вне текстовой строки снимает режим ввода: иначе editing
         // остаётся в «протухшей» строке и печать уходит мимо целевого поля.
         for (Panel panel : panels) {
@@ -205,7 +205,7 @@ public class ClickGuiScreen extends Screen {
     }
 
     @Override
-    public boolean mouseReleased(Click click) {
+    public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent click) {
         for (Panel panel : panels) {
             panel.mouseReleased(click.x(), click.y(), click.button());
         }
@@ -232,10 +232,10 @@ public class ClickGuiScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(KeyInput input) {
+    public boolean keyPressed(net.minecraft.client.input.KeyEvent input) {
         int key = input.key();
 
-        if (input.hasCtrl() && key == GLFW.GLFW_KEY_F) {
+        if (input.hasControlDown() && key == GLFW.GLFW_KEY_F) {
             searchActive = !searchActive;
             if (!searchActive) {
                 searchQuery = "";
@@ -283,7 +283,7 @@ public class ClickGuiScreen extends Screen {
         }
 
         if (key == GLFW.GLFW_KEY_ESCAPE || (UI.INSTANCE != null && key == UI.INSTANCE.getKeybind().getValue())) {
-            close();
+            onClose();
             return true;
         }
 
@@ -295,16 +295,16 @@ public class ClickGuiScreen extends Screen {
     }
 
     @Override
-    public boolean charTyped(CharInput input) {
-        if (searchActive && input.isValidChar()) {
+    public boolean charTyped(net.minecraft.client.input.CharacterEvent input) {
+        if (searchActive && input.isAllowedChatCharacter()) {
             searchCursor = Math.max(0, Math.min(searchCursor, searchQuery.length()));
-            String str = input.asString();
+            String str = input.codepointAsString();
             searchQuery = searchQuery.substring(0, searchCursor) + str + searchQuery.substring(searchCursor);
             searchCursor += str.length();
             return true;
         }
-        if (input.isValidChar()) {
-            char chr = input.asString().charAt(0);
+        if (input.isAllowedChatCharacter()) {
+            char chr = input.codepointAsString().charAt(0);
             for (Panel panel : panels) {
                 if (panel.charTyped(chr)) return true;
             }
@@ -376,7 +376,7 @@ public class ClickGuiScreen extends Screen {
         return new float[]{ cardX, cardY, cardW, cardH };
     }
 
-    private void renderModuleTooltip(GuiGraphics context, Module module, float mouseX, float mouseY) {
+    private void renderModuleTooltip(GuiGraphicsExtractor context, Module module, float mouseX, float mouseY) {
         float[] b = getTooltipBounds(module, mouseX, mouseY);
         if (b[2] <= 0 || b[3] <= 0) return;
 
@@ -414,11 +414,11 @@ public class ClickGuiScreen extends Screen {
 
 
     @Override
-    public void close() {
+    public void onClose() {
         if (UI.INSTANCE != null) {
             UI.INSTANCE.setToggled(false);
         }
-        super.close();
+        super.onClose();
     }
 
     @Override
@@ -430,7 +430,7 @@ public class ClickGuiScreen extends Screen {
     }
 
     @Override
-    public boolean shouldPause() {
+    public boolean isPauseScreen() {
         return false;
     }
 }

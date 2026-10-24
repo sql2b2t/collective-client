@@ -35,30 +35,30 @@ public class AntiBot extends Module {
 
     @Override
     public void onUpdate() {
-        if (mc.player == null || mc.world == null || mc.getNetworkHandler() == null) return;
+        if (mc.player == null || mc.level == null || mc.getConnection() == null) return;
         long now = System.currentTimeMillis();
         if (now - lastCheck < 2000) return;
         lastCheck = now;
 
         Set<UUID> tabIds = new HashSet<>();
         if (tabList.getValue()) {
-            for (PlayerListEntry entry : mc.getNetworkHandler().getPlayerList()) {
+            for (PlayerInfo entry : mc.getConnection().getOnlinePlayers()) {
                 tabIds.add(entry.getProfile().id());
             }
         }
 
-        for (Player p : new java.util.ArrayList<>(mc.world.getPlayers())) {
+        for (Player p : new java.util.ArrayList<>(mc.level.players())) {
             // Player-list packets can arrive after entity spawn; never delete a fresh
             // real player or our explicit test dummy based on that transient absence.
-            if (p == mc.player || !p.isAlive() || p.age < 100 || FakePlayer.isLocalFake(p)) continue;
+            if (p == mc.player || !p.isAlive() || p.tickCount < 100 || FakePlayer.isLocalFake(p)) continue;
             if (FriendManager.getInstance().isFriend(p)) continue;
 
-            if (tabList.getValue() && !tabIds.contains(p.getUuid())) {
-                mc.world.removeEntity(p.getId(), Entity.RemovalReason.DISCARDED);
+            if (tabList.getValue() && !tabIds.contains(p.getUUID())) {
+                mc.level.removeEntity(p.getId(), Entity.RemovalReason.DISCARDED);
                 continue;
             }
-            if (invisibles.getValue() && p.isInvisible() && p.getEquippedStack(net.minecraft.entity.EquipmentSlot.HEAD).isEmpty()) {
-                mc.world.removeEntity(p.getId(), Entity.RemovalReason.DISCARDED);
+            if (invisibles.getValue() && p.isInvisible() && p.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).isEmpty()) {
+                mc.level.removeEntity(p.getId(), Entity.RemovalReason.DISCARDED);
             }
         }
     }

@@ -26,11 +26,11 @@ public class FastUse extends Module {
     private void onTick(TickEvent.Pre event) {
         if (mc.player == null) return;
 
-        ItemStack stack = mc.player.getMainHandStack();
-        ItemStack offhand = mc.player.getOffHandStack();
+        ItemStack stack = mc.player.getMainHandItem();
+        ItemStack offhand = mc.player.getOffhandItem();
 
         boolean isExp = stack.getItem() instanceof ExperienceBottleItem || offhand.getItem() instanceof ExperienceBottleItem;
-        boolean isCrystal = stack.isOf(net.minecraft.item.Items.END_CRYSTAL) || offhand.isOf(net.minecraft.item.Items.END_CRYSTAL);
+        boolean isCrystal = stack.is(net.minecraft.world.item.Items.END_CRYSTAL) || offhand.is(net.minecraft.world.item.Items.END_CRYSTAL);
         boolean isFirework = stack.getItem() instanceof FireworkRocketItem || offhand.getItem() instanceof FireworkRocketItem;
         boolean isBlock = stack.getItem() instanceof BlockItem || offhand.getItem() instanceof BlockItem;
 
@@ -42,8 +42,8 @@ public class FastUse extends Module {
             if (isBlock && !blocks.getValue()) return;
         }
 
-        if (mc.itemUseCooldown > cooldown.getValue().intValue()) {
-            mc.itemUseCooldown = cooldown.getValue().intValue();
+        if (((me.collective.mixin.MinecraftAccessor) mc).collective$getRightClickDelay() > cooldown.getValue().intValue()) {
+            ((me.collective.mixin.MinecraftAccessor) mc).collective$setRightClickDelay((int) (cooldown.getValue().intValue()));
         }
     }
 }

@@ -73,8 +73,8 @@ public class RocketBoost extends Module {
 
     @Override
     public void onEnable() {
-        lastMovement = mc.player == null ? Vec3.ZERO : mc.player.getVelocity();
-        prevPos = mc.player == null ? null : mc.player.getEntityPos();
+        lastMovement = mc.player == null ? Vec3.ZERO : mc.player.getDeltaMovement();
+        prevPos = mc.player == null ? null : mc.player.position();
         lastGlidePos = null;
         repositioned = false;
         windowOpen = false;
@@ -98,17 +98,17 @@ public class RocketBoost extends Module {
 
     @EventHandler
     private void onPacketReceive(PacketEvent.Receive event) {
-        if (event.getPacket() instanceof PlayerPositionLookS2CPacket) {
+        if (event.getPacket() instanceof ClientboundPlayerPositionPacket) {
             repositioned = true;
         }
     }
 
     @EventHandler
     private void onTickPre(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) {
+        if (mc.player == null || mc.level == null) {
             return;
         }
-        if (!mc.player.isGliding()) {
+        if (!mc.player.isFallFlying()) {
             lastGlidePos = null;
         }
         trackWindow();
@@ -121,7 +121,7 @@ public class RocketBoost extends Module {
         keepAimFresh();
 
         // Tick post debug logging
-        Vec3 pos = mc.player.getEntityPos();
+        Vec3 pos = mc.player.position();
         Vec3 travelled = prevPos == null ? Vec3.ZERO : pos.subtract(prevPos);
         if (travelled.length() > MAX_PLAUSIBLE_MOVEMENT) {
             travelled = Vec3.ZERO;
@@ -143,14 +143,14 @@ public class RocketBoost extends Module {
     }
 
     private void keepAimFresh() {
-        if (!(mc.player.isGliding() && windowOpen && allowed())) {
+        if (!(mc.player.isFallFlying() && windowOpen && allowed())) {
             return;
         }
         RotationUtils.getInstance().keepWireFresh();
     }
 
     private void trackWindow() {
-        if (!mc.player.isGliding()) {
+        if (!mc.player.isFallFlying()) {
             windowOpen = false;
             latchedRocketId = -1;
             latchGraceTicks = 0;
@@ -163,7 +163,7 @@ public class RocketBoost extends Module {
             windowOpen = true;
             return;
         }
-        Entity latched = latchedRocketId == -1 ? null : mc.world.getEntityById(latchedRocketId);
+        Entity latched = latchedRocketId == -1 ? null : mc.level.getEntity(latchedRocketId);
         if (latched instanceof FireworkRocketEntity firework && firework.isAlive()) {
             windowOpen = true;
         } else if (latchGraceTicks > 0) {
@@ -176,10 +176,10 @@ public class RocketBoost extends Module {
     }
 
     public Vec3 glideVelocity(Vec3 oldVelocity, Vec3 vanilla) {
-        if (mc.player == null || mc.world == null) {
+        if (mc.player == null || mc.level == null) {
             return null;
         }
-        Vec3 pos = mc.player.getEntityPos();
+        Vec3 pos = mc.player.position();
         Vec3 start = lastGlidePos == null ? oldVelocity : pos.subtract(lastGlidePos);
         boolean desynced = lastGlidePos != null && (repositioned || start.length() > MAX_PLAUSIBLE_MOVEMENT);
         repositioned = false;
@@ -188,7 +188,7 @@ public class RocketBoost extends Module {
         if (desynced) {
             return note("ресинхрон после телепорта");
         }
-        if (!mc.player.isGliding()) {
+        if (!mc.player.isFallFlying()) {
             return note("не планирует");
         }
         if (!allowed()) {
@@ -197,26 +197,26 @@ public class RocketBoost extends Module {
         if (!windowOpen) {
             return note("нет живого фейерверка");
         }
-        if (pauseInFluid.getValue() && (mc.player.isTouchingWater() || mc.player.isInLava())) {
+        if (pauseInFluid.getValue() && (mc.player.isInWater() || mc.player.isInLava())) {
             return note("в жидкости");
         }
         RotationUtils rotations = RotationUtils.getInstance();
         float pitch = rotations.getSentPitch();
-        Vec3 look = Vec3.fromPolar(pitch, rotations.getSentYaw());
-        if (look.lengthSquared() < 1.0E-9) {
+        Vec3 look = Vec3.directionFromRotation(pitch, rotations.getSentYaw());
+        if (look.lengthSqr() < 1.0E-9) {
             return note("нет направления взгляда");
         }
         Vec3 velocity = rideBox(start, look, pitch, throttledSpeed(look));
         if (velocity == null) {
             return note("нет места в окне");
         }
-        if (velocity.dotProduct(look) <= vanilla.dotProduct(look)) {
+        if (velocity.dot(look) <= vanilla.dot(look)) {
             return note("ванила быстрее на этом курсе");
         }
         state = "буст";
         syncedToBaritone = baritoneSync.getValue() && baritoneFlying();
         appliedSpeed = velocity.length();
-        appliedOffAim = Math.toDegrees(Math.acos(MathHelper.clamp(velocity.dotProduct(look) / Math.max(appliedSpeed, 1.0E-9), -1.0, 1.0)));
+        appliedOffAim = Math.toDegrees(Math.acos(Mth.clamp(velocity.dot(look) / Math.max(appliedSpeed, 1.0E-9), -1.0, 1.0)));
         appliedInWindow++;
         return velocity;
     }
@@ -228,7 +228,7 @@ public class RocketBoost extends Module {
 
     private Vec3 rideBox(Vec3 start, Vec3 look, float pitch, double cap) {
         RotationUtils rotations = RotationUtils.getInstance();
-        Vec3 lastLook = Vec3.fromPolar(rotations.getServerPitch(), rotations.getServerYaw());
+        Vec3 lastLook = Vec3.directionFromRotation(rotations.getServerPitch(), rotations.getServerYaw());
         return rideWindow(start, look, lastLook, pitch, effectiveGravity(start.y), amount.getValue(), antiTickSkipping(), effectiveAlignment(), cap);
     }
 
@@ -244,11 +244,11 @@ public class RocketBoost extends Module {
         if (reach <= 1.0E-9) {
             return null;
         }
-        Vec3 ride = heading.multiply(Math.min(reach, cap));
+        Vec3 ride = heading.scale(Math.min(reach, cap));
         return new Vec3(
-            MathHelper.clamp(ride.x, w[0], w[3]),
-            MathHelper.clamp(ride.y, w[1], w[4]),
-            MathHelper.clamp(ride.z, w[2], w[5])
+            Mth.clamp(ride.x, w[0], w[3]),
+            Mth.clamp(ride.y, w[1], w[4]),
+            Mth.clamp(ride.z, w[2], w[5])
         );
     }
 
@@ -262,8 +262,8 @@ public class RocketBoost extends Module {
         if (len <= 1.0E-9) {
             return look;
         }
-        Vec3 target = corner.multiply(1.0 / len);
-        double angle = Math.acos(MathHelper.clamp(target.dotProduct(look), -1.0, 1.0));
+        Vec3 target = corner.scale(1.0 / len);
+        double angle = Math.acos(Mth.clamp(target.dot(look), -1.0, 1.0));
         if (angle <= slack) {
             return target;
         }
@@ -272,7 +272,7 @@ public class RocketBoost extends Module {
         }
         double t = slack / angle;
         double sin = Math.sin(angle);
-        return look.multiply(Math.sin((1.0 - t) * angle) / sin).add(target.multiply(Math.sin(t * angle) / sin));
+        return look.scale(Math.sin((1.0 - t) * angle) / sin).add(target.scale(Math.sin(t * angle) / sin));
     }
 
     private static double reach(Vec3 dir, double[] w, double anti) {
@@ -300,7 +300,7 @@ public class RocketBoost extends Module {
         if (dir < -anti) {
             return lo;
         }
-        return MathHelper.clamp(0.0, lo, hi);
+        return Mth.clamp(0.0, lo, hi);
     }
 
     public static double antiTickSkipping() {
@@ -323,7 +323,7 @@ public class RocketBoost extends Module {
     public static Vec3 predictGliding(Vec3 old, Vec3 look, float pitchDeg, double gravity) {
         float pitchRad = pitchDeg * ((float) Math.PI / 180);
         double horizSqrt = Math.sqrt(look.x * look.x + look.z * look.z);
-        double horizLen = old.horizontalLength();
+        double horizLen = old.horizontalDistance();
         double vertCos = Math.cos(pitchRad);
         vertCos = vertCos * vertCos * Math.min(1.0, look.length() / 0.4);
         Vec3 v = old.add(0.0, gravity * (-1.0 + vertCos * 0.75), 0.0);
@@ -332,7 +332,7 @@ public class RocketBoost extends Module {
             v = v.add(look.x * d / horizSqrt, d, look.z * d / horizSqrt);
         }
         if (pitchRad < 0.0f && horizSqrt > 0.0) {
-            double d = horizLen * (double) (-MathHelper.sin(pitchRad)) * 0.04;
+            double d = horizLen * (double) (-Mth.sin(pitchRad)) * 0.04;
             v = v.add(-look.x * d / horizSqrt, d * 3.2, -look.z * d / horizSqrt);
         }
         if (horizSqrt > 0.0) {
@@ -342,8 +342,8 @@ public class RocketBoost extends Module {
     }
 
     private double effectiveGravity(double velocityY) {
-        double gravity = mc.player.getAttributeValue(EntityAttributes.GRAVITY);
-        if (velocityY <= 0.0 && mc.player.hasStatusEffect(StatusEffects.SLOW_FALLING)) {
+        double gravity = mc.player.getAttributeValue(Attributes.GRAVITY);
+        if (velocityY <= 0.0 && mc.player.hasEffect(MobEffects.SLOW_FALLING)) {
             return Math.min(gravity, 0.01);
         }
         return gravity;
@@ -353,13 +353,13 @@ public class RocketBoost extends Module {
         double capped = speed.getValue();
         int ticks = lookahead.getValue().intValue();
         double reach = Math.max(4.0, capped * ticks);
-        Vec3 eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePosition();
         limiter = "speed";
         if (wallCheck.getValue()) {
-            Vec3 end = eye.add(look.multiply(reach));
-            BlockHitResult hit = mc.world.raycast(new RaycastContext(eye, end, RaycastContext.ShapeType.OUTLINE, RaycastContext.FluidHandling.NONE, mc.player));
+            Vec3 end = eye.add(look.scale(reach));
+            BlockHitResult hit = mc.level.clip(new ClipContext(eye, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, mc.player));
             if (hit.getType() != HitResult.Type.MISS) {
-                double limit = hit.getBlockPos().toCenterPos().distanceTo(eye) / ticks;
+                double limit = Vec3.atCenterOf(hit.getBlockPos()).distanceTo(eye) / ticks;
                 if (limit < capped) {
                     capped = limit;
                     limiter = "впереди стена";
@@ -368,9 +368,9 @@ public class RocketBoost extends Module {
         }
         if (chunkCheck.getValue()) {
             for (double d = 16.0; d <= reach; d += 16.0) {
-                Vec3 at = eye.add(look.multiply(d));
-                BlockPos atPos = BlockPos.ofFloored(at);
-                if (mc.world.isChunkLoaded(atPos.getX() >> 4, atPos.getZ() >> 4)) continue;
+                Vec3 at = eye.add(look.scale(d));
+                BlockPos atPos = BlockPos.containing(at);
+                if (mc.level.hasChunk(atPos.getX() >> 4, atPos.getZ() >> 4)) continue;
                 if (!(d / ticks < capped)) break;
                 capped = d / ticks;
                 limiter = "незагруженные чанки";
@@ -393,7 +393,7 @@ public class RocketBoost extends Module {
         if (baritoneSync.getValue() && baritoneFlying()) {
             return true;
         }
-        return mc.options.forwardKey.isPressed() || mc.options.backKey.isPressed() || mc.options.leftKey.isPressed() || mc.options.rightKey.isPressed() || mc.options.jumpKey.isPressed() || mc.options.sneakKey.isPressed();
+        return mc.options.keyUp.isDown() || mc.options.keyDown.isDown() || mc.options.keyLeft.isDown() || mc.options.keyRight.isDown() || mc.options.keyJump.isDown() || mc.options.keyShift.isDown();
     }
 
     public void suppress() {
@@ -431,12 +431,12 @@ public class RocketBoost extends Module {
     private FireworkRocketEntity findAttachedRocket() {
         FireworkRocketEntity best = null;
         int bestRemaining = Integer.MIN_VALUE;
-        AABB box = new AABB(mc.player.getEntityPos().subtract(64, 64, 64), mc.player.getEntityPos().add(64, 64, 64));
-        List<Entity> entities = mc.world.getOtherEntities(mc.player, box, e -> e instanceof FireworkRocketEntity);
+        AABB box = new AABB(mc.player.position().subtract(64, 64, 64), mc.player.position().add(64, 64, 64));
+        List<Entity> entities = mc.level.getEntities(mc.player, box, e -> e instanceof FireworkRocketEntity);
         for (Entity entity : entities) {
             FireworkRocketEntity firework = (FireworkRocketEntity) entity;
             if (!firework.isAlive()) continue;
-            if (firework.shooter != mc.player) continue;
+            if (firework.getOwner() != mc.player) continue;
             int remaining = remainingLife(firework);
             if (remaining <= bestRemaining) continue;
             bestRemaining = remaining;
@@ -446,13 +446,15 @@ public class RocketBoost extends Module {
     }
 
     private int remainingLife(FireworkRocketEntity firework) {
-        return firework.lifeTime - firework.life;
+        var acc = (me.collective.mixin.FireworkRocketEntityAccessor) firework;
+        return acc.getLifetime() - acc.getLife();
     }
 
     public static int earliestDeath(FireworkRocketEntity firework) {
-        FireworksComponent fireworks = firework.getStack().get(DataComponentTypes.FIREWORKS);
+        Fireworks fireworks = firework.getItem().get(DataComponents.FIREWORKS);
         int duration = fireworks != null ? fireworks.flightDuration() : 1;
-        return 10 * duration + 1 - firework.life;
+        var acc = (me.collective.mixin.FireworkRocketEntityAccessor) firework;
+        return 10 * duration + 1 - acc.getLife();
     }
 
     public void declarePitchFree() {

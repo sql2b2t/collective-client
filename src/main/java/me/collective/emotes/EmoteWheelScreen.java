@@ -2,7 +2,7 @@ package me.collective.emotes;
 
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
@@ -69,7 +69,7 @@ public class EmoteWheelScreen extends Screen {
         if (play) {
             EmoteEngine.playSelected();
         }
-        super.close();
+        super.onClose();
     }
 
     public boolean renderClosing(float mouseX) {
@@ -77,7 +77,7 @@ public class EmoteWheelScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         clampSelection();
         int size = Emote.ALL.size();
         int count = size == 0 ? 0 : Math.min(PAGE_SIZE, size - page * PAGE_SIZE);
@@ -88,13 +88,13 @@ public class EmoteWheelScreen extends Screen {
         context.fill(0, 0, this.width, this.height, 0x78060910);
         context.fill(listX - 6, listY - 24, listX + listW + 6, listY + PAGE_SIZE * ROW_H + 22, 0xE0070B13);
 
-        if (this.textRenderer != null) {
-            context.drawCenteredTextWithShadow(this.textRenderer, Component.literal("Эмоции"), this.width / 2, listY - 16, 0xFFF8FBFF);
+        if (this.font != null) {
+            context.centeredText(this.font, Component.literal("Эмоции"), this.width / 2, listY - 16, 0xFFF8FBFF);
         }
 
         if (size == 0) {
-            if (this.textRenderer != null) {
-                context.drawCenteredTextWithShadow(this.textRenderer, Component.literal("Нет эмоций"), this.width / 2, this.height / 2, 0xFF969EAE);
+            if (this.font != null) {
+                context.centeredText(this.font, Component.literal("Нет эмоций"), this.width / 2, this.height / 2, 0xFF969EAE);
             }
         } else {
             int hovered = rowAt(mouseX, mouseY, count);
@@ -111,21 +111,21 @@ public class EmoteWheelScreen extends Screen {
                 }
                 Identifier icon = emote.icon();
                 if (icon != null) {
-                    context.drawTexture(RenderPipelines.GUI_TEXTURED, icon, rx + 4, ry + 2, 0.0f, 0.0f, ICON, ICON, ICON, ICON, 0xFFFFFFFF);
+                    context.blit(RenderPipelines.GUI_TEXTURED, icon, rx + 4, ry + 2, 0.0f, 0.0f, ICON, ICON, ICON, ICON, 0xFFFFFFFF);
                 }
-                if (this.textRenderer != null) {
+                if (this.font != null) {
                     String label = emote.title() != null ? emote.title() : emote.id();
-                    context.drawTextWithShadow(this.textRenderer, label, rx + 24, ry + 6, sel ? 0xFFF8FBFF : 0xFFDEE5F2);
+                    context.text(this.font, label, rx + 24, ry + 6, sel ? 0xFFF8FBFF : 0xFFDEE5F2);
                 }
             }
 
-            if (this.textRenderer != null) {
+            if (this.font != null) {
                 String pages = (page + 1) + " / " + pageCount();
-                context.drawCenteredTextWithShadow(this.textRenderer, Component.literal(pages), this.width / 2, listY + PAGE_SIZE * ROW_H + 6, 0xFF969EAE);
+                context.centeredText(this.font, Component.literal(pages), this.width / 2, listY + PAGE_SIZE * ROW_H + 6, 0xFF969EAE);
             }
         }
 
-        super.render(context, mouseX, mouseY, delta);
+        super.extractRenderState(context, mouseX, mouseY, delta);
     }
 
     private int rowAt(double mouseX, double mouseY, int count) {
@@ -137,7 +137,7 @@ public class EmoteWheelScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(Click click, boolean doubled) {
+    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent click, boolean doubled) {
         clampSelection();
         int count = Emote.ALL.isEmpty() ? 0 : Math.min(PAGE_SIZE, Emote.ALL.size() - page * PAGE_SIZE);
         if (click.button() == 0) {
@@ -167,7 +167,7 @@ public class EmoteWheelScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(KeyInput input) {
+    public boolean keyPressed(net.minecraft.client.input.KeyEvent input) {
         int key = input.key();
         if (key == GLFW.GLFW_KEY_ESCAPE) {
             finish(false);
@@ -214,9 +214,9 @@ public class EmoteWheelScreen extends Screen {
     }
 
     @Override
-    public void close() {
+    public void onClose() {
         finished = true;
-        super.close();
+        super.onClose();
     }
 
     @Override
@@ -226,7 +226,7 @@ public class EmoteWheelScreen extends Screen {
     }
 
     @Override
-    public boolean shouldPause() {
+    public boolean isPauseScreen() {
         return false;
     }
 }

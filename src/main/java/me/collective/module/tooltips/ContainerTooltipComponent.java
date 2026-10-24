@@ -2,7 +2,7 @@ package me.collective.module.tooltips;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.level.saveddata.maps.MapId;
@@ -24,7 +24,7 @@ import java.util.List;
  *
  * <ul>
  *   <li>счётчик {@code 69} рисуется строкой {@code "0"}, а не красным
- *       {@code OrderedText}: в Yarn у {@code drawStackOverlay} есть только
+ *       {@code FormattedCharSequence}: в Yarn у {@code drawStackOverlay} есть только
  *       перегрузка со {@code String}, форматирование недоступно;
  *   <li>карта внутри ячейки блитится готовой текстурой карты вместо вызова
  *       ванильного картографического рендерера — в 1.21.11 он принимает
@@ -32,7 +32,7 @@ import java.util.List;
  *       компонента тултипа.
  * </ul>
  */
-public class ContainerTooltipComponent implements TooltipComponent {
+public class ContainerTooltipComponent implements ClientTooltipComponent {
 
     /** Служебная метка оригинала для стака с нулевым количеством. */
     public static final int ZERO_MARKER = 69;
@@ -63,17 +63,17 @@ public class ContainerTooltipComponent implements TooltipComponent {
     }
 
     @Override
-    public int getHeight(TextRenderer textRenderer) {
+    public int getHeight(Font textRenderer) {
         return HEIGHT;
     }
 
     @Override
-    public int getWidth(TextRenderer textRenderer) {
+    public int getWidth(Font textRenderer) {
         return WIDTH;
     }
 
     @Override
-    public void drawItems(TextRenderer textRenderer, int x, int y, int width, int height, GuiGraphics context) {
+    public void extractImage(Font textRenderer, int x, int y, int width, int height, GuiGraphicsExtractor context) {
         Minecraft mc = Minecraft.getInstance();
         ItemStack hovered = null;
 
@@ -88,32 +88,32 @@ public class ContainerTooltipComponent implements TooltipComponent {
 
             if (inside && !stack.isEmpty() && hovered == null) hovered = stack;
 
-            MapIdComponent mapId = mapIdOf(stack);
-            MapState mapState = mapOverlay ? mapStateOf(stack, mapId, mc) : null;
+            MapId mapId = mapIdOf(stack);
+            MapItemSavedData mapState = mapOverlay ? mapStateOf(stack, mapId, mc) : null;
 
             if (!mapOverlay || mapId == null || mapState == null) {
-                context.drawItem(stack, cellX + 1, cellY + 1);
+                context.item(stack, cellX + 1, cellY + 1);
                 // метка нулевого количества в оригинале рисуется красной «0»
-                context.drawStackOverlay(textRenderer, stack, cellX + 1, cellY + 1,
+                context.itemDecorations(textRenderer, stack, cellX + 1, cellY + 1,
                         stack.getCount() == ZERO_MARKER ? "0" : null);
             } else {
                 drawMap(context, mapId, mapState, cellX + 1, cellY + 1);
 
                 // при зажатом Alt счётчик на карте скрывается
                 if (!isAltPressed(mc)) {
-                    context.drawStackOverlay(textRenderer, stack, cellX + 1, cellY + 1);
+                    context.itemDecorations(textRenderer, stack, cellX + 1, cellY + 1);
                 }
             }
         }
 
-        if (hovered == null || hovered.isOf(Items.AIR)) return;
+        if (hovered == null || hovered.is(Items.AIR)) return;
 
-        context.drawItemTooltip(textRenderer, hovered, mouseX, mouseY);
+        context.setTooltipForNextFrame(textRenderer, hovered, mouseX, mouseY);
     }
 
-    private static MapIdComponent mapIdOf(ItemStack stack) {
-        MapIdComponent id = stack.get(DataComponentTypes.MAP_ID);
-        return id != null ? id : new MapIdComponent(-1);
+    private static MapId mapIdOf(ItemStack stack) {
+        MapId id = stack.get(DataComponents.MAP_ID);
+        return id != null ? id : new MapId(-1);
     }
 
     /**
@@ -122,39 +122,39 @@ public class ContainerTooltipComponent implements TooltipComponent {
      * <p>Перенос {@code getMapState2654}: сперва пробуем серверное состояние,
      * затем — кэш по имени, если у предмета есть своё имя.
      */
-    private static MapState mapStateOf(ItemStack stack, MapIdComponent id, Minecraft mc) {
-        if (mc.world == null) return null;
+    private static MapItemSavedData mapStateOf(ItemStack stack, MapId id, Minecraft mc) {
+        if (mc.level == null) return null;
 
-        MapState state = FilledMapItem.getMapState(id, mc.world);
+        MapItemSavedData state = MapItem.getSavedData(id, mc.level);
         if (id.id() != -1 && state != null) return state;
 
-        if (stack.contains(DataComponentTypes.CUSTOM_NAME)) {
-            return NamedMaps.get(stack.getName().getString());
+        if (stack.has(DataComponents.CUSTOM_NAME)) {
+            return NamedMaps.get(stack.getHoverName().getString());
         }
 
         return null;
     }
 
     /** Блит текстуры карты в ячейку сетки. */
-    private static void drawMap(GuiGraphics context, MapIdComponent id, MapState state, int x, int y) {
+    private static void drawMap(GuiGraphicsExtractor context, MapId id, MapItemSavedData state, int x, int y) {
         Minecraft mc = Minecraft.getInstance();
 
-        var texture = mc.getMapTextureManager().getTextureId(id, state);
+        var texture = mc.getMapTextureManager().prepareMapTexture(id, state);
         if (texture == null) return;
 
-        var matrices = context.getMatrices();
+        var matrices = context.pose();
         matrices.pushMatrix();
         matrices.translate(x, y);
         matrices.scale(0.25f);
 
-        context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, texture,
+        context.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, texture,
                 0, 0, 0f, 0f, 128, 128, 128, 128);
 
         matrices.popMatrix();
     }
 
     private static boolean isAltPressed(Minecraft mc) {
-        return org.lwjgl.glfw.GLFW.glfwGetKey(mc.getWindow().getHandle(), org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_ALT) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
+        return org.lwjgl.glfw.GLFW.glfwGetKey(mc.getWindow().handle(), org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_ALT) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
     }
 
     /**
@@ -168,13 +168,13 @@ public class ContainerTooltipComponent implements TooltipComponent {
         private NamedMaps() {
         }
 
-        private static final java.util.Map<String, MapState> MAPS = new java.util.concurrent.ConcurrentHashMap<>();
+        private static final java.util.Map<String, MapItemSavedData> MAPS = new java.util.concurrent.ConcurrentHashMap<>();
 
-        public static void put(String name, MapState state) {
+        public static void put(String name, MapItemSavedData state) {
             if (name != null && state != null) MAPS.put(name, state);
         }
 
-        public static MapState get(String name) {
+        public static MapItemSavedData get(String name) {
             return MAPS.get(name);
         }
     }

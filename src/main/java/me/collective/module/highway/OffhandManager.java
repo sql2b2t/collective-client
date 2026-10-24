@@ -36,9 +36,9 @@ public class OffhandManager extends Module {
         EGap(Items.ENCHANTED_GOLDEN_APPLE),
         Totem(Items.TOTEM_OF_UNDYING);
 
-        final net.minecraft.item.Item item;
+        final net.minecraft.world.item.Item item;
 
-        Item(net.minecraft.item.Item item) {
+        Item(net.minecraft.world.item.Item item) {
             this.item = item;
         }
     }
@@ -77,26 +77,26 @@ public class OffhandManager extends Module {
      */
     @EventHandler
     public void onPreTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null || !isToggled()) return;
+        if (mc.player == null || mc.level == null || !isToggled()) return;
 
         AirPlaceScaffold scaffold = ModuleManager.INSTANCE.getModule(AirPlaceScaffold.class);
         boolean scaffolding = scaffold != null && scaffold.isBusy();
         if (scaffolding) return;
 
         // Switch back if swap key has been used
-        if (mc.options.swapHandsKey.isPressed() && !swapped
-            && mc.player.getOffHandStack().isOf(currentItem.item)) swapped = true;
-        else if (mc.options.swapHandsKey.isPressed() && swapped
-            && mc.player.getMainHandStack().isOf(currentItem.item)) swapped = false;
+        if (mc.options.keySwapOffhand.isDown() && !swapped
+            && mc.player.getOffhandItem().is(currentItem.item)) swapped = true;
+        else if (mc.options.keySwapOffhand.isDown() && swapped
+            && mc.player.getMainHandItem().is(currentItem.item)) swapped = false;
         else swapped = false;
 
         // Checking offhand item
-        if (!mc.player.getOffHandStack().isOf(currentItem.item) && !swapped) {
-            FindItemResult item = InventoryUtil.find(stack -> stack.isOf(currentItem.item),
+        if (!mc.player.getOffhandItem().is(currentItem.item) && !swapped) {
+            FindItemResult item = InventoryUtil.find(stack -> stack.is(currentItem.item),
                 hotbar.getValue() ? 0 : 9, 35);
 
             if (!item.found() && currentItem == Item.EGap) {
-                item = InventoryUtil.find(stack -> stack.isOf(Items.GOLDEN_APPLE),
+                item = InventoryUtil.find(stack -> stack.is(Items.GOLDEN_APPLE),
                     hotbar.getValue() ? 0 : 9, 35);
             }
 
@@ -116,7 +116,7 @@ public class OffhandManager extends Module {
         // ── Авто-гепы ─────────────────────────────────────────────────
         if (eating) {
             if (shouldEat(scaffolding)) {
-                if (mc.player.getOffHandStack().get(DataComponentTypes.FOOD) == null) {
+                if (mc.player.getOffhandItem().get(DataComponents.FOOD) == null) {
                     stopEating();
                 } else {
                     startEating();
@@ -125,22 +125,22 @@ public class OffhandManager extends Module {
                 stopEating();
             }
         } else if (shouldEat(scaffolding)
-                && mc.player.getOffHandStack().get(DataComponentTypes.FOOD) != null) {
+                && mc.player.getOffhandItem().get(DataComponents.FOOD) != null) {
             startEating();
         }
     }
 
     @EventHandler
     private void onPostTick(TickEvent.Post event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         if (mc.player.getHealth() <= healthThreshold.getValue()
-            || (fallDamage.getValue() && !mc.player.isTouchingWater() && mc.player.fallDistance > 3)) {
+            || (fallDamage.getValue() && !mc.player.isInWater() && mc.player.fallDistance > 3)) {
             currentItem = Item.Totem;
         } else if (autoFireRes.getValue() && !justStarted
-            && !mc.player.hasStatusEffect(StatusEffects.FIRE_RESISTANCE)) {
+            && !mc.player.hasEffect(MobEffects.FIRE_RESISTANCE)) {
             currentItem = Item.EGap;
-        } else if (mc.player.getHungerManager().getFoodLevel() < hungerThreshold.getIntValue() + 1) {
+        } else if (mc.player.getFoodData().getFoodLevel() < hungerThreshold.getIntValue() + 1) {
             currentItem = Item.EGap;
         } else {
             currentItem = Item.Totem;
@@ -149,45 +149,45 @@ public class OffhandManager extends Module {
 
     @EventHandler
     private void onPacketSend(PacketEvent.Send event) {
-        if (event.getPacket() instanceof PlayerInteractBlockC2SPacket) stopEating();
+        if (event.getPacket() instanceof ServerboundUseItemOnPacket) stopEating();
     }
 
     private boolean shouldEat(boolean scaffolding) {
-        return (mc.player.getHungerManager().getFoodLevel() <= hungerThreshold.getIntValue()
-            || (autoFireRes.getValue() && !mc.player.hasStatusEffect(StatusEffects.FIRE_RESISTANCE)))
+        return (mc.player.getFoodData().getFoodLevel() <= hungerThreshold.getIntValue()
+            || (autoFireRes.getValue() && !mc.player.hasEffect(MobEffects.FIRE_RESISTANCE)))
             && !scaffolding;
     }
 
     private void startEating() {
-        if (mc.player == null || mc.interactionManager == null) return;
+        if (mc.player == null || mc.gameMode == null) return;
 
         eating = true;
         justStarted = false;
 
         if (mc.player.isUsingItem()) return;
 
-        mc.options.useKey.setPressed(true);
-        mc.interactionManager.interactItem(mc.player, InteractionHand.OFF_HAND);
+        mc.options.keyUse.setDown(true);
+        mc.gameMode.useItem(mc.player, InteractionHand.OFF_HAND);
     }
 
     private void stopEating() {
         if (mc.player == null) return;
 
-        mc.options.useKey.setPressed(false);
+        mc.options.keyUse.setDown(false);
         mc.player.stopUsingItem();
-        if (mc.getNetworkHandler() != null) {
-            BlockPos pos = mc.player.getBlockPos();
-            mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
-                PlayerActionC2SPacket.Action.RELEASE_USE_ITEM, pos, Direction.DOWN));
+        if (mc.getConnection() != null) {
+            BlockPos pos = mc.player.blockPosition();
+            mc.getConnection().send(new ServerboundPlayerActionPacket(
+                ServerboundPlayerActionPacket.Action.RELEASE_USE_ITEM, pos, Direction.DOWN));
         }
         eating = false;
     }
 
     private void dropCursor() {
-        if (mc.player == null || mc.interactionManager == null) return;
-        if (mc.player.currentScreenHandler.getCursorStack().isEmpty()) return;
-        mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId,
-            -999, 0, net.minecraft.screen.slot.SlotActionType.PICKUP, mc.player);
+        if (mc.player == null || mc.gameMode == null) return;
+        if (mc.player.containerMenu.getCarried().isEmpty()) return;
+        mc.gameMode.handleContainerInput(mc.player.containerMenu.containerId,
+            -999, 0, net.minecraft.world.inventory.ContainerInput.PICKUP, mc.player);
     }
 
     public boolean isEating() {

@@ -2,7 +2,7 @@ package me.collective.module.hud;
 
 import me.collective.render.RenderUtil;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 
 import java.awt.Color;
@@ -17,7 +17,7 @@ public class PlayerModel extends HudModule {
     }
 
     @Override
-    public void render(GuiGraphics context, float delta) {
+    public void render(GuiGraphicsExtractor context, float delta) {
         if (!isToggled() || mc.player == null) return;
 
         this.width = size.getIntValue() * 1.4f;
@@ -32,6 +32,6 @@ public class PlayerModel extends HudModule {
         int x2 = (int) (x + width);
         int y2 = (int) (y + height);
 
-        InventoryScreen.drawEntity(context, x1, y1, x2, y2, size.getIntValue(), 0.0625f, 0, 0, mc.player);
+        InventoryScreen.extractEntityInInventoryFollowsMouse(context, x1, y1, x2, y2, size.getIntValue(), 0.0625f, 0, 0, mc.player);
     }
 }

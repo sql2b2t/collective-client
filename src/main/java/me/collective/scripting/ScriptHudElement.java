@@ -2,13 +2,13 @@ package me.collective.scripting;
 
 import me.collective.module.hud.HudModule;
 import me.collective.setting.*;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.awt.Color;
 import java.util.function.BiConsumer;
 
 public class ScriptHudElement extends HudModule {
-    private BiConsumer<GuiGraphics, Float> renderAction;
+    private BiConsumer<GuiGraphicsExtractor, Float> renderAction;
     private ScriptContext scriptContext;
     private int errorCount;
 
@@ -49,7 +49,7 @@ public class ScriptHudElement extends HudModule {
         return add(new EnumSetting<>(name, defaultValue));
     }
 
-    public void onRender(BiConsumer<GuiGraphics, Float> renderAction) {
+    public void onRender(BiConsumer<GuiGraphicsExtractor, Float> renderAction) {
         this.renderAction = renderAction;
     }
 
@@ -83,13 +83,13 @@ public class ScriptHudElement extends HudModule {
     }
 
     @Override
-    public void render(GuiGraphics context, float delta) {
+    public void render(GuiGraphicsExtractor context, float delta) {
         if (renderAction != null) {
             // Встроенные HUD-модули (Watermark/Bps) рисуют в абсолютных x,y.
             // Скрипты рисуют в локальных 0,0 — сдвигаем матрицы, иначе картинка
             // висит в углу экрана, а хитбокс для перетаскивания в другом месте.
-            context.getMatrices().pushMatrix();
-            context.getMatrices().translate(x, y);
+            context.pose().pushMatrix();
+            context.pose().translate(x, y);
             try {
                 renderAction.accept(context, delta);
             } catch (Throwable t) {
@@ -100,7 +100,7 @@ public class ScriptHudElement extends HudModule {
                     setToggled(false);
                 }
             } finally {
-                context.getMatrices().popMatrix();
+                context.pose().popMatrix();
             }
         }
     }

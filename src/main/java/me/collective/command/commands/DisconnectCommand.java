@@ -10,6 +10,6 @@ public class DisconnectCommand extends Command {
 
     @Override
     public void execute(String[] args) {
-        mc.disconnect(Component.literal("Disconnected"));
+        mc.disconnectFromWorld(Component.literal("Disconnected"));
     }
 }

@@ -34,7 +34,7 @@ import net.minecraft.world.entity.projectile.FireworkRocketEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
 import net.minecraft.world.InteractionHand;
@@ -361,11 +361,11 @@ public class ControlFly extends Module {
     }
 
     public double getSmoothCamX(float tickDelta) {
-        return MathHelper.lerp(tickDelta, this.prevSmoothX, this.smoothX);
+        return Mth.lerp(tickDelta, this.prevSmoothX, this.smoothX);
     }
 
     public double getSmoothCamZ(float tickDelta) {
-        return MathHelper.lerp(tickDelta, this.prevSmoothZ, this.smoothZ);
+        return Mth.lerp(tickDelta, this.prevSmoothZ, this.smoothZ);
     }
 
     @Override
@@ -462,12 +462,12 @@ public class ControlFly extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        if (this.mc.player == null || this.mc.world == null) {
+        if (this.mc.player == null || this.mc.level == null) {
             this.glideSwap.tick(false);
             return;
         }
 
-        if (!this.mc.player.isGliding()) {
+        if (!this.mc.player.isFallFlying()) {
             restorePreviousSlot();
             this.idleHovering = false;
             clearPark();
@@ -505,7 +505,7 @@ public class ControlFly extends Module {
             if (this.reanchor) {
                 // сервер телепортинул: переносим точку парковки на новое место
                 this.reanchor = false;
-                this.wirePos = this.mc.player.getEntityPos();
+                this.wirePos = this.mc.player.position();
                 this.pendingStep = null;
                 this.ticksSinceSetback = 0;
 
@@ -527,7 +527,7 @@ public class ControlFly extends Module {
                     if (this.parkBlocked != null && TickPacer.clientTick() > this.lastWirePosTick + 1) {
                         clearPark();
                     } else {
-                        this.mc.player.setVelocity(Vec3.ZERO);
+                        this.mc.player.setDeltaMovement(Vec3.ZERO);
                     }
                 }
             }
@@ -539,7 +539,7 @@ public class ControlFly extends Module {
         boolean rocketDue = !freezeHolding && this.autoFirework.get() && fireworkDue();
 
         this.glideSwap.tick(
-            this.chestSwap.get() && !this.mc.player.isOnGround() && !bounceOwnsGlide(), rocketDue);
+            this.chestSwap.get() && !this.mc.player.onGround() && !bounceOwnsGlide(), rocketDue);
 
         if (rocketDue && this.glideSwap.isServerGliding()) handleFirework();
 
@@ -553,11 +553,11 @@ public class ControlFly extends Module {
     @EventHandler
     private void onPacketSend(PacketEvent.Send event) {
         Packet<?> packet = event.packet;
-        if (!(packet instanceof PlayerMoveC2SPacket move)) return;
+        if (!(packet instanceof ServerboundMovePlayerPacket move)) return;
 
-        if (this.mc.player == null || !this.mc.player.isGliding()) return;
+        if (this.mc.player == null || !this.mc.player.isFallFlying()) return;
 
-        if (move.changesPosition()) {
+        if (move.hasPosition()) {
             this.keepaliveTicks = 0;
 
             // сколько-то пакетов пропускаем: сервер уже ответил телепортом
@@ -570,13 +570,13 @@ public class ControlFly extends Module {
         }
 
         if (!parkPinned()) return;
-        if (!move.changesPosition()) return;
+        if (!move.hasPosition()) return;
         if (this.pendingStep != null || this.parkedWithRocket) return;
 
         // угол в пакете всё равно нужен: иначе сервер решит, что мы смотрим вниз
-        if (move.changesLook()) {
-            this.mc.getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.LookAndOnGround(
-                move.getYaw(this.mc.player.getYaw()), move.getPitch(this.mc.player.getPitch()),
+        if (move.hasRotation()) {
+            this.mc.getConnection().send(new ServerboundMovePlayerPacket.Rot(
+                move.getYRot(this.mc.player.getYRot()), move.getXRot(this.mc.player.getXRot()),
                 move.isOnGround(), move.horizontalCollision()));
         }
 
@@ -585,12 +585,12 @@ public class ControlFly extends Module {
 
     @EventHandler
     private void onMoveDispatched(PacketEvent.Send event) {
-        if (!(event.packet instanceof PlayerMoveC2SPacket move)) return;
+        if (!(event.packet instanceof ServerboundMovePlayerPacket move)) return;
         if (this.mc.player == null) return;
 
         this.glideSwap.onPacketSend(event);
 
-        if (!move.changesPosition()) return;
+        if (!move.hasPosition()) return;
 
         this.pendingStep = null;
 
@@ -610,7 +610,7 @@ public class ControlFly extends Module {
     }
 
     private void holdPark() {
-        if (this.mc.player == null || this.mc.world == null || !this.mc.player.isGliding()) return;
+        if (this.mc.player == null || this.mc.level == null || !this.mc.player.isFallFlying()) return;
 
         if (this.pendingStep != null) {
             if (this.wirePos != null) this.wirePos = this.wirePos.subtract(this.pendingStep);
@@ -621,8 +621,8 @@ public class ControlFly extends Module {
         if (!parkPinned()) return;
 
         if (this.mc.getCameraEntity() != this.mc.player) {
-            this.mc.player.setPosition(this.wirePos);
-            this.mc.player.setVelocity(Vec3.ZERO);
+            this.mc.player.setPos(this.wirePos);
+            this.mc.player.setDeltaMovement(Vec3.ZERO);
             return;
         }
 
@@ -637,8 +637,8 @@ public class ControlFly extends Module {
             this.pendingStep = step;
         }
 
-        this.mc.player.setPosition(this.wirePos);
-        this.mc.player.setVelocity(Vec3.ZERO);
+        this.mc.player.setPos(this.wirePos);
+        this.mc.player.setDeltaMovement(Vec3.ZERO);
     }
 
     private boolean parkPinned() {
@@ -656,24 +656,24 @@ public class ControlFly extends Module {
         RotationUtils rotations = RotationUtils.getInstance();
 
         float pitch = rotations.getSentPitch();
-        Vec3 look = Vec3.fromPolar(pitch, rotations.getSentYaw());
+        Vec3 look = Vec3.directionFromRotation(pitch, rotations.getSentYaw());
 
         return RideWindow.predictGliding(Vec3.ZERO, look, pitch,
-            this.mc.player.getAttributeValue(EntityAttributes.GRAVITY));
+            this.mc.player.getAttributeValue(Attributes.GRAVITY));
     }
 
     /** Причины, по которым парковку надо снять. */
     private String parkBlockedBy() {
         if (this.wirePos == null) return "no wire position yet";
         if (this.reanchor || this.passMovePackets.get() > 0) return "teleport in flight";
-        if (this.mc.player.hasVehicle()) return "riding";
-        if (this.mc.player.isOnGround() || this.mc.player.horizontalCollision) return "collided";
-        if (this.mc.player.isTouchingWater() || this.mc.player.isInLava()) return "in fluid";
-        if (this.mc.player.isClimbing()) return "on a climbable";
-        if (this.mc.player.hasStatusEffect(StatusEffects.LEVITATION)) return "levitating";
-        if (this.mc.player.hasStatusEffect(StatusEffects.SLOW_FALLING)) return "slow falling";
+        if (this.mc.player.isPassenger()) return "riding";
+        if (this.mc.player.onGround() || this.mc.player.horizontalCollision) return "collided";
+        if (this.mc.player.isInWater() || this.mc.player.isInLava()) return "in fluid";
+        if (this.mc.player.onClimbable()) return "on a climbable";
+        if (this.mc.player.hasEffect(MobEffects.LEVITATION)) return "levitating";
+        if (this.mc.player.hasEffect(MobEffects.SLOW_FALLING)) return "slow falling";
 
-        if (Math.abs(this.mc.player.getAttributeValue(EntityAttributes.GRAVITY) - DEFAULT_GRAVITY) > 1.0E-9) {
+        if (Math.abs(this.mc.player.getAttributeValue(Attributes.GRAVITY) - DEFAULT_GRAVITY) > 1.0E-9) {
             return "gravity changed";
         }
 
@@ -683,7 +683,7 @@ public class ControlFly extends Module {
         SpeedMine speedMine = ModuleManager.INSTANCE.getModule(SpeedMine.class);
         if (speedMine != null && speedMine.needsMiningTickPacket()) return "mining";
 
-        if (this.mc.world.getStatesInBox(this.mc.player.getBoundingBox().expand(0.05))
+        if (this.mc.level.getBlockStates(this.mc.player.getBoundingBox().inflate(0.05))
             .anyMatch(state -> !state.isAir())) {
             return "in a block";
         }
@@ -695,14 +695,14 @@ public class ControlFly extends Module {
 
     /** Сервер ведёт свою копию игрока и она упрётся в стену. */
     private boolean clearOfTerrain() {
-        return this.mc.world.isBlockSpaceEmpty(
-            this.mc.player, this.mc.player.getBoundingBox().expand(GHOST_CLEARANCE));
+        return this.mc.level.noBlockCollision(
+            this.mc.player, this.mc.player.getBoundingBox().inflate(GHOST_CLEARANCE));
     }
 
     private boolean gliderNearlySpent() {
         ItemStack glider = ChestSwapGlide.gliderStack();
 
-        return glider.isDamageable() && glider.getMaxDamage() - glider.getDamage() <= 2;
+        return glider.isDamageableItem() && glider.getMaxDamage() - glider.getDamageValue() <= 2;
     }
 
     private void clearPark() {
@@ -723,7 +723,7 @@ public class ControlFly extends Module {
     private void onPacketReceive(PacketEvent.Receive event) {
         this.glideSwap.onPacketReceive(event);
 
-        if (!(event.packet instanceof PlayerPositionLookS2CPacket)) return;
+        if (!(event.packet instanceof ClientboundPlayerPositionPacket)) return;
         if (!this.frozen) return;
 
         // во время парковки телепорт — это откат: надо перестать держать позицию
@@ -744,10 +744,10 @@ public class ControlFly extends Module {
     }
 
     private boolean fireworkAttached() {
-        for (Entity entity : this.mc.world.getEntities()) {
+        for (Entity entity : this.mc.level.entitiesForRendering()) {
             if (!(entity instanceof FireworkRocketEntity firework)) continue;
             if (!firework.isAlive()) continue;
-            if (firework.shooter != this.mc.player) continue;
+            if (firework.getOwner() != this.mc.player) continue;
 
             return true;
         }
@@ -757,7 +757,7 @@ public class ControlFly extends Module {
 
     @EventHandler
     private void onTickPost(TickEvent.Post event) {
-        if (this.mc.player == null || !this.mc.player.isGliding() || !this.idleHovering) return;
+        if (this.mc.player == null || !this.mc.player.isFallFlying() || !this.idleHovering) return;
         if (this.hoverMode.get() != HoverMode.FLIP_FLOP) return;
 
         this.prevSmoothX = this.smoothX;
@@ -789,7 +789,7 @@ public class ControlFly extends Module {
         }
 
         // игрок сам жмёт — не мешаем
-        return !this.mc.options.useKey.isPressed();
+        return !this.mc.options.keyUse.isDown();
     }
 
     private void handleFirework() {
@@ -798,8 +798,8 @@ public class ControlFly extends Module {
         if (fireworkSlot == -1) return;
 
         if (this.durationScaling.get()) {
-            ItemStack stack = this.mc.player.getInventory().getStack(fireworkSlot);
-            FireworksComponent component = stack.get(DataComponentTypes.FIREWORKS);
+            ItemStack stack = this.mc.player.getInventory().getItem(fireworkSlot);
+            Fireworks component = stack.get(DataComponents.FIREWORKS);
 
             int flightDuration = component != null ? component.flightDuration() : 1;
 
@@ -809,7 +809,7 @@ public class ControlFly extends Module {
             this.nextFireworkDelay = this.fireworkDelay.get();
         }
 
-        int currentSlot = this.mc.player.getInventory().selectedSlot;
+        int currentSlot = this.mc.player.getInventory().getSelectedSlot();
 
         if (currentSlot != fireworkSlot) {
             this.previousSlot = currentSlot;
@@ -817,8 +817,8 @@ public class ControlFly extends Module {
             this.swapBackTicks = 2;
         }
 
-        this.mc.interactionManager.interactItem(this.mc.player, InteractionHand.MAIN_HAND);
-        this.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
+        this.mc.gameMode.useItem(this.mc.player, InteractionHand.MAIN_HAND);
+        this.mc.getConnection().send(ServerboundPunchPacket.INSTANCE);
 
         this.lastFireworkTime = System.currentTimeMillis();
         this.ticksSinceFirework = 0;
@@ -828,10 +828,10 @@ public class ControlFly extends Module {
     private int windowRemaining() {
         int best = -1;
 
-        for (Entity entity : this.mc.world.getEntities()) {
+        for (Entity entity : this.mc.level.entitiesForRendering()) {
             if (!(entity instanceof FireworkRocketEntity firework)) continue;
             if (!firework.isAlive()) continue;
-            if (firework.shooter != this.mc.player) continue;
+            if (firework.getOwner() != this.mc.player) continue;
 
             best = Math.max(best, RocketBoost.earliestDeath(firework));
         }
@@ -841,9 +841,9 @@ public class ControlFly extends Module {
 
     /** Пинг в тиках: ракету надо запускать с запасом на круговой путь. */
     private int pingTicks() {
-        PlayerListEntry info = this.mc.getNetworkHandler() == null
+        PlayerInfo info = this.mc.getConnection() == null
             ? null
-            : this.mc.getNetworkHandler().getPlayerListEntry(this.mc.player.getUuid());
+            : this.mc.getConnection().getPlayerInfo(this.mc.player.getUUID());
 
         int ms = info == null || info.getLatency() <= 0 ? DEFAULT_PING_MS : info.getLatency();
 
@@ -852,8 +852,8 @@ public class ControlFly extends Module {
 
     private int findFireworkHotbar() {
         for (int i = 0; i < 9; i++) {
-            ItemStack stack = this.mc.player.getInventory().getStack(i);
-            if (!stack.isOf(Items.FIREWORK_ROCKET)) continue;
+            ItemStack stack = this.mc.player.getInventory().getItem(i);
+            if (!stack.is(Items.FIREWORK_ROCKET)) continue;
 
             return i;
         }
@@ -866,8 +866,8 @@ public class ControlFly extends Module {
         int invSlot = -1;
 
         for (int i = 9; i < 36; i++) {
-            ItemStack stack = this.mc.player.getInventory().getStack(i);
-            if (!stack.isOf(Items.FIREWORK_ROCKET)) continue;
+            ItemStack stack = this.mc.player.getInventory().getItem(i);
+            if (!stack.is(Items.FIREWORK_ROCKET)) continue;
 
             invSlot = i;
             break;
@@ -897,7 +897,7 @@ public class ControlFly extends Module {
 
     private int findEmptyHotbarSlot() {
         for (int i = 0; i < 9; i++) {
-            if (!this.mc.player.getInventory().getStack(i).isEmpty()) continue;
+            if (!this.mc.player.getInventory().getItem(i).isEmpty()) continue;
 
             return i;
         }
@@ -909,24 +909,24 @@ public class ControlFly extends Module {
     private void handleMovement() {
         Vec3 vec = Vec3.ZERO;
 
-        float yaw = this.mc.player.getYaw();
+        float yaw = this.mc.player.getYRot();
         boolean jumpHeld = false;
         boolean sneakHeld = false;
 
         Freecam freecam = ModuleManager.INSTANCE.getModule(Freecam.class);
 
         if (freecam == null || !freecam.isActive()) {
-            if (this.mc.options.forwardKey.isPressed()) vec = vec.add(Vec3.fromPolar(0.0f, yaw));
-            if (this.mc.options.backKey.isPressed()) vec = vec.add(Vec3.fromPolar(0.0f, yaw + 180.0f));
-            if (this.mc.options.leftKey.isPressed()) vec = vec.add(Vec3.fromPolar(0.0f, yaw - 90.0f));
-            if (this.mc.options.rightKey.isPressed()) vec = vec.add(Vec3.fromPolar(0.0f, yaw + 90.0f));
+            if (this.mc.options.keyUp.isDown()) vec = vec.add(Vec3.directionFromRotation(0.0f, yaw));
+            if (this.mc.options.keyDown.isDown()) vec = vec.add(Vec3.directionFromRotation(0.0f, yaw + 180.0f));
+            if (this.mc.options.keyLeft.isDown()) vec = vec.add(Vec3.directionFromRotation(0.0f, yaw - 90.0f));
+            if (this.mc.options.keyRight.isDown()) vec = vec.add(Vec3.directionFromRotation(0.0f, yaw + 90.0f));
 
             jumpHeld = ChestSwapGlide.rawJumpDown();
-            sneakHeld = this.mc.options.sneakKey.isPressed();
+            sneakHeld = this.mc.options.keyShift.isDown();
         }
 
         boolean hasFirework = findFireworkHotbar() != -1 || hasFireworkInInventory();
-        boolean horizontal = vec.lengthSquared() >= 1.0E-4;
+        boolean horizontal = vec.lengthSqr() >= 1.0E-4;
 
         // ── Ничего не нажато: зависание ──
         if (!(horizontal || jumpHeld || sneakHeld)) {
@@ -958,7 +958,7 @@ public class ControlFly extends Module {
 
                     if (this.parkBlocked == null) {
                         if (this.reparkCooldown > 0
-                            || this.mc.player.getVelocity().horizontalLengthSquared() > 0.25) {
+                            || this.mc.player.getDeltaMovement().horizontalDistanceSqr() > 0.25) {
                             // ещё не остановились: раскачиваем курс, чтобы гасить
                             if (this.flipFlop) {
                                 this.flipFlop = false;
@@ -986,9 +986,9 @@ public class ControlFly extends Module {
                     if (!hasFirework) return;
                 }
 
-                if (this.mc.options.useKey.isPressed()) {
+                if (this.mc.options.keyUse.isDown()) {
                     RotationUtils.getInstance().setRotationFullInstant(
-                        this.mc.player.getYaw(), this.mc.player.getPitch());
+                        this.mc.player.getYRot(), this.mc.player.getXRot());
                 } else {
                     float idlePitch = this.hoverPitch.get().floatValue();
 
@@ -1037,7 +1037,7 @@ public class ControlFly extends Module {
 
         // после зависания разгоняемся на скорости терминальной
         if (wasIdle && fireworkAttached()) {
-            this.mc.player.setVelocity(Vec3.fromPolar(pitch, rot[0]).multiply(FIREWORK_TERMINAL_SPEED));
+            this.mc.player.setDeltaMovement(Vec3.directionFromRotation(pitch, rot[0]).scale(FIREWORK_TERMINAL_SPEED));
 
             RocketBoost boost = ModuleManager.INSTANCE.getModule(RocketBoost.class);
             if (boost != null && boost.isActive()) boost.clearSuppression();
@@ -1077,7 +1077,7 @@ public class ControlFly extends Module {
         if (this.porpoiseFlipTicks > 0) this.porpoiseFlipTicks--;
 
         boolean manualUp = ChestSwapGlide.rawJumpDown();
-        boolean manualDown = this.mc.options.sneakKey.isPressed();
+        boolean manualDown = this.mc.options.keyShift.isDown();
 
         // игрок берёт управление на себя
         if (manualUp || manualDown) {
@@ -1103,8 +1103,8 @@ public class ControlFly extends Module {
             boost.alignmentDegrees(), boost.pitchAlignmentDegrees(),
             boost.windowThreshold(), RocketBoost.antiTickSkipping(),
             this.asymmetricLegs.get(), this.pumpLegs.get(),
-            this.mc.player.getAttributeValue(EntityAttributes.GRAVITY),
-            this.mc.player.hasStatusEffect(StatusEffects.SLOW_FALLING));
+            this.mc.player.getAttributeValue(Attributes.GRAVITY),
+            this.mc.player.hasEffect(MobEffects.SLOW_FALLING));
 
         // нога упирается в скалу: переворачиваем раньше
         if (this.porpoiseFlipTicks == 0
@@ -1140,20 +1140,20 @@ public class ControlFly extends Module {
         if (descending ? rise >= 0.0 : rise <= 0.0) return false;
 
         double ground = Math.abs(rise) / (2.0 * half) * legs.ground(descending);
-        ground = MathHelper.clamp(ground, MIN_LEG_LOOKAHEAD, MAX_LEG_LOOKAHEAD);
+        ground = Mth.clamp(ground, MIN_LEG_LOOKAHEAD, MAX_LEG_LOOKAHEAD);
 
-        Vec3 eye = this.mc.player.getEyePos();
-        Vec3 along = Vec3.fromPolar(0.0f, yaw).multiply(ground);
+        Vec3 eye = this.mc.player.getEyePosition();
+        Vec3 along = Vec3.directionFromRotation(0.0f, yaw).scale(ground);
         Vec3 end3 = eye.add(along.x, rise, along.z);
 
-        return this.mc.world.raycast(new RaycastContext(eye, end3,
-            RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, this.mc.player))
+        return this.mc.level.clip(new ClipContext(eye, end3,
+            ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this.mc.player))
             .getType() != HitResult.Type.MISS;
     }
 
     private boolean hasFireworkInInventory() {
         for (int i = 9; i < 36; i++) {
-            if (!this.mc.player.getInventory().getStack(i).isOf(Items.FIREWORK_ROCKET)) continue;
+            if (!this.mc.player.getInventory().getItem(i).is(Items.FIREWORK_ROCKET)) continue;
 
             return true;
         }
@@ -1166,8 +1166,8 @@ public class ControlFly extends Module {
     }
 
     private float[] getYawPitch(Vec3 vec) {
-        if (vec.lengthSquared() < 1.0E-8) {
-            return new float[]{this.mc.player.getYaw(), this.mc.player.getPitch()};
+        if (vec.lengthSqr() < 1.0E-8) {
+            return new float[]{this.mc.player.getYRot(), this.mc.player.getXRot()};
         }
 
         vec = vec.normalize();
@@ -1176,14 +1176,14 @@ public class ControlFly extends Module {
 
         double horizontalLength = Math.sqrt(vec.x * vec.x + vec.z * vec.z);
         float pitch = (float) -Math.toDegrees(Math.atan2(vec.y, horizontalLength));
-        pitch = MathHelper.clamp(pitch, -90.0f, 90.0f);
+        pitch = Mth.clamp(pitch, -90.0f, 90.0f);
 
         return new float[]{yaw, pitch};
     }
 
     @Override
     public String getInfoString() {
-        if (this.mc.player == null || !this.mc.player.isGliding()) return null;
+        if (this.mc.player == null || !this.mc.player.isFallFlying()) return null;
 
         String state;
         if (this.idleHovering && this.hoverMode.get() == HoverMode.FREEZE) {
@@ -1207,14 +1207,14 @@ public class ControlFly extends Module {
     }
 
     private String flightContext() {
-        if (this.mc.player == null || this.mc.world == null) return "no player";
+        if (this.mc.player == null || this.mc.level == null) return "no player";
 
-        Vec3 velocity = this.mc.player.getVelocity();
+        Vec3 velocity = this.mc.player.getDeltaMovement();
 
         return String.format(
             "%s at %.0f b/s (%.1f vertical), pitch %.0f, Y %.0f, %s, last rocket %d ticks ago",
-            flightState(), velocity.horizontalLength() * 20.0, velocity.y * 20.0,
-            this.mc.player.getPitch(), this.mc.player.getY(),
+            flightState(), velocity.horizontalDistance() * 20.0, velocity.y * 20.0,
+            this.mc.player.getXRot(), this.mc.player.getY(),
             fireworkAttached() ? "a rocket attached" : "no rocket", this.ticksSinceFirework);
     }
 
@@ -1223,11 +1223,11 @@ public class ControlFly extends Module {
 
         this.debugTicks = 0;
 
-        Vec3 velocity = this.mc.player.getVelocity();
+        Vec3 velocity = this.mc.player.getDeltaMovement();
 
         info("%.1f b/s | %.1f b/s vertical | Y %.0f | pitch %.0f | %s%s | %s, %d catch-up ticks paced",
-            velocity.horizontalLength() * 20.0, velocity.y * 20.0, this.mc.player.getY(),
-            this.mc.player.getPitch(), flightState(),
+            velocity.horizontalDistance() * 20.0, velocity.y * 20.0, this.mc.player.getY(),
+            this.mc.player.getXRot(), flightState(),
             this.chestSwap.get() && this.glideSwap.isEngaged()
                 ? " | chest swap " + this.glideSwap.stats()
                 : "",

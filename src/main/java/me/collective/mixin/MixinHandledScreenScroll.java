@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * - Ведение с клавишей Q (быстрый выброс предметов)
  * - Прокрутка колесом мыши (вниз — отдать, вверх — забрать)
  */
-@Mixin(HandledScreen.class)
+@Mixin(AbstractContainerScreen.class)
 public abstract class MixinHandledScreenScroll {
 
     @Shadow
@@ -26,9 +26,9 @@ public abstract class MixinHandledScreenScroll {
     @Shadow
     protected int y;
 
-    private Slot getSlotUnderMouse(HandledScreen<?> screen, double mouseX, double mouseY) {
-        if (screen == null || screen.getScreenHandler() == null) return null;
-        for (Slot slot : screen.getScreenHandler().slots) {
+    private Slot getSlotUnderMouse(AbstractContainerScreen<?> screen, double mouseX, double mouseY) {
+        if (screen == null || screen.getMenu() == null) return null;
+        for (Slot slot : screen.getMenu().slots) {
             double slotX = this.x + slot.x;
             double slotY = this.y + slot.y;
             if (mouseX >= slotX && mouseX < slotX + 16.0 && mouseY >= slotY && mouseY < slotY + 16.0) {
@@ -43,7 +43,7 @@ public abstract class MixinHandledScreenScroll {
         ItemScroller module = ItemScroller.INSTANCE;
         if (module == null || !module.isToggled()) return;
 
-        HandledScreen<?> screen = (HandledScreen<?>) (Object) this;
+        AbstractContainerScreen<?> screen = (AbstractContainerScreen<?>) (Object) this;
         Slot hovered = getSlotUnderMouse(screen, mouseX, mouseY);
         if (hovered == null) return;
 
@@ -54,11 +54,11 @@ public abstract class MixinHandledScreenScroll {
     }
 
     @Inject(method = "mouseDragged", at = @At("HEAD"), cancellable = true)
-    private void onMouseDragged(Click click, double offsetX, double offsetY, CallbackInfoReturnable<Boolean> info) {
+    private void onMouseDragged(net.minecraft.client.input.MouseButtonEvent click, double offsetX, double offsetY, CallbackInfoReturnable<Boolean> info) {
         ItemScroller module = ItemScroller.INSTANCE;
         if (module == null || !module.isToggled()) return;
 
-        HandledScreen<?> screen = (HandledScreen<?>) (Object) this;
+        AbstractContainerScreen<?> screen = (AbstractContainerScreen<?>) (Object) this;
         Slot hovered = getSlotUnderMouse(screen, click.x(), click.y());
         if (module.onMouseDrag(screen, hovered, click)) {
             info.setReturnValue(true);
@@ -67,11 +67,11 @@ public abstract class MixinHandledScreenScroll {
     }
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
-    private void onMouseClicked(Click click, boolean bl, CallbackInfoReturnable<Boolean> info) {
+    private void onMouseClicked(net.minecraft.client.input.MouseButtonEvent click, boolean bl, CallbackInfoReturnable<Boolean> info) {
         ItemScroller module = ItemScroller.INSTANCE;
         if (module == null || !module.isToggled()) return;
 
-        HandledScreen<?> screen = (HandledScreen<?>) (Object) this;
+        AbstractContainerScreen<?> screen = (AbstractContainerScreen<?>) (Object) this;
         Slot hovered = getSlotUnderMouse(screen, click.x(), click.y());
         if (hovered != null && module.onMouseClick(screen, hovered, click)) {
             info.setReturnValue(true);
@@ -80,7 +80,7 @@ public abstract class MixinHandledScreenScroll {
     }
 
     @Inject(method = "mouseReleased", at = @At("HEAD"))
-    private void onMouseReleased(Click click, CallbackInfoReturnable<Boolean> info) {
+    private void onMouseReleased(net.minecraft.client.input.MouseButtonEvent click, CallbackInfoReturnable<Boolean> info) {
         ItemScroller module = ItemScroller.INSTANCE;
         if (module != null) {
             module.onMouseRelease(click.button());

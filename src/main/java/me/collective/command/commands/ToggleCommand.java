@@ -16,13 +16,13 @@ public class ToggleCommand extends Command {
     @Override
     public void execute(String[] args) {
         if (args.length < 1) {
-            ChatHelper.sendMessage(Component.literal("Usage: " + getSyntax()).styled(s -> s.withColor(ChatFormatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Usage: " + getSyntax()).withStyle(s -> s.withColor(ChatFormatting.RED)));
             return;
         }
 
         Module mod = ModuleManager.INSTANCE.getModule(args[0]);
         if (mod == null) {
-            ChatHelper.sendMessage(Component.literal("Module not found: " + args[0]).styled(s -> s.withColor(ChatFormatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Module not found: " + args[0]).withStyle(s -> s.withColor(ChatFormatting.RED)));
             return;
         }
 
@@ -33,10 +33,10 @@ public class ToggleCommand extends Command {
             mod.toggle();
         }
 
-        MutableText msg = Component.literal("Module ").styled(s -> s.withColor(ChatFormatting.GRAY))
-            .append(Component.literal(mod.getName()).styled(s -> s.withColor(ChatHelper.getPrimaryTextColor())))
-            .append(Component.literal(" is now ").styled(s -> s.withColor(ChatFormatting.GRAY)))
-            .append(Component.literal(mod.isToggled() ? "enabled" : "disabled").styled(s -> s.withColor(mod.isToggled() ? ChatFormatting.GREEN : ChatFormatting.RED)));
+        MutableComponent msg = Component.literal("Module ").withStyle(s -> s.withColor(ChatFormatting.GRAY))
+            .append(Component.literal(mod.getName()).withStyle(s -> s.withColor(ChatHelper.getPrimaryTextColor())))
+            .append(Component.literal(" is now ").withStyle(s -> s.withColor(ChatFormatting.GRAY)))
+            .append(Component.literal(mod.isToggled() ? "enabled" : "disabled").withStyle(s -> s.withColor(mod.isToggled() ? ChatFormatting.GREEN : ChatFormatting.RED)));
 
         ChatHelper.sendMessage(msg);
     }

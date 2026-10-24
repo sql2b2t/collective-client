@@ -12,6 +12,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.item.Items;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.core.Direction;
 
 import java.util.ArrayList;
@@ -39,7 +40,7 @@ public class HoleFiller extends Module {
 
     @Override
     public void onUpdate() {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
         if (delayTimer > 0) {
             delayTimer--;
             return;
@@ -50,7 +51,7 @@ public class HoleFiller extends Module {
             : InventoryUtil.findInHotbarOrOffhand(Items.OBSIDIAN, Items.CRYING_OBSIDIAN, Items.NETHERITE_BLOCK);
         if (!mat.found()) return;
 
-        BlockPos self = mc.player.getBlockPos();
+        BlockPos self = mc.player.blockPosition();
         int r = range.getIntValue();
 
         // Собираем дыры, сортируем по близости: сначала закрываем то,
@@ -59,15 +60,15 @@ public class HoleFiller extends Module {
         for (int x = -r; x <= r; x++) {
             for (int z = -r; z <= r; z++) {
                 for (int y = -2; y <= 1; y++) {
-                    BlockPos pos = self.add(x, y, z);
-                    if (pos.equals(self) || pos.equals(self.up(1))) continue;
-                    if (isHole(pos)) holes.add(pos.toImmutable());
+                    BlockPos pos = self.offset(x, y, z);
+                    if (pos.equals(self) || pos.equals(self.above(1))) continue;
+                    if (isHole(pos)) holes.add(pos.immutable());
                 }
             }
         }
 
         holes.sort(Comparator.comparingDouble(
-            p -> mc.player.squaredDistanceTo(p.toCenterPos())));
+            p -> mc.player.distanceToSqr(Vec3.atCenterOf(p))));
 
         int placed = 0;
         for (BlockPos pos : holes) {
@@ -85,7 +86,7 @@ public class HoleFiller extends Module {
     /** Дыру, внутри которой уже кто-то стоит, не заливаем — блоки тратить зря. */
     private boolean isOccupedByEntity(BlockPos pos) {
         AABB box = new AABB(pos);
-        for (net.minecraft.entity.Entity entity : mc.world.getEntities()) {
+        for (net.minecraft.world.entity.Entity entity : mc.level.entitiesForRendering()) {
             if (entity == mc.player) continue;
             if (entity.getBoundingBox().intersects(box)) return true;
         }
@@ -93,24 +94,24 @@ public class HoleFiller extends Module {
     }
 
     private boolean isHole(BlockPos pos) {
-        if (!mc.world.getBlockState(pos).isAir()) return false;
-        if (!mc.world.getBlockState(pos.up(1)).isAir()) return false;
-        if (!isSolid(pos.down())) return false;
-        for (Direction dir : Direction.Type.HORIZONTAL) {
-            BlockPos side = pos.offset(dir);
+        if (!mc.level.getBlockState(pos).isAir()) return false;
+        if (!mc.level.getBlockState(pos.above(1)).isAir()) return false;
+        if (!isSolid(pos.below())) return false;
+        for (Direction dir : Direction.Plane.HORIZONTAL) {
+            BlockPos side = pos.relative(dir);
             if (!isSolid(side)) {
                 if (!doubles.getValue()) return false;
                 // Двойная: второй блок тоже должен быть дырой
-                if (!mc.world.getBlockState(side).isAir()
-                    || !mc.world.getBlockState(side.up(1)).isAir()
-                    || !isSolid(side.down())) return false;
+                if (!mc.level.getBlockState(side).isAir()
+                    || !mc.level.getBlockState(side.above(1)).isAir()
+                    || !isSolid(side.below())) return false;
             }
         }
         return true;
     }
 
     private boolean isSolid(BlockPos pos) {
-        BlockState state = mc.world.getBlockState(pos);
-        return !state.isAir() && state.isSolidBlock(mc.world, pos);
+        BlockState state = mc.level.getBlockState(pos);
+        return !state.isAir() && state.isSolid();
     }
 }

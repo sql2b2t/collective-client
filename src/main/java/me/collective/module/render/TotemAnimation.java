@@ -23,7 +23,7 @@ public class TotemAnimation extends Module {
     public final EnumSetting<Mode> mode = add(new EnumSetting<>("Режим", Mode.FadeOut));
     public final NumberSetting speed = add(new NumberSetting("Скорость", 40.0, 1.0, 100.0, 1.0));
 
-    private final ItemRenderState itemRenderState = new ItemRenderState();
+    private final ItemStackRenderState itemRenderState = new ItemStackRenderState();
 
     public TotemAnimation() {
         super("TotemAnimation", "Кастомная плавная анимация тотема бессмертия при срабатывании", Category.RENDER);
@@ -34,94 +34,82 @@ public class TotemAnimation extends Module {
         // Track item activation
     }
 
-    public boolean renderCustomAnimation(PoseStack matrices, float tickDelta, OrderedRenderCommandQueue renderCommands, ItemStack floatingItem, int floatingItemTimer) {
+    public boolean renderCustomAnimation(PoseStack matrices, float tickDelta, SubmitNodeCollector renderCommands, ItemStack floatingItem, int floatingItemTimer) {
         if (!isToggled() || mode.getValue() == Mode.Off) return false;
         if (floatingItem == null || floatingItemTimer <= 0) return false;
 
         int totalTicks = getTime();
         int elapsed = totalTicks - floatingItemTimer;
-        float progress = MathHelper.clamp(((float) elapsed + tickDelta) / (float) totalTicks, 0.0f, 1.0f);
+        float progress = Mth.clamp(((float) elapsed + tickDelta) / (float) totalTicks, 0.0f, 1.0f);
 
         float p2 = progress * progress;
         float p3 = progress * p2;
         float oscillation = 10.25F * p3 * p2 - 24.95F * p2 * p2 + 25.5F * p3 - 13.8F * p2 + 4.0F * progress;
         float oscRad = oscillation * (float) Math.PI;
 
-        int sw = mc.getWindow().getScaledWidth();
-        int sh = mc.getWindow().getScaledHeight();
+        int sw = mc.getWindow().getGuiScaledWidth();
+        int sh = mc.getWindow().getGuiScaledHeight();
 
-        matrices.push();
+        matrices.pushPose();
         try {
             float adj = (float) elapsed + tickDelta;
-        float baseScale = 0.5f + 1.75f * MathHelper.sin(oscRad);
+            float baseScale = 0.5f + 1.75f * Mth.sin(oscRad);
 
-        switch (mode.getValue()) {
-            case FadeOut -> {
-                float x2 = (float) (Math.sin((adj * 112.0f) / 180.0f) * 1.5f);
-                float y2 = (float) (Math.cos((adj * 112.0f) / 180.0f) * 0.8f);
-                matrices.translate(x2, y2, -1.0f);
-                matrices.scale(baseScale, baseScale, baseScale);
+            switch (mode.getValue()) {
+                case FadeOut -> {
+                    float x2 = (float) (Math.sin((adj * 112.0f) / 180.0f) * 1.5f);
+                    float y2 = (float) (Math.cos((adj * 112.0f) / 180.0f) * 1.5f);
+                    matrices.translate((sw / 2.0f) + x2, (sh / 2.0f) + y2, -50.0f);
+                    matrices.scale(baseScale * 50.0f, -baseScale * 50.0f, baseScale * 50.0f);
+                }
+                case Size -> {
+                    matrices.translate(sw / 2.0f, sh / 2.0f, -50.0f);
+                    float s = Math.max(0.01f, 1.0f - progress);
+                    matrices.scale(s * 50.0f, -s * 50.0f, s * 50.0f);
+                }
+                case Otkisuli -> {
+                    matrices.translate(sw / 2.0f, sh / 2.0f, -50.0f);
+                    matrices.scale(baseScale * 50.0f, -baseScale * 50.0f, baseScale * 50.0f);
+                    matrices.rotate(Axis.ZP.rotationDegrees(adj * 8.0f));
+                }
+                case Insert -> {
+                    matrices.translate(sw / 2.0f, (sh / 2.0f) - (progress * 80.0f), -50.0f);
+                    matrices.scale(baseScale * 50.0f, -baseScale * 50.0f, baseScale * 50.0f);
+                }
+                case Fall -> {
+                    matrices.translate(sw / 2.0f, (sh / 2.0f) + (progress * 120.0f), -50.0f);
+                    matrices.scale(baseScale * 50.0f, -baseScale * 50.0f, baseScale * 50.0f);
+                }
+                case Rocket -> {
+                    matrices.translate(sw / 2.0f, (sh / 2.0f) - (progress * 200.0f), -50.0f);
+                    matrices.scale(baseScale * 50.0f, -baseScale * 50.0f, baseScale * 50.0f);
+                }
+                case Roll -> {
+                    matrices.translate(sw / 2.0f, sh / 2.0f, -50.0f);
+                    matrices.rotate(Axis.YP.rotationDegrees(adj * 18.0f));
+                    float sc = Math.max(0.1f, 2.0f - adj * 0.04f);
+                    matrices.scale(sc, sc, sc);
+                }
+                case Off -> {}
             }
-            case Size -> {
-                matrices.translate(0.0f, 0.0f, -1.0f);
-                matrices.scale(baseScale, baseScale, baseScale);
-            }
-            case Otkisuli -> {
-                matrices.translate(0.0f, 0.0f, -1.0f);
-                matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(adj * 8.0f));
-                matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(adj * 8.0f));
-                float sc = Math.max(0.1f, 2.0f - adj * 0.04f);
-                matrices.scale(sc, sc, sc);
-            }
-            case Insert -> {
-                matrices.translate(0.0f, 0.0f, -1.0f);
-                matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(adj * 12.0f));
-                float sc = Math.max(0.1f, 2.0f - adj * 0.04f);
-                matrices.scale(sc, sc, sc);
-            }
-            case Fall -> {
-                float down = (float) (Math.pow(adj * 0.05f, 3) * 0.5f);
-                matrices.translate(0.0f, -down, -1.0f);
-                matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(adj * 15.0f));
-                float sc = Math.max(0.1f, 2.0f - adj * 0.04f);
-                matrices.scale(sc, sc, sc);
-            }
-            case Rocket -> {
-                float up = (float) (Math.pow(adj * 0.05f, 3) * 0.5f);
-                matrices.translate(0.0f, up, -1.0f);
-                matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(adj * floatingItemTimer * 2.0f));
-                float sc = Math.max(0.1f, 2.0f - adj * 0.04f);
-                matrices.scale(sc, sc, sc);
-            }
-            case Roll -> {
-                float right = (float) (Math.pow(adj * 0.05f, 2) * 1.5f);
-                matrices.translate(right, 0.0f, -1.0f);
-                matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(adj * 40.0f));
-                float sc = Math.max(0.1f, 2.0f - adj * 0.04f);
-                matrices.scale(sc, sc, sc);
-            }
-            case Off -> {}
-        }
 
-        mc.getItemModelManager().clearAndUpdate(
-                itemRenderState,
-                floatingItem,
-                ItemDisplayContext.FIXED,
-                mc.world,
-                null,
-                0
-        );
+            mc.getItemModelResolver().updateForNonLiving(
+                    itemRenderState,
+                    floatingItem,
+                    ItemDisplayContext.FIXED,
+                    null
+            );
 
-        itemRenderState.render(
-                matrices,
-                renderCommands,
-                15728880,
-                OverlayTexture.DEFAULT_UV,
-                0
-        );
+            itemRenderState.submit(
+                    matrices,
+                    renderCommands,
+                    15728880,
+                    OverlayTexture.NO_OVERLAY,
+                    0
+            );
 
         } finally {
-            matrices.pop();
+            matrices.popPose();
         }
         return true;
     }

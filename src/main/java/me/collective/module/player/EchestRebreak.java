@@ -18,7 +18,7 @@ import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.core.Holder;
@@ -226,10 +226,10 @@ public class EchestRebreak extends Module {
 
     @EventHandler
     private void onTickPre(TickEvent.Pre event) {
-        if (this.mc.player == null || this.mc.world == null || this.mc.getNetworkHandler() == null) return;
+        if (this.mc.player == null || this.mc.level == null || this.mc.getConnection() == null) return;
         // Player-inventory indices are only valid in the player's own handler.
-        if (this.mc.player.currentScreenHandler != this.mc.player.playerScreenHandler
-            || !this.mc.player.currentScreenHandler.getCursorStack().isEmpty()) {
+        if (this.mc.player.containerMenu != this.mc.player.inventoryMenu
+            || !this.mc.player.containerMenu.getCarried().isEmpty()) {
             this.pendingPlaceHit = null;
             RotationUtils.getInstance().clearRotations(this);
             return;
@@ -257,7 +257,7 @@ public class EchestRebreak extends Module {
         }
 
         // Проверка досягаемости
-        if (GrimUtils.closestEyeDistanceSqTo(this.mc.player, this.targetPos.toCenterPos()) > REACH_SQ) {
+        if (GrimUtils.closestEyeDistanceSqTo(this.mc.player, Vec3.atCenterOf(this.targetPos)) > REACH_SQ) {
             RotationUtils.getInstance().clearRotations(this);
             this.pendingPlaceHit = null;
             return;
@@ -271,9 +271,9 @@ public class EchestRebreak extends Module {
             return;
         }
 
-        BlockState state = this.mc.world.getBlockState(this.targetPos);
+        BlockState state = this.mc.level.getBlockState(this.targetPos);
 
-        if (state.isAir() || state.isReplaceable()) {
+        if (state.isAir() || state.canBeReplaced()) {
             // Сундука нет — если только что поставили, ждём подтверждения от сервера
             if (this.placedWaitTimer > 0) {
                 return;
@@ -282,7 +282,7 @@ public class EchestRebreak extends Module {
             this.initialMiningStarted = false;
             this.breakingProgress = 0.0f;
             preparePlaceEchest();
-        } else if (state.isOf(Blocks.ENDER_CHEST)) {
+        } else if (state.is(Blocks.ENDER_CHEST)) {
             // Эндер-сундук на месте — ломаем
             this.placedWaitTimer = 0;
             this.pendingPlaceHit = null;
@@ -310,8 +310,8 @@ public class EchestRebreak extends Module {
 
         this.pendingPlaceHit = hit;
 
-        Vec3 eye = this.mc.player.getEyePos();
-        float[] rot = RotationUtils.getRotationsTo(eye, hit.getPos());
+        Vec3 eye = this.mc.player.getEyePosition();
+        float[] rot = RotationUtils.getRotationsTo(eye, hit.getLocation());
 
         RotationUtils rotUtils = RotationUtils.getInstance();
         rotUtils.setRotationFull(this, ROTATION_PRIORITY, rot[0], rot[1], this.turnSpeed.get());
@@ -340,8 +340,8 @@ public class EchestRebreak extends Module {
         }
 
         int seq = GrimUtils.nextSequence();
-        this.mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(InteractionHand.MAIN_HAND, hit, seq));
-        this.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
+        this.mc.getConnection().send(new ServerboundUseItemOnPacket(InteractionHand.MAIN_HAND, hit, seq));
+        this.mc.getConnection().send(ServerboundPunchPacket.INSTANCE);
 
         this.placedWaitTimer = 10;
         this.actionTimer = this.placeDelay.get();
@@ -371,8 +371,8 @@ public class EchestRebreak extends Module {
             return;
         }
 
-        Vec3 center = this.targetPos.toCenterPos();
-        Vec3 eye = this.mc.player.getEyePos();
+        Vec3 center = Vec3.atCenterOf(this.targetPos);
+        Vec3 eye = this.mc.player.getEyePosition();
         float[] rot = RotationUtils.getRotationsTo(eye, center);
         RotationUtils.getInstance().setRotationSilentDirect(this, ROTATION_PRIORITY, rot[0], rot[1], this.turnSpeed.get());
 
@@ -382,8 +382,8 @@ public class EchestRebreak extends Module {
             // Rebreak через STOP_DESTROY_BLOCK
             sendSwing();
             int seq = GrimUtils.nextSequence();
-            this.mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
-                PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK, this.targetPos, Direction.UP, seq));
+            this.mc.getConnection().send(new ServerboundPlayerActionPacket(
+                ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK, this.targetPos, Direction.UP, seq));
 
             this.staleTicks++;
             if (this.staleTicks > 10) {
@@ -398,20 +398,20 @@ public class EchestRebreak extends Module {
             // Первое легитное разрушение (Priming)
             if (!this.initialMiningStarted) {
                 int seq = GrimUtils.nextSequence();
-                this.mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
-                    PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, this.targetPos, Direction.UP, seq));
+                this.mc.getConnection().send(new ServerboundPlayerActionPacket(
+                    ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, this.targetPos, Direction.UP, seq));
                 sendSwing();
                 this.initialMiningStarted = true;
                 this.breakingProgress = 0.0f;
             } else {
                 sendSwing();
-                float delta = state.calcBlockBreakingDelta(this.mc.player, this.mc.world, this.targetPos);
+                float delta = state.getDestroyProgress(this.mc.player, this.mc.level, this.targetPos);
                 this.breakingProgress += delta;
 
                 if (this.breakingProgress >= 1.0f) {
                     int seq = GrimUtils.nextSequence();
-                    this.mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
-                        PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK, this.targetPos, Direction.UP, seq));
+                    this.mc.getConnection().send(new ServerboundPlayerActionPacket(
+                        ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK, this.targetPos, Direction.UP, seq));
                     this.rebreakPrimed = true;
                     this.initialMiningStarted = false;
                     this.breakingProgress = 0.0f;
@@ -422,17 +422,17 @@ public class EchestRebreak extends Module {
     }
 
     private BlockHitResult findBestSupportHit(BlockPos placePos) {
-        if (this.mc.player == null || this.mc.world == null) return null;
+        if (this.mc.player == null || this.mc.level == null) return null;
 
-        Vec3 eye = this.mc.player.getEyePos();
+        Vec3 eye = this.mc.player.getEyePosition();
         BlockHitResult best = null;
         double bestDist = Double.MAX_VALUE;
 
         for (Direction dir : Direction.values()) {
-            BlockPos neighbor = placePos.offset(dir);
-            BlockState state = this.mc.world.getBlockState(neighbor);
+            BlockPos neighbor = placePos.relative(dir);
+            BlockState state = this.mc.level.getBlockState(neighbor);
 
-            if (state.isReplaceable() || state.getCollisionShape(this.mc.world, neighbor).isEmpty()) {
+            if (state.canBeReplaced() || state.getCollisionShape(this.mc.level, neighbor).isEmpty()) {
                 continue;
             }
 
@@ -443,17 +443,17 @@ public class EchestRebreak extends Module {
 
             Vec3 sample = getFaceSamplePoint(neighbor, clickFace, eye);
             Vec3 dirVec = sample.subtract(eye);
-            if (dirVec.lengthSquared() < 1.0E-6) continue;
+            if (dirVec.lengthSqr() < 1.0E-6) continue;
 
-            Vec3 end = eye.add(dirVec.normalize().multiply(REACH + 0.1));
-            BlockHitResult clip = this.mc.world.raycast(new RaycastContext(
-                eye, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, this.mc.player
+            Vec3 end = eye.add(dirVec.normalize().scale(REACH + 0.1));
+            BlockHitResult clip = this.mc.level.clip(new ClipContext(
+                eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this.mc.player
             ));
 
             if (clip.getType() == HitResult.Type.BLOCK
                 && clip.getBlockPos().equals(neighbor)
-                && clip.getSide() == clickFace) {
-                double d = eye.squaredDistanceTo(clip.getPos());
+                && clip.getDirection() == clickFace) {
+                double d = eye.distanceToSqr(clip.getLocation());
                 if (d <= REACH_SQ && d < bestDist) {
                     bestDist = d;
                     best = clip;
@@ -465,22 +465,22 @@ public class EchestRebreak extends Module {
     }
 
     private BlockHitResult confirmSentRaycast(BlockHitResult expected) {
-        if (this.mc.player == null || this.mc.world == null) return null;
+        if (this.mc.player == null || this.mc.level == null) return null;
 
         RotationUtils rotUtils = RotationUtils.getInstance();
-        Vec3 eye = this.mc.player.getEyePos();
+        Vec3 eye = this.mc.player.getEyePosition();
         float yaw = rotUtils.getSentYaw();
         float pitch = rotUtils.getSentPitch();
 
         Vec3 look = RotationUtils.getRotationVector(pitch, yaw);
-        Vec3 end = eye.add(look.multiply(REACH + 0.1));
-        BlockHitResult clip = this.mc.world.raycast(new RaycastContext(
-            eye, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, this.mc.player
+        Vec3 end = eye.add(look.scale(REACH + 0.1));
+        BlockHitResult clip = this.mc.level.clip(new ClipContext(
+            eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this.mc.player
         ));
 
         if (clip.getType() == HitResult.Type.BLOCK
             && clip.getBlockPos().equals(expected.getBlockPos())
-            && eye.squaredDistanceTo(clip.getPos()) <= REACH_SQ) {
+            && eye.distanceToSqr(clip.getLocation()) <= REACH_SQ) {
             return clip;
         }
 
@@ -514,22 +514,22 @@ public class EchestRebreak extends Module {
     }
 
     private void sendSwing() {
-        if (this.mc.getNetworkHandler() != null) {
-            this.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
+        if (this.mc.getConnection() != null) {
+            this.mc.getConnection().send(ServerboundPunchPacket.INSTANCE);
         }
     }
 
     private FindItemResult findEnderChest() {
-        FindItemResult hotbar = InvUtils.find(stack -> stack.isOf(Items.ENDER_CHEST), 0, 8);
+        FindItemResult hotbar = InvUtils.find(stack -> stack.is(Items.ENDER_CHEST), 0, 8);
         if (hotbar.found()) return hotbar;
 
         if (this.replenish.get()
-            && this.mc.player.currentScreenHandler == this.mc.player.playerScreenHandler
-            && this.mc.player.currentScreenHandler.getCursorStack().isEmpty()) {
+            && this.mc.player.containerMenu == this.mc.player.inventoryMenu
+            && this.mc.player.containerMenu.getCarried().isEmpty()) {
             FindItemResult inv = InvUtils.find(Items.ENDER_CHEST);
             if (inv.found() && inv.slot() >= 9 && inv.slot() < 36) {
-                InvUtils.move().from(inv.slot()).toHotbar(this.mc.player.getInventory().selectedSlot);
-                return InvUtils.find(stack -> stack.isOf(Items.ENDER_CHEST), 0, 8);
+                InvUtils.move().from(inv.slot()).toHotbar(this.mc.player.getInventory().getSelectedSlot());
+                return InvUtils.find(stack -> stack.is(Items.ENDER_CHEST), 0, 8);
             }
         }
 
@@ -538,17 +538,17 @@ public class EchestRebreak extends Module {
 
     private FindItemResult findPickaxe() {
         if (this.preferNoSilk.get()) {
-            FindItemResult noSilk = InvUtils.find(stack -> stack.isIn(ItemTags.PICKAXES) && !hasSilkTouch(stack), 0, 8);
+            FindItemResult noSilk = InvUtils.find(stack -> stack.is(ItemTags.PICKAXES) && !hasSilkTouch(stack), 0, 8);
             if (noSilk.found()) return noSilk;
         }
 
-        return InvUtils.find(stack -> stack.isIn(ItemTags.PICKAXES), 0, 8);
+        return InvUtils.find(stack -> stack.is(ItemTags.PICKAXES), 0, 8);
     }
 
     private boolean hasSilkTouch(ItemStack stack) {
-        ItemEnchantmentsComponent enchants = stack.getEnchantments();
-        for (RegistryEntry<Enchantment> entry : enchants.getEnchantments()) {
-            if (entry.matchesKey(Enchantments.SILK_TOUCH)) {
+        ItemEnchantments enchants = stack.getEnchantments();
+        for (net.minecraft.core.Holder<Enchantment> entry : enchants.keySet()) {
+            if (entry.is(Enchantments.SILK_TOUCH)) {
                 return true;
             }
         }
@@ -556,17 +556,17 @@ public class EchestRebreak extends Module {
     }
 
     private BlockPos determineAutoPosition() {
-        if (this.mc.player == null || this.mc.world == null) return null;
+        if (this.mc.player == null || this.mc.level == null) return null;
 
-        Direction facing = this.mc.player.getHorizontalFacing();
-        BlockPos front = this.mc.player.getBlockPos().offset(facing);
+        Direction facing = this.mc.player.getDirection();
+        BlockPos front = this.mc.player.blockPosition().relative(facing);
 
-        if (this.mc.world.getBlockState(front).isOf(Blocks.ENDER_CHEST) || this.mc.world.getBlockState(front).isReplaceable()) {
+        if (this.mc.level.getBlockState(front).is(Blocks.ENDER_CHEST) || this.mc.level.getBlockState(front).canBeReplaced()) {
             return front;
         }
 
-        BlockPos down = this.mc.player.getBlockPos().down();
-        if (this.mc.world.getBlockState(down).isOf(Blocks.ENDER_CHEST) || this.mc.world.getBlockState(down).isReplaceable()) {
+        BlockPos down = this.mc.player.blockPosition().below();
+        if (this.mc.level.getBlockState(down).is(Blocks.ENDER_CHEST) || this.mc.level.getBlockState(down).canBeReplaced()) {
             return down;
         }
 

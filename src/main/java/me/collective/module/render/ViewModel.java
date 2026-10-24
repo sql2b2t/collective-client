@@ -84,8 +84,8 @@ public class ViewModel extends Module {
 
         event.getMatrices().translate(px, py, pz);
         event.getMatrices().scale(sc, sc, sc);
-        if (rx != 0.0f) event.getMatrices().multiply(RotationAxis.POSITIVE_X.rotationDegrees(rx));
-        if (ry != 0.0f) event.getMatrices().multiply(RotationAxis.POSITIVE_Y.rotationDegrees(ry));
-        if (rz != 0.0f) event.getMatrices().multiply(RotationAxis.POSITIVE_Z.rotationDegrees(rz));
+        if (rx != 0.0f) event.getMatrices().rotate(Axis.XP.rotationDegrees(rx));
+        if (ry != 0.0f) event.getMatrices().rotate(Axis.YP.rotationDegrees(ry));
+        if (rz != 0.0f) event.getMatrices().rotate(Axis.ZP.rotationDegrees(rz));
     }
 }

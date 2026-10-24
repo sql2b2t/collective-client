@@ -55,7 +55,7 @@ import net.minecraft.world.phys.shapes.CollisionContext;
  * (AirPlaceExecutor). При отсутствии решения/материала цель уходит в кулдаун.
  *
  * 1.21.11 (Yarn): isAutoSpinAttack -> isUsingRiptide, isPassenger -> hasVehicle,
- * keyJump.isDown -> options.jumpKey.isPressed(), BlockState.contains/get,
+ * keyJump.isDown -> options.keyJump.isDown(), BlockState.contains/get,
  * CollisionView.canPlace(state, pos, ShapeContext), MultifaceBlock.getProperty(Direction).
  */
 public class LitematicaPrinter extends Module {
@@ -92,13 +92,13 @@ public class LitematicaPrinter extends Module {
     private static final int T_GONE = 2;
 
     /** Свойства-«счётчики» (слои, свечи и т.п.), по которым блок можно досыпать в уже стоящий. */
-    private static final IntProperty[] COUNT_PROPERTIES = new IntProperty[]{
-        Properties.LAYERS,
-        Properties.CANDLES,
-        Properties.PICKLES,
-        Properties.EGGS,
-        Properties.FLOWER_AMOUNT,
-        Properties.SEGMENT_AMOUNT
+    private static final net.minecraft.world.level.block.state.properties.IntegerProperty[] COUNT_PROPERTIES = new net.minecraft.world.level.block.state.properties.IntegerProperty[]{
+        net.minecraft.world.level.block.state.properties.BlockStateProperties.LAYERS,
+        net.minecraft.world.level.block.state.properties.BlockStateProperties.CANDLES,
+        net.minecraft.world.level.block.state.properties.BlockStateProperties.PICKLES,
+        net.minecraft.world.level.block.state.properties.BlockStateProperties.EGGS,
+        net.minecraft.world.level.block.state.properties.BlockStateProperties.FLOWER_AMOUNT,
+        net.minecraft.world.level.block.state.properties.BlockStateProperties.SEGMENT_AMOUNT
     };
 
     private Phase phase;
@@ -335,7 +335,7 @@ public class LitematicaPrinter extends Module {
 
     @EventHandler
     private void onTickPre(TickEvent.Pre event) {
-        if (this.mc.player == null || this.mc.world == null) {
+        if (this.mc.player == null || this.mc.level == null) {
             return;
         }
         if (!LITEMATICA) {
@@ -438,7 +438,7 @@ public class LitematicaPrinter extends Module {
                 break;
             case HOLD:
                 if (!this.solution.anyRotation() && this.solution.latticeK() == null) {
-                    float[] rot = RotationUtils.getRotationsTo(this.mc.player.getEyePos(), this.solution.hit().getPos());
+                    float[] rot = RotationUtils.getRotationsTo(this.mc.player.getEyePosition(), this.solution.hit().getLocation());
                     this.solution = new PlacementSolver.Solution(
                         this.solution.hit(), this.solution.hand(), rot[0], rot[1], this.solution.predicted(), null, false
                     );
@@ -463,26 +463,26 @@ public class LitematicaPrinter extends Module {
     }
 
     private boolean rotationUnsafe() {
-        if (this.mc.player.isGliding() || this.mc.player.isSwimming() || this.mc.player.isUsingRiptide() || this.mc.player.hasVehicle()) {
+        if (this.mc.player.isFallFlying() || this.mc.player.isSwimming() || this.mc.player.isAutoSpinAttack() || this.mc.player.isPassenger()) {
             return true;
         }
         // Спрыг-прыжок: ротацию в этот момент ставить опасно.
-        if (this.mc.player.isSprinting() && this.mc.player.isOnGround() && this.mc.options.jumpKey.isPressed()) {
+        if (this.mc.player.isSprinting() && this.mc.player.onGround() && this.mc.options.keyJump.isDown()) {
             return true;
         }
         return this.onMove.get() == OnMove.Pause && this.hasMovementInput();
     }
 
     private boolean hasMovementInput() {
-        if (this.mc.options.forwardKey.isPressed()
-            || this.mc.options.backKey.isPressed()
-            || this.mc.options.leftKey.isPressed()
-            || this.mc.options.rightKey.isPressed()) {
+        if (this.mc.options.keyUp.isDown()
+            || this.mc.options.keyDown.isDown()
+            || this.mc.options.keyLeft.isDown()
+            || this.mc.options.keyRight.isDown()) {
             return true;
         }
         // 1.21.11: player.input теперь Input; оверрайд движения идёт через InputAccessor (модульный миксин).
         if (this.mc.player != null && this.mc.player.input != null) {
-            net.minecraft.util.math.Vec2f move = this.mc.player.input.getMovementInput();
+            net.minecraft.world.phys.Vec2 move = this.mc.player.input.getMoveVector();
             return Math.abs(move.x) > 1.0E-4f || Math.abs(move.y) > 1.0E-4f;
         }
         return false;
@@ -521,11 +521,11 @@ public class LitematicaPrinter extends Module {
                     cd = Math.max(cd, 20);
                 }
             } else {
-                this.lastAbandoned = this.target.toImmutable();
+                this.lastAbandoned = this.target.immutable();
                 this.repeatAbandons = 1;
             }
             if (cd > 0) {
-                this.cooldown.put(this.target.toImmutable(), this.tick + cd);
+                this.cooldown.put(this.target.immutable(), this.tick + cd);
             }
             this.debug("abandon " + this.target.toShortString() + ": " + reason + (cd > 0 ? " (retry in " + cd + "t)" : ""));
         }
@@ -543,7 +543,7 @@ public class LitematicaPrinter extends Module {
 
     @EventHandler
     private void onTickPost(TickEvent.Post event) {
-        if (this.mc.player == null || this.mc.world == null || this.solution == null || this.target == null) {
+        if (this.mc.player == null || this.mc.level == null || this.solution == null || this.target == null) {
             return;
         }
         if (this.phase == Phase.ALIGN) {
@@ -608,7 +608,7 @@ public class LitematicaPrinter extends Module {
         this.repeatAbandons = 0;
         this.lastProgressTick = this.tick;
         this.consecutiveResets = 0;
-        this.cooldown.put(this.target.toImmutable(), this.tick + this.replaceCooldown.get());
+        this.cooldown.put(this.target.immutable(), this.tick + this.replaceCooldown.get());
         this.preview.remove(this.target);
         this.finishTarget();
     }
@@ -694,13 +694,13 @@ public class LitematicaPrinter extends Module {
             tally[T_GONE]++;
             return null;
         }
-        if (!this.mc.world.canPlace(ts, c, ShapeContext.absent())) {
+        if (!this.mc.level.isUnobstructed(ts, c, CollisionContext.empty())) {
             this.cooldown.put(c, this.tick + 10L);
             tally[T_OBSTRUCTED]++;
             return null;
         }
-        BlockState ws = this.mc.world.getBlockState(c);
-        if (!ws.isReplaceable() && !LitematicaPrinter.isMergeCandidate(ws, ts)) {
+        BlockState ws = this.mc.level.getBlockState(c);
+        if (!ws.canBeReplaced() && !LitematicaPrinter.isMergeCandidate(ws, ts)) {
             this.cooldown.put(c, this.tick + 10L);
             tally[T_GONE]++;
             return null;
@@ -749,18 +749,18 @@ public class LitematicaPrinter extends Module {
         if (required != null && !required.isEmpty() && InvUtils.findInHotbar(required.getItem()).found()) {
             return;
         }
-        this.info("Missing material in hotbar: " + (required == null || required.isEmpty() ? "unknown item" : required.getName().getString()));
+        this.info("Missing material in hotbar: " + (required == null || required.isEmpty() ? "unknown item" : required.getHoverName().getString()));
         this.lastMissingWarnTick = this.tick;
     }
 
     private List<BlockPos> scan() {
         this.preview.clear();
         List<BlockPos> out = new ArrayList<>();
-        Vec3 eye = this.mc.player.getEyePos();
-        BlockPos origin = BlockPos.ofFloored(eye);
+        Vec3 eye = this.mc.player.getEyePosition();
+        BlockPos origin = BlockPos.containing(eye);
         int r = (int) Math.ceil(this.range.get()) + 1;
         double reachSq = this.range.get() * this.range.get();
-        BlockPos.Mutable pos = new BlockPos.Mutable();
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         HashSet<Block> ignored = new HashSet<>(this.ignoredBlocks.get());
         for (int dx = -r; dx <= r; dx++) {
             for (int dy = -r; dy <= r; dy++) {
@@ -772,16 +772,16 @@ public class LitematicaPrinter extends Module {
                         || (ts = SchematicAccess.getTargetState(pos)) == null
                         || ts.isAir()
                         || ignored.contains(ts.getBlock())
-                        || !(ws = this.mc.world.getBlockState(pos)).isReplaceable() && !LitematicaPrinter.isMergeCandidate(ws, ts)
+                        || !(ws = this.mc.level.getBlockState(pos)).canBeReplaced() && !LitematicaPrinter.isMergeCandidate(ws, ts)
                         || PlacementSolver.statesMatch(ts, ws)
-                        || eye.squaredDistanceTo(Vec3.ofCenter(pos)) > reachSq) {
+                        || eye.distanceToSqr(Vec3.atCenterOf(pos)) > reachSq) {
                         continue;
                     }
-                    out.add(pos.toImmutable());
+                    out.add(pos.immutable());
                 }
             }
         }
-        out.sort(Comparator.comparingDouble(p -> eye.squaredDistanceTo(Vec3.ofCenter(p))));
+        out.sort(Comparator.comparingDouble(p -> eye.distanceToSqr(Vec3.atCenterOf(p))));
         if (this.render.get()) {
             this.preview.addAll(out);
         }
@@ -808,23 +808,23 @@ public class LitematicaPrinter extends Module {
         if (ws.getBlock() != ts.getBlock()) {
             return false;
         }
-        if (ws.contains(Properties.SLAB_TYPE)) {
-            return ts.get(Properties.SLAB_TYPE) == SlabType.DOUBLE && ws.get(Properties.SLAB_TYPE) != SlabType.DOUBLE;
+        if (ws.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.SLAB_TYPE)) {
+            return ts.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.SLAB_TYPE) == net.minecraft.world.level.block.state.properties.SlabType.DOUBLE && ws.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.SLAB_TYPE) != net.minecraft.world.level.block.state.properties.SlabType.DOUBLE;
         }
-        for (IntProperty p : COUNT_PROPERTIES) {
-            if (ws.contains(p)) {
-                return ts.get(p) > ws.get(p);
+        for (net.minecraft.world.level.block.state.properties.IntegerProperty p : COUNT_PROPERTIES) {
+            if (ws.hasProperty(p)) {
+                return ts.getValue(p) > ws.getValue(p);
             }
         }
         if (PlacementSolver.faceDefinedByPlacement(ts)) {
             boolean missing = false;
             for (Direction d : Direction.values()) {
-                BooleanProperty p = MultifaceBlock.getProperty(d);
-                if (p == null || !ws.contains(p) || !ts.contains(p)) {
+                net.minecraft.world.level.block.state.properties.BooleanProperty p = MultifaceBlock.getFaceProperty(d);
+                if (p == null || !ws.hasProperty(p) || !ts.hasProperty(p)) {
                     continue;
                 }
-                boolean have = ws.get(p);
-                boolean want = ts.get(p);
+                boolean have = ws.getValue(p);
+                boolean want = ts.getValue(p);
                 if (have && !want) {
                     return false;
                 }

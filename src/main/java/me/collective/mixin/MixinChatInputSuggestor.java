@@ -28,48 +28,49 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-@Mixin(ChatInputSuggestor.class)
+@Mixin(CommandSuggestions.class)
 public abstract class MixinChatInputSuggestor {
 
     @Shadow
     @Final
-    TextFieldWidget textField;
+    EditBox input;
 
     @Shadow
     @Final
-    TextRenderer textRenderer;
+    Font font;
 
     @Shadow
     @Final
-    private Screen owner;
+    private Screen screen;
 
     @Shadow
-    private List<OrderedText> messages;
+    @Final
+    private List<FormattedCharSequence> commandUsage;
 
     @Shadow
-    private int x;
+    private int commandUsagePosition;
 
     @Shadow
-    private int width;
+    private int commandUsageWidth;
 
     @Shadow
     private CompletableFuture<Suggestions> pendingSuggestions;
 
     @Shadow
-    public abstract void show(boolean narrateFirstSuggestion);
+    public abstract void showSuggestions(boolean narrateFirstSuggestion);
 
-    @Inject(method = "refresh", at = @At("HEAD"), cancellable = true)
-    private void onRefresh(CallbackInfo ci) {
-        String text = this.textField.getText();
+    @Inject(method = "updateCommandInfo", at = @At("HEAD"), cancellable = true)
+    private void onUpdateCommandInfo(CallbackInfo ci) {
+        String text = this.input.getValue();
         String prefix = CommandManager.INSTANCE.getPrefix();
 
         if (text != null && text.startsWith(prefix)) {
             ci.cancel();
 
-            this.messages.clear();
+            this.commandUsage.clear();
 
             String query = text.substring(prefix.length());
-            int cursor = this.textField.getCursor();
+            int cursor = this.input.getCursorPosition();
 
             // Позиция начала последнего слова (аргумента)
             int lastSpace = text.lastIndexOf(' ');
@@ -136,27 +137,27 @@ public abstract class MixinChatInputSuggestor {
             if (matchedCmd != null) {
                 String syntax = matchedCmd.getSyntax();
                 if (syntax != null && !syntax.isEmpty()) {
-                    this.messages.add(OrderedText.styledForwardsVisitedString(
+                    this.commandUsage.add(FormattedCharSequence.forward(
                         syntax,
                         Style.EMPTY.withColor(ChatFormatting.GRAY)
                     ));
 
                     if (matchedCmd.getDescription() != null && !matchedCmd.getDescription().isEmpty()) {
-                        this.messages.add(OrderedText.styledForwardsVisitedString(
+                        this.commandUsage.add(FormattedCharSequence.forward(
                             "  " + matchedCmd.getDescription(),
                             Style.EMPTY.withColor(ChatFormatting.DARK_GRAY)
                         ));
                     }
 
                     int textWidth = 0;
-                    for (OrderedText ot : this.messages) {
-                        textWidth = Math.max(textWidth, this.textRenderer.getWidth(ot));
+                    for (FormattedCharSequence ot : this.commandUsage) {
+                        textWidth = Math.max(textWidth, this.font.width(ot));
                     }
 
-                    int charX = this.textField.getCharacterX(prefix.length());
-                    int maxRight = this.textField.getCharacterX(0) + this.textField.getInnerWidth();
-                    this.x = MathHelper.clamp(charX, 0, Math.max(0, maxRight - textWidth));
-                    this.width = textWidth;
+                    int charX = this.input.getScreenX(prefix.length());
+                    int maxRight = this.input.getScreenX(0) + this.input.getInnerWidth();
+                    this.commandUsagePosition = Mth.clamp(charX, 0, Math.max(0, maxRight - textWidth));
+                    this.commandUsageWidth = textWidth;
                 }
             }
 
@@ -164,7 +165,7 @@ public abstract class MixinChatInputSuggestor {
             this.pendingSuggestions = builder.buildFuture();
             this.pendingSuggestions.thenRun(() -> {
                 if (this.pendingSuggestions.isDone()) {
-                    this.show(false);
+                    this.showSuggestions(false);
                 }
             });
         }

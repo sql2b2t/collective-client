@@ -24,7 +24,7 @@ public class Step extends Module {
     @Override
     public void onDisable() {
         if (mc.player != null) {
-            var attr = mc.player.getAttributeInstance(EntityAttributes.STEP_HEIGHT);
+            var attr = mc.player.getAttribute(Attributes.STEP_HEIGHT);
             if (attr != null) {
                 attr.setBaseValue(0.6);
             }
@@ -36,12 +36,12 @@ public class Step extends Module {
         if (mc.player == null) return;
 
         if (grimBypass.getValue()) {
-            var attr = mc.player.getAttributeInstance(EntityAttributes.STEP_HEIGHT);
+            var attr = mc.player.getAttribute(Attributes.STEP_HEIGHT);
             if (attr != null && attr.getBaseValue() != 0.6) {
                 attr.setBaseValue(0.6);
             }
-            if (mc.player.horizontalCollision && mc.player.isOnGround() && !mc.player.isSneaking()) {
-                mc.player.jump();
+            if (mc.player.horizontalCollision && mc.player.onGround() && !mc.player.isShiftKeyDown()) {
+                mc.player.jumpFromGround();
             }
         } else {
             updateStep();
@@ -50,7 +50,7 @@ public class Step extends Module {
 
     private void updateStep() {
         if (mc.player == null) return;
-        var attr = mc.player.getAttributeInstance(EntityAttributes.STEP_HEIGHT);
+        var attr = mc.player.getAttribute(Attributes.STEP_HEIGHT);
         if (attr != null) {
             attr.setBaseValue(height.getValue());
         }

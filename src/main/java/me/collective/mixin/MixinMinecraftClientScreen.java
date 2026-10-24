@@ -24,7 +24,7 @@ public abstract class MixinMinecraftClientScreen {
         if (autoSign == null) return;
 
         AbstractSignEditScreen signScreen = (AbstractSignEditScreen) screen;
-        if (autoSign.queueAutoFill(((AbstractSignEditScreenAccessor) signScreen).collective$getBlockEntity().getPos())) {
+        if (autoSign.queueAutoFill(((AbstractSignEditScreenAccessor) signScreen).collective$getBlockEntity().getBlockPos())) {
             ci.cancel();
         }
     }

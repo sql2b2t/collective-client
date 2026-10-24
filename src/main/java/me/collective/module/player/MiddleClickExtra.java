@@ -8,7 +8,7 @@ import me.collective.setting.BooleanSetting;
 import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
 import net.minecraft.world.item.Items;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemPacket;
 import net.minecraft.world.InteractionHand;
 import org.lwjgl.glfw.GLFW;
@@ -25,12 +25,12 @@ public class MiddleClickExtra extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.currentScreen != null) return;
+        if (mc.player == null || mc.gui.screen() != null) return;
 
-        boolean isPressed = GLFW.glfwGetMouseButton(mc.getWindow().getHandle(), GLFW.GLFW_MOUSE_BUTTON_MIDDLE) == GLFW.GLFW_PRESS;
+        boolean isPressed = GLFW.glfwGetMouseButton(mc.getWindow().handle(), GLFW.GLFW_MOUSE_BUTTON_MIDDLE) == GLFW.GLFW_PRESS;
 
         if (isPressed && !wasPressed) {
-            if (friend.getValue() && mc.crosshairTarget instanceof net.minecraft.util.hit.EntityHitResult hit && hit.getEntity() instanceof net.minecraft.entity.player.Player player) {
+            if (friend.getValue() && mc.hitResult instanceof net.minecraft.world.phys.EntityHitResult hit && hit.getEntity() instanceof net.minecraft.world.entity.player.Player player) {
                 String name = player.getName().getString();
                 if (me.collective.manager.FriendManager.getInstance().isFriend(name)) {
                     me.collective.manager.FriendManager.getInstance().removeFriend(name);
@@ -58,9 +58,9 @@ public class MiddleClickExtra extends Module {
             InventoryUtil.swap(pearlResult.slot());
         }
 
-        if (mc.getNetworkHandler() != null) {
-            mc.getNetworkHandler().sendPacket(new PlayerInteractItemC2SPacket(hand, me.collective.util.GrimUtils.nextSequence(), mc.player.getYaw(), mc.player.getPitch()));
-            mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
+        if (mc.getConnection() != null) {
+            mc.getConnection().send(new ServerboundUseItemPacket(hand, me.collective.util.GrimUtils.nextSequence(), mc.player.getYRot(), mc.player.getXRot()));
+            mc.getConnection().send(ServerboundPunchPacket.INSTANCE);
         }
 
         if (!pearlResult.isOffhand()) {

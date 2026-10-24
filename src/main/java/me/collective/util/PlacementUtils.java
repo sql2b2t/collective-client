@@ -9,7 +9,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.core.BlockPos;
@@ -48,13 +48,13 @@ public class PlacementUtils {
 
     public static boolean placeBlock(BlockPos pos, FindItemResult block, boolean rotate, boolean swing,
                                      boolean strictDirection) {
-        if (mc.player == null || mc.world == null) return false;
+        if (mc.player == null || mc.level == null) return false;
         if (!block.found()) return false;
         if (!canPlace(pos, strictDirection)) return false;
 
         ItemStack stack = block.isOffhand()
-            ? mc.player.getOffHandStack()
-            : mc.player.getInventory().getStack(block.slot());
+            ? mc.player.getOffhandItem()
+            : mc.player.getInventory().getItem(block.slot());
 
         if (!(stack.getItem() instanceof BlockItem blockItem)) return false;
 
@@ -68,14 +68,14 @@ public class PlacementUtils {
         if (!block.isOffhand() && !InventoryUtil.swap(block.slot(), false)) return false;
 
         InteractionHand hand = block.getHand();
-        BlockState predicted = blockItem.getBlock().getDefaultState();
+        BlockState predicted = blockItem.getBlock().defaultBlockState();
         BlockHitResult placeHit = hit;
 
         Runnable send = () -> {
-            if (!placeHit.isInsideBlock()) {
+            if (!placeHit.isInside()) {
                 AirPlaceExecutor.silentPlace(placeHit, pos, predicted, hand, swing);
             } else if (hand == InteractionHand.OFF_HAND) {
-                BlockHitResult wireHit = new BlockHitResult(placeHit.getPos(), placeHit.getSide(),
+                BlockHitResult wireHit = new BlockHitResult(placeHit.getLocation(), placeHit.getDirection(),
                     placeHit.getBlockPos(), false);
                 AirPlaceExecutor.silentPlace(wireHit, pos, predicted, hand, swing);
             } else {
@@ -84,7 +84,7 @@ public class PlacementUtils {
         };
 
         if (rotate) {
-            float[] rotations = RotationUtils.getLegitRotations(hit.getPos());
+            float[] rotations = RotationUtils.getLegitRotations(hit.getLocation());
             RotationUtils.getInstance().setRotationSilentInstant(null, 50, rotations[0], rotations[1]);
             send.run();
         } else {
@@ -95,9 +95,9 @@ public class PlacementUtils {
     }
 
     public static BlockHitResult getAirPlaceHit(BlockPos pos, double reach) {
-        if (mc.player == null || mc.world == null) return null;
+        if (mc.player == null || mc.level == null) return null;
 
-        Vec3 eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePosition();
 
         double minX = pos.getX();
         double minY = pos.getY();
@@ -155,7 +155,7 @@ public class PlacementUtils {
 
             if (!visible || point == null) continue;
 
-            double dist = eye.squaredDistanceTo(point);
+            double dist = eye.distanceToSqr(point);
             if (dist > reachSq || dist >= bestDist) continue;
 
             bestDist = dist;
@@ -170,24 +170,24 @@ public class PlacementUtils {
     }
 
     public static BlockHitResult getSupportHit(BlockPos pos, double reach) {
-        if (mc.player == null || mc.world == null) return null;
+        if (mc.player == null || mc.level == null) return null;
 
-        Vec3 eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePosition();
 
         BlockHitResult best = null;
         double bestDist = Double.MAX_VALUE;
 
         for (Direction dir : Direction.values()) {
-            BlockPos neighbor = pos.offset(dir);
-            BlockState state = mc.world.getBlockState(neighbor);
+            BlockPos neighbor = pos.relative(dir);
+            BlockState state = mc.level.getBlockState(neighbor);
 
-            if (state.isReplaceable()
-                || state.getCollisionShape(mc.world, neighbor).isEmpty()) continue;
+            if (state.canBeReplaced()
+                || state.getCollisionShape(mc.level, neighbor).isEmpty()) continue;
 
             Direction side = dir.getOpposite();
-            Vec3 normal = Vec3.of(side.getVector());
+            Vec3 normal = side.getUnitVec3();
 
-            boolean visible = eye.subtract(Vec3.ofCenter(neighbor)).dotProduct(normal) > -0.05
+            boolean visible = eye.subtract(Vec3.atCenterOf(neighbor)).dot(normal) > -0.05
                 || (side.getAxis().isHorizontal() && eye.y >= neighbor.getY() + 0.85);
 
             if (!visible) continue;
@@ -213,7 +213,7 @@ public class PlacementUtils {
             }
 
             Vec3 hitVec = new Vec3(px, py, pz);
-            double dist = eye.squaredDistanceTo(hitVec);
+            double dist = eye.distanceToSqr(hitVec);
             if (dist > reach * reach || dist >= bestDist) continue;
 
             bestDist = dist;
@@ -225,16 +225,16 @@ public class PlacementUtils {
 
 
     public static boolean canPlace(BlockPos pos, boolean strictDirection) {
-        if (mc.world == null) return false;
-        if (!mc.world.getBlockState(pos).isReplaceable()) return false;
+        if (mc.level == null) return false;
+        if (!mc.level.getBlockState(pos).canBeReplaced()) return false;
 
-        if (!mc.world.canPlace(Blocks.OBSIDIAN.getDefaultState(), pos, ShapeContext.absent())) {
+        if (!mc.level.isUnobstructed(Blocks.OBSIDIAN.defaultBlockState(), pos, net.minecraft.world.phys.shapes.CollisionContext.empty())) {
             return false;
         }
 
-        AABB checkBox = AABB.from(Vec3.ofCenter(pos));
+        AABB checkBox = new AABB(pos);
 
-        for (Entity entity : mc.world.getOtherEntities(null, checkBox)) {
+        for (Entity entity : mc.level.getEntities(null, checkBox)) {
             if (entity.isSpectator() || !entity.isAlive()) continue;
             return false;
         }
@@ -243,16 +243,16 @@ public class PlacementUtils {
     }
 
     public static Direction getPlaceSide(BlockPos pos) {
-        if (mc.world == null) return null;
-        if (!mc.world.getBlockState(pos.down()).isReplaceable()) return Direction.DOWN;
+        if (mc.level == null) return null;
+        if (!mc.level.getBlockState(pos.below()).canBeReplaced()) return Direction.DOWN;
 
-        for (Direction side : Direction.Type.HORIZONTAL) {
-            BlockPos neighbor = pos.offset(side);
-            if (mc.world.getBlockState(neighbor).isReplaceable()) continue;
+        for (Direction side : Direction.Plane.HORIZONTAL) {
+            BlockPos neighbor = pos.relative(side);
+            if (mc.level.getBlockState(neighbor).canBeReplaced()) continue;
             return side;
         }
 
-        if (!mc.world.getBlockState(pos.up()).isReplaceable()) return Direction.UP;
+        if (!mc.level.getBlockState(pos.above()).canBeReplaced()) return Direction.UP;
 
         return null;
     }
@@ -261,7 +261,7 @@ public class PlacementUtils {
         if (mc.player == null) return -1;
 
         for (int i = 0; i < 45; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
+            ItemStack stack = mc.player.getInventory().getItem(i);
             if (stack.getItem() != Items.ENDER_PEARL) continue;
             return i;
         }
@@ -269,9 +269,9 @@ public class PlacementUtils {
         return -1;
     }
 
-    public static void clickSlot(int slot, SlotActionType actionType) {
-        if (mc.interactionManager != null && mc.player != null) {
-            mc.interactionManager.clickSlot(0, slot, 0, actionType, mc.player);
+    public static void handleContainerInput(int slot, ContainerInput actionType) {
+        if (mc.gameMode != null && mc.player != null) {
+            mc.gameMode.handleContainerInput(0, slot, 0, actionType, mc.player);
         }
     }
 }

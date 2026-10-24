@@ -17,8 +17,8 @@ public class CoordsCommand extends Command {
         int y = mc.player.getBlockY();
         int z = mc.player.getBlockZ();
         String coords = x + " " + y + " " + z;
-        mc.keyboard.setClipboard(coords);
-        ChatHelper.sendMessage(Component.literal("Coordinates copied to clipboard: ").styled(s -> s.withColor(ChatFormatting.GRAY))
-            .append(Component.literal(coords).styled(s -> s.withColor(ChatFormatting.GREEN))));
+        mc.keyboardHandler.setClipboard(coords);
+        ChatHelper.sendMessage(Component.literal("Coordinates copied to clipboard: ").withStyle(s -> s.withColor(ChatFormatting.GRAY))
+            .append(Component.literal(coords).withStyle(s -> s.withColor(ChatFormatting.GREEN))));
     }
 }

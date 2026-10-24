@@ -6,7 +6,8 @@ import me.collective.module.ModuleManager;
 import me.collective.module.client.HUD;
 import me.collective.module.hud.HudModule;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.minecraft.resources.Identifier;
 import net.minecraft.client.Minecraft;
 
 public class CollectiveClient implements ClientModInitializer {
@@ -29,30 +30,30 @@ public class CollectiveClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        System.out.println("[" + MOD_NAME + "] Initializing for Minecraft 1.21.11...");
+        System.out.println("[" + MOD_NAME + "] Initializing for Minecraft 26.3...");
 
         // Initialize ModuleManager
         ModuleManager moduleManager = ModuleManager.INSTANCE;
 
         // Register HUD Render Callback
-        HudRenderCallback.EVENT.register((drawContext, renderTickCounter) -> {
+        HudElementRegistry.addLast(Identifier.fromNamespaceAndPath(MOD_ID, "hud"), (drawContext, renderTickCounter) -> {
             Minecraft mc = Minecraft.getInstance();
 
             // Do not render normal HUD when in ClickGUI or HudEditor
-            if (mc.currentScreen instanceof ClickGuiScreen
-                    || mc.currentScreen instanceof HudEditorScreen) {
+            if (mc.gui.screen() instanceof ClickGuiScreen
+                    || mc.gui.screen() instanceof HudEditorScreen) {
                 return;
             }
 
-            float delta = renderTickCounter != null ? renderTickCounter.getTickProgress(false) : 1.0f;
+            float delta = renderTickCounter != null ? renderTickCounter.getGameTimeDeltaPartialTick(false) : 1.0f;
 
             if (HUD.INSTANCE != null && HUD.INSTANCE.isToggled()) {
                 // Live drag поверх чата: обновляем позицию перетаскиваемого
                 // HUD-модуля по текущему курсору и рисуем его рамку-подсветку.
-                if (mc.currentScreen instanceof net.minecraft.client.gui.screen.ChatScreen) {
-                    double mx = mc.mouse.getX() * mc.getWindow().getScaledWidth()
+                if (mc.gui.screen() instanceof net.minecraft.client.gui.screens.ChatScreen) {
+                    double mx = mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth()
                         / mc.getWindow().getWidth();
-                    double my = mc.mouse.getY() * mc.getWindow().getScaledHeight()
+                    double my = mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight()
                         / mc.getWindow().getHeight();
                     me.collective.gui.hud.ChatHudDrag.update(mx, my);
 
@@ -84,7 +85,7 @@ public class CollectiveClient implements ClientModInitializer {
         // Register Client Tick Callbacks for Modules and EventBus
         net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.START_CLIENT_TICK.register(client -> {
             me.collective.util.TickPacer.onTick();
-            if (client.player != null && client.world != null) {
+            if (client.player != null && client.level != null) {
                 // Кэш расчёта урона от взрывов живёт ровно один тик: ключ содержит
                 // блок и id сущности, но НЕ позицию — она меняется каждый тик.
                 // Чистим здесь, до всех модулей, иначе кто-то прочитает значения,
@@ -95,7 +96,7 @@ public class CollectiveClient implements ClientModInitializer {
         });
 
         net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (client.player != null && client.world != null) {
+            if (client.player != null && client.level != null) {
                 me.collective.event.EventBus.INSTANCE.post(new me.collective.event.events.TickEvent.Post());
                 ModuleManager.INSTANCE.onUpdate();
             }
@@ -123,10 +124,10 @@ public class CollectiveClient implements ClientModInitializer {
             });
 
         // Register Level 3D Render Callback for Modules
-        net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents.AFTER_ENTITIES.register(context -> {
-            net.minecraft.client.render.Camera camera = context.gameRenderer() != null ? context.gameRenderer().getCamera() : null;
-            float tickDelta = Minecraft.getInstance().getRenderTickCounter() != null
-                ? Minecraft.getInstance().getRenderTickCounter().getTickProgress(false)
+        net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.BEFORE_GIZMOS.register(context -> {
+            net.minecraft.client.Camera camera = Minecraft.getInstance().gameRenderer != null ? Minecraft.getInstance().gameRenderer.mainCamera() : null;
+            float tickDelta = Minecraft.getInstance().getDeltaTracker() != null
+                ? Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false)
                 : 1.0f;
 
             // Один gizmo-скоуп на весь кадр: все Renderer3D.box/line рисуют в
@@ -134,7 +135,7 @@ public class CollectiveClient implements ClientModInitializer {
             me.collective.render.Renderer3D.beginFrameScope();
             try {
                 me.collective.event.EventBus.INSTANCE.post(new me.collective.event.events.Render3DEvent(
-                    context.matrices(), camera, tickDelta, context.consumers()
+                    context.poseStack(), camera, tickDelta
                 ));
             } finally {
                 me.collective.render.Renderer3D.endFrameScope();
@@ -172,7 +173,7 @@ public class CollectiveClient implements ClientModInitializer {
 
     public static void onKeyPressed(int key) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.currentScreen == null) {
+        if (mc.gui.screen() == null) {
             if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT_SHIFT && me.collective.module.client.UI.INSTANCE != null) {
                 me.collective.module.client.UI.INSTANCE.getKeybind().setValue(org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT_SHIFT);
                 me.collective.module.client.UI.INSTANCE.toggle();

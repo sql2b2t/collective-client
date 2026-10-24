@@ -249,7 +249,7 @@ public class VillagerRoller extends Module {
     }
 
     private State currentState = State.DISABLED;
-    private VillagerEntity rollingVillager;
+    private Villager rollingVillager;
     private BlockPos rollingBlockPos;
     private Block rollingBlock;
     private long failedToPlacePrevMsg = System.currentTimeMillis();
@@ -284,12 +284,12 @@ public class VillagerRoller extends Module {
         if (currentState != State.WAITING_FOR_TARGET_BLOCK) return;
 
         rollingBlockPos = event.blockPos;
-        rollingBlock = mc.world.getBlockState(rollingBlockPos).getBlock();
+        rollingBlock = mc.level.getBlockState(rollingBlockPos).getBlock();
         currentState = State.WAITING_FOR_TARGET_VILLAGER;
 
         if (instantRebreak.get()) {
-            mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
-                PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, rollingBlockPos, Direction.UP));
+            mc.getConnection().send(new ServerboundPlayerActionPacket(
+                ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, rollingBlockPos, Direction.UP));
         }
 
         if (cfSetup.get()) info("Блок выбран, теперь взаимодействуй с жителем");
@@ -298,7 +298,7 @@ public class VillagerRoller extends Module {
     @EventHandler
     private void onInteractEntity(InteractEntityEvent event) {
         if (currentState != State.WAITING_FOR_TARGET_VILLAGER) return;
-        if (!(event.entity instanceof VillagerEntity villager)) return;
+        if (!(event.entity instanceof Villager villager)) return;
 
         rollingVillager = villager;
         currentState = State.ROLLING_BREAKING_BLOCK;
@@ -309,7 +309,7 @@ public class VillagerRoller extends Module {
     @EventHandler
     private void onReceivePacket(PacketEvent.Receive event) {
         if (currentState != State.ROLLING_WAITING_FOR_TRADES) return;
-        if (!(event.packet instanceof SetTradeOffersS2CPacket packet)) return;
+        if (!(event.packet instanceof net.minecraft.network.protocol.game.ClientboundMerchantOffersPacket packet)) return;
 
         mc.execute(() -> checkTrades(packet.getOffers()));
     }
@@ -328,23 +328,23 @@ public class VillagerRoller extends Module {
 
     private void tickBreaking() {
         if (instantRebreak.get()) {
-            mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
-                PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK, rollingBlockPos, Direction.DOWN));
+            mc.getConnection().send(new ServerboundPlayerActionPacket(
+                ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK, rollingBlockPos, Direction.DOWN));
         }
 
-        if (mc.world.getBlockState(rollingBlockPos).isAir()) {
+        if (mc.level.getBlockState(rollingBlockPos).isAir()) {
             currentState = State.ROLLING_WAITING_FOR_PROFESSION_CLEAR;
         }
         else if (!instantRebreak.get()) {
-            if (!mc.interactionManager.updateBlockBreakingProgress(rollingBlockPos, Direction.UP)) {
-                mc.interactionManager.attackBlock(rollingBlockPos, Direction.UP);
+            if (!mc.gameMode.continueDestroyBlock(rollingBlockPos, Direction.UP)) {
+                mc.gameMode.startDestroyBlock(rollingBlockPos, Direction.UP);
             }
-            mc.player.swingHand(net.minecraft.util.InteractionHand.MAIN_HAND);
+            me.collective.util.Utils.swingHand(net.minecraft.world.InteractionHand.MAIN_HAND);
         }
     }
 
     private void tickWaitProfessionClear() {
-        if (mc.world.getBlockState(rollingBlockPos).isOf(Blocks.LECTERN)) {
+        if (mc.level.getBlockState(rollingBlockPos).is(Blocks.LECTERN)) {
             if (cfDiscrepancy.get()) info("Разрушение блока откатилось?");
             currentState = State.ROLLING_BREAKING_BLOCK;
             return;
@@ -353,13 +353,13 @@ public class VillagerRoller extends Module {
         if (rollingVillager == null) return;
 
         // В 1.21.11 профессия лежит прямо в record VillagerData (без Optional).
-        if (rollingVillager.getVillagerData().profession().matchesKey(VillagerProfession.NONE)) {
+        if (rollingVillager.getVillagerData().profession().is(VillagerProfession.NONE)) {
             currentState = State.ROLLING_PLACING_BLOCK;
         }
     }
 
     private void tickPlacing() {
-        if (mc.world.getBlockState(rollingBlockPos).isOf(Blocks.LECTERN)) {
+        if (mc.level.getBlockState(rollingBlockPos).is(Blocks.LECTERN)) {
             if (cfDiscrepancy.get()) info("Установка пюпитра откатилась?");
             currentState = State.ROLLING_WAITING_FOR_PROFESSION_NEW;
             return;
@@ -373,18 +373,18 @@ public class VillagerRoller extends Module {
 
         if (slot != mc.player.getInventory().getSelectedSlot()) {
             mc.player.getInventory().setSelectedSlot(slot);
-            if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
+            me.collective.util.InventoryUtil.syncSelectedSlot();
         }
 
         // Хит-пойнт — центр ВЕРХНЕЙ грани блока (ofCenter уже даёт +0.5;
         // прошлый вариант добавлял ещё 0.5 и вылезал за хитбокс — сервер
         // отклонял interact, потому пюпитр и «не ставился».
-        net.minecraft.util.hit.BlockHitResult hit = new net.minecraft.util.hit.BlockHitResult(
-            net.minecraft.util.math.Vec3.ofCenter(rollingBlockPos).add(0, 0.5, 0),
+        net.minecraft.world.phys.BlockHitResult hit = new net.minecraft.world.phys.BlockHitResult(
+            net.minecraft.world.phys.Vec3.atCenterOf(rollingBlockPos).add(0, 0.5, 0),
             Direction.UP, rollingBlockPos, false);
 
-        var result = mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND, hit);
-        if (!result.isAccepted()) {
+        var result = mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, hit);
+        if (!result.consumesAction()) {
             // Не переходим в ожидание профессии: сервер не принял установку.
             retryPlaceTicks++;
             placeFailed("Сервер отклонил установку пюпитра");
@@ -405,7 +405,7 @@ public class VillagerRoller extends Module {
             return;
         }
 
-        if (mc.world.getBlockState(rollingBlockPos).isAir()) {
+        if (mc.level.getBlockState(rollingBlockPos).isAir()) {
             if (cfDiscrepancy.get()) info("Сервер откатил установку пюпитра?");
             currentState = State.ROLLING_PLACING_BLOCK;
             return;
@@ -413,7 +413,7 @@ public class VillagerRoller extends Module {
 
         if (rollingVillager == null) return;
 
-        if (!rollingVillager.getVillagerData().profession().matchesKey(VillagerProfession.NONE)) {
+        if (!rollingVillager.getVillagerData().profession().is(VillagerProfession.NONE)) {
             currentState = State.ROLLING_WAITING_FOR_TRADES;
             triggerInteract();
         }
@@ -440,21 +440,22 @@ public class VillagerRoller extends Module {
         if (failedToPlaceDisable.get()) toggle();
     }
 
-    private int findInHotbar(net.minecraft.item.Item item) {
+    private int findInHotbar(net.minecraft.world.item.Item item) {
+        if (mc.player == null) return -1;
         for (int i = 0; i < 9; i++) {
-            if (mc.player.getInventory().getStack(i).isOf(item)) return i;
+            if (mc.player.getInventory().getItem(i).is(item)) return i;
         }
         return -1;
     }
 
     private void triggerInteract() {
-        if (pauseOnScreen.get() && mc.currentScreen != null) {
+        if (pauseOnScreen.get() && mc.gui.screen() != null) {
             if (cfPausedOnScreen.get()) info("Ролл на паузе, взаимодействуй с жителем");
             return;
         }
 
-        if (rollingVillager == null) return;
-        mc.interactionManager.interactEntity(mc.player, rollingVillager, InteractionHand.MAIN_HAND);
+        if (rollingVillager == null || mc.player == null) return;
+        mc.gameMode.interact(mc.player, rollingVillager, new net.minecraft.world.phys.EntityHitResult(rollingVillager), InteractionHand.MAIN_HAND);
         waitingForTradesTicks = 0;
     }
 
@@ -481,25 +482,23 @@ public class VillagerRoller extends Module {
         return !remaining.isEmpty();
     }
 
-    private void checkTrades(TradeOfferList offers) {
-        for (TradeOffer offer : offers) {
-            ItemStack sellItem = offer.getSellItem();
-            if (!sellItem.isOf(Items.ENCHANTED_BOOK)) continue;
-            if (!sellItem.contains(DataComponentTypes.STORED_ENCHANTMENTS)) continue;
+    private void checkTrades(MerchantOffers offers) {
+        for (MerchantOffer offer : offers) {
+            ItemStack sellItem = offer.getResult();
+            if (!sellItem.is(Items.ENCHANTED_BOOK)) continue;
+            if (!sellItem.has(DataComponents.STORED_ENCHANTMENTS)) continue;
 
-            ItemEnchantmentsComponent enchants = sellItem.get(DataComponentTypes.STORED_ENCHANTMENTS);
+            ItemEnchantments enchants = sellItem.get(DataComponents.STORED_ENCHANTMENTS);
             if (enchants == null) continue;
 
-            int cost = offer.getFirstBuyItem().count();
+            int cost = offer.getBaseCostA().count();
 
-            for (var entry : enchants.getEnchantmentEntries()) {
+            for (var entry : enchants.entrySet()) {
                 Enchantment enchantment = entry.getKey().value();
                 int level = entry.getIntValue();
 
-                // Реестр зачарований — через RegistryKeys (в этом билде нет Registries.ENCHANTMENT).
-                String id = mc.world.getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT)
-                    .getId(enchantment).toString();
-                String name = Enchantment.getName(entry.getKey(), level).getString();
+                String id = entry.getKey().unwrapKey().map(k -> k.identifier().toString()).orElse("");
+                String name = Enchantment.getFullname(entry.getKey(), level).getString();
 
                 boolean found = false;
                 for (String wanted : wantedEnchants.get().split(",")) {
@@ -529,28 +528,24 @@ public class VillagerRoller extends Module {
                     }
 
                     if (enablePlaySound.get()) {
-                        SoundEvent sound = SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME;
+                        SoundEvent sound = SoundEvents.AMETHYST_BLOCK_CHIME;
                         mc.getSoundManager().play(
-                            net.minecraft.client.sound.PositionedSoundInstance.ambient(
+                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
                                 sound, soundPitch.get().floatValue(), soundVolume.get().floatValue()));
                     }
 
-                    if (disconnectIfFound.get()) {
-                        mc.getNetworkHandler().getConnection().disconnect(net.minecraft.text.Component.literal(
+                    if (disconnectIfFound.get() && mc.getConnection() != null) {
+                        mc.getConnection().getConnection().disconnect(net.minecraft.network.chat.Component.literal(
                             "Villager Roller: найдено %s%s за %d изумрудов — выход.".formatted(
                                 name, level > 1 ? " " + level : "", cost)));
                     }
 
-                    // disableIfFound: убираем найденное из списка и продолжаем
-                    // роллить остальное; если список опустел — выключаем модуль.
                     if (disableIfFound.get()) {
                         if (!removeWanted(wanted)) toggle();
                     } else {
                         toggle();
                     }
-                    // Экран не закрываем через хвост метода: ролл остановлен
-                    // (или список изменился) — выходим немедленно.
-                    mc.player.closeHandledScreen();
+                    if (mc.player != null) mc.player.closeContainer();
                     currentState = State.ROLLING_BREAKING_BLOCK;
                     return;
                 }
@@ -559,20 +554,20 @@ public class VillagerRoller extends Module {
             }
         }
 
-        mc.player.closeHandledScreen();
+        if (mc.player != null) mc.player.closeContainer();
         currentState = State.ROLLING_BREAKING_BLOCK;
     }
 
     /** Пустой список — принимаем любое зачарование; иначе сравниваем по ID или имени. */
-    private boolean matches(String wanted, String id, RegistryEntry<Enchantment> entry) {
+    private boolean matches(String wanted, String id, Holder<Enchantment> entry) {
         if (wanted == null || wanted.isBlank()) return true;
 
         String w = wanted.trim().toLowerCase();
         if (id.toLowerCase().contains(w)) return true;
 
         try {
-            Identifier parsed = Identifier.of(w);
-            return entry.matchesKey(net.minecraft.registry.RegistryKey.of(RegistryKeys.ENCHANTMENT, parsed));
+            Identifier parsed = Identifier.parse(w);
+            return entry.is(parsed);
         }
         catch (Exception ignored) {
             return false;

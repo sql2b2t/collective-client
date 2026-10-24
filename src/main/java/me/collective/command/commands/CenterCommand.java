@@ -10,7 +10,7 @@ public class CenterCommand extends Command {
     @Override
     public void execute(String[] args) {
         if (mc.player == null) return;
-        mc.player.setPosition(
+        mc.player.setPos(
             Math.floor(mc.player.getX()) + 0.5,
             mc.player.getY(),
             Math.floor(mc.player.getZ()) + 0.5);

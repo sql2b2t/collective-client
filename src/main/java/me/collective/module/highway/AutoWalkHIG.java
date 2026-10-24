@@ -48,7 +48,7 @@ public class AutoWalkHIG extends Module {
 
     @EventHandler
     private void onPacket(PacketEvent.Receive event) {
-        if (!(event.getPacket() instanceof WorldTimeUpdateS2CPacket)) return;
+        if (!(event.getPacket() instanceof ClientboundSetTimePacket)) return;
         long now = System.currentTimeMillis();
         if (lastTickMs > 0) {
             float delta = Math.max(1, now - lastTickMs);
@@ -83,7 +83,7 @@ public class AutoWalkHIG extends Module {
             }
         }
 
-        mc.options.forwardKey.setPressed(true);
+        mc.options.keyUp.setDown(true);
 
         if (keepY.getValue()) {
             // -0.125 чтобы можно было идти по соулсенду и похожим блокам
@@ -96,7 +96,7 @@ public class AutoWalkHIG extends Module {
 
         if (pickToggle.getValue()) {
             boolean hasPick = InventoryUtil.find(stack ->
-                stack.isOf(Items.DIAMOND_PICKAXE) || stack.isOf(Items.NETHERITE_PICKAXE)).found();
+                stack.is(Items.DIAMOND_PICKAXE) || stack.is(Items.NETHERITE_PICKAXE)).found();
             if (!hasPick) {
                 error("No pickaxe found, disabling.");
                 setToggled(false);
@@ -106,7 +106,7 @@ public class AutoWalkHIG extends Module {
 
         if (gapToggle.getValue()) {
             boolean hasGap = InventoryUtil.find(stack ->
-                stack.isOf(Items.ENCHANTED_GOLDEN_APPLE) || stack.isOf(Items.GOLDEN_APPLE)).found();
+                stack.is(Items.ENCHANTED_GOLDEN_APPLE) || stack.is(Items.GOLDEN_APPLE)).found();
             if (!hasGap) {
                 error("No gap found, disabling.");
                 setToggled(false);
@@ -115,6 +115,6 @@ public class AutoWalkHIG extends Module {
     }
 
     private void unpress() {
-        if (mc.options != null) mc.options.forwardKey.setPressed(false);
+        if (mc.options != null) mc.options.keyUp.setDown(false);
     }
 }

@@ -11,7 +11,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerInput;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -44,21 +44,21 @@ public class ItemScroller extends Module {
     /**
      * Обрабатывает ведение курсора с зажатой кнопкой мыши по слотам контейнера (MouseDrag).
      */
-    public boolean onMouseDrag(HandledScreen<?> screen, Slot hovered, Click click) {
-        if (mc.player == null || mc.interactionManager == null) return false;
+    public boolean onMouseDrag(AbstractContainerScreen<?> screen, Slot hovered, net.minecraft.client.input.MouseButtonEvent click) {
+        if (mc.player == null || mc.gameMode == null) return false;
         if (!mouseDrag.getValue()) return false;
         if (hovered == null) return false;
-        if (hovered.id == lastDraggedSlotId) return false;
+        if (hovered.index == lastDraggedSlotId) return false;
 
-        ScreenHandler handler = screen.getScreenHandler();
-        if (handler != mc.player.currentScreenHandler) return false;
+        AbstractContainerMenu handler = screen.getMenu();
+        if (handler != mc.player.containerMenu) return false;
 
         // Выбрасывание предметов при зажатой клавише Q
         if (dropDrag.getValue() && isKeyDown(GLFW.GLFW_KEY_Q)) {
-            if (!hovered.hasStack() || !hovered.canTakeItems(mc.player)) return false;
-            lastDraggedSlotId = hovered.id;
+            if (!hovered.hasItem() || !hovered.mayPickup(mc.player)) return false;
+            lastDraggedSlotId = hovered.index;
             boolean dropAll = isCtrlDown();
-            mc.interactionManager.clickSlot(handler.syncId, hovered.id, dropAll ? 1 : 0, SlotActionType.THROW, mc.player);
+            mc.gameMode.handleContainerInput(handler.containerId, hovered.index, dropAll ? 1 : 0, ContainerInput.THROW, mc.player);
             return true;
         }
 
@@ -66,21 +66,21 @@ public class ItemScroller extends Module {
         if (click.button() != 0) return false;
 
         // Если на курсоре уже зажат предмет, не выполняем автоматическое перемещение
-        if (!handler.getCursorStack().isEmpty()) return false;
+        if (!handler.getCarried().isEmpty()) return false;
 
         // Ctrl + Shift + Drag: перенос всех предметов совпадающего типа
         if (ctrlShiftAll.getValue() && isShiftDown() && isCtrlDown()) {
-            if (!hovered.hasStack() || !hovered.canTakeItems(mc.player)) return false;
-            lastDraggedSlotId = hovered.id;
-            boolean playerSide = hovered.inventory instanceof Inventory;
+            if (!hovered.hasItem() || !hovered.mayPickup(mc.player)) return false;
+            lastDraggedSlotId = hovered.index;
+            boolean playerSide = hovered.container instanceof Inventory;
             return moveMatching(handler, hovered, playerSide);
         }
 
         // Shift + Drag: быстрый перенос каждого слота по траектории курсора (как в Meteor)
         if (shiftDrag.getValue() && isShiftDown()) {
-            if (!hovered.hasStack() || !hovered.canTakeItems(mc.player)) return false;
-            lastDraggedSlotId = hovered.id;
-            mc.interactionManager.clickSlot(handler.syncId, hovered.id, 0, SlotActionType.QUICK_MOVE, mc.player);
+            if (!hovered.hasItem() || !hovered.mayPickup(mc.player)) return false;
+            lastDraggedSlotId = hovered.index;
+            mc.gameMode.handleContainerInput(handler.containerId, hovered.index, 0, ContainerInput.QUICK_MOVE, mc.player);
             return true;
         }
 
@@ -90,17 +90,17 @@ public class ItemScroller extends Module {
     /**
      * Обрабатывает одиночный клик по слоту (для комбинаций Ctrl + Shift).
      */
-    public boolean onMouseClick(HandledScreen<?> screen, Slot hovered, Click click) {
-        if (mc.player == null || mc.interactionManager == null) return false;
-        if (hovered == null || !hovered.hasStack()) return false;
+    public boolean onMouseClick(AbstractContainerScreen<?> screen, Slot hovered, net.minecraft.client.input.MouseButtonEvent click) {
+        if (mc.player == null || mc.gameMode == null) return false;
+        if (hovered == null || !hovered.hasItem()) return false;
 
-        ScreenHandler handler = screen.getScreenHandler();
-        if (handler != mc.player.currentScreenHandler) return false;
+        AbstractContainerMenu handler = screen.getMenu();
+        if (handler != mc.player.containerMenu) return false;
 
         if (click.button() == 0 && ctrlShiftAll.getValue() && isShiftDown() && isCtrlDown()) {
-            if (!hovered.canTakeItems(mc.player)) return false;
-            lastDraggedSlotId = hovered.id;
-            boolean playerSide = hovered.inventory instanceof Inventory;
+            if (!hovered.mayPickup(mc.player)) return false;
+            lastDraggedSlotId = hovered.index;
+            boolean playerSide = hovered.container instanceof Inventory;
             return moveMatching(handler, hovered, playerSide);
         }
 
@@ -117,42 +117,42 @@ public class ItemScroller extends Module {
     /**
      * Обрабатывает прокрутку колеса мыши над слотом.
      */
-    public boolean onScroll(HandledScreen<?> screen, Slot hovered, double amount) {
-        if (!scroll.getValue() || amount == 0 || mc.player == null || mc.interactionManager == null) return false;
+    public boolean onScroll(AbstractContainerScreen<?> screen, Slot hovered, double amount) {
+        if (!scroll.getValue() || amount == 0 || mc.player == null || mc.gameMode == null) return false;
 
-        ScreenHandler handler = screen.getScreenHandler();
-        if (handler != mc.player.currentScreenHandler) return false;
-        if (!handler.getCursorStack().isEmpty()) return false;
+        AbstractContainerMenu handler = screen.getMenu();
+        if (handler != mc.player.containerMenu) return false;
+        if (!handler.getCarried().isEmpty()) return false;
 
-        boolean playerSide = hovered.inventory instanceof Inventory;
+        boolean playerSide = hovered.container instanceof Inventory;
         boolean push = !scrollDirection.getValue() || amount < 0;
 
         if (push) {
             // Прокрутка вниз: отдаём из hovered-слота в противоположный инвентарь
-            ItemStack source = hovered.getStack();
-            if (source.isEmpty() || !hovered.canTakeItems(mc.player)) return false;
+            ItemStack source = hovered.getItem();
+            if (source.isEmpty() || !hovered.mayPickup(mc.player)) return false;
 
             if (isCtrlDown()) {
                 return moveMatching(handler, hovered, playerSide);
             }
             if (isShiftDown()) {
-                mc.interactionManager.clickSlot(handler.syncId, hovered.id, 0, SlotActionType.QUICK_MOVE, mc.player);
+                mc.gameMode.handleContainerInput(handler.containerId, hovered.index, 0, ContainerInput.QUICK_MOVE, mc.player);
                 return true;
             }
             return moveSingle(handler, hovered, playerSide);
         } else {
             // Прокрутка вверх: забираем из противоположного инвентаря в hovered-слот
             if (isCtrlDown()) {
-                ItemStack sample = hovered.getStack();
+                ItemStack sample = hovered.getItem();
                 if (sample.isEmpty()) return false;
                 return moveMatching(handler, hovered, !playerSide);
             }
             if (isShiftDown()) {
-                ItemStack sample = hovered.getStack();
+                ItemStack sample = hovered.getItem();
                 if (sample.isEmpty()) return false;
                 Slot otherSlot = findMatchingSlot(handler, !playerSide, sample);
                 if (otherSlot != null) {
-                    mc.interactionManager.clickSlot(handler.syncId, otherSlot.id, 0, SlotActionType.QUICK_MOVE, mc.player);
+                    mc.gameMode.handleContainerInput(handler.containerId, otherSlot.index, 0, ContainerInput.QUICK_MOVE, mc.player);
                     return true;
                 }
                 return false;
@@ -161,8 +161,8 @@ public class ItemScroller extends Module {
         }
     }
 
-    private boolean moveSingle(ScreenHandler handler, Slot source, boolean playerSide) {
-        Slot dest = findDestination(handler, playerSide, source.getStack());
+    private boolean moveSingle(AbstractContainerMenu handler, Slot source, boolean playerSide) {
+        Slot dest = findDestination(handler, playerSide, source.getItem());
         if (dest == null) return false;
         click(handler, source, 0);
         click(handler, dest, 1);
@@ -170,14 +170,14 @@ public class ItemScroller extends Module {
         return true;
     }
 
-    private boolean pullSingle(ScreenHandler handler, Slot hovered, boolean playerSide) {
+    private boolean pullSingle(AbstractContainerMenu handler, Slot hovered, boolean playerSide) {
         Slot otherSlot;
-        if (hovered.hasStack()) {
-            otherSlot = findMatchingSlot(handler, !playerSide, hovered.getStack());
+        if (hovered.hasItem()) {
+            otherSlot = findMatchingSlot(handler, !playerSide, hovered.getItem());
         } else {
             otherSlot = findFirstAvailableSlot(handler, !playerSide);
         }
-        if (otherSlot == null || !otherSlot.canTakeItems(mc.player)) return false;
+        if (otherSlot == null || !otherSlot.mayPickup(mc.player)) return false;
 
         click(handler, otherSlot, 0);
         click(handler, hovered, 1);
@@ -185,83 +185,83 @@ public class ItemScroller extends Module {
         return true;
     }
 
-    private boolean moveMatching(ScreenHandler handler, Slot hovered, boolean playerSide) {
-        if (hovered == null || !hovered.hasStack()) return false;
-        Item item = hovered.getStack().getItem();
+    private boolean moveMatching(AbstractContainerMenu handler, Slot hovered, boolean playerSide) {
+        if (hovered == null || !hovered.hasItem()) return false;
+        Item item = hovered.getItem().getItem();
         int limit = stackLimit.getIntValue();
         int moved = 0;
         for (Slot slot : new ArrayList<>(handler.slots)) {
             if (moved >= limit) break;
-            if ((slot.inventory instanceof Inventory) != playerSide) continue;
-            ItemStack stack = slot.getStack();
-            if (stack.isEmpty() || !stack.isOf(item) || !slot.canTakeItems(mc.player)) continue;
-            mc.interactionManager.clickSlot(handler.syncId, slot.id, 0, SlotActionType.QUICK_MOVE, mc.player);
+            if ((slot.container instanceof Inventory) != playerSide) continue;
+            ItemStack stack = slot.getItem();
+            if (stack.isEmpty() || !stack.is(item) || !slot.mayPickup(mc.player)) continue;
+            mc.gameMode.handleContainerInput(handler.containerId, slot.index, 0, ContainerInput.QUICK_MOVE, mc.player);
             moved++;
         }
         return moved > 0;
     }
 
-    private Slot findMatchingSlot(ScreenHandler handler, boolean playerSide, ItemStack sample) {
+    private Slot findMatchingSlot(AbstractContainerMenu handler, boolean playerSide, ItemStack sample) {
         for (Slot slot : handler.slots) {
-            if ((slot.inventory instanceof Inventory) != playerSide) continue;
-            ItemStack stack = slot.getStack();
-            if (!stack.isEmpty() && ItemStack.areItemsAndComponentsEqual(stack, sample) && slot.canTakeItems(mc.player)) {
+            if ((slot.container instanceof Inventory) != playerSide) continue;
+            ItemStack stack = slot.getItem();
+            if (!stack.isEmpty() && ItemStack.isSameItemSameComponents(stack, sample) && slot.mayPickup(mc.player)) {
                 return slot;
             }
         }
         return null;
     }
 
-    private Slot findFirstAvailableSlot(ScreenHandler handler, boolean playerSide) {
+    private Slot findFirstAvailableSlot(AbstractContainerMenu handler, boolean playerSide) {
         for (Slot slot : handler.slots) {
-            if ((slot.inventory instanceof Inventory) != playerSide) continue;
-            if (slot.hasStack() && slot.canTakeItems(mc.player)) {
+            if ((slot.container instanceof Inventory) != playerSide) continue;
+            if (slot.hasItem() && slot.mayPickup(mc.player)) {
                 return slot;
             }
         }
         return null;
     }
 
-    private Slot findDestination(ScreenHandler handler, boolean sourcePlayerSide, ItemStack sample) {
+    private Slot findDestination(AbstractContainerMenu handler, boolean sourcePlayerSide, ItemStack sample) {
         Slot mergeable = null;
         Slot empty = null;
         for (Slot slot : handler.slots) {
-            if ((slot.inventory instanceof Inventory) == sourcePlayerSide) continue;
-            if (!slot.canInsert(sample)) continue;
-            ItemStack inSlot = slot.getStack();
+            if ((slot.container instanceof Inventory) == sourcePlayerSide) continue;
+            if (!slot.mayPlace(sample)) continue;
+            ItemStack inSlot = slot.getItem();
             if (inSlot.isEmpty()) {
                 if (empty == null) empty = slot;
                 continue;
             }
             if (mergeable == null
-                    && ItemStack.areItemsAndComponentsEqual(inSlot, sample)
-                    && inSlot.getCount() < slot.getMaxItemCount(sample)) {
+                    && ItemStack.isSameItemSameComponents(inSlot, sample)
+                    && inSlot.getCount() < slot.getMaxStackSize(sample)) {
                 mergeable = slot;
             }
         }
         return mergeable != null ? mergeable : empty;
     }
 
-    private void click(ScreenHandler handler, Slot slot, int button) {
-        mc.interactionManager.clickSlot(handler.syncId, slot.id, button, SlotActionType.PICKUP, mc.player);
+    private void click(AbstractContainerMenu handler, Slot slot, int button) {
+        mc.gameMode.handleContainerInput(handler.containerId, slot.index, button, ContainerInput.PICKUP, mc.player);
     }
 
     private boolean isShiftDown() {
         if (mc == null || mc.getWindow() == null) return false;
-        long h = mc.getWindow().getHandle();
+        long h = mc.getWindow().handle();
         return GLFW.glfwGetKey(h, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS
                 || GLFW.glfwGetKey(h, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS;
     }
 
     private boolean isCtrlDown() {
         if (mc == null || mc.getWindow() == null) return false;
-        long h = mc.getWindow().getHandle();
+        long h = mc.getWindow().handle();
         return GLFW.glfwGetKey(h, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS
                 || GLFW.glfwGetKey(h, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
     }
 
     private boolean isKeyDown(int key) {
         if (mc == null || mc.getWindow() == null) return false;
-        return GLFW.glfwGetKey(mc.getWindow().getHandle(), key) == GLFW.GLFW_PRESS;
+        return GLFW.glfwGetKey(mc.getWindow().handle(), key) == GLFW.GLFW_PRESS;
     }
 }

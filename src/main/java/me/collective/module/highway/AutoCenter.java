@@ -56,7 +56,7 @@ public class AutoCenter extends Module {
     }
 
     private void check() {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         highway = HighwayUtils.getHighway();
         if (highway == -1) {
@@ -95,19 +95,19 @@ public class AutoCenter extends Module {
 
         if (mode.getValue() == CenterMode.Input) {
             // Grim-Safe: проецируем вектор смещения на локальную ось стрейфа игрока (+right)
-            float rad = (float) Math.toRadians(mc.player.getYaw());
+            float rad = (float) Math.toRadians(mc.player.getYRot());
             double strafeDot = -diffX * Math.cos(rad) - diffZ * Math.sin(rad);
 
             if (strafeDot > 0.04) {
                 // Цель справа от игрока
-                mc.options.rightKey.setPressed(true);
-                mc.options.leftKey.setPressed(false);
+                mc.options.keyRight.setDown(true);
+                mc.options.keyLeft.setDown(false);
                 pressedRight = true;
                 pressedLeft = false;
             } else if (strafeDot < -0.04) {
                 // Цель слева от игрока
-                mc.options.leftKey.setPressed(true);
-                mc.options.rightKey.setPressed(false);
+                mc.options.keyLeft.setDown(true);
+                mc.options.keyRight.setDown(false);
                 pressedLeft = true;
                 pressedRight = false;
             } else {
@@ -116,28 +116,28 @@ public class AutoCenter extends Module {
         } else {
             // Legacy режим прямого изменения скорости
             if (highway == 1 || highway == 2) {
-                mc.player.addVelocity(0.0, 0.0, Math.max(-max, Math.min(max, diffZ)));
+                mc.player.push(0.0, 0.0, Math.max(-max, Math.min(max, diffZ)));
             } else if (highway == 3 || highway == 4) {
-                mc.player.addVelocity(Math.max(-max, Math.min(max, diffX)), 0.0, 0.0);
+                mc.player.push(Math.max(-max, Math.min(max, diffX)), 0.0, 0.0);
             } else if (highway == 5) {
-                mc.player.addVelocity(0.0, 0.0, Math.max(-max, Math.min(max, diffZ)));
+                mc.player.push(0.0, 0.0, Math.max(-max, Math.min(max, diffZ)));
             } else if (highway == 6) {
-                mc.player.addVelocity(Math.max(-max, Math.min(max, diffX)), 0.0, 0.0);
+                mc.player.push(Math.max(-max, Math.min(max, diffX)), 0.0, 0.0);
             } else if (highway == 7) {
-                mc.player.addVelocity(Math.max(-max, Math.min(max, diffX)), 0.0, 0.0);
+                mc.player.push(Math.max(-max, Math.min(max, diffX)), 0.0, 0.0);
             } else if (highway == 8) {
-                mc.player.addVelocity(0.0, 0.0, Math.max(-max, Math.min(max, diffZ)));
+                mc.player.push(0.0, 0.0, Math.max(-max, Math.min(max, diffZ)));
             }
         }
     }
 
     private void releaseKeys() {
         if (pressedLeft) {
-            mc.options.leftKey.setPressed(false);
+            mc.options.keyLeft.setDown(false);
             pressedLeft = false;
         }
         if (pressedRight) {
-            mc.options.rightKey.setPressed(false);
+            mc.options.keyRight.setDown(false);
             pressedRight = false;
         }
     }

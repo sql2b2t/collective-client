@@ -9,13 +9,13 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(PlayerEntityRenderer.class)
+@Mixin(AvatarRenderer.class)
 public abstract class MixinEmoteState {
-    @Inject(method = "updateRenderState(Lnet/minecraft/entity/PlayerLikeEntity;Lnet/minecraft/client/render/entity/state/PlayerEntityRenderState;F)V", at = @At("TAIL"))
-    private void collective$mapEmoteState(PlayerLikeEntity entity, PlayerEntityRenderState state, float tickDelta, CallbackInfo ci) {
+    @Inject(method = "updateRenderState(Lnet/minecraft/entity/Avatar;Lnet/minecraft/client/render/entity/state/AvatarRenderState;F)V", at = @At("TAIL"))
+    private void collective$mapEmoteState(Avatar entity, AvatarRenderState state, float tickDelta, CallbackInfo ci) {
         if (entity == null) return;
         // Мапим ВСЕХ: локальный игрок нужен для своих эмоутов, чужие — для
         // эмоутов из релея IRC (EmoteEngine различает по STATE_UUID).
-        EmoteEngine.mapState(state, entity.getUuid());
+        EmoteEngine.mapState(state, entity.getUUID());
     }
 }

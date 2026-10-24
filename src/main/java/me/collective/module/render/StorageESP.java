@@ -72,7 +72,7 @@ public class StorageESP extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.world == null || mc.player == null) {
+        if (mc.level == null || mc.player == null) {
             if (!alertedPositions.isEmpty()) alertedPositions.clear();
             toRender.clear();
             return;
@@ -84,9 +84,9 @@ public class StorageESP extends Module {
             // Кэш рамок: тип → цвет; итерируем block entities напрямую —
             // кандидатов немного, полный проход раз в тик безопасен.
             double rangeSq = this.range.getValue() * this.range.getValue();
-            for (BlockEntity be : mc.world.getBlockEntities()) {
-                BlockPos pos = be.getPos();
-                if (mc.player.squaredDistanceTo(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) > rangeSq) continue;
+            for (BlockEntity be : getNearbyBlockEntities((int) Math.ceil(this.range.getValue() / 16.0) + 1)) {
+                BlockPos pos = be.getBlockPos();
+                if (mc.player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) > rangeSq) continue;
 
                 Color tint = null;
                 if (chests.getValue() && be instanceof ChestBlockEntity) tint = CHEST_TINT;
@@ -109,8 +109,8 @@ public class StorageESP extends Module {
         }
 
         if (chatAlert.getValue()) {
-            for (BlockEntity be : mc.world.getBlockEntities()) {
-                BlockPos pos = be.getPos();
+            for (BlockEntity be : getNearbyBlockEntities((int) Math.ceil(this.range.getValue() / 16.0) + 1)) {
+                BlockPos pos = be.getBlockPos();
                 if (alertedPositions.contains(pos)) continue;
 
                 String type = null;
@@ -124,10 +124,10 @@ public class StorageESP extends Module {
 
                 if (type != null) {
                     alertedPositions.add(pos);
-                    double dist = mc.player.getEyePos().distanceTo(pos.toCenterPos());
+                    double dist = mc.player.getEyePosition().distanceTo(Vec3.atCenterOf(pos));
                     if (dist > 8.0) { // only alert if not right next to player
-                        mc.player.sendMessage(Component.literal(String.format("§7[§6StorageESP§7] §e%s §7found at §aX: %d, Y: %d, Z: %d §7(§f%.0fm§7)",
-                            type, pos.getX(), pos.getY(), pos.getZ(), dist)), false);
+                        mc.player.sendSystemMessage(Component.literal(String.format("§7[§6StorageESP§7] §e%s §7found at §aX: %d, Y: %d, Z: %d §7(§f%.0fm§7)",
+                            type, pos.getX(), pos.getY(), pos.getZ(), dist)));
                     }
                 }
             }
@@ -141,7 +141,7 @@ public class StorageESP extends Module {
         double rangeBlocks = this.range.getValue();
         for (PosBox pb : toRender) {
             BlockPos pos = pb.pos();
-            double dist = Math.sqrt(mc.player.squaredDistanceTo(
+            double dist = Math.sqrt(mc.player.distanceToSqr(
                 pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5));
             Color tint = pb.color();
             Color fill = ColorUtil.fadeByDistance(dist, rangeBlocks,
@@ -149,6 +149,23 @@ public class StorageESP extends Module {
             Color line = ColorUtil.fadeLineByDistance(dist, rangeBlocks, tint, 220);
             Renderer3D.box(new AABB(pos), fill, line, ShapeMode.Both, true);
         }
+    }
+
+        private List<BlockEntity> getNearbyBlockEntities(int chunkRadius) {
+        List<BlockEntity> list = new ArrayList<>();
+        if (mc.level == null || mc.player == null) return list;
+        int pcx = mc.player.getBlockX() >> 4;
+        int pcz = mc.player.getBlockZ() >> 4;
+        for (int cx = pcx - chunkRadius; cx <= pcx + chunkRadius; cx++) {
+            for (int cz = pcz - chunkRadius; cz <= pcz + chunkRadius; cz++) {
+                if (!mc.level.hasChunk(cx, cz)) continue;
+                var chunk = mc.level.getChunk(cx, cz);
+                if (chunk != null) {
+                    list.addAll(chunk.getBlockEntities().values());
+                }
+            }
+        }
+        return list;
     }
 
     private record PosBox(BlockPos pos, Color color) {}

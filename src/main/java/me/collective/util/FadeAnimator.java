@@ -11,7 +11,7 @@ public class FadeAnimator {
 
         float dt = this.lastNanos == 0L ? 0.0f : (float) (now - this.lastNanos) / 1.0E9f;
         this.lastNanos = now;
-        dt = MathHelper.clamp(dt, 0.0f, 0.1f);
+        dt = Mth.clamp(dt, 0.0f, 0.1f);
 
         if (!enabled) {
             this.alpha = targetVisible ? 1.0f : 0.0f;
@@ -38,7 +38,7 @@ public class FadeAnimator {
 
     public int apply(int argb) {
         int a = argb >>> 24 & 0xFF;
-        a = MathHelper.clamp(Math.round((float) a * this.alpha), 0, 255);
+        a = Mth.clamp(Math.round((float) a * this.alpha), 0, 255);
         return a << 24 | argb & 0xFFFFFF;
     }
 }

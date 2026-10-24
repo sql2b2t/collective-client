@@ -3,7 +3,7 @@ package me.collective.module.hud;
 import me.collective.font.FontManager;
 import me.collective.render.RenderUtil;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.entity.player.Player;
 
 import java.awt.Color;
@@ -38,13 +38,13 @@ public class TextRadar extends HudModule {
         if (now - this.lastRebuild < 50) return this.cachedRows;
         this.lastRebuild = now;
 
-        if (mc.player == null || mc.world == null) return this.cachedRows = List.of();
+        if (mc.player == null || mc.level == null) return this.cachedRows = List.of();
 
         double rangeSq = (double) this.range.getIntValue() * this.range.getIntValue();
         List<Row> list = new ArrayList<>();
-        for (Player p : mc.world.getPlayers()) {
+        for (Player p : mc.level.players()) {
             if (p == mc.player || !p.isAlive()) continue;
-            double dSq = mc.player.squaredDistanceTo(p);
+            double dSq = mc.player.distanceToSqr(p);
             if (dSq > rangeSq) continue;
 
             int dist = (int) Math.sqrt(dSq);
@@ -57,8 +57,8 @@ public class TextRadar extends HudModule {
     }
 
     @Override
-    public void render(GuiGraphics context, float delta) {
-        if (!isToggled() || mc.player == null || mc.world == null) return;
+    public void render(GuiGraphicsExtractor context, float delta) {
+        if (!isToggled() || mc.player == null || mc.level == null) return;
 
         List<Row> players = rows();
 

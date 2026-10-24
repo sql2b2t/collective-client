@@ -15,16 +15,16 @@ public class DrawnCommand extends Command {
     @Override
     public void execute(String[] args) {
         if (args.length < 1) {
-            ChatHelper.sendMessage(Component.literal("Usage: " + getSyntax()).styled(s -> s.withColor(ChatFormatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Usage: " + getSyntax()).withStyle(s -> s.withColor(ChatFormatting.RED)));
             return;
         }
         Module mod = ModuleManager.INSTANCE.getModule(args[0]);
         if (mod == null) {
-            ChatHelper.sendMessage(Component.literal("Module not found: " + args[0]).styled(s -> s.withColor(ChatFormatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Module not found: " + args[0]).withStyle(s -> s.withColor(ChatFormatting.RED)));
             return;
         }
-        ChatHelper.sendMessage(Component.literal("Module ").styled(s -> s.withColor(ChatFormatting.GRAY))
-            .append(Component.literal(mod.getName()).styled(s -> s.withColor(ChatFormatting.WHITE)))
-            .append(Component.literal(" drawn toggled").styled(s -> s.withColor(ChatFormatting.GRAY))));
+        ChatHelper.sendMessage(Component.literal("Module ").withStyle(s -> s.withColor(ChatFormatting.GRAY))
+            .append(Component.literal(mod.getName()).withStyle(s -> s.withColor(ChatFormatting.WHITE)))
+            .append(Component.literal(" drawn toggled").withStyle(s -> s.withColor(ChatFormatting.GRAY))));
     }
 }

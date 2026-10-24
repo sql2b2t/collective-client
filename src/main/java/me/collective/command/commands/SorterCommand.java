@@ -20,7 +20,7 @@ public class SorterCommand extends Command {
     public void execute(String[] args) {
         StashSorter s = sorter();
         if (s == null) {
-            ChatHelper.sendMessage(Component.literal("Модуль StashSorter не найден.").styled(st -> st.withColor(ChatFormatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Модуль StashSorter не найден.").withStyle(st -> st.withColor(ChatFormatting.RED)));
             return;
         }
 
@@ -68,7 +68,7 @@ public class SorterCommand extends Command {
                 ChatHelper.sendMessage(Component.literal("§aСортировщик продолжен."));
             }
             case "очистить" -> clearZones(s);
-            default -> ChatHelper.sendMessage(Component.literal("Неизвестная подкоманда. Используйте: .сорт помощь").styled(st -> st.withColor(ChatFormatting.RED)));
+            default -> ChatHelper.sendMessage(Component.literal("Неизвестная подкоманда. Используйте: .сорт помощь").withStyle(st -> st.withColor(ChatFormatting.RED)));
         }
     }
 

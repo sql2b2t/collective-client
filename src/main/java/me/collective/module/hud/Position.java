@@ -4,7 +4,7 @@ import me.collective.font.FontManager;
 import me.collective.module.client.HUD;
 import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.awt.Color;
 
@@ -17,7 +17,7 @@ public class Position extends HudModule {
     }
 
     @Override
-    public void render(GuiGraphics context, float delta) {
+    public void render(GuiGraphicsExtractor context, float delta) {
         if (!isToggled() || mc.player == null) return;
 
         double posX = mc.player.getX();
@@ -26,9 +26,9 @@ public class Position extends HudModule {
 
         String coords = String.format("XYZ: §f%.1f, %.1f, %.1f", posX, posY, posZ);
 
-        if (nether.getValue() && mc.world != null) {
-            boolean isNether = mc.world.getRegistryKey() == net.minecraft.world.Level.NETHER;
-            boolean isOverworld = mc.world.getRegistryKey() == net.minecraft.world.Level.OVERWORLD;
+        if (nether.getValue() && mc.level != null) {
+            boolean isNether = mc.level.dimension() == net.minecraft.world.level.Level.NETHER;
+            boolean isOverworld = mc.level.dimension() == net.minecraft.world.level.Level.OVERWORLD;
             if (isNether || isOverworld) {
                 double nX = isNether ? posX * 8.0 : posX / 8.0;
                 double nZ = isNether ? posZ * 8.0 : posZ / 8.0;
@@ -37,9 +37,9 @@ public class Position extends HudModule {
         }
 
         if (angles.getValue()) {
-            float yaw = mc.player.getYaw() % 360;
+            float yaw = mc.player.getYRot() % 360;
             if (yaw < 0) yaw += 360;
-            float pitch = mc.player.getPitch();
+            float pitch = mc.player.getXRot();
             coords += String.format(" §7(§f%.1f§7, §f%.1f§7)", yaw, pitch);
         }
 

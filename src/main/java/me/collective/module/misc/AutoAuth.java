@@ -47,28 +47,28 @@ public class AutoAuth extends Module {
 
     @EventHandler
     public void onPacketReceive(PacketEvent.Receive event) {
-        if (!(event.packet instanceof GameMessageS2CPacket packet)) return;
-        var connection = mc.getNetworkHandler();
+        if (!(event.packet instanceof net.minecraft.network.protocol.game.ClientboundSystemChatPacket packet)) return;
+        var connection = mc.getConnection();
         if (connection == null || mc.player == null) return;
         mc.execute(() -> {
             // A queued hint from an old connection must never authenticate a new server.
-            if (mc.getNetworkHandler() == connection) handleAuthMessage(packet);
+            if (mc.getConnection() == connection) handleAuthMessage(packet);
         });
     }
 
-    private void handleAuthMessage(GameMessageS2CPacket packet) {
-        if (!isToggled() || mc.getNetworkHandler() == null || mc.player == null) return;
-        var server = mc.getCurrentServerEntry();
+    private void handleAuthMessage(net.minecraft.network.protocol.game.ClientboundSystemChatPacket packet) {
+        if (!isToggled() || mc.getConnection() == null || mc.player == null) return;
+        var server = mc.getCurrentServer();
         if (server == null) return;
-        String serverKey = normalizeServer(server.address);
+        String serverKey = normalizeServer(server.ip);
         if (serverKey.isEmpty() || !serverKey.equals(normalizeServer(trustedServer.getValue()))) return;
 
         String message = packet.content().getString().toLowerCase(Locale.ROOT);
         boolean register = message.contains("/reg") || message.contains("зарегистрируйтесь");
         boolean login = message.contains("авторизуйтесь") || message.contains("/login") || LOGIN_HINT.matcher(message).find();
         if (!register && !login) return;
-        if (lastConnection != mc.getNetworkHandler()) {
-            lastConnection = mc.getNetworkHandler();
+        if (lastConnection != mc.getConnection()) {
+            lastConnection = mc.getConnection();
             lastAuthCommand = "";
             lastAuthAt = 0;
         }
@@ -79,7 +79,7 @@ public class AutoAuth extends Module {
         if (pass == null) return;
         lastAuthAt = now;
         lastAuthCommand = command;
-        mc.getNetworkHandler().sendChatCommand(register ? "reg " + pass + " " + pass : "login " + pass);
+        mc.getConnection().sendCommand(register ? "reg " + pass + " " + pass : "login " + pass);
         // Never echo a credential, even if an old config has ShowPassword enabled.
         info(register ? "Отправлена регистрация." : "Отправлен вход.");
     }
@@ -94,7 +94,7 @@ public class AutoAuth extends Module {
     }
 
     private String resolvePassword(String serverKey) {
-        String nick = mc.getUser().getUsername().toLowerCase(Locale.ROOT);
+        String nick = mc.getUser().getName().toLowerCase(Locale.ROOT);
         if (nick.isBlank()) return null;
         String pass;
         if (authMode.process("Random")) {

@@ -41,9 +41,9 @@ public final class ContainerContents {
         List<ItemStack> slots = new ArrayList<>(SLOTS);
         for (int i = 0; i < SLOTS; i++) slots.add(ItemStack.EMPTY);
 
-        ContainerComponent component = stack.get(DataComponentTypes.CONTAINER);
+        ItemContainerContents component = stack.get(DataComponents.CONTAINER);
         if (component != null) {
-            List<ItemStack> contents = component.stream().toList();
+            List<ItemStack> contents = component.itemCopies().toList();
             for (int i = 0; i < contents.size() && i < SLOTS; i++) {
                 ItemStack copy = contents.get(i).copy();
                 // в оригинале нулевое количество помечается значением 69,
@@ -66,20 +66,20 @@ public final class ContainerContents {
      * требует реестрового кодека, а на этих серверах NBT-зачасто обрезан.
      */
     private static void readFromNbt(ItemStack stack, List<ItemStack> slots) {
-        NbtComponent custom = stack.getOrDefault(DataComponentTypes.CUSTOM_DATA, NbtComponent.DEFAULT);
-        NbtCompound nbt = custom.copyNbt();
+        CustomData custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
+        CompoundTag nbt = custom.copyTag();
 
         if (nbt == null || !nbt.contains("BlockEntityTag")) return;
 
-        Optional<NbtCompound> blockEntityTag = nbt.getCompound("BlockEntityTag");
+        Optional<CompoundTag> blockEntityTag = nbt.getCompound("BlockEntityTag");
         if (blockEntityTag.isEmpty() || !blockEntityTag.get().contains("Items")) return;
 
-        Optional<NbtList> itemsOpt = blockEntityTag.get().getList("Items");
+        Optional<ListTag> itemsOpt = blockEntityTag.get().getList("Items");
         if (itemsOpt.isEmpty()) return;
 
-        NbtList items = itemsOpt.get();
+        ListTag items = itemsOpt.get();
         for (int i = 0; i < items.size() && i < SLOTS; i++) {
-            Optional<NbtCompound> itemOpt = items.getCompound(i);
+            Optional<CompoundTag> itemOpt = items.getCompound(i);
             if (itemOpt.isEmpty()) continue;
 
             ItemStack parsed = parseItem(itemOpt.get());
@@ -92,18 +92,18 @@ public final class ContainerContents {
     }
 
     /** Предмет по идентификатору и количеству из NBT. */
-    private static ItemStack parseItem(NbtCompound tag) {
-        String id = tag.getString("id", "");
+    private static ItemStack parseItem(CompoundTag tag) {
+        String id = tag.getStringOr("id", "");
         if (id.isEmpty()) return ItemStack.EMPTY;
 
         int count = 1;
-        if (tag.contains("count")) count = tag.getInt("count", 1);
-        else if (tag.contains("Count")) count = tag.getByte("Count", (byte) 1);
+        if (tag.contains("count")) count = tag.getIntOr("count", 1);
+        else if (tag.contains("Count")) count = tag.getByteOr("Count", (byte) 1);
 
         Identifier itemId = Identifier.tryParse(id);
-        if (itemId == null || !Registries.ITEM.containsId(itemId)) return ItemStack.EMPTY;
+        if (itemId == null || !BuiltInRegistries.ITEM.containsKey(itemId)) return ItemStack.EMPTY;
 
-        return new ItemStack(Registries.ITEM.get(itemId), count);
+        return new ItemStack(BuiltInRegistries.ITEM.getValue(itemId), count);
     }
 
     /** Есть ли что показывать. */

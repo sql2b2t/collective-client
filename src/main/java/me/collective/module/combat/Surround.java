@@ -14,7 +14,7 @@ import me.collective.util.SwapManager;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.item.Items;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.world.InteractionHand;
@@ -50,10 +50,10 @@ public class Surround extends Module {
     @Override
     public void onEnable() {
         delayTimer = 0;
-        if (mc.player != null && center.getValue() && mc.player.isOnGround()) {
+        if (mc.player != null && center.getValue() && mc.player.onGround()) {
             double cx = Math.floor(mc.player.getX()) + 0.5;
             double cz = Math.floor(mc.player.getZ()) + 0.5;
-            mc.player.setPosition(cx, mc.player.getY(), cz);
+            mc.player.setPos(cx, mc.player.getY(), cz);
         }
     }
 
@@ -64,8 +64,8 @@ public class Surround extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
-        if (onlyOnGround.getValue() && !mc.player.isOnGround()) return;
+        if (mc.player == null || mc.level == null) return;
+        if (onlyOnGround.getValue() && !mc.player.onGround()) return;
 
         if (delayTimer > 0) {
             delayTimer--;
@@ -81,7 +81,7 @@ public class Surround extends Module {
         // Ярусные цели: сначала полностью закрываем первый ярус (у ног),
         // только потом тратим обсидиан на второй — иначе над дыркой
         // появится крыша, а стенки так и останутся с дырой.
-        BlockPos playerPos = mc.player.getBlockPos();
+        BlockPos playerPos = mc.player.blockPosition();
         List<BlockPos> tier0 = new ArrayList<>();
         List<BlockPos> tier1 = new ArrayList<>();
 
@@ -98,22 +98,22 @@ public class Surround extends Module {
         }
 
         if (doubleHeight.getValue()) {
-            tier1.add(playerPos.north().up());
-            tier1.add(playerPos.south().up());
-            tier1.add(playerPos.east().up());
-            tier1.add(playerPos.west().up());
+            tier1.add(playerPos.north().above());
+            tier1.add(playerPos.south().above());
+            tier1.add(playerPos.east().above());
+            tier1.add(playerPos.west().above());
 
             if (diagonal.getValue()) {
-                tier1.add(playerPos.north().east().up());
-                tier1.add(playerPos.north().west().up());
-                tier1.add(playerPos.south().east().up());
-                tier1.add(playerPos.south().west().up());
+                tier1.add(playerPos.north().east().above());
+                tier1.add(playerPos.north().west().above());
+                tier1.add(playerPos.south().east().above());
+                tier1.add(playerPos.south().west().above());
             }
         }
 
-        Vec3 eyePos = mc.player.getEyePos();
+        Vec3 eyePos = mc.player.getEyePosition();
         Comparator<BlockPos> byDistance
-            = Comparator.comparingDouble(p -> eyePos.squaredDistanceTo(p.toCenterPos()));
+            = Comparator.comparingDouble(p -> eyePos.distanceToSqr(Vec3.atCenterOf(p)));
         tier0.sort(byDistance);
         tier1.sort(byDistance);
 
@@ -125,10 +125,10 @@ public class Surround extends Module {
 
         for (BlockPos pos : targetPositions) {
             if (placed >= maxPlaced) break;
-            if (!mc.world.getBlockState(pos).isReplaceable()) continue;
+            if (!mc.level.getBlockState(pos).canBeReplaced()) continue;
 
             // Не ставим, если хитбокс игрока пересекает блок
-            AABB blockBox = new AABB(pos).contract(0.01);
+            AABB blockBox = new AABB(pos).deflate(0.01);
             if (mc.player.getBoundingBox().intersects(blockBox)) continue;
 
             if (placeBlock(pos, obsidian)) {
@@ -144,16 +144,16 @@ public class Surround extends Module {
     }
 
     private boolean placeBlock(BlockPos pos, FindItemResult obsidian) {
-        if (mc.player == null || mc.world == null) return false;
+        if (mc.player == null || mc.level == null) return false;
 
         // Поиск твёрдого соседа для клика (GrimAC требует валидную опору)
         Direction placeSide = null;
         BlockPos neighborPos = null;
 
         for (Direction side : Direction.values()) {
-            BlockPos neighbor = pos.offset(side);
-            BlockState state = mc.world.getBlockState(neighbor);
-            if (!state.isReplaceable()) {
+            BlockPos neighbor = pos.relative(side);
+            BlockState state = mc.level.getBlockState(neighbor);
+            if (!state.canBeReplaced()) {
                 placeSide = side.getOpposite();
                 neighborPos = neighbor;
                 break;
@@ -170,20 +170,20 @@ public class Surround extends Module {
             double rz = (RANDOM.nextDouble() - 0.5) * 0.4;
 
             hitVec = new Vec3(
-                neighborPos.getX() + 0.5 + placeSide.getOffsetX() * 0.5 + (placeSide.getAxis() != Direction.Axis.X ? rx : 0),
-                neighborPos.getY() + 0.5 + placeSide.getOffsetY() * 0.5 + (placeSide.getAxis() != Direction.Axis.Y ? ry : 0),
-                neighborPos.getZ() + 0.5 + placeSide.getOffsetZ() * 0.5 + (placeSide.getAxis() != Direction.Axis.Z ? rz : 0)
+                neighborPos.getX() + 0.5 + placeSide.getStepX() * 0.5 + (placeSide.getAxis() != Direction.Axis.X ? rx : 0),
+                neighborPos.getY() + 0.5 + placeSide.getStepY() * 0.5 + (placeSide.getAxis() != Direction.Axis.Y ? ry : 0),
+                neighborPos.getZ() + 0.5 + placeSide.getStepZ() * 0.5 + (placeSide.getAxis() != Direction.Axis.Z ? rz : 0)
             );
             hitResult = new BlockHitResult(hitVec, placeSide, neighborPos, false);
         } else {
             // Grim Air place fallback
-            hitVec = Vec3.ofCenter(pos);
+            hitVec = Vec3.atCenterOf(pos);
             hitResult = new BlockHitResult(hitVec, Direction.UP, pos, false);
         }
 
         // Ротация под GrimAC
         if (rotate.getValue()) {
-            float[] rots = RotationUtils.getRotationsTo(mc.player.getEyePos(), hitVec);
+            float[] rots = RotationUtils.getRotationsTo(mc.player.getEyePosition(), hitVec);
             RotationUtils.getInstance().setRotationSmooth(this, ROTATION_PRIORITY, rots[0], rots[1], 80.0, true);
             RotationUtils.getInstance().keepWireFresh();
         }
@@ -196,20 +196,20 @@ public class Surround extends Module {
         }
 
         if (neighborPos != null && placeSide != null) {
-            mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(
+            mc.getConnection().send(new ServerboundUseItemOnPacket(
                 hand, hitResult, GrimUtils.nextSequence()
             ));
-            mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
+            mc.getConnection().send(ServerboundPunchPacket.INSTANCE);
         } else {
-            mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
-                PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, BlockPos.ORIGIN, Direction.DOWN
+            mc.getConnection().send(new ServerboundPlayerActionPacket(
+                ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, BlockPos.ZERO, Direction.DOWN
             ));
-            mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(
+            mc.getConnection().send(new ServerboundUseItemOnPacket(
                 hand, hitResult, GrimUtils.nextSequence()
             ));
-            mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
-            mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
-                PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, BlockPos.ORIGIN, Direction.DOWN
+            mc.getConnection().send(ServerboundPunchPacket.INSTANCE);
+            mc.getConnection().send(new ServerboundPlayerActionPacket(
+                ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, BlockPos.ZERO, Direction.DOWN
             ));
         }
 

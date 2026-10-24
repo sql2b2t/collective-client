@@ -17,18 +17,18 @@ public class Sprint extends Module {
     @EventHandler
     private void onTick(TickEvent.Pre event) {
         if (mc.player == null) return;
-        if (mc.player.isSneaking() || mc.player.getHungerManager().getFoodLevel() <= 6) return;
+        if (mc.player.isShiftKeyDown() || mc.player.getFoodData().getFoodLevel() <= 6) return;
 
         if (grimSafe.getValue()) {
-            if (mc.player.input.hasForwardMovement() && !mc.player.horizontalCollision) {
+            if (mc.player.input.hasForwardImpulse() && !mc.player.horizontalCollision) {
                 mc.player.setSprinting(true);
             }
         } else if (omni.getValue()) {
-            if (mc.player.input.hasForwardMovement() || Math.abs(mc.player.input.getMovementInput().x) > 0) {
+            if (mc.player.input.hasForwardImpulse() || Math.abs(mc.player.input.getMoveVector().x) > 0) {
                 mc.player.setSprinting(true);
             }
         } else {
-            if (mc.player.input.hasForwardMovement() && !mc.player.horizontalCollision) {
+            if (mc.player.input.hasForwardImpulse() && !mc.player.horizontalCollision) {
                 mc.player.setSprinting(true);
             }
         }

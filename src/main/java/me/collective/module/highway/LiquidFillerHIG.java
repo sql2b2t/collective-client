@@ -17,7 +17,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.item.BlockItem;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.InteractionHand;
@@ -86,7 +86,7 @@ public class LiquidFillerHIG extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null || mc.interactionManager == null) return;
+        if (mc.player == null || mc.level == null || mc.gameMode == null) return;
 
         if (timer < delay.getIntValue()) {
             timer++;
@@ -104,10 +104,10 @@ public class LiquidFillerHIG extends Module {
         Set<Block> filter = parseBlocks();
         if (listMode.getValue() == ListMode.Whitelist) {
             item = InventoryUtil.findInHotbarOrOffhand(stack ->
-                stack.getItem() instanceof BlockItem && filter.contains(Block.getBlockFromItem(stack.getItem())));
+                stack.getItem() instanceof BlockItem && filter.contains(Block.byItem(stack.getItem())));
         } else {
             item = InventoryUtil.findInHotbarOrOffhand(stack ->
-                stack.getItem() instanceof BlockItem && !filter.contains(Block.getBlockFromItem(stack.getItem())));
+                stack.getItem() instanceof BlockItem && !filter.contains(Block.byItem(stack.getItem())));
         }
         if (!item.found()) return;
 
@@ -129,14 +129,14 @@ public class LiquidFillerHIG extends Module {
                         || (tooFarCube && shape.getValue() == Shape.UniformCube)
                         || belowPlayer) continue;
 
-                    Fluid fluid = mc.world.getBlockState(pos).getFluidState().getFluid();
+                    Fluid fluid = mc.level.getBlockState(pos).getFluidState().getType();
                     if ((placeInLiquids.getValue() == PlaceIn.Both && (fluid != Fluids.WATER && fluid != Fluids.LAVA))
                         || (placeInLiquids.getValue() == PlaceIn.Water && fluid != Fluids.WATER)
                         || (placeInLiquids.getValue() == PlaceIn.Lava && fluid != Fluids.LAVA)) continue;
 
-                    if (!mc.world.getBlockState(pos).isReplaceable()) continue;
+                    if (!mc.level.getBlockState(pos).canBeReplaced()) continue;
 
-                    targets.add(pos.toImmutable());
+                    targets.add(pos.immutable());
                 }
             }
         }
@@ -162,12 +162,12 @@ public class LiquidFillerHIG extends Module {
     private boolean place(BlockPos pos, FindItemResult item) {
         Direction[] order = {Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
         for (Direction dir : order) {
-            BlockPos neighbor = pos.offset(dir);
-            if (!mc.world.getBlockState(neighbor).isReplaceable()
-                && mc.world.getBlockState(neighbor).isSolidBlock(mc.world, neighbor)) {
+            BlockPos neighbor = pos.relative(dir);
+            if (!mc.level.getBlockState(neighbor).canBeReplaced()
+                && mc.level.getBlockState(neighbor).isSolid()) {
                 Direction side = dir.getOpposite();
-                Vec3 hitVec = Vec3.ofCenter(neighbor).add(
-                    side.getOffsetX() * 0.45, side.getOffsetY() * 0.45, side.getOffsetZ() * 0.45);
+                Vec3 hitVec = Vec3.atCenterOf(neighbor).add(
+                    side.getStepX() * 0.45, side.getStepY() * 0.45, side.getStepZ() * 0.45);
 
                 if (GrimUtils.closestEyeDistanceSqTo(mc.player, hitVec) > 18.0) continue;
 
@@ -177,7 +177,7 @@ public class LiquidFillerHIG extends Module {
                 }
 
                 if (rotate.getValue()) {
-                    Vec3 eyes = mc.player.getEyePos();
+                    Vec3 eyes = mc.player.getEyePosition();
                     double dx = hitVec.x - eyes.x;
                     double dy = hitVec.y - eyes.y;
                     double dz = hitVec.z - eyes.z;
@@ -186,10 +186,10 @@ public class LiquidFillerHIG extends Module {
                     float pitch = (float) -Math.toDegrees(Math.atan2(dy, distXZ));
                     RotationUtils.getInstance().setRotationSilentInstant(this, 40, yaw, pitch);
                 }
-                mc.interactionManager.interactBlock(mc.player, hand,
+                mc.gameMode.useItemOn(mc.player, hand,
                     new BlockHitResult(hitVec, side, neighbor, false));
-                if (mc.getNetworkHandler() != null) {
-                    mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
+                if (mc.getConnection() != null) {
+                    mc.getConnection().send(ServerboundPunchPacket.INSTANCE);
                 }
                 if (!item.isOffhand()) {
                     InventoryUtil.swapBack();
@@ -207,8 +207,8 @@ public class LiquidFillerHIG extends Module {
             if (id.isEmpty()) continue;
             if (!id.contains(":")) id = "minecraft:" + id;
             Identifier ident = Identifier.tryParse(id);
-            if (ident == null || !Registries.BLOCK.containsId(ident)) continue;
-            out.add(Registries.BLOCK.get(ident));
+            if (ident == null || !BuiltInRegistries.BLOCK.containsKey(ident)) continue;
+            out.add(BuiltInRegistries.BLOCK.getValue(ident));
         }
         return out;
     }

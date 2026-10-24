@@ -2,7 +2,7 @@ package me.collective.module.tooltips;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.world.level.saveddata.maps.MapId;
@@ -21,44 +21,44 @@ import net.minecraft.resources.Identifier;
  * {@code MapRenderState} и очередь render-команд, до которых нельзя дотянуться
  * из компонента тултипа.
  */
-public class MapTooltipComponent implements TooltipComponent {
+public class MapTooltipComponent implements ClientTooltipComponent {
 
-    private static final Identifier BACKGROUND = Identifier.ofVanilla("textures/map/map_background.png");
+    private static final Identifier BACKGROUND = Identifier.withDefaultNamespace("textures/map/map_background.png");
 
     public static final int WIDTH = 108;
     public static final int HEIGHT = 110;
 
     private final int id;
-    private final MapState mapState;
+    private final MapItemSavedData mapState;
 
-    public MapTooltipComponent(int id, MapState mapState) {
+    public MapTooltipComponent(int id, MapItemSavedData mapState) {
         this.id = id;
         this.mapState = mapState;
     }
 
     @Override
-    public int getHeight(TextRenderer textRenderer) {
+    public int getHeight(Font textRenderer) {
         return HEIGHT;
     }
 
     @Override
-    public int getWidth(TextRenderer textRenderer) {
+    public int getWidth(Font textRenderer) {
         return WIDTH;
     }
 
     @Override
-    public void drawItems(TextRenderer textRenderer, int x, int y, int width, int height, GuiGraphics context) {
-        var matrices = context.getMatrices();
+    public void extractImage(Font textRenderer, int x, int y, int width, int height, GuiGraphicsExtractor context) {
+        var matrices = context.pose();
 
         // подложка: масштаб 1.5, как в оригинале
         matrices.pushMatrix();
         matrices.translate(x, y);
         matrices.scale(1.5f);
-        context.drawTexture(RenderPipelines.GUI_TEXTURED, BACKGROUND, 0, 0, 0f, 0f, 64, 64, 64, 64);
+        context.blit(RenderPipelines.GUI_TEXTURED, BACKGROUND, 0, 0, 0f, 0f, 64, 64, 64, 64);
         matrices.popMatrix();
 
         Minecraft mc = Minecraft.getInstance();
-        var texture = mc.getMapTextureManager().getTextureId(new MapIdComponent(id), mapState);
+        var texture = mc.getMapTextureManager().prepareMapTexture(new MapId(id), mapState);
         if (texture == null) return;
 
         // карта: масштаб 0.75 и сдвиг 8 пикселей
@@ -66,7 +66,7 @@ public class MapTooltipComponent implements TooltipComponent {
         matrices.translate(x, y);
         matrices.scale(0.75f);
         matrices.translate(8f, 8f);
-        context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, 0, 0, 0f, 0f, 128, 128, 128, 128);
+        context.blit(RenderPipelines.GUI_TEXTURED, texture, 0, 0, 0f, 0f, 128, 128, 128, 128);
         matrices.popMatrix();
     }
 
@@ -74,7 +74,7 @@ public class MapTooltipComponent implements TooltipComponent {
         return id;
     }
 
-    public MapState mapState() {
+    public MapItemSavedData mapState() {
         return mapState;
     }
 }

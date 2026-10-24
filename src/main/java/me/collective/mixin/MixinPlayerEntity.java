@@ -15,9 +15,9 @@ public abstract class MixinPlayerEntity {
         Player self = (Player) (Object) this;
         if (!ElytraBounce.lookLikeFalling()) return;
         if (self != net.minecraft.client.Minecraft.getInstance().player) return;
-        if (!self.isGliding()) return;
+        if (!self.isFallFlying()) return;
 
-        self.setPose(EntityPose.STANDING);
+        self.setPose(Pose.STANDING);
         ci.cancel();
     }
 }

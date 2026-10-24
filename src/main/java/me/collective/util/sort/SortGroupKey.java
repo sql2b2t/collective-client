@@ -66,11 +66,11 @@ public final class SortGroupKey {
         // Один предмет занимает большую часть шалкера — называем его содержимым
         if (stackShare.size() != 1 && topStacks * 100 < DOMINANT_PERCENT * totalStacks) {
             List<String> ids = new ArrayList<>();
-            for (Item item : stackShare.keySet()) ids.add(Registries.ITEM.getId(item).toString());
+            for (Item item : stackShare.keySet()) ids.add(BuiltInRegistries.ITEM.getKey(item).toString());
             return format(ids);
         }
 
-        return SHULKER_PREFIX + Registries.ITEM.getId(top);
+        return SHULKER_PREFIX + BuiltInRegistries.ITEM.getKey(top);
     }
 
     /** Кит = шалкер с перечислением нескольких предметов. */
@@ -157,8 +157,8 @@ public final class SortGroupKey {
 
     private static ItemStack stackFromId(String id) {
         Identifier ident = Identifier.tryParse(id);
-        return ident != null && Registries.ITEM.containsId(ident)
-            ? new ItemStack((ItemConvertible) Registries.ITEM.get(ident))
+        return ident != null && BuiltInRegistries.ITEM.containsKey(ident)
+            ? new ItemStack((net.minecraft.world.level.ItemLike) BuiltInRegistries.ITEM.getValue(ident))
             : ItemStack.EMPTY;
     }
 

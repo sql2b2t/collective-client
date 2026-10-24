@@ -91,7 +91,7 @@ public class Excavator extends Module {
 
     @EventHandler
     private void onMouseClick(MouseClickEvent event) {
-        if (!isToggled() || mc.currentScreen != null) return;
+        if (!isToggled() || mc.gui.screen() != null) return;
         int bind = selectionBind.getValue();
         // Mouse buttons are encoded as -100 - button
         if (bind <= -100 && bind == (-100 - event.button)) {
@@ -101,7 +101,7 @@ public class Excavator extends Module {
 
     @EventHandler
     private void onKeyInput(KeyInputEvent event) {
-        if (!isToggled() || mc.currentScreen != null) return;
+        if (!isToggled() || mc.gui.screen() != null) return;
         int bind = selectionBind.getValue();
         if (bind > 0 && bind == event.key) {
             selectCorners();
@@ -109,7 +109,7 @@ public class Excavator extends Module {
     }
 
     private void selectCorners() {
-        if (mc.crosshairTarget == null || !(mc.crosshairTarget instanceof BlockHitResult result)) return;
+        if (mc.hitResult == null || !(mc.hitResult instanceof BlockHitResult result)) return;
 
         if (status == Status.SEL_START) {
             start = BetterBlockPos.from(result.getBlockPos());
@@ -140,7 +140,7 @@ public class Excavator extends Module {
         if (!isToggled()) return;
 
         if (status == Status.SEL_START || status == Status.SEL_END) {
-            if (mc.crosshairTarget instanceof BlockHitResult result) {
+            if (mc.hitResult instanceof BlockHitResult result) {
                 event.renderer.box(result.getBlockPos(), sideColor.getValue(), lineColor.getValue(), shapeMode.getValue(), 0);
             }
             if (status == Status.SEL_END && start != null) {
@@ -158,7 +158,7 @@ public class Excavator extends Module {
                 // Skip the fill while the camera is inside the area: while Baritone
                 // digs, the player usually stands inside it, and the translucent faces
                 // right in front of the camera wash out the whole screen in white.
-                Vec3 eye = mc.player != null ? mc.player.getEyePos() : null;
+                Vec3 eye = mc.player != null ? mc.player.getEyePosition() : null;
                 boolean inside = eye != null
                         && eye.x >= minX && eye.x <= maxX
                         && eye.y >= minY && eye.y <= maxY

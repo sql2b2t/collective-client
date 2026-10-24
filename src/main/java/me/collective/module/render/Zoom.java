@@ -46,7 +46,7 @@ public class Zoom extends Module {
     }
 
     public boolean isZooming() {
-        if (mc.player == null || mc.world == null || mc.currentScreen != null) {
+        if (mc.player == null || mc.level == null || mc.gui.screen() != null) {
             return false;
         }
 
@@ -56,7 +56,7 @@ public class Zoom extends Module {
 
         int key = getKeybind().getValue();
         if (key != GLFW.GLFW_KEY_UNKNOWN && mc.getWindow() != null) {
-            return InputUtil.isKeyPressed(mc.getWindow(), key);
+            return com.mojang.blaze3d.platform.InputConstants.isKeyDown(key);
         }
 
         return isToggled();
@@ -85,10 +85,10 @@ public class Zoom extends Module {
     private void updateCinematicCamera(boolean zooming) {
         if (cinematic.getValue() && mc.options != null) {
             if (zooming && !wasZooming) {
-                savedSmoothCamera = mc.options.smoothCameraEnabled;
-                mc.options.smoothCameraEnabled = true;
+                savedSmoothCamera = mc.options.smoothCamera;
+                mc.options.smoothCamera = true;
             } else if (!zooming && wasZooming) {
-                mc.options.smoothCameraEnabled = savedSmoothCamera;
+                mc.options.smoothCamera = savedSmoothCamera;
             }
         }
         wasZooming = zooming;
@@ -96,13 +96,13 @@ public class Zoom extends Module {
 
     private void resetCinematicCamera() {
         if (wasZooming && cinematic.getValue() && mc.options != null) {
-            mc.options.smoothCameraEnabled = savedSmoothCamera;
+            mc.options.smoothCamera = savedSmoothCamera;
         }
     }
 
     private void interpolateFov(float target) {
         long now = System.currentTimeMillis();
-        float dt = MathHelper.clamp((now - lastTime) / 1000.0f, 0.001f, 0.1f);
+        float dt = Mth.clamp((now - lastTime) / 1000.0f, 0.001f, 0.1f);
         lastTime = now;
 
         float speed = smoothSpeed.getValue().floatValue();

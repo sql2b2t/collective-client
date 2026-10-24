@@ -48,16 +48,18 @@ public class Search extends Module {
         Blocks.COAL_ORE, Blocks.DEEPSLATE_COAL_ORE,
         Blocks.ANCIENT_DEBRIS, Blocks.NETHER_QUARTZ_ORE);
 
-    private static final Set<Block> STORAGE = Set.of(
-        Blocks.CHEST, Blocks.TRAPPED_CHEST, Blocks.BARREL,
-        Blocks.ENDER_CHEST, Blocks.HOPPER, Blocks.FURNACE,
-        Blocks.DISPENSER, Blocks.DROPPER, Blocks.CRAFTER,
-        Blocks.SHULKER_BOX, Blocks.WHITE_SHULKER_BOX, Blocks.ORANGE_SHULKER_BOX,
-        Blocks.MAGENTA_SHULKER_BOX, Blocks.LIGHT_BLUE_SHULKER_BOX, Blocks.YELLOW_SHULKER_BOX,
-        Blocks.LIME_SHULKER_BOX, Blocks.PINK_SHULKER_BOX, Blocks.GRAY_SHULKER_BOX,
-        Blocks.LIGHT_GRAY_SHULKER_BOX, Blocks.CYAN_SHULKER_BOX, Blocks.PURPLE_SHULKER_BOX,
-        Blocks.BLUE_SHULKER_BOX, Blocks.BROWN_SHULKER_BOX, Blocks.GREEN_SHULKER_BOX,
-        Blocks.RED_SHULKER_BOX, Blocks.BLACK_SHULKER_BOX);
+    private static final Set<Block> STORAGE = buildStorageSet();
+
+    private static Set<Block> buildStorageSet() {
+        Set<Block> set = new HashSet<>(Set.of(
+            Blocks.CHEST, Blocks.TRAPPED_CHEST, Blocks.BARREL,
+            Blocks.ENDER_CHEST, Blocks.HOPPER, Blocks.FURNACE,
+            Blocks.DISPENSER, Blocks.DROPPER, Blocks.CRAFTER,
+            Blocks.SHULKER_BOX
+        ));
+        set.addAll(Blocks.DYED_SHULKER_BOX.asList());
+        return Set.copyOf(set);
+    }
 
     public Search() {
         super("Search", "Подсветка руд и хранилищ сквозь стены.", Category.RENDER);
@@ -71,7 +73,7 @@ public class Search extends Module {
 
     @Override
     public void onUpdate() {
-        if (mc.player == null || mc.world == null) {
+        if (mc.player == null || mc.level == null) {
             found.clear();
             scan.clear();
             return;
@@ -86,7 +88,7 @@ public class Search extends Module {
             targets.add(Blocks.TRIAL_SPAWNER);
         }
 
-        List<BlockPos> scanned = scan.tick(mc.world, mc.player.getBlockPos(), range.getIntValue(),
+        List<BlockPos> scanned = scan.tick(mc.level, mc.player.blockPosition(), range.getIntValue(),
             targets, System.currentTimeMillis());
         found.clear();
         found.addAll(scanned);
@@ -96,13 +98,13 @@ public class Search extends Module {
     public void onRender3D(Render3DEvent event) {
         if (!isToggled() || found.isEmpty() || mc.player == null) return;
         Color fill = color.getValue();
-        Vec3 cam = mc.gameRenderer.getCamera().getCameraPos();
+        Vec3 cam = mc.gameRenderer.mainCamera().position();
         double rangeBlocks = this.range.getValue();
         // found меняется только в тиковых обработчиках того же потока —
         // обход напрямую, без защитной копии на каждый кадр
         for (BlockPos pos : found) {
             AABB box = new AABB(pos);
-            double dist = Math.sqrt(mc.player.squaredDistanceTo(
+            double dist = Math.sqrt(mc.player.distanceToSqr(
                 pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5));
             Color fillF = ColorUtil.fadeByDistance(dist, rangeBlocks, fill);
             Color lineF = ColorUtil.fadeLineByDistance(dist, rangeBlocks, fill, 255);

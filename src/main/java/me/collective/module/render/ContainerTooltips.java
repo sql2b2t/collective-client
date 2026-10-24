@@ -26,7 +26,7 @@ import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.ShulkerBoxBlock;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.tooltip.TooltipRenderUtil;
 import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.item.BlockItem;
@@ -50,7 +50,7 @@ import java.util.List;
  * выключен, запись всё равно идёт, пока включён тултип.
  */
 public class ContainerTooltips extends Module {
-    private static final Identifier SLOT_TEXTURE = Identifier.ofVanilla("container/slot");
+    private static final Identifier SLOT_TEXTURE = Identifier.withDefaultNamespace("container/slot");
     private static final int ITEM_SIZE = 18;
     private static final long UPDATE_INTERVAL_MS = 100L;
 
@@ -179,7 +179,7 @@ public class ContainerTooltips extends Module {
     public void onUpdate() {
         // Замена GameJoined/GameLeft из b2xy: выход из мира — сохранить индекс,
         // вход обрабатывается лениво через getData(), плюс периодический автосейв.
-        if (mc.world == null) {
+        if (mc.level == null) {
             if (wasInWorld) {
                 wasInWorld = false;
                 currentTooltip = null;
@@ -207,15 +207,15 @@ public class ContainerTooltips extends Module {
 
     @EventHandler
     private void onPacketReceive(PacketEvent.Receive event) {
-        if (ownsRecorder() && event.getPacket() instanceof InventoryS2CPacket packet) {
+        if (ownsRecorder() && event.getPacket() instanceof ClientboundContainerSetContentPacket packet) {
             ContainerIndexRecorder.onInventoryPacket(packet);
         }
     }
 
-    public void onRender2D(GuiGraphics drawContext, float tickDelta) {
-        if (mc.player == null || mc.world == null) return;
+    public void onRender2D(GuiGraphicsExtractor drawContext, float tickDelta) {
+        if (mc.player == null || mc.level == null) return;
 
-        if (hideInScreens.get() && mc.currentScreen != null) {
+        if (hideInScreens.get() && mc.gui.screen() != null) {
             currentTooltip = null;
             return;
         }
@@ -234,8 +234,8 @@ public class ContainerTooltips extends Module {
         if (now - lastUpdateTime < UPDATE_INTERVAL_MS) return;
         lastUpdateTime = now;
 
-        HitResult hit = mc.crosshairTarget;
-        if (hit == null || hit.getPos().distanceTo(mc.player.getEyePos()) > maxDistance.get()) {
+        HitResult hit = mc.hitResult;
+        if (hit == null || hit.getLocation().distanceTo(mc.player.getEyePosition()) > maxDistance.get()) {
             currentTooltip = null;
             return;
         }
@@ -250,7 +250,7 @@ public class ContainerTooltips extends Module {
 
         if (showItemFrameShulkers.get()
             && hit instanceof EntityHitResult entityHit
-            && entityHit.getEntity() instanceof ItemFrameEntity frame) {
+            && entityHit.getEntity() instanceof ItemFrame frame) {
             TooltipData data = itemFrameTooltip(frame);
             if (data != null) {
                 currentTooltip = data;
@@ -262,13 +262,13 @@ public class ContainerTooltips extends Module {
     }
 
     private TooltipData trackedTooltip(BlockPos pos) {
-        String dimension = mc.world.getRegistryKey().getValue().toString();
-        BlockState state = mc.world.getBlockState(pos);
+        String dimension = mc.level.dimension().identifier().toString();
+        BlockState state = mc.level.getBlockState(pos);
 
         TrackedContainer container = ChestTrackerDataManager.getData().getContainer(pos, dimension);
         // Сундук могли записать по другой половине двойного
         if (container == null && state.getBlock() instanceof ChestBlock) {
-            BlockPos other = me.collective.util.sort.ContainerGeometry.otherHalf(mc.world, pos);
+            BlockPos other = me.collective.util.sort.ContainerGeometry.otherHalf(mc.level, pos);
             if (other != null) container = ChestTrackerDataManager.getData().getContainer(other, dimension);
         }
         // Содержимое эндер-сундука общее — подойдёт любая его запись
@@ -286,16 +286,16 @@ public class ContainerTooltips extends Module {
             showLastUpdated.get() ? formatLastUpdated(container.getLastUpdated()) : null);
     }
 
-    private TooltipData itemFrameTooltip(ItemFrameEntity frame) {
-        ItemStack held = frame.getHeldItemStack();
+    private TooltipData itemFrameTooltip(ItemFrame frame) {
+        ItemStack held = frame.getItem();
         if (held.isEmpty() || !(held.getItem() instanceof BlockItem blockItem)
             || !(blockItem.getBlock() instanceof ShulkerBoxBlock)) return null;
 
         List<ItemStack> items = ShulkerDataParser.parseShulkerContentsAsList(held);
         if (items.isEmpty() && !showEmptyContainers.get()) return null;
 
-        return new TooltipData(held.getName().getString(), items,
-            showPosition.get() ? formatPosition(frame.getBlockPos()) : null, null);
+        return new TooltipData(held.getHoverName().getString(), items,
+            showPosition.get() ? formatPosition(frame.blockPosition()) : null, null);
     }
 
     private TrackedContainer anyEnderChest(String dimension) {
@@ -305,30 +305,30 @@ public class ContainerTooltips extends Module {
         return null;
     }
 
-    private void renderTooltip(GuiGraphics context, TooltipData data) {
-        TextRenderer text = mc.textRenderer;
-        int screenWidth = mc.getWindow().getScaledWidth();
-        int screenHeight = mc.getWindow().getScaledHeight();
+    private void renderTooltip(GuiGraphicsExtractor context, TooltipData data) {
+        Font text = mc.font;
+        int screenWidth = mc.getWindow().getGuiScaledWidth();
+        int screenHeight = mc.getWindow().getGuiScaledHeight();
 
         int perRow = data.items.size() < 9 ? Math.max(1, data.items.size()) : 9;
         int rows = data.items.isEmpty() ? 1 : (int) Math.ceil(data.items.size() / 9.0);
 
         int contentWidth = perRow * ITEM_SIZE + 2;
         int contentHeight = rows * ITEM_SIZE + 2;
-        if (data.items.isEmpty()) contentWidth = Math.max(contentWidth, text.getWidth("Пусто") + 4);
+        if (data.items.isEmpty()) contentWidth = Math.max(contentWidth, text.width("Пусто") + 4);
 
         int headerHeight = 0;
         if (showContainerName.get() && data.name != null) {
             headerHeight += 9 + 2;
-            contentWidth = Math.max(contentWidth, text.getWidth(data.name) + 4);
+            contentWidth = Math.max(contentWidth, text.width(data.name) + 4);
         }
         if (data.position != null) {
             headerHeight += 9 + 1;
-            contentWidth = Math.max(contentWidth, text.getWidth(data.position) + 4);
+            contentWidth = Math.max(contentWidth, text.width(data.position) + 4);
         }
         if (data.lastUpdated != null) {
             headerHeight += 9 + 1;
-            contentWidth = Math.max(contentWidth, text.getWidth(data.lastUpdated) + 4);
+            contentWidth = Math.max(contentWidth, text.width(data.lastUpdated) + 4);
         }
 
         int totalHeight = contentHeight + headerHeight;
@@ -364,24 +364,24 @@ public class ContainerTooltips extends Module {
         x = Math.max(12, Math.min(x, screenWidth - contentWidth - 12)) + offsetX.get();
         y = Math.max(12, Math.min(y, screenHeight - totalHeight - 12)) + offsetY.get();
 
-        TooltipBackgroundRenderer.render(context, x, y, contentWidth, totalHeight, null);
+        net.minecraft.client.gui.screens.inventory.tooltip.TooltipRenderUtil.extractTooltipBackground(context, x, y, contentWidth, totalHeight, null);
 
         int currentY = y;
         if (showContainerName.get() && data.name != null) {
-            context.drawText(text, data.name, x, currentY, -1, true);
+            context.text(text, data.name, x, currentY, -1, true);
             currentY += 9 + 2;
         }
         if (data.position != null) {
-            context.drawText(text, data.position, x, currentY, -8355712, true);
+            context.text(text, data.position, x, currentY, -8355712, true);
             currentY += 9 + 1;
         }
         if (data.lastUpdated != null) {
-            context.drawText(text, data.lastUpdated, x, currentY, -8355712, true);
+            context.text(text, data.lastUpdated, x, currentY, -8355712, true);
             currentY += 9 + 1;
         }
 
         if (data.items.isEmpty()) {
-            context.drawText(text, "Пусто", x, currentY + 2, -8355712, true);
+            context.text(text, "Пусто", x, currentY + 2, -8355712, true);
             return;
         }
 
@@ -393,16 +393,16 @@ public class ContainerTooltips extends Module {
                 ItemStack stack = data.items.get(index++);
                 int itemX = x + col * ITEM_SIZE + 2;
                 int itemY = currentY + row * ITEM_SIZE + 2;
-                context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, SLOT_TEXTURE, itemX, itemY, ITEM_SIZE, ITEM_SIZE);
-                context.drawItem(stack, itemX + 1, itemY + 1);
-                context.drawStackOverlay(text, stack, itemX + 1, itemY + 1);
+                context.blitSprite(RenderPipelines.GUI_TEXTURED, SLOT_TEXTURE, itemX, itemY, ITEM_SIZE, ITEM_SIZE);
+                context.item(stack, itemX + 1, itemY + 1);
+                context.itemDecorations(text, stack, itemX + 1, itemY + 1);
                 if (shulkerBadge.get()) drawShulkerBadge(context, stack, itemX + ITEM_SIZE - 8, itemY + ITEM_SIZE - 8);
             }
         }
     }
 
     /** Иконка самого частого предмета внутри шалкера — видно, что за кит. */
-    private void drawShulkerBadge(GuiGraphics context, ItemStack stack, int x, int y) {
+    private void drawShulkerBadge(GuiGraphicsExtractor context, ItemStack stack, int x, int y) {
         if (stack.isEmpty() || !(stack.getItem() instanceof BlockItem blockItem)
             || !(blockItem.getBlock() instanceof ShulkerBoxBlock)) return;
 
@@ -410,7 +410,7 @@ public class ContainerTooltips extends Module {
         if (nested.isEmpty()) return;
 
         context.fill(x - 1, y - 1, x + 9, y + 9, -16777216);
-        context.drawItem(nested.get(0), x, y);
+        context.item(nested.get(0), x, y);
     }
 
     private String containerName(TrackedContainer container) {

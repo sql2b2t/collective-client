@@ -13,7 +13,7 @@ public final class PivotStore {
         if (p == null || SNAP.containsKey(p)) {
             return;
         }
-        SNAP.put(p, new float[]{p.pitch, p.yaw, p.roll, p.originX, p.originY, p.originZ});
+        SNAP.put(p, new float[]{p.xRot, p.yRot, p.zRot, p.x, p.y, p.z});
     }
 
     public static synchronized void restore(ModelPart p) {
@@ -24,9 +24,9 @@ public final class PivotStore {
         if (s == null) {
             return;
         }
-        p.originX = s[3];
-        p.originY = s[4];
-        p.originZ = s[5];
+        p.x = s[3];
+        p.y = s[4];
+        p.z = s[5];
     }
 
     /** Полный сброс (пивоты + повороты) — только при окончании эмоута. */
@@ -38,12 +38,12 @@ public final class PivotStore {
         if (s == null) {
             return;
         }
-        p.pitch = s[0];
-        p.yaw = s[1];
-        p.roll = s[2];
-        p.originX = s[3];
-        p.originY = s[4];
-        p.originZ = s[5];
+        p.xRot = s[0];
+        p.yRot = s[1];
+        p.zRot = s[2];
+        p.x = s[3];
+        p.y = s[4];
+        p.z = s[5];
     }
 
     public static synchronized void clear() {

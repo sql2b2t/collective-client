@@ -10,7 +10,7 @@ import me.collective.module.render.Blur;
 import me.collective.render.BlurEngine;
 import me.collective.render.RenderUtil;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
@@ -69,7 +69,7 @@ public class HudEditorScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         float screenW = width;
         float screenH = height;
         float cx = screenW / 2.0f;
@@ -220,11 +220,11 @@ public class HudEditorScreen extends Screen {
         // 9. Render HUD Category Panel
         hudPanel.render(context, mouseX, mouseY, delta, "");
 
-        super.render(context, mouseX, mouseY, delta);
+        super.extractRenderState(context, mouseX, mouseY, delta);
     }
 
     @Override
-    public boolean mouseClicked(Click click, boolean bl) {
+    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent click, boolean bl) {
         int button = click.button();
         double mouseX = click.x();
         double mouseY = click.y();
@@ -264,7 +264,7 @@ public class HudEditorScreen extends Screen {
     }
 
     @Override
-    public boolean mouseReleased(Click click) {
+    public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent click) {
         hudPanel.mouseReleased(click.x(), click.y(), click.button());
         if (draggingModule != null) {
             draggingModule = null;
@@ -273,11 +273,11 @@ public class HudEditorScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(KeyInput input) {
+    public boolean keyPressed(net.minecraft.client.input.KeyEvent input) {
         int key = input.key();
 
         if (key == GLFW.GLFW_KEY_ESCAPE) {
-            close();
+            onClose();
             return true;
         }
 
@@ -312,18 +312,18 @@ public class HudEditorScreen extends Screen {
     }
 
     @Override
-    public void close() {
+    public void onClose() {
         if (draggingModule != null) {
             draggingModule = null;
         }
         if (UI.INSTANCE != null && UI.INSTANCE.isToggled()) {
             UI.INSTANCE.setToggled(false);
         }
-        super.close();
+        super.onClose();
     }
 
     @Override
-    public boolean shouldPause() {
+    public boolean isPauseScreen() {
         return false;
     }
 }

@@ -24,25 +24,25 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class MixinBaritoneBlockStateInterface {
 
     @Inject(
-        method = "a(Lnet/minecraft/world/chunk/WorldChunk;III)Lnet/minecraft/block/BlockState;",
+        method = "a(Lnet/minecraft/world/chunk/LevelChunk;III)Lnet/minecraft/block/BlockState;",
         at = @At("HEAD"),
         remap = false,
         require = 0,
         cancellable = true
     )
     private static void collective$safeGetFromChunk(
-        WorldChunk chunk, int x, int y, int z, CallbackInfoReturnable<BlockState> cir) {
+        LevelChunk chunk, int x, int y, int z, CallbackInfoReturnable<BlockState> cir) {
 
-        ChunkSection[] sections = chunk.getSectionArray();
+        LevelChunkSection[] sections = chunk.getSections();
         int index = y >> 4;
         if (index < 0 || index >= sections.length) {
-            cir.setReturnValue(Blocks.AIR.getDefaultState());
+            cir.setReturnValue(Blocks.AIR.defaultBlockState());
             return;
         }
 
-        ChunkSection section = sections[index];
-        if (section == null || section.isEmpty()) {
-            cir.setReturnValue(Blocks.AIR.getDefaultState());
+        LevelChunkSection section = sections[index];
+        if (section == null || section.hasOnlyAir()) {
+            cir.setReturnValue(Blocks.AIR.defaultBlockState());
             return;
         }
 
@@ -54,7 +54,7 @@ public class MixinBaritoneBlockStateInterface {
             try {
                 cir.setReturnValue(section.getBlockState(x & 15, y & 15, z & 15));
             } catch (ArrayIndexOutOfBoundsException second) {
-                cir.setReturnValue(Blocks.AIR.getDefaultState());
+                cir.setReturnValue(Blocks.AIR.defaultBlockState());
             }
         }
     }

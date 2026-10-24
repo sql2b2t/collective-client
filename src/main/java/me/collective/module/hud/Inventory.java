@@ -1,7 +1,7 @@
 package me.collective.module.hud;
 
 import me.collective.render.RenderUtil;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.item.ItemStack;
 
 import java.awt.Color;
@@ -14,7 +14,7 @@ public class Inventory extends HudModule {
     }
 
     @Override
-    public void render(GuiGraphics context, float delta) {
+    public void render(GuiGraphicsExtractor context, float delta) {
         if (!isToggled() || mc.player == null) return;
 
         RenderUtil.drawRect(context, x, y, x + width, y + height, new Color(20, 20, 20, 180));
@@ -24,14 +24,14 @@ public class Inventory extends HudModule {
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
                 int slot = startSlot + row * 9 + col;
-                ItemStack stack = mc.player.getInventory().getStack(slot);
+                ItemStack stack = mc.player.getInventory().getItem(slot);
                 int itemX = (int) (x + 2 + col * 18);
                 int itemY = (int) (y + 2 + row * 18);
 
                 RenderUtil.drawRect(context, itemX, itemY, itemX + 16, itemY + 16, new Color(40, 40, 40, 100));
                 if (!stack.isEmpty()) {
-                    context.drawItem(stack, itemX, itemY);
-                    context.drawStackOverlay(mc.textRenderer, stack, itemX, itemY);
+                    context.item(stack, itemX, itemY);
+                    context.itemDecorations(mc.font, stack, itemX, itemY);
                 }
             }
         }

@@ -30,26 +30,26 @@ public class Jesus extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
-        if (mc.options.sneakKey.isPressed()) return;
+        if (mc.player == null || mc.level == null) return;
+        if (mc.options.keyShift.isDown()) return;
 
-        boolean touchingWater = water.getValue() && mc.player.isTouchingWater();
+        boolean touchingWater = water.getValue() && mc.player.isInWater();
         boolean touchingLava = lava.getValue() && mc.player.isInLava();
         if (!touchingWater && !touchingLava) return;
 
-        BlockPos feet = mc.player.getBlockPos();
-        BlockPos above = feet.up();
-        FluidState aboveFluid = mc.world.getFluidState(above);
-        boolean surfaceOfWater = touchingWater && !aboveFluid.isIn(FluidTags.WATER);
-        boolean surfaceOfLava = touchingLava && !aboveFluid.isIn(FluidTags.LAVA);
+        BlockPos feet = mc.player.blockPosition();
+        BlockPos above = feet.above();
+        FluidState aboveFluid = mc.level.getFluidState(above);
+        boolean surfaceOfWater = touchingWater && !aboveFluid.is(FluidTags.WATER);
+        boolean surfaceOfLava = touchingLava && !aboveFluid.is(FluidTags.LAVA);
 
         if (!surfaceOfWater && !surfaceOfLava) return;
-        if (aboveFluid.isIn(FluidTags.WATER) || aboveFluid.isIn(FluidTags.LAVA)) return;
+        if (aboveFluid.is(FluidTags.WATER) || aboveFluid.is(FluidTags.LAVA)) return;
 
         // Гасим вертикальное падение и даём постоянный подъём —
         // так игрок «стоит» на поверхности, а не тонет.
-        double vy = Math.max(mc.player.getVelocity().y, lift.getFloatValue());
-        mc.player.setVelocity(mc.player.getVelocity().x, vy, mc.player.getVelocity().z);
+        double vy = Math.max(mc.player.getDeltaMovement().y, lift.getFloatValue());
+        mc.player.setDeltaMovement(mc.player.getDeltaMovement().x, vy, mc.player.getDeltaMovement().z);
         // Сбрасываем дистанцию падения: сервер уже увидел посадку на жидкость.
         mc.player.fallDistance = 0;
     }

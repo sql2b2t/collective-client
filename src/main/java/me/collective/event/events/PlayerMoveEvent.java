@@ -5,10 +5,10 @@ import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.phys.Vec3;
 
 public class PlayerMoveEvent extends CancellableEvent {
-    public final MovementType type;
+    public final MoverType type;
     public Vec3 movement;
 
-    public PlayerMoveEvent(MovementType type, Vec3 movement) {
+    public PlayerMoveEvent(MoverType type, Vec3 movement) {
         this.type = type;
         this.movement = movement;
     }

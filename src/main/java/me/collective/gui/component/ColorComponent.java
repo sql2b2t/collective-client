@@ -6,7 +6,7 @@ import me.collective.module.client.Colors;
 import me.collective.module.client.UI;
 import me.collective.render.SoundUtil;
 import me.collective.setting.ColorSetting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.awt.Color;
 
@@ -29,7 +29,7 @@ public class ColorComponent extends Component {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         if (!setting.isVisible()) return;
 
         if (open && draggingSlider >= 0) {
@@ -91,7 +91,7 @@ public class ColorComponent extends Component {
         }
     }
 
-    private void renderSliderRow(GuiGraphics context, float rx, float ry, float rw, String label, float pct, int barColor) {
+    private void renderSliderRow(GuiGraphicsExtractor context, float rx, float ry, float rw, String label, float pct, int barColor) {
         ClickGuiTheme.badge().drawString(context, label, rx + 2f, ry + 2f, ClickGuiTheme.TEXT_MUTED);
 
         float trackX = rx + 36f;

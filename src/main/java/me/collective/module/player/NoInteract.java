@@ -33,6 +33,6 @@ public class NoInteract extends Module {
 
     /** Активен ли запрет для текущего ручного нажатия ПКМ. */
     public boolean shouldBlockManual() {
-        return isToggled() && mc != null && mc.options != null && mc.options.useKey.isPressed();
+        return isToggled() && mc != null && mc.options != null && mc.options.keyUse.isDown();
     }
 }

@@ -29,7 +29,7 @@ public class AutoSign extends Module {
     private String[] capturedLines;
     private Boolean capturedFront;
 
-    private final Queue<UpdateSignC2SPacket> queue = new ArrayDeque<>();
+    private final Queue<net.minecraft.network.protocol.game.ServerboundSignUpdatePacket> queue = new ArrayDeque<>();
     private int timer;
 
     public AutoSign() {
@@ -58,17 +58,17 @@ public class AutoSign extends Module {
             return;
         }
 
-        mc.player.networkHandler.sendPacket(queue.poll());
+        mc.getConnection().send(queue.poll());
 
         timer = 0;
     }
 
     @EventHandler
     public void onPacketSend(PacketEvent.Send event) {
-        if (!(event.packet instanceof UpdateSignC2SPacket sign)) return;
+        if (!(event.packet instanceof net.minecraft.network.protocol.game.ServerboundSignUpdatePacket sign)) return;
 
-        this.capturedLines = sign.getText().clone();
-        this.capturedFront = sign.isFront();
+        this.capturedLines = sign.lines().toArray(new String[0]);
+        this.capturedFront = sign.slot() == net.minecraft.world.level.block.entity.SignTextSlot.FRONT;
     }
 
     /**
@@ -79,10 +79,10 @@ public class AutoSign extends Module {
     public boolean queueAutoFill(BlockPos signPos) {
         if (!isToggled() || capturedLines == null || capturedFront == null) return false;
 
-        queue.add(new UpdateSignC2SPacket(
+        queue.add(new net.minecraft.network.protocol.game.ServerboundSignUpdatePacket(
             signPos,
-            capturedFront,
-            capturedLines[0], capturedLines[1], capturedLines[2], capturedLines[3]
+            java.util.List.of(capturedLines),
+            capturedFront ? net.minecraft.world.level.block.entity.SignTextSlot.FRONT : net.minecraft.world.level.block.entity.SignTextSlot.BACK
         ));
         return true;
     }

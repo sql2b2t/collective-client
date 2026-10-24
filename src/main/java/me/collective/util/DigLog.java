@@ -52,23 +52,23 @@ public final class DigLog {
 
         Packet<?> packet = event.packet;
 
-        if (packet instanceof PlayerMoveC2SPacket.LookAndOnGround) {
+        if (packet instanceof ServerboundMovePlayerPacket.Rot) {
             this.lookSeenThisTick = true;
             return;
         }
 
-        if (packet instanceof net.minecraft.network.packet.c2s.play.HandSwingC2SPacket) {
+        if (packet instanceof net.minecraft.network.protocol.game.ServerboundPunchPacket) {
             ChatHelper.sendMessage(String.format(
                 "[DigLog] SWING %s",
                 this.lookSeenThisTick ? "§e(look-пакет был до свинга)" : "§f(без look)"));
             return;
         }
 
-        if (packet instanceof PlayerActionC2SPacket action) {
-            PlayerActionC2SPacket.Action type = action.getAction();
-            if (type == PlayerActionC2SPacket.Action.START_DESTROY_BLOCK
-                || type == PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK
-                || type == PlayerActionC2SPacket.Action.ABORT_DESTROY_BLOCK) {
+        if (packet instanceof ServerboundPlayerActionPacket action) {
+            ServerboundPlayerActionPacket.Action type = action.getAction();
+            if (type == ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK
+                || type == ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK
+                || type == ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK) {
                 ChatHelper.sendMessage(String.format(
                     "[DigLog] %s %s dir=%s seq=%d %s",
                     type,
@@ -82,7 +82,7 @@ public final class DigLog {
             return;
         }
 
-        if (packet instanceof ClientTickEndC2SPacket) {
+        if (packet instanceof net.minecraft.network.protocol.game.ServerboundClientTickEndPacket) {
             this.lookSeenThisTick = false;
         }
     }

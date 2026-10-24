@@ -2,7 +2,7 @@ package me.collective.font;
 
 import me.collective.module.ModuleManager;
 import me.collective.module.client.Fonts;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.Component;
@@ -19,7 +19,7 @@ public final class ChatFontUtil {
     }
 
     /** Возвращает true если отрисовали сами и ваниллу надо пропустить. */
-    public static boolean drawCustomChat(GuiGraphics context, int y, float opacity, OrderedText text) {
+    public static boolean drawCustomChat(GuiGraphicsExtractor context, int y, float opacity, FormattedCharSequence text) {
         Fonts fonts = ModuleManager.INSTANCE.getModule(Fonts.class);
         if (fonts == null || !fonts.isToggled() || !fonts.chat.getValue()) return false;
         if (text == null) return false;
@@ -30,8 +30,8 @@ public final class ChatFontUtil {
         return true;
     }
 
-    /** OrderedText со стилями → строка с §-кодами. */
-    public static String toSectionString(OrderedText text) {
+    /** FormattedCharSequence со стилями → строка с §-кодами. */
+    public static String toSectionString(FormattedCharSequence text) {
         StringBuilder sb = new StringBuilder("§r§f");
         final int[] last = {-1, 0, 0, 0, 0, 0}; // colorRgb, bold, italic, underline, strike, obfuscated
         final boolean[] first = {true};
@@ -59,7 +59,7 @@ public final class ChatFontUtil {
     private static void emitStyle(StringBuilder sb, int[] last, boolean[] first, Style style) {
         int rgb = -1;
         TextColor color = style.getColor();
-        if (color != null) rgb = color.getRgb();
+        if (color != null) rgb = color.getValue();
         int bold = style.isBold() ? 1 : 0;
         int italic = style.isItalic() ? 1 : 0;
         int underline = style.isUnderlined() ? 1 : 0;

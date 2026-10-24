@@ -78,6 +78,6 @@ public class Fonts extends Module {
 
     @Override
     public void onDisable() {
-        // Will seamlessly fallback to Minecraft's TextRenderer
+        // Will seamlessly fallback to Minecraft's Font
     }
 }

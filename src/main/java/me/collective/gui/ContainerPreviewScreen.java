@@ -17,7 +17,7 @@ import java.util.List;
  * {@code syncId}, которого на сервере нет, поэтому окно только для чтения —
  * сервер клики в нём проигнорирует.
  *
- * <p>У оригинала был подкласс {@code GuiGraphics}, подменявший счётчик на «0»
+ * <p>У оригинала был подкласс {@code GuiGraphicsExtractor}, подменявший счётчик на «0»
  * для служебного значения 69. Здесь это не воспроизводится: 69 — внутренняя
  * пасхалка мода, а не признак пустого слота.
  */
@@ -32,19 +32,19 @@ public class ContainerPreviewScreen extends ShulkerBoxScreen {
                 title(container));
     }
 
-    private static ShulkerBoxScreenHandler createHandler(List<ItemStack> contents) {
-        SimpleInventory inventory = new SimpleInventory(27);
+    private static ShulkerBoxMenu createHandler(List<ItemStack> contents) {
+        SimpleContainer inventory = new SimpleContainer(27);
 
         for (int i = 0; i < contents.size() && i < 27; i++) {
             ItemStack stack = contents.get(i);
-            if (!stack.isEmpty()) inventory.setStack(i, stack.copy());
+            if (!stack.isEmpty()) inventory.setItem(i, stack.copy());
         }
 
-        return new ShulkerBoxScreenHandler(FAKE_SYNC_ID,
+        return new ShulkerBoxMenu(FAKE_SYNC_ID,
                 Minecraft.getInstance().player.getInventory(), inventory);
     }
 
     private static Component title(ItemStack container) {
-        return container.getName().copy().append(Component.literal(" (просмотр)"));
+        return container.getHoverName().copy().append(Component.literal(" (просмотр)"));
     }
 }

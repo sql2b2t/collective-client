@@ -98,7 +98,7 @@ public class ElytraRecast extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
         if (this.state == null) return;
         if (!this.hasElytraEquipped()) return;
 
@@ -125,12 +125,12 @@ public class ElytraRecast extends Module {
 
     @EventHandler
     private void onPacketReceive(PacketEvent.Receive event) {
-        if (event.packet instanceof DamageTiltS2CPacket packet) {
+        if (event.packet instanceof ClientboundHurtAnimationPacket packet) {
             // Receive стреляет на нетти-треде: raycast и состояние игрока
             // разрешено трогать только на основном, планируем через mc.execute.
             int id = packet.id();
             mc.execute(() -> {
-                if (mc.player == null || mc.world == null || this.state == null) return;
+                if (mc.player == null || mc.level == null || this.state == null) return;
                 if (id == mc.player.getId() && this.looksLikeWallHit()) {
                     this.pendingWallHit = true;
                 }
@@ -139,13 +139,13 @@ public class ElytraRecast extends Module {
     }
 
     private boolean looksLikeWallHit() {
-        if (!mc.player.isGliding()) return false;
-        Vec3 vel = mc.player.getVelocity();
-        if (Math.abs(vel.getX()) + Math.abs(vel.getZ()) < 0.1) return false;
-        Vec3 eye = mc.player.getEyePos();
-        Vec3 dir = new Vec3(vel.getX(), 0.0, vel.getZ()).normalize();
-        HitResult hit = mc.world.raycast(
-            new RaycastContext(eye, eye.add(dir.multiply(1.5)), RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, mc.player)
+        if (!mc.player.isFallFlying()) return false;
+        Vec3 vel = mc.player.getDeltaMovement();
+        if (Math.abs(vel.x) + Math.abs(vel.z) < 0.1) return false;
+        Vec3 eye = mc.player.getEyePosition();
+        Vec3 dir = new Vec3(vel.x, 0.0, vel.z).normalize();
+        HitResult hit = mc.level.clip(
+            new ClipContext(eye, eye.add(dir.scale(1.5)), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, mc.player)
         );
         return hit.getType() == HitResult.Type.BLOCK;
     }
@@ -177,7 +177,7 @@ public class ElytraRecast extends Module {
             this.pauseTicks--;
             this.notGlidingTicks = 0;
         } else {
-            boolean currentlyGliding = mc.player.isGliding();
+            boolean currentlyGliding = mc.player.isFallFlying();
             double currentY = mc.player.getY();
             if (this.isInNether()) {
                 if (!currentlyGliding) {
@@ -239,9 +239,9 @@ public class ElytraRecast extends Module {
         this.rocketTickCounter = this.rocketDelay.getIntValue();
         this.usedActivationRocket = false;
         this.netherRocketUsed = false;
-        if (mc.player.isGliding()) {
+        if (mc.player.isFallFlying()) {
             this.state = State.ASCENDING;
-        } else if (mc.player.isOnGround()) {
+        } else if (mc.player.onGround()) {
             this.state = State.JUMPING;
         } else {
             this.state = State.ACTIVATING;
@@ -249,8 +249,8 @@ public class ElytraRecast extends Module {
     }
 
     private void handleJumping() {
-        if (mc.player.isOnGround()) {
-            mc.player.jump();
+        if (mc.player.onGround()) {
+            mc.player.jumpFromGround();
             this.tickCounter = 0;
         } else if (this.tickCounter >= this.activationDelay.getIntValue()) {
             this.state = State.ACTIVATING;
@@ -259,11 +259,11 @@ public class ElytraRecast extends Module {
     }
 
     private void handleActivating() {
-        if (mc.player.isGliding()) {
+        if (mc.player.isFallFlying()) {
             this.state = State.ASCENDING;
             this.rocketTickCounter = this.rocketDelay.getIntValue();
             this.tickCounter = 0;
-        } else if (mc.player.isOnGround()) {
+        } else if (mc.player.onGround()) {
             this.state = State.JUMPING;
             this.tickCounter = 0;
             this.usedActivationRocket = false;
@@ -296,7 +296,7 @@ public class ElytraRecast extends Module {
     }
 
     private void handleAscending() {
-        if (!mc.player.isGliding()) {
+        if (!mc.player.isFallFlying()) {
             if (!this.hasRockets() && this.disableIfNoRockets.getValue()) {
                 sendClientMessage("§cПолёт потерян и ракет нет! Отключаюсь.");
                 this.toggle();
@@ -355,27 +355,27 @@ public class ElytraRecast extends Module {
 
     private boolean shouldBoost() {
         if (!this.hasRocketClearance()) return false;
-        return !this.smartRockets.getValue() || !this.isBoosted() && mc.player.getVelocity().y < this.minClimbSpeed.getValue();
+        return !this.smartRockets.getValue() || !this.isBoosted() && mc.player.getDeltaMovement().y < this.minClimbSpeed.getValue();
     }
 
     private boolean hasRocketClearance() {
-        Vec3 eye = mc.player.getEyePos();
-        Vec3 end = eye.add(mc.player.getRotationVec(1.0f).multiply(this.wallClearance.getIntValue()));
-        return mc.world.raycast(
-            new RaycastContext(eye, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, mc.player)
+        Vec3 eye = mc.player.getEyePosition();
+        Vec3 end = eye.add(mc.player.getViewVector(1.0f).scale(this.wallClearance.getIntValue()));
+        return mc.level.clip(
+            new ClipContext(eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, mc.player)
         ).getType() == HitResult.Type.MISS;
     }
 
     private boolean isBoosted() {
-        return !mc.world.getOtherEntities(
+        return !mc.level.getEntities(
             mc.player,
-            mc.player.getBoundingBox().expand(2.0),
-            e -> e instanceof FireworkRocketEntity rocket && !rocket.wasShotAtAngle()
+            mc.player.getBoundingBox().inflate(2.0),
+            e -> e instanceof FireworkRocketEntity rocket && !rocket.isShotAtAngle()
         ).isEmpty();
     }
 
     private void adjustPitchUp() {
-        float currentPitch = mc.player.getPitch();
+        float currentPitch = mc.player.getXRot();
         float target = this.targetPitch.getFloatValue();
         float speed = this.rotationSpeed.getFloatValue();
         float diff = target - currentPitch;
@@ -388,13 +388,13 @@ public class ElytraRecast extends Module {
             }
             float newPitch = currentPitch + adjustment;
             newPitch = Math.max(-89.0F, Math.min(89.0F, newPitch));
-            mc.player.setPitch(newPitch);
+            mc.player.setXRot(newPitch);
         }
     }
 
     private void sendElytraPacket() {
-        if (mc.player != null && mc.getNetworkHandler() != null) {
-            mc.getNetworkHandler().sendPacket(new ClientCommandC2SPacket(mc.player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
+        if (mc.player != null && mc.getConnection() != null) {
+            mc.getConnection().send(new ServerboundPlayerCommandPacket(mc.player, ServerboundPlayerCommandPacket.Action.START_FALL_FLYING));
         }
     }
 
@@ -420,22 +420,22 @@ public class ElytraRecast extends Module {
 
     private int findEmptyHotbarSlot() {
         for (int i = 0; i < 9; i++) {
-            if (mc.player.getInventory().getStack(i).isEmpty()) return i;
+            if (mc.player.getInventory().getItem(i).isEmpty()) return i;
         }
         return -1;
     }
 
     private boolean hasElytraEquipped() {
-        return mc.player.getEquippedStack(EquipmentSlot.CHEST).getItem() == Items.ELYTRA;
+        return mc.player.getItemBySlot(EquipmentSlot.CHEST).getItem() == Items.ELYTRA;
     }
 
     private boolean isInNether() {
-        return mc.world != null && mc.world.getRegistryKey() == Level.NETHER;
+        return mc.level != null && mc.level.dimension() == Level.NETHER;
     }
 
     private void sendClientMessage(String msg) {
         if (mc.player != null) {
-            mc.player.sendMessage(net.minecraft.text.Component.literal("§7[§bElytraRecast§7] §f" + msg), false);
+            mc.player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§7[§bElytraRecast§7] §f" + msg));
         }
     }
 

@@ -1,8 +1,6 @@
 package me.collective.render;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.renderer.block.model.BakedQuad;
-import com.mojang.blaze3d.vertex.PoseStack;
 
 public final class NoOpVertexConsumer implements VertexConsumer {
     public static final NoOpVertexConsumer INSTANCE = new NoOpVertexConsumer();
@@ -10,54 +8,47 @@ public final class NoOpVertexConsumer implements VertexConsumer {
     private NoOpVertexConsumer() {}
 
     @Override
-    public VertexConsumer vertex(float x, float y, float z) {
+    public VertexConsumer addVertex(float x, float y, float z) {
         return this;
     }
 
     @Override
-    public VertexConsumer color(int r, int g, int b, int a) {
+    public VertexConsumer setColor(int r, int g, int b, int a) {
         return this;
     }
 
     @Override
-    public VertexConsumer color(int color) {
+    public VertexConsumer setColor(int color) {
         return this;
     }
 
     @Override
-    public VertexConsumer texture(float u, float v) {
+    public VertexConsumer setUv(float u, float v) {
         return this;
     }
 
     @Override
-    public VertexConsumer overlay(int u, int v) {
+    public VertexConsumer setUv1(int u, int v) {
         return this;
     }
 
     @Override
-    public VertexConsumer light(int u, int v) {
+    public VertexConsumer setUv2(int u, int v) {
         return this;
     }
 
     @Override
-    public VertexConsumer normal(float x, float y, float z) {
+    public VertexConsumer setUv3(float u, float v) {
         return this;
     }
 
     @Override
-    public VertexConsumer lineWidth(float width) {
+    public VertexConsumer setNormal(float x, float y, float z) {
         return this;
     }
 
     @Override
-    public void vertex(float x, float y, float z, int color, float u, float v, int overlay, int light, float nx, float ny, float nz) {
-    }
-
-    @Override
-    public void quad(PoseStack.Entry matrixEntry, BakedQuad quad, float red, float green, float blue, float alpha, int light, int overlay) {
-    }
-
-    @Override
-    public void quad(PoseStack.Entry matrixEntry, BakedQuad quad, float[] brightnesses, float red, float green, float blue, float alpha, int[] lights, int overlay) {
+    public VertexConsumer setLineWidth(float width) {
+        return this;
     }
 }

@@ -13,11 +13,11 @@ public class EntityListComponent extends RegistryListComponent<EntityType<?>> {
 
     @Override
     protected Iterable<EntityType<?>> registryEntries() {
-        return Registries.ENTITY_TYPE;
+        return BuiltInRegistries.ENTITY_TYPE;
     }
 
     @Override
     protected Identifier idOf(EntityType<?> entry) {
-        return Registries.ENTITY_TYPE.getId(entry);
+        return BuiltInRegistries.ENTITY_TYPE.getKey(entry);
     }
 }

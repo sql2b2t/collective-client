@@ -57,7 +57,7 @@ public class TrackedContainer {
 
         for (ItemStack stack : stacks) {
             if (stack == null || stack.isEmpty()) continue;
-            String itemId = Registries.ITEM.getId(stack.getItem()).toString();
+            String itemId = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
             items.merge(itemId, stack.getCount(), Integer::sum);
             sigCounts.merge(ItemSignature.of(stack), stack.getCount(), Integer::sum);
             topSigCounts.merge(SortGroupKey.of(stack), stack.getCount(), Integer::sum);
@@ -73,14 +73,14 @@ public class TrackedContainer {
         if (!ContainerGeometry.isShulkerItem(stack)) return;
         for (ItemStack nested : ShulkerDataParser.parseShulkerContentsAsList(stack)) {
             if (nested == null || nested.isEmpty()) continue;
-            String itemId = Registries.ITEM.getId(nested.getItem()).toString();
+            String itemId = BuiltInRegistries.ITEM.getKey(nested.getItem()).toString();
             items.merge(itemId, nested.getCount(), Integer::sum);
             sigCounts.merge(ItemSignature.of(nested), nested.getCount(), Integer::sum);
         }
     }
 
     public boolean containsItem(Item item) {
-        return items.containsKey(Registries.ITEM.getId(item).toString());
+        return items.containsKey(BuiltInRegistries.ITEM.getKey(item).toString());
     }
 
     public boolean containsSignature(String sig) {
@@ -161,7 +161,7 @@ public class TrackedContainer {
         JsonArray stacksJson = new JsonArray();
         for (ItemStack stack : itemStacks) {
             JsonObject s = new JsonObject();
-            s.addProperty("id", Registries.ITEM.getId(stack.getItem()).toString());
+            s.addProperty("id", BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
             s.addProperty("count", stack.getCount());
 
             if (ContainerGeometry.isShulkerItem(stack)) {
@@ -169,7 +169,7 @@ public class TrackedContainer {
                 for (ItemStack nested : ShulkerDataParser.parseShulkerContentsAsList(stack)) {
                     if (nested == null || nested.isEmpty()) continue;
                     JsonObject n = new JsonObject();
-                    n.addProperty("id", Registries.ITEM.getId(nested.getItem()).toString());
+                    n.addProperty("id", BuiltInRegistries.ITEM.getKey(nested.getItem()).toString());
                     n.addProperty("count", nested.getCount());
                     nestedJson.add(n);
                 }
@@ -197,23 +197,23 @@ public class TrackedContainer {
             for (JsonElement el : json.getAsJsonArray("stacks")) {
                 JsonObject s = el.getAsJsonObject();
                 Identifier id = Identifier.tryParse(s.get("id").getAsString());
-                if (id == null || !Registries.ITEM.containsId(id)) continue;
+                if (id == null || !BuiltInRegistries.ITEM.containsKey(id)) continue;
 
                 int count = s.get("count").getAsInt();
                 if (count <= 0) continue;
 
-                ItemStack stack = new ItemStack((ItemConvertible) Registries.ITEM.get(id), count);
+                ItemStack stack = new ItemStack((net.minecraft.world.level.ItemLike) BuiltInRegistries.ITEM.getValue(id), count);
                 if (s.has("nested")) {
                     List<ItemStack> nested = new ArrayList<>();
                     for (JsonElement ne : s.getAsJsonArray("nested")) {
                         if (nested.size() >= SHULKER_SLOTS) break;
                         JsonObject n = ne.getAsJsonObject();
                         Identifier nid = Identifier.tryParse(n.get("id").getAsString());
-                        if (nid == null || !Registries.ITEM.containsId(nid)) continue;
+                        if (nid == null || !BuiltInRegistries.ITEM.containsKey(nid)) continue;
                         int ncount = n.get("count").getAsInt();
-                        if (ncount > 0) nested.add(new ItemStack((ItemConvertible) Registries.ITEM.get(nid), ncount));
+                        if (ncount > 0) nested.add(new ItemStack((net.minecraft.world.level.ItemLike) BuiltInRegistries.ITEM.getValue(nid), ncount));
                     }
-                    if (!nested.isEmpty()) stack.set(DataComponentTypes.CONTAINER, ContainerComponent.fromStacks(nested));
+                    if (!nested.isEmpty()) stack.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(nested));
                 }
 
                 container.itemStacks.add(stack);

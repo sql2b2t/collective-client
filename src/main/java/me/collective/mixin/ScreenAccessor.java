@@ -7,9 +7,9 @@ import net.minecraft.client.gui.screens.Screen;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
-/** Доступ к protected addDrawableChild из миксинов экранов. */
+/** Доступ к protected addRenderableWidget из миксинов экранов. */
 @Mixin(Screen.class)
 public interface ScreenAccessor {
-    @Invoker("addDrawableChild")
-    <T extends Element & Drawable & Selectable> T invokeAddDrawableChild(T element);
+    @Invoker("addRenderableWidget")
+    <T extends GuiEventListener & Renderable & NarratableEntry> T invokeAddRenderableWidget(T element);
 }

@@ -21,7 +21,7 @@ public class MoverCommand extends Command {
     public void execute(String[] args) {
         StashMover m = mover();
         if (m == null) {
-            ChatHelper.sendMessage(Component.literal("Модуль StashMover не найден.").styled(st -> st.withColor(ChatFormatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Модуль StashMover не найден.").withStyle(st -> st.withColor(ChatFormatting.RED)));
             return;
         }
 
@@ -41,12 +41,12 @@ public class MoverCommand extends Command {
         }
 
         if (!zone.equals("вход") && !zone.equals("выход")) {
-            ChatHelper.sendMessage(Component.literal("Укажите «вход» или «выход». Например: .перенос вход 1").styled(st -> st.withColor(ChatFormatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Укажите «вход» или «выход». Например: .перенос вход 1").withStyle(st -> st.withColor(ChatFormatting.RED)));
             return;
         }
 
         if (args.length < 2) {
-            ChatHelper.sendMessage(Component.literal("Укажите номер угла (1 или 2) или «очистить»").styled(st -> st.withColor(ChatFormatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Укажите номер угла (1 или 2) или «очистить»").withStyle(st -> st.withColor(ChatFormatting.RED)));
             return;
         }
 
@@ -60,13 +60,13 @@ public class MoverCommand extends Command {
         try {
             n = Integer.parseInt(args[1]);
         } catch (NumberFormatException e) {
-            ChatHelper.sendMessage(Component.literal("Номер угла должен быть 1 или 2").styled(st -> st.withColor(ChatFormatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Номер угла должен быть 1 или 2").withStyle(st -> st.withColor(ChatFormatting.RED)));
             return;
         }
 
         BlockPos pos = m.lookedAtBlock();
         if (pos == null) {
-            ChatHelper.sendMessage(Component.literal("Смотри на угол и повтори.").styled(st -> st.withColor(ChatFormatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Смотри на угол и повтори.").withStyle(st -> st.withColor(ChatFormatting.RED)));
             return;
         }
 

@@ -107,7 +107,7 @@ public final class MicrosoftAuth {
 
                 // Open browser
                 try {
-                    Util.getOperatingSystem().open(uri);
+                    com.mojang.blaze3d.Blaze3D.openUri(java.net.URI.create(uri));
                 } catch (Exception ignored) {}
 
                 return new DeviceCode(devCode, userCode, uri, exp, intv);

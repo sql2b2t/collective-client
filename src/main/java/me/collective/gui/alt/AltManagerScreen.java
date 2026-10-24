@@ -11,8 +11,8 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.PlayerFaceRenderer;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.PlayerFaceExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
@@ -39,7 +39,7 @@ public class AltManagerScreen extends Screen {
     private static final Path ALTS_FILE = FabricLoader.getInstance()
             .getGameDir().resolve("collective").resolve("alts.txt");
 
-    private static final Identifier BG_TEXTURE = Identifier.of("collective", "textures/gui/alt_background.png");
+    private static final Identifier BG_TEXTURE = Identifier.fromNamespaceAndPath("collective", "textures/gui/alt_background.png");
 
     private static final int BG_MODAL = 0xDE141822;
     private static final int BORDER_MODAL = 0x2AFFFFFF;
@@ -74,7 +74,7 @@ public class AltManagerScreen extends Screen {
         public UUID uuid;
         public String refreshToken = "";
         public String mcToken = "";
-        private Supplier<SkinTextures> skinSupplier;
+        private Supplier<PlayerSkin> skinSupplier;
 
         public AltEntry(String username, String type) {
             this.username = username;
@@ -90,22 +90,22 @@ public class AltManagerScreen extends Screen {
             this.mcToken = mcToken != null ? mcToken : "";
         }
 
-        public SkinTextures getSkin() {
+        public PlayerSkin getSkin() {
             if (skinSupplier == null) {
                 try {
-                    skinSupplier = Minecraft.getInstance().getSkinProvider()
-                            .supplySkinTextures(new GameProfile(uuid, username), true);
+                    skinSupplier = Minecraft.getInstance().getSkinManager()
+                            .createLookup(new GameProfile(uuid, username), true);
                 } catch (Exception ignored) {
                 }
             }
             if (skinSupplier != null) {
                 try {
-                    SkinTextures textures = skinSupplier.get();
+                    PlayerSkin textures = skinSupplier.get();
                     if (textures != null) return textures;
                 } catch (Exception ignored) {
                 }
             }
-            return DefaultSkinHelper.getSkinTextures(uuid);
+            return DefaultPlayerSkin.get(uuid);
         }
     }
 
@@ -175,11 +175,11 @@ public class AltManagerScreen extends Screen {
     // ============================================================= Render
 
     @Override
-    public void renderBackground(GuiGraphics ctx, int mx, int my, float delta) {
+    public void extractBackground(GuiGraphicsExtractor ctx, int mx, int my, float delta) {
         renderAtmosphericBackground(ctx);
     }
 
-    private void renderAtmosphericBackground(GuiGraphics ctx) {
+    private void renderAtmosphericBackground(GuiGraphicsExtractor ctx) {
         if (width <= 0 || height <= 0) return;
 
         float rScreen = (float) width / (float) Math.max(1, height);
@@ -200,7 +200,7 @@ public class AltManagerScreen extends Screen {
         }
 
         try {
-            ctx.drawTexture(
+            ctx.blit(
                     RenderPipelines.GUI_TEXTURED,
                     BG_TEXTURE,
                     0, 0,
@@ -218,8 +218,8 @@ public class AltManagerScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics ctx, int mx, int my, float delta) {
-        renderBackground(ctx, mx, my, delta);
+    public void extractRenderState(GuiGraphicsExtractor ctx, int mx, int my, float delta) {
+        extractBackground(ctx, mx, my, delta);
 
         float px = getPanelX();
         float py = getPanelY();
@@ -241,12 +241,12 @@ public class AltManagerScreen extends Screen {
             renderModalPopup(ctx, px, py, pw, ph, mx, my);
         }
 
-        super.render(ctx, mx, my, delta);
+        super.extractRenderState(ctx, mx, my, delta);
     }
 
     // ------------------------------------------------------------- Header
 
-    private void renderHeader(GuiGraphics ctx, float px, float py, float pw, int mx, int my) {
+    private void renderHeader(GuiGraphicsExtractor ctx, float px, float py, float pw, int mx, int my) {
         ModernFonts.fontTitle.drawStringWithShadow(ctx, "Менеджер аккаунтов", px + 16f, py + 12f, 0xFFFFFFFF);
 
         String counterText = "Всего: " + alts.size();
@@ -256,9 +256,9 @@ public class AltManagerScreen extends Screen {
         renderSearchBar(ctx, px, py, pw, mx, my);
     }
 
-    private void renderCurrentProfileBadge(GuiGraphics ctx, float px, float py, float pw) {
-        String curName = client.getUser().getUsername();
-        UUID curUuid = client.getUser().getUuidOrNull();
+    private void renderCurrentProfileBadge(GuiGraphicsExtractor ctx, float px, float py, float pw) {
+        String curName = minecraft.getUser().getName();
+        UUID curUuid = minecraft.getUser().getProfileId();
         for (AltEntry a : alts) {
             if (a.username.equalsIgnoreCase(curName)) {
                 if (a.uuid != null) curUuid = a.uuid;
@@ -304,7 +304,7 @@ public class AltManagerScreen extends Screen {
         ModernFonts.fontBadge.drawString(ctx, "В сети", dotX + 6f, dotY - ModernFonts.fontBadge.getFontHeight() / 2f, STATUS_ACTIVE);
     }
 
-    private void renderSearchBar(GuiGraphics ctx, float px, float py, float pw, int mx, int my) {
+    private void renderSearchBar(GuiGraphicsExtractor ctx, float px, float py, float pw, int mx, int my) {
         float sw = 125f;
         float sh = 20f;
         float sx = px + pw - 16f - sw;
@@ -345,7 +345,7 @@ public class AltManagerScreen extends Screen {
 
     // ------------------------------------------------------------- Cards List
 
-    private void renderCardsList(GuiGraphics ctx, float px, float py, float pw, float ph, int mx, int my) {
+    private void renderCardsList(GuiGraphicsExtractor ctx, float px, float py, float pw, float ph, int mx, int my) {
         List<AltEntry> filtered = getFilteredAlts();
 
         float listTop = py + 48f;
@@ -364,7 +364,7 @@ public class AltManagerScreen extends Screen {
 
         ctx.enableScissor((int) (px + 10), (int) listTop, (int) (px + pw - 10), (int) listBottom);
 
-        String currentSession = client.getUser().getUsername();
+        String currentSession = minecraft.getUser().getName();
 
         for (int i = 0; i < filtered.size(); i++) {
             AltEntry alt = filtered.get(i);
@@ -382,7 +382,7 @@ public class AltManagerScreen extends Screen {
         ctx.disableScissor();
     }
 
-    private void renderEmptyListPlaceholder(GuiGraphics ctx, float px, float pw, float listTop) {
+    private void renderEmptyListPlaceholder(GuiGraphicsExtractor ctx, float px, float pw, float listTop) {
         if (searchQuery.trim().isEmpty()) {
             String empty1 = "Список аккаунтов пуст";
             String empty2 = "Нажмите «+ Добавить» или «Случайный» для быстрого старта";
@@ -400,7 +400,7 @@ public class AltManagerScreen extends Screen {
         }
     }
 
-    private void renderCard(GuiGraphics ctx, AltEntry alt, float cx, float cy, float cw,
+    private void renderCard(GuiGraphicsExtractor ctx, AltEntry alt, float cx, float cy, float cw,
                             boolean selected, boolean isCurrent, boolean hovered, int mx, int my) {
         if (selected) {
             SmoothGfx.strokeRounded(ctx, cx - 1.2f, cy - 1.2f, cw + 2.4f, CARD_H + 2.4f, 9f, 1.0f, 0x33A8E1FF);
@@ -427,7 +427,7 @@ public class AltManagerScreen extends Screen {
         renderCardHoverActions(ctx, cx, cy, cw, isCurrent, mx, my);
     }
 
-    private void renderTypeBadge(GuiGraphics ctx, String type, float bx, float by) {
+    private void renderTypeBadge(GuiGraphicsExtractor ctx, String type, float bx, float by) {
         boolean isMs = "Microsoft".equalsIgnoreCase(type);
         String label = isMs ? "Microsoft" : "Офлайн";
         float bw = ModernFonts.fontBadge.getStringWidth(label) + 8f;
@@ -440,7 +440,7 @@ public class AltManagerScreen extends Screen {
         ModernFonts.fontBadge.drawString(ctx, label, bx + 4f, by + (bh - ModernFonts.fontBadge.getFontHeight()) / 2f, textCol);
     }
 
-    private void renderStatusIndicator(GuiGraphics ctx, boolean isCurrent, float sx, float sy) {
+    private void renderStatusIndicator(GuiGraphicsExtractor ctx, boolean isCurrent, float sx, float sy) {
         if (isCurrent) {
             float pulse = (float) (Math.sin(System.currentTimeMillis() / 300.0) * 0.5 + 0.5);
             int glowAlpha = Math.round(0x22 + pulse * 0x33);
@@ -453,7 +453,7 @@ public class AltManagerScreen extends Screen {
         }
     }
 
-    private void renderCardHoverActions(GuiGraphics ctx, float cx, float cy, float cw,
+    private void renderCardHoverActions(GuiGraphicsExtractor ctx, float cx, float cy, float cw,
                                         boolean isCurrent, int mx, int my) {
         // Delete button
         float delX = cx + cw - 20f;
@@ -478,7 +478,7 @@ public class AltManagerScreen extends Screen {
 
     // ------------------------------------------------------------- Bottom Bar
 
-    private void renderBottomBar(GuiGraphics ctx, float px, float py, float pw, float ph, int mx, int my) {
+    private void renderBottomBar(GuiGraphicsExtractor ctx, float px, float py, float pw, float ph, int mx, int my) {
         float barY = py + ph - 38f;
         float barH = 20f;
         float gap = 5f;
@@ -521,7 +521,7 @@ public class AltManagerScreen extends Screen {
         renderFooterHints(ctx, px, py, pw, ph);
     }
 
-    private void renderFooterHints(GuiGraphics ctx, float px, float py, float pw, float ph) {
+    private void renderFooterHints(GuiGraphicsExtractor ctx, float px, float py, float pw, float ph) {
         String hints = "[↑/↓] Выбор   •   [Enter] Войти   •   [Del] Удалить   •   [Esc] Назад";
         float hw = ModernFonts.fontBadge.getStringWidth(hints);
         float hx = px + (pw - hw) / 2f;
@@ -529,7 +529,7 @@ public class AltManagerScreen extends Screen {
         ModernFonts.fontBadge.drawString(ctx, hints, hx, hy, 0x66FFFFFF);
     }
 
-    private void renderButton(GuiGraphics ctx, float bx, float by, float bw, float bh,
+    private void renderButton(GuiGraphicsExtractor ctx, float bx, float by, float bw, float bh,
                               String text, boolean primary, boolean hovered) {
         int bg = primary
                 ? (hovered ? 0xFFFFFFFF : 0xFFE8EEF5)
@@ -544,7 +544,7 @@ public class AltManagerScreen extends Screen {
 
     // ------------------------------------------------------------- Modals & Toasts
 
-    private void renderStatusToast(GuiGraphics ctx, float px, float py, float pw, float ph) {
+    private void renderStatusToast(GuiGraphicsExtractor ctx, float px, float py, float pw, float ph) {
         float tw = ModernFonts.fontStatus.getStringWidth(statusMsg) + 20f;
         float th = 18f;
         float tx = px + (pw - tw) / 2f;
@@ -554,7 +554,7 @@ public class AltManagerScreen extends Screen {
         ModernFonts.fontStatus.drawStringWithShadow(ctx, statusMsg, tx + 10f, ty + (th - ModernFonts.fontStatus.getFontHeight()) / 2f, 0xFFEBF3FB);
     }
 
-    private void renderModalPopup(GuiGraphics ctx, float px, float py, float pw, float ph, int mx, int my) {
+    private void renderModalPopup(GuiGraphicsExtractor ctx, float px, float py, float pw, float ph, int mx, int my) {
         SmoothGfx.fillRounded(ctx, px, py, pw, ph, 14f, 0xCC090C12);
 
         float mw = 250f;
@@ -585,7 +585,7 @@ public class AltManagerScreen extends Screen {
         }
     }
 
-    private float renderModalTypeSelector(GuiGraphics ctx, float mxPos, float curY, float mw, int mx, int my) {
+    private float renderModalTypeSelector(GuiGraphicsExtractor ctx, float mxPos, float curY, float mw, int mx, int my) {
         String[] types = {"Microsoft", "Офлайн"};
         float pillW = (mw - 32f - 6f) / 2f;
 
@@ -604,7 +604,7 @@ public class AltManagerScreen extends Screen {
         return curY + 22f;
     }
 
-    private void renderMicrosoftAddPrompt(GuiGraphics ctx, float mxPos, float curY, float mw, int mx, int my) {
+    private void renderMicrosoftAddPrompt(GuiGraphicsExtractor ctx, float mxPos, float curY, float mw, int mx, int my) {
         String desc = "Официальный вход через браузер";
         ModernFonts.fontBadge.drawString(ctx, desc, mxPos + 16f, curY + 6f, 0x88FFFFFF);
 
@@ -621,7 +621,7 @@ public class AltManagerScreen extends Screen {
         renderModalCloseButtons(ctx, mxPos, btnY + btnH + 10f, mw, mx, my, false);
     }
 
-    private void renderOfflineInputPrompt(GuiGraphics ctx, float mxPos, float curY, float mw, int mx, int my) {
+    private void renderOfflineInputPrompt(GuiGraphicsExtractor ctx, float mxPos, float curY, float mw, int mx, int my) {
         float inW = mw - 32f - 24f;
         float inH = 20f;
         float inX = mxPos + 16f;
@@ -650,7 +650,7 @@ public class AltManagerScreen extends Screen {
         renderModalCloseButtons(ctx, mxPos, curY + inH + 12f, mw, mx, my, true);
     }
 
-    private void renderModalCloseButtons(GuiGraphics ctx, float mxPos, float btnY, float mw, int mx, int my, boolean showConfirm) {
+    private void renderModalCloseButtons(GuiGraphicsExtractor ctx, float mxPos, float btnY, float mw, int mx, int my, boolean showConfirm) {
         float totalW = mw - 32f;
         float btnW = showConfirm ? (totalW - 6f) / 2f : totalW;
         float cancelX = mxPos + 16f;
@@ -675,7 +675,7 @@ public class AltManagerScreen extends Screen {
         }
     }
 
-    private void renderMsPollingModal(GuiGraphics ctx, float mxPos, float myPos, float mw, float mh, int mx, int my) {
+    private void renderMsPollingModal(GuiGraphicsExtractor ctx, float mxPos, float myPos, float mw, float mh, int mx, int my) {
         ModernFonts.fontName.drawStringWithShadow(ctx, "Авторизация Microsoft", mxPos + 16f, myPos + 12f, 0xFFFFFFFF);
 
         String code = msDeviceCode != null ? msDeviceCode.userCode : "Загрузка...";
@@ -704,7 +704,7 @@ public class AltManagerScreen extends Screen {
     // ============================================================= Input Handling
 
     @Override
-    public boolean mouseClicked(Click click, boolean doubled) {
+    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent click, boolean doubled) {
         double mx = click.x();
         double my = click.y();
         float px = getPanelX();
@@ -790,7 +790,7 @@ public class AltManagerScreen extends Screen {
         rx -= wBack;
         if (inBounds(mx, my, rx, barY, wBack, barH)) {
             playClickSound(1.0f);
-            client.setScreen(parent);
+            minecraft.gui.setScreen(parent);
             return true;
         }
 
@@ -1009,19 +1009,19 @@ public class AltManagerScreen extends Screen {
             this.msAuthStatus = "Код скопирован! Жду авторизацию...";
 
             MicrosoftAuth.pollAndAuthenticate(dc, status -> this.msAuthStatus = status)
-                    .thenAccept(authSession -> client.execute(() -> {
+                    .thenAccept(authSession -> minecraft.execute(() -> {
                         applyAuthSession(authSession);
                         modal = ModalType.NONE;
                         setStatus("Вход выполнен: " + authSession.username + " (Microsoft)");
                     })).exceptionally(ex -> {
-                        client.execute(() -> {
+                        minecraft.execute(() -> {
                             modal = ModalType.NONE;
                             setStatus("Ошибка входа: " + ex.getMessage());
                         });
                         return null;
                     });
         }).exceptionally(ex -> {
-            client.execute(() -> {
+            minecraft.execute(() -> {
                 modal = ModalType.NONE;
                 setStatus("Не удалось связаться с сервером Microsoft");
             });
@@ -1032,7 +1032,7 @@ public class AltManagerScreen extends Screen {
     private void applyAuthSession(MicrosoftAuth.AuthSession s) {
         try {
             User session = new User(s.username, s.uuid, s.mcToken, Optional.empty(), Optional.empty());
-            ((MixinMinecraftClient) client).setSession(session);
+            ((MixinMinecraftClient) minecraft).setSession(session);
 
             AltEntry existing = null;
             for (AltEntry a : alts) {
@@ -1081,7 +1081,7 @@ public class AltManagerScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(KeyInput input) {
+    public boolean keyPressed(net.minecraft.client.input.KeyEvent input) {
         int key = input.key();
         float py = getPanelY();
         float ph = getPanelHeight();
@@ -1152,7 +1152,7 @@ public class AltManagerScreen extends Screen {
         }
 
         if (key == GLFW.GLFW_KEY_ESCAPE) {
-            client.setScreen(parent);
+            minecraft.gui.setScreen(parent);
             return true;
         }
 
@@ -1160,7 +1160,7 @@ public class AltManagerScreen extends Screen {
     }
 
     private void handleClipboard(int key, boolean isModal) {
-        long win = client.getWindow().getHandle();
+        long win = minecraft.getWindow().handle();
         boolean ctrl = GLFW.glfwGetKey(win, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS
                 || GLFW.glfwGetKey(win, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
 
@@ -1183,16 +1183,16 @@ public class AltManagerScreen extends Screen {
     }
 
     @Override
-    public boolean charTyped(CharInput input) {
-        if (modal != ModalType.NONE && modalInputActive && input.isValidChar() && modalInput.length() < 16) {
-            char c = input.asString().charAt(0);
+    public boolean charTyped(net.minecraft.client.input.CharacterEvent input) {
+        if (modal != ModalType.NONE && modalInputActive && input.isAllowedChatCharacter() && modalInput.length() < 16) {
+            char c = input.codepointAsString().charAt(0);
             if (Character.isLetterOrDigit(c) || c == '_') {
                 modalInput += c;
                 return true;
             }
         }
-        if (searchActive && input.isValidChar() && searchQuery.length() < 24) {
-            searchQuery += input.asString();
+        if (searchActive && input.isAllowedChatCharacter() && searchQuery.length() < 24) {
+            searchQuery += input.codepointAsString();
             return true;
         }
         return super.charTyped(input);
@@ -1205,11 +1205,11 @@ public class AltManagerScreen extends Screen {
             if (!alt.refreshToken.isEmpty()) {
                 setStatus("Обновление сессии Microsoft...");
                 MicrosoftAuth.refreshSession(alt.refreshToken, s -> setStatus(s))
-                        .thenAccept(authSession -> client.execute(() -> {
+                        .thenAccept(authSession -> minecraft.execute(() -> {
                             applyAuthSession(authSession);
                             setStatus("Вход: " + authSession.username + " (Microsoft)");
                         })).exceptionally(ex -> {
-                            client.execute(() -> {
+                            minecraft.execute(() -> {
                                 setStatus("Сессия истекла, войдите заново");
                                 modal = ModalType.ADD_ACCOUNT;
                                 modalTypeChoice = "Microsoft";
@@ -1232,7 +1232,7 @@ public class AltManagerScreen extends Screen {
         try {
             UUID uuid = UUID.nameUUIDFromBytes(("OfflinePlayer:" + username).getBytes(StandardCharsets.UTF_8));
             User s = new User(username, uuid, "0", Optional.empty(), Optional.empty());
-            ((MixinMinecraftClient) client).setSession(s);
+            ((MixinMinecraftClient) minecraft).setSession(s);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1271,7 +1271,7 @@ public class AltManagerScreen extends Screen {
         }
 
         if (alts.isEmpty()) {
-            String cur = client.getUser().getUsername();
+            String cur = minecraft.getUser().getName();
             alts.add(new AltEntry(cur, "Offline"));
             saveAlts();
         }

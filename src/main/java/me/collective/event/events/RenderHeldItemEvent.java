@@ -7,14 +7,14 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.InteractionHand;
 
 public class RenderHeldItemEvent {
-    private final AbstractClientPlayerEntity player;
+    private final AbstractClientPlayer player;
     private final InteractionHand hand;
     private final ItemStack item;
     private final PoseStack matrices;
-    private final OrderedRenderCommandQueue renderCommands;
+    private final SubmitNodeCollector renderCommands;
     private final int light;
 
-    public RenderHeldItemEvent(AbstractClientPlayerEntity player, InteractionHand hand, ItemStack item, PoseStack matrices, OrderedRenderCommandQueue renderCommands, int light) {
+    public RenderHeldItemEvent(AbstractClientPlayer player, InteractionHand hand, ItemStack item, PoseStack matrices, SubmitNodeCollector renderCommands, int light) {
         this.player = player;
         this.hand = hand;
         this.item = item;
@@ -23,7 +23,7 @@ public class RenderHeldItemEvent {
         this.light = light;
     }
 
-    public AbstractClientPlayerEntity getPlayer() {
+    public AbstractClientPlayer getPlayer() {
         return player;
     }
 
@@ -39,7 +39,7 @@ public class RenderHeldItemEvent {
         return matrices;
     }
 
-    public OrderedRenderCommandQueue getRenderCommands() {
+    public SubmitNodeCollector getRenderCommands() {
         return renderCommands;
     }
 

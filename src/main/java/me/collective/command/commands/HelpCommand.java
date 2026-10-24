@@ -22,8 +22,8 @@ public class HelpCommand extends Command {
             list.add(cmd.getName());
         }
 
-        MutableText msg = Component.literal("Commands (%d): ".formatted(list.size())).styled(s -> s.withColor(ChatFormatting.GRAY))
-            .append(Component.literal(String.join(", ", list)).styled(s -> s.withColor(ChatHelper.getPrimaryTextColor())));
+        MutableComponent msg = Component.literal("Commands (%d): ".formatted(list.size())).withStyle(s -> s.withColor(ChatFormatting.GRAY))
+            .append(Component.literal(String.join(", ", list)).withStyle(s -> s.withColor(ChatHelper.getPrimaryTextColor())));
 
         ChatHelper.sendMessage(msg);
     }

@@ -20,8 +20,8 @@ import java.util.Map;
  * {@code item.getDefaultStack()} — то есть один предмет без компонентов.
  *
  * <p>Список накапливается из пакетов обновления инвентаря, а не пересчитывается
- * наведением: в оригинале он обновляется на {@code InventoryS2CPacket} и
- * {@code ScreenHandlerSlotUpdateS2CPacket}.
+ * наведением: в оригинале он обновляется на {@code ClientboundContainerSetContentPacket} и
+ * {@code AbstractContainerMenuSlotUpdateS2CPacket}.
  */
 public final class DominantStacks {
 
@@ -71,14 +71,14 @@ public final class DominantStacks {
     public static ItemStack getDominant(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return null;
 
-        net.minecraft.component.type.ContainerComponent container = stack.get(DataComponentTypes.CONTAINER);
+        net.minecraft.world.item.component.ItemContainerContents container = stack.get(DataComponents.CONTAINER);
         if (container != null) {
-            return findDominantFromIterable(container.iterateNonEmpty());
+            return findDominantFromIterable(container.itemCopies().toList());
         }
 
-        net.minecraft.component.type.BundleContentsComponent bundle = stack.get(DataComponentTypes.BUNDLE_CONTENTS);
+        net.minecraft.world.item.component.BundleContents bundle = stack.get(DataComponents.BUNDLE_CONTENTS);
         if (bundle != null) {
-            return findDominantFromIterable(bundle.iterate());
+            return findDominantFromIterable(bundle.itemCopies().toList());
         }
 
         return null;
@@ -146,10 +146,10 @@ public final class DominantStacks {
     }
 
     private static String getCategoryKey(ItemStack stack, Item item) {
-        String path = net.minecraft.registry.Registries.ITEM.getId(item).getPath();
-        net.minecraft.component.type.EquippableComponent equippable = stack.get(DataComponentTypes.EQUIPPABLE);
+        String path = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item).getPath();
+        net.minecraft.world.item.equipment.Equippable equippable = stack.get(DataComponents.EQUIPPABLE);
 
-        if (equippable != null && equippable.slot().isArmorSlot()) {
+        if (equippable != null && equippable.slot().isArmor()) {
             if (path.startsWith("netherite_")) return "armor_netherite";
             if (path.startsWith("diamond_")) return "armor_diamond";
             if (path.startsWith("iron_")) return "armor_iron";
@@ -159,7 +159,7 @@ public final class DominantStacks {
             return "armor_other";
         }
 
-        if (item == net.minecraft.item.Items.ELYTRA) {
+        if (item == net.minecraft.world.item.Items.ELYTRA) {
             return "armor_netherite"; // Элитра органично дополняет незеритовый PvP-сет
         }
 
@@ -168,13 +168,13 @@ public final class DominantStacks {
             if (path.startsWith("diamond_")) return "tools_diamond";
         }
 
-        return "item_" + net.minecraft.registry.Registries.ITEM.getId(item);
+        return "item_" + net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item);
     }
 
     private static int getRepresentativePriority(ItemStack stack, Item item) {
-        String path = net.minecraft.registry.Registries.ITEM.getId(item).getPath();
+        String path = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item).getPath();
         if (path.endsWith("_chestplate")) return 100;
-        if (item == net.minecraft.item.Items.ELYTRA) return 95;
+        if (item == net.minecraft.world.item.Items.ELYTRA) return 95;
         if (path.endsWith("_sword")) return 90;
         if (path.endsWith("_helmet")) return 80;
         if (path.endsWith("_leggings")) return 70;

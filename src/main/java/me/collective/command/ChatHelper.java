@@ -16,12 +16,12 @@ public class ChatHelper {
     public static Component getPrefix() {
         Color primary = getPrimaryColor();
         TextColor primaryTc = TextColor.fromRgb(primary.getRGB() & 0xFFFFFF);
-        TextColor bracketTc = TextColor.fromFormatting(ChatFormatting.DARK_GRAY);
+        TextColor bracketTc = TextColor.fromLegacyFormat(ChatFormatting.DARK_GRAY);
 
-        MutableText prefix = Component.empty();
-        prefix.append(Component.literal("[").styled(s -> s.withColor(bracketTc)));
-        prefix.append(Component.literal("Collective").styled(s -> s.withColor(primaryTc).withBold(false)));
-        prefix.append(Component.literal("]").styled(s -> s.withColor(bracketTc)));
+        MutableComponent prefix = Component.empty();
+        prefix.append(Component.literal("[").withStyle(s -> s.withColor(bracketTc)));
+        prefix.append(Component.literal("Collective").withStyle(s -> s.withColor(primaryTc).withBold(false)));
+        prefix.append(Component.literal("]").withStyle(s -> s.withColor(bracketTc)));
         return prefix;
     }
 
@@ -40,15 +40,15 @@ public class ChatHelper {
     }
 
     public static void sendMessage(Component text) {
-        MutableText full = Component.empty().append(getPrefix()).append(" ").append(text);
-        if (mc.inGameHud != null && mc.inGameHud.getChatHud() != null) {
-            mc.inGameHud.getChatHud().addMessage(full);
+        MutableComponent full = Component.empty().append(getPrefix()).append(" ").append(text);
+        if (mc.gui != null && mc.gui.hud != null && mc.gui.hud.getChat() != null) {
+            mc.gui.hud.getChat().addClientSystemMessage(full);
         } else if (mc.player != null) {
-            mc.player.sendMessage(full, false);
+            mc.player.sendSystemMessage(full);
         }
     }
 
     public static void sendMessage(String text) {
-        sendMessage(Component.literal(text).styled(s -> s.withColor(ChatFormatting.GRAY)));
+        sendMessage(Component.literal(text).withStyle(ChatFormatting.GRAY));
     }
 }

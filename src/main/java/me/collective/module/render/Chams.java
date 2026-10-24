@@ -17,6 +17,8 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityEvent;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.network.protocol.game.ClientboundEntityEventPacket;
@@ -118,28 +120,28 @@ public class Chams extends Module {
     @EventHandler
     public void onPacketReceive(PacketEvent.Receive event) {
         if (!pop.getValue()) return;
-        if (event.getPacket() instanceof EntityStatusS2CPacket packet) {
-            byte status = packet.getStatus();
-            boolean isTotemPop = status == EntityStatuses.USE_TOTEM_OF_UNDYING;
-            boolean isDeath = status == EntityStatuses.ADD_DEATH_PARTICLES;
+        if (event.getPacket() instanceof ClientboundEntityEventPacket packet) {
+            byte status = packet.getEventId();
+            boolean isTotemPop = status == EntityEvent.PROTECTED_FROM_DEATH;
+            boolean isDeath = status == EntityEvent.DEATH;
 
             if (isTotemPop || (isDeath && death.getValue())) {
-                if (mc.world == null) return;
-                Entity entity = packet.getEntity(mc.world);
+                if (mc.level == null) return;
+                Entity entity = packet.getEntity(mc.level);
                 if (entity instanceof Player player) {
                     if (player == mc.player && self.getValue() == ChamsMode.OFF) {
                         return;
                     }
                     ghosts.add(new PopGhost(
                         player.getName().getString(),
-                        player.getUuid(),
+                        player.getUUID(),
                         player.getX(),
                         player.getY(),
                         player.getZ(),
-                        player.getWidth(),
-                        player.getHeight(),
-                        player.getYaw(),
-                        player.getPitch()
+                        player.getBbWidth(),
+                        player.getBbHeight(),
+                        player.getYRot(),
+                        player.getXRot()
                     ));
                 }
             }
@@ -148,20 +150,20 @@ public class Chams extends Module {
 
     @EventHandler
     public void onRender3D(Render3DEvent event) {
-        if (mc.world == null || mc.player == null) return;
+        if (mc.level == null || mc.player == null) return;
 
-        Vec3 cameraPos = event.camera != null ? event.camera.getCameraPos() : mc.player.getEyePos();
+        Vec3 cameraPos = event.camera != null ? event.camera.position() : mc.player.getEyePosition();
         float tickDelta = event.tickDelta;
         long now = System.currentTimeMillis();
 
         // 1. Render Target Entities
-        for (Entity entity : mc.world.getEntities()) {
+        for (Entity entity : mc.level.entitiesForRendering()) {
             if (entity == null || !entity.isAlive()) continue;
 
             ChamsMode mode = getEntityMode(entity);
             if (mode == null || mode == ChamsMode.OFF) continue;
 
-            double dist = cameraPos.distanceTo(entity.getEntityPos());
+            double dist = cameraPos.distanceTo(entity.position());
             if (dist > range.getValue()) continue;
 
             float alphaFactor = calculateFadeFactor(dist);
@@ -203,7 +205,7 @@ public class Chams extends Module {
                 }
 
                 float progress = elapsed / maxDuration;
-                float remaining = MathHelper.clamp(1.0f - progress, 0.0f, 1.0f);
+                float remaining = Mth.clamp(1.0f - progress, 0.0f, 1.0f);
 
                 double upwardOffset = (1.0 - remaining) * motionSpeed * 2.0;
                 if (doBoost) {
@@ -251,10 +253,10 @@ public class Chams extends Module {
         if (entity instanceof Player) {
             return players.getValue();
         }
-        if (entity instanceof EndCrystalEntity) {
+        if (entity instanceof EndCrystal) {
             return crystals.getValue();
         }
-        if (entity instanceof PassiveEntity) {
+        if (entity instanceof Animal) {
             return animals.getValue();
         }
         if (entity instanceof Monster) {
@@ -298,7 +300,7 @@ public class Chams extends Module {
 
     private Color applyAlpha(Color c, float factor) {
         if (c == null) return new Color(0, 0, 0, 0);
-        int a = MathHelper.clamp((int) (c.getAlpha() * factor), 0, 255);
+        int a = Mth.clamp((int) (c.getAlpha() * factor), 0, 255);
         return new Color(c.getRed(), c.getGreen(), c.getBlue(), a);
     }
 
@@ -312,14 +314,12 @@ public class Chams extends Module {
     }
 
     private AABB getInterpolatedBox(Entity entity, float tickDelta) {
-        double lerpX = MathHelper.lerp(tickDelta, entity.lastRenderX, entity.getX());
-        double lerpY = MathHelper.lerp(tickDelta, entity.lastRenderY, entity.getY());
-        double lerpZ = MathHelper.lerp(tickDelta, entity.lastRenderZ, entity.getZ());
-        double halfW = entity.getWidth() * 0.5;
-        double h = entity.getHeight();
+        Vec3 pos = entity.getPosition(tickDelta);
+        double halfW = entity.getBbWidth() * 0.5;
+        double h = entity.getBbHeight();
         return new AABB(
-            lerpX - halfW, lerpY, lerpZ - halfW,
-            lerpX + halfW, lerpY + h, lerpZ + halfW
+            pos.x - halfW, pos.y, pos.z - halfW,
+            pos.x + halfW, pos.y + h, pos.z + halfW
         );
     }
 

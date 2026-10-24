@@ -15,9 +15,9 @@ public class FolderCommand extends Command {
 
     @Override
     public void execute(String[] args) {
-        File dir = new File(mc.runDirectory, "collective");
+        File dir = new File(mc.gameDirectory, "collective");
         if (!dir.exists()) dir.mkdirs();
-        Util.getOperatingSystem().open(dir);
-        ChatHelper.sendMessage(Component.literal("Opened configuration directory").styled(s -> s.withColor(ChatFormatting.GRAY)));
+        com.mojang.blaze3d.Blaze3D.openPath(dir.toPath());
+        ChatHelper.sendMessage(Component.literal("Opened configuration directory").withStyle(s -> s.withColor(ChatFormatting.GRAY)));
     }
 }

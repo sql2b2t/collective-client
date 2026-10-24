@@ -35,19 +35,19 @@ public class CevBreaker extends Module {
 
     @Override
     public void onUpdate() {
-        if (mc.player == null || mc.world == null || mc.interactionManager == null) return;
+        if (mc.player == null || mc.level == null || mc.gameMode == null) return;
 
         Player target = getTarget();
         if (target == null) return;
 
         if (SpeedMine.INSTANCE != null && !SpeedMine.INSTANCE.isToggled()) {
             SpeedMine.INSTANCE.setToggled(true);
-            mc.player.sendMessage(Component.literal("§7[§dCevBreaker§7] §6Сам включил SpeedMine — её настройки (скорость/обход/дальность) теперь копают твои блоки и могут флагать Grim."), false);
+            mc.player.sendSystemMessage(Component.literal("§7[§dCevBreaker§7] §6Сам включил SpeedMine — её настройки (скорость/обход/дальность) теперь копают твои блоки и могут флагать Grim."));
         }
 
         // Ломаем блок над головой цели
-        BlockPos cev = target.getBlockPos().up(2);
-        if (!mc.world.getBlockState(cev).isAir() && SpeedMine.INSTANCE != null) {
+        BlockPos cev = target.blockPosition().above(2);
+        if (!mc.level.getBlockState(cev).isAir() && SpeedMine.INSTANCE != null) {
             if (!SpeedMine.INSTANCE.isMiningBlock(cev)) {
                 SpeedMine.INSTANCE.mineBlock(cev, Direction.UP);
             }
@@ -58,12 +58,12 @@ public class CevBreaker extends Module {
             delayTimer--;
             return;
         }
-        AABB box = new AABB(target.getBlockPos()).expand(crystalRange.getFloatValue());
-        for (Entity e : mc.world.getOtherEntities(mc.player, box)) {
-            if (!(e instanceof EndCrystalEntity crystal)) continue;
+        AABB box = new AABB(target.blockPosition()).inflate(crystalRange.getFloatValue());
+        for (Entity e : mc.level.getEntities(mc.player, box)) {
+            if (!(e instanceof EndCrystal crystal)) continue;
             if (mc.player.distanceTo(crystal) > crystalRange.getFloatValue()) continue;
-            mc.interactionManager.attackEntity(mc.player, crystal);
-            mc.player.swingHand(InteractionHand.MAIN_HAND);
+            mc.gameMode.attack(mc.player, crystal);
+            me.collective.util.Utils.swingHand(InteractionHand.MAIN_HAND);
             delayTimer = attackDelay.getIntValue();
             break;
         }
@@ -72,7 +72,7 @@ public class CevBreaker extends Module {
     private Player getTarget() {
         Player best = null;
         double bestDist = range.getFloatValue();
-        for (Player p : mc.world.getPlayers()) {
+        for (Player p : mc.level.players()) {
             if (p == mc.player || !p.isAlive() || p.isSpectator() || p.isCreative()) continue;
             if (FriendManager.getInstance().isFriend(p)) continue;
             double d = mc.player.distanceTo(p);

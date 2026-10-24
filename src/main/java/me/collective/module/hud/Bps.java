@@ -5,7 +5,7 @@ import me.collective.module.client.HUD;
 import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.EnumSetting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.awt.Color;
 import java.util.Locale;
@@ -25,12 +25,12 @@ public class Bps extends HudModule {
     }
 
     @Override
-    public void render(GuiGraphics context, float delta) {
+    public void render(GuiGraphicsExtractor context, float delta) {
         if (!isToggled() || mc.player == null) return;
 
-        double dX = mc.player.getX() - mc.player.lastX;
-        double dY = mc.player.getY() - mc.player.lastY;
-        double dZ = mc.player.getZ() - mc.player.lastZ;
+        double dX = mc.player.getX() - mc.player.xo;
+        double dY = mc.player.getY() - mc.player.yo;
+        double dZ = mc.player.getZ() - mc.player.zo;
 
         double distance = both3D.getValue() ? Math.sqrt(dX * dX + dY * dY + dZ * dZ) : Math.hypot(dX, dZ);
         double speed = distance * 20.0;

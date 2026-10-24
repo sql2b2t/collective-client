@@ -6,9 +6,9 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-@Mixin(EntityVelocityUpdateS2CPacket.class)
+@Mixin(ClientboundSetEntityMotionPacket.class)
 public interface EntityVelocityUpdateS2CPacketAccessor {
     @Mutable
-    @Accessor("velocity")
-    void setVelocity(Vec3 velocity);
+    @Accessor("movement")
+    void setMovement(Vec3 movement);
 }

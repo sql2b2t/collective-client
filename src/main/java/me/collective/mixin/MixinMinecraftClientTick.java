@@ -23,12 +23,12 @@ public abstract class MixinMinecraftClientTick {
     @Inject(method = "tick", at = @At("TAIL"))
     private void repositionMenuButtons(CallbackInfo ci) {
         Minecraft mc = (Minecraft) (Object) this;
-        Screen screen = mc.currentScreen;
+        Screen screen = mc.gui.screen();
         if (screen == null) return;
-        boolean mp = screen instanceof MultiplayerScreen;
+        boolean mp = screen instanceof JoinMultiplayerScreen;
         if (!mp && !(screen instanceof TitleScreen)) return;
-        for (Element child : screen.children()) {
-            if (!(child instanceof ButtonWidget button)) continue;
+        for (GuiEventListener child : screen.children()) {
+            if (!(child instanceof Button button)) continue;
             String label = button.getMessage().getString();
             if (label.equals("Alts")) {
                 button.setX(screen.width - 108);

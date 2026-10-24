@@ -14,7 +14,7 @@ public final class HighwayUtils {
     }
 
     private static Direction facing() {
-        return mc.player != null ? mc.player.getHorizontalFacing() : Direction.NORTH;
+        return mc.player != null ? mc.player.getDirection() : Direction.NORTH;
     }
 
     public static BlockPos forward(BlockPos pos, int distance) {

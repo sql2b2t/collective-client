@@ -30,27 +30,27 @@ public abstract class MixinClientPlayerEntity {
         return !rotUtils.isRotating() && !rotUtils.isWireFresh() ? original : rotUtils.getSentPitch();
     }
 
-    @ModifyExpressionValue(method = "tick", at = @At(value = "FIELD", target = "Lnet/minecraft/client/input/Input;playerInput:Lnet/minecraft/util/PlayerInput;"))
-    private PlayerInput collective$modifyDeclaredInput(PlayerInput original) {
+    @ModifyExpressionValue(method = "tick", at = @At(value = "FIELD", target = "Lnet/minecraft/client/player/ClientInput;keyPresses:Lnet/minecraft/world/entity/player/Input;"))
+    private Input collective$modifyDeclaredInput(Input original) {
         if (me.collective.module.render.Freecam.INSTANCE != null && me.collective.module.render.Freecam.INSTANCE.isToggled()) {
             // Пока баритон ведёт игрока (PlayerMovementInput), его принудительные
             // вводы не глушим — иначе фрикам ломает путь. Глушим только живую
             // клавиатуру, когда баритон не пиктов.
             if (!BaritoneBridge.isPathing()) {
-                return new PlayerInput(false, false, false, false, false, false, false);
+                return new Input(false, false, false, false, false, false, false);
             }
         }
         me.collective.module.highway.HighwayBuilderHIG hb = me.collective.module.highway.HighwayBuilderHIG.INSTANCE;
-        PlayerInput in = original;
+        Input in = original;
         if (hb != null && hb.isToggled() && hb.isDrivingInput()) {
-            in = new PlayerInput(
+            in = new Input(
                 original.forward() || hb.inFwd, original.backward() || hb.inBack,
                 original.left() || hb.inLeft, original.right() || hb.inRight,
-                original.jump() || hb.inJump, original.sneak() || hb.inSneak, original.sprint());
+                original.jump() || hb.inJump, original.shift() || hb.inSneak, original.sprint());
         }
         me.collective.module.movement.AirPlaceScaffold scaffold = me.collective.module.movement.AirPlaceScaffold.INSTANCE;
         if (scaffold != null && scaffold.isSafeWalking() && scaffold.isAtEdge()) {
-            in = new PlayerInput(in.forward(), in.backward(), in.left(), in.right(),
+            in = new Input(in.forward(), in.backward(), in.left(), in.right(),
                 in.jump(), true, in.sprint());
         }
         RotationUtils rotUtils = RotationUtils.getInstance();
@@ -67,26 +67,26 @@ public abstract class MixinClientPlayerEntity {
         }
     }
 
-    @ModifyExpressionValue(method = "tickMovementInput", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/input/Input;getMovementInput()Lnet/minecraft/util/math/Vec2f;"))
-    private net.minecraft.util.math.Vec2f collective$modifyMovementInput(net.minecraft.util.math.Vec2f original) {
+    @ModifyExpressionValue(method = "tickMovementInput", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/input/Input;getMovementInput()Lnet/minecraft/util/math/Vec2;"))
+    private net.minecraft.world.phys.Vec2 collective$modifyMovementInput(net.minecraft.world.phys.Vec2 original) {
         RotationUtils rotUtils = RotationUtils.getInstance();
         if (rotUtils.isRotating() && !rotUtils.isSyncMovement()) {
             LocalPlayer player = (LocalPlayer) (Object) this;
-            if (player.input != null && player.input.playerInput != null) {
-                PlayerInput in = player.input.playerInput;
+            if (player.input != null && player.input.keyPresses != null) {
+                Input in = player.input.keyPresses;
                 float s = (in.left() ? 1f : 0f) - (in.right() ? 1f : 0f);
                 float f = (in.forward() ? 1f : 0f) - (in.backward() ? 1f : 0f);
                 if (s != 0f || f != 0f) {
-                    return new net.minecraft.util.math.Vec2f(s, f).normalize();
+                    return new net.minecraft.world.phys.Vec2(s, f).normalized();
                 }
-                return net.minecraft.util.math.Vec2f.ZERO;
+                return net.minecraft.world.phys.Vec2.ZERO;
             }
         }
         return original;
     }
 
     @org.spongepowered.asm.mixin.injection.ModifyVariable(method = "move", at = @At("HEAD"), argsOnly = true)
-    private Vec3 collective$onMove(Vec3 movement, net.minecraft.entity.MovementType type) {
+    private Vec3 collective$onMove(Vec3 movement, net.minecraft.world.entity.MoverType type) {
         if (me.collective.module.render.Freecam.INSTANCE != null && me.collective.module.render.Freecam.INSTANCE.isToggled()) {
             return Vec3.ZERO;
         }

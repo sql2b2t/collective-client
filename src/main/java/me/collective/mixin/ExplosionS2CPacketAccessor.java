@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 import java.util.Optional;
 
-@Mixin(ExplosionS2CPacket.class)
+@Mixin(ClientboundExplodePacket.class)
 public interface ExplosionS2CPacketAccessor {
     @Mutable
     @Accessor("playerKnockback")

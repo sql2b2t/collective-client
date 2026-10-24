@@ -50,7 +50,7 @@ public final class BounceSolver {
 
         double free = 0.0;
 
-        for (double rise = 0.05; rise <= MAX_USEFUL_HEADROOM && world.isSpaceEmpty(box.offset(0.0, rise, 0.0)); rise += 0.05) {
+        for (double rise = 0.05; rise <= MAX_USEFUL_HEADROOM && world.noCollision(box.move(0.0, rise, 0.0)); rise += 0.05) {
             free = rise;
         }
 
@@ -130,10 +130,10 @@ public final class BounceSolver {
             if (gliding) {
                 double f = pitch * (Math.PI / 180);
 
-                double lookZ = MathHelper.cos(f);
+                double lookZ = Mth.cos(f);
                 double d = Math.abs(lookZ);
                 double e = Math.sqrt(vx * vx + vz * vz);
-                double h = MathHelper.square(MathHelper.cos(f));
+                double h = Mth.square(Mth.cos(f));
 
                 vy += GRAVITY * (-1.0 + h * 0.75);
 

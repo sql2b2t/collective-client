@@ -272,22 +272,22 @@ public class ConfigManager {
         }
         if (s instanceof BlockListSetting bls) {
             com.google.gson.JsonArray arr = new com.google.gson.JsonArray();
-            for (net.minecraft.block.Block b : bls.getValue()) {
-                arr.add(net.minecraft.registry.Registries.BLOCK.getId(b).toString());
+            for (net.minecraft.world.level.block.Block b : bls.getValue()) {
+                arr.add(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(b).toString());
             }
             return arr;
         }
         if (s instanceof EntityListSetting els) {
             com.google.gson.JsonArray arr = new com.google.gson.JsonArray();
-            for (net.minecraft.entity.EntityType<?> type : els.getValue()) {
-                arr.add(net.minecraft.registry.Registries.ENTITY_TYPE.getId(type).toString());
+            for (net.minecraft.world.entity.EntityType<?> type : els.getValue()) {
+                arr.add(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(type).toString());
             }
             return arr;
         }
         if (s instanceof me.collective.setting.ItemListSetting ils) {
             com.google.gson.JsonArray arr = new com.google.gson.JsonArray();
-            for (net.minecraft.item.Item item : ils.getValue()) {
-                arr.add(net.minecraft.registry.Registries.ITEM.getId(item).toString());
+            for (net.minecraft.world.item.Item item : ils.getValue()) {
+                arr.add(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item).toString());
             }
             return arr;
         }
@@ -326,12 +326,12 @@ public class ConfigManager {
             return;
         }
         if (s instanceof BlockListSetting bls && el.isJsonArray()) {
-            java.util.List<net.minecraft.block.Block> list = new java.util.ArrayList<>();
+            java.util.List<net.minecraft.world.level.block.Block> list = new java.util.ArrayList<>();
             for (var item : el.getAsJsonArray()) {
                 try {
-                    net.minecraft.block.Block b = net.minecraft.registry.Registries.BLOCK.get(
-                        net.minecraft.util.Identifier.of(item.getAsString()));
-                    if (b != null && b != net.minecraft.block.Blocks.AIR) list.add(b);
+                    net.minecraft.world.level.block.Block b = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getValue(
+                        net.minecraft.resources.Identifier.parse(item.getAsString()));
+                    if (b != null && b != net.minecraft.world.level.block.Blocks.AIR) list.add(b);
                 } catch (Exception ignored) {
                 }
             }
@@ -339,11 +339,11 @@ public class ConfigManager {
             return;
         }
         if (s instanceof EntityListSetting els && el.isJsonArray()) {
-            java.util.List<net.minecraft.entity.EntityType<?>> list = new java.util.ArrayList<>();
+            java.util.List<net.minecraft.world.entity.EntityType<?>> list = new java.util.ArrayList<>();
             for (var item : el.getAsJsonArray()) {
                 try {
-                    net.minecraft.entity.EntityType<?> type = net.minecraft.registry.Registries.ENTITY_TYPE.get(
-                        net.minecraft.util.Identifier.of(item.getAsString()));
+                    net.minecraft.world.entity.EntityType<?> type = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getValue(
+                        net.minecraft.resources.Identifier.parse(item.getAsString()));
                     if (type != null) list.add(type);
                 } catch (Exception ignored) {
                 }
@@ -352,12 +352,12 @@ public class ConfigManager {
             return;
         }
         if (s instanceof me.collective.setting.ItemListSetting ils && el.isJsonArray()) {
-            java.util.List<net.minecraft.item.Item> list = new java.util.ArrayList<>();
+            java.util.List<net.minecraft.world.item.Item> list = new java.util.ArrayList<>();
             for (var item : el.getAsJsonArray()) {
                 try {
-                    net.minecraft.item.Item it = net.minecraft.registry.Registries.ITEM.get(
-                        net.minecraft.util.Identifier.of(item.getAsString()));
-                    if (it != null && it != net.minecraft.item.Items.AIR) list.add(it);
+                    net.minecraft.world.item.Item it = net.minecraft.core.registries.BuiltInRegistries.ITEM.getValue(
+                        net.minecraft.resources.Identifier.parse(item.getAsString()));
+                    if (it != null && it != net.minecraft.world.item.Items.AIR) list.add(it);
                 } catch (Exception ignored) {
                 }
             }

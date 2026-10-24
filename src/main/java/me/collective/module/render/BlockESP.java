@@ -60,12 +60,12 @@ public class BlockESP extends Module {
 
     @Override
     public void onUpdate() {
-        if (mc.player == null || mc.world == null) {
+        if (mc.player == null || mc.level == null) {
             found.clear();
             scan.clear();
             return;
         }
-        List<BlockPos> scanned = scan.tick(mc.world, mc.player.getBlockPos(), range.getIntValue(),
+        List<BlockPos> scanned = scan.tick(mc.level, mc.player.blockPosition(), range.getIntValue(),
             new HashSet<>(blocks.getValue()), System.currentTimeMillis());
         found.clear();
         found.addAll(scanned);
@@ -81,13 +81,13 @@ public class BlockESP extends Module {
             case "Lines" -> ShapeMode.Lines;
             default -> ShapeMode.Both;
         };
-        Vec3 cam = mc.gameRenderer.getCamera().getCameraPos();
+        Vec3 cam = mc.gameRenderer.mainCamera().position();
         double rangeBlocks = this.range.getValue();
         // found меняется только в тиковых обработчиках того же потока —
         // обход напрямую, без защитной копии на каждый кадр
         for (BlockPos pos : found) {
             AABB box = new AABB(pos);
-            double dist = Math.sqrt(mc.player.squaredDistanceTo(
+            double dist = Math.sqrt(mc.player.distanceToSqr(
                 pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5));
             Color fillF = ColorUtil.fadeByDistance(dist, rangeBlocks, fill);
             Color lineF = ColorUtil.fadeLineByDistance(dist, rangeBlocks, fill, 255);

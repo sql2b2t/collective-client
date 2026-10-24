@@ -182,7 +182,7 @@ public class McpServer {
     /** Выполняет действие в основном (игровом) потоке и ждёт результат. */
     private static <T> T callSync(ThrowingSupplier<T> supplier) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc == null || mc.isOnThread()) {
+        if (mc == null || mc.isSameThread()) {
             try {
                 return supplier.get();
             } catch (Exception e) {
@@ -712,30 +712,30 @@ public class McpServer {
 
         if (mc.player == null) {
             state.addProperty("inGame", false);
-            state.addProperty("screen", mc.currentScreen != null ? mc.currentScreen.getClass().getSimpleName() : "None");
+            state.addProperty("screen", mc.gui.screen() != null ? mc.gui.screen().getClass().getSimpleName() : "None");
         } else {
             state.addProperty("inGame", true);
             state.addProperty("name", mc.player.getName().getString());
             state.addProperty("health", mc.player.getHealth());
-            state.addProperty("hunger", mc.player.getHungerManager().getFoodLevel());
+            state.addProperty("hunger", mc.player.getFoodData().getFoodLevel());
             state.addProperty("x", mc.player.getX());
             state.addProperty("y", mc.player.getY());
             state.addProperty("z", mc.player.getZ());
-            state.addProperty("yaw", mc.player.getYaw());
-            state.addProperty("pitch", mc.player.getPitch());
-            state.addProperty("onGround", mc.player.isOnGround());
-            state.addProperty("dimension", mc.world != null ? mc.world.getRegistryKey().getValue().toString() : "unknown");
-            state.addProperty("server", mc.getCurrentServerEntry() != null
-                    ? mc.getCurrentServerEntry().address
-                    : (mc.isInSingleplayer() ? "Singleplayer" : "None"));
+            state.addProperty("yaw", mc.player.getYRot());
+            state.addProperty("pitch", mc.player.getXRot());
+            state.addProperty("onGround", mc.player.onGround());
+            state.addProperty("dimension", mc.level != null ? mc.level.dimension().identifier().toString() : "unknown");
+            state.addProperty("server", mc.getCurrentServer() != null
+                    ? mc.getCurrentServer().ip
+                    : (mc.hasSingleplayerServer() ? "Singleplayer" : "None"));
 
             JsonArray inv = new JsonArray();
-            for (int i = 0; i < mc.player.getInventory().size(); i++) {
-                ItemStack is = mc.player.getInventory().getStack(i);
+            for (int i = 0; i < mc.player.getInventory().getContainerSize(); i++) {
+                ItemStack is = mc.player.getInventory().getItem(i);
                 if (!is.isEmpty()) {
                     JsonObject it = new JsonObject();
                     it.addProperty("slot", i);
-                    it.addProperty("item", Registries.ITEM.getId(is.getItem()).toString());
+                    it.addProperty("item", BuiltInRegistries.ITEM.getKey(is.getItem()).toString());
                     it.addProperty("count", is.getCount());
                     inv.add(it);
                 }
@@ -749,22 +749,23 @@ public class McpServer {
         Minecraft mc = Minecraft.getInstance();
         JsonObject o = new JsonObject();
 
-        if (mc.world == null || mc.player == null) {
+        if (mc.level == null || mc.player == null) {
             o.addProperty("inGame", false);
             return GSON.toJson(o);
         }
 
         o.addProperty("inGame", true);
-        o.addProperty("dimension", mc.world.getRegistryKey().getValue().toString());
-        o.addProperty("timeOfDay", mc.world.getTimeOfDay());
-        o.addProperty("day", mc.world.isDay());
-        o.addProperty("raining", mc.world.isRaining());
-        o.addProperty("thundering", mc.world.isThundering());
-        o.addProperty("difficulty", mc.world.getDifficulty().getName());
-        o.addProperty("players", mc.world.getPlayers().size());
-        o.addProperty("server", mc.getCurrentServerEntry() != null
-                ? mc.getCurrentServerEntry().address
-                : (mc.isInSingleplayer() ? "Singleplayer" : "None"));
+        o.addProperty("dimension", mc.level.dimension().identifier().toString());
+        long clockTime = mc.level.getOverworldClockTime();
+        o.addProperty("timeOfDay", clockTime);
+        o.addProperty("day", (clockTime % 24000L) < 12000L);
+        o.addProperty("raining", mc.level.isRaining());
+        o.addProperty("thundering", mc.level.isThundering());
+        o.addProperty("difficulty", mc.level.getDifficulty().getSerializedName());
+        o.addProperty("players", mc.level.players().size());
+        o.addProperty("server", mc.getCurrentServer() != null
+                ? mc.getCurrentServer().ip
+                : (mc.hasSingleplayerServer() ? "Singleplayer" : "None"));
         return GSON.toJson(o);
     }
 
@@ -773,8 +774,8 @@ public class McpServer {
         double radius = args.has("radius") ? args.get("radius").getAsDouble() : 32.0;
         JsonArray arr = new JsonArray();
 
-        if (mc.world != null && mc.player != null) {
-            for (Entity e : mc.world.getEntities()) {
+        if (mc.level != null && mc.player != null) {
+            for (Entity e : mc.level.entitiesForRendering()) {
                 if (e == mc.player) continue;
                 double dist = mc.player.distanceTo(e);
                 if (dist > radius) continue;
@@ -790,8 +791,8 @@ public class McpServer {
                     o.addProperty("health", pe.getHealth());
                 }
                 if (e instanceof ItemEntity ie) {
-                    ItemStack stack = ie.getStack();
-                    o.addProperty("item", Registries.ITEM.getId(stack.getItem()).toString());
+                    ItemStack stack = ie.getItem();
+                    o.addProperty("item", BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
                     o.addProperty("count", stack.getCount());
                 }
                 arr.add(o);
@@ -894,9 +895,9 @@ public class McpServer {
 
     private static String describeValue(Object item) {
         if (item == null) return "null";
-        if (item instanceof Block b) return Registries.BLOCK.getId(b).toString();
-        if (item instanceof Item i) return Registries.ITEM.getId(i).toString();
-        if (item instanceof EntityType<?> t) return Registries.ENTITY_TYPE.getId(t).toString();
+        if (item instanceof Block b) return BuiltInRegistries.BLOCK.getKey(b).toString();
+        if (item instanceof Item i) return BuiltInRegistries.ITEM.getKey(i).toString();
+        if (item instanceof EntityType<?> t) return BuiltInRegistries.ENTITY_TYPE.getKey(t).toString();
         return String.valueOf(item);
     }
 
@@ -1000,11 +1001,11 @@ public class McpServer {
     private static String chatMessageTool(JsonObject args) {
         Minecraft mc = Minecraft.getInstance();
         String msg = requiredString(args, "message");
-        if (mc.getNetworkHandler() == null) throw new IllegalStateException("Нет соединения с сервером");
+        if (mc.getConnection() == null) throw new IllegalStateException("Нет соединения с сервером");
         if (msg.startsWith("/")) {
-            mc.getNetworkHandler().sendChatCommand(msg.substring(1));
+            mc.getConnection().sendCommand(msg.substring(1));
         } else {
-            mc.getNetworkHandler().sendChatMessage(msg);
+            mc.getConnection().sendChat(msg);
         }
         return "Отправлено: " + msg;
     }
@@ -1029,8 +1030,8 @@ public class McpServer {
 
         RotationUtils.getInstance().setRotationSilent(yaw, pitch);
         if (mc.player != null) {
-            mc.player.setYaw(yaw);
-            mc.player.setPitch(pitch);
+            mc.player.setYRot(yaw);
+            mc.player.setXRot(pitch);
         }
         return "Углы выставлены: yaw=" + yaw + ", pitch=" + pitch;
     }

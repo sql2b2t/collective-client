@@ -9,7 +9,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerInput;
 
 import java.util.Set;
 
@@ -36,20 +36,20 @@ public class AutoDrop extends Module {
 
     @Override
     public void onUpdate() {
-        if (mc.player == null || mc.interactionManager == null) return;
-        if (mc.currentScreen != null || !InventoryUtil.canUsePlayerInventory()) return;
+        if (mc.player == null || mc.gameMode == null) return;
+        if (mc.gui.screen() != null || !InventoryUtil.canUsePlayerInventory()) return;
         if (delayTimer > 0) {
             delayTimer--;
             return;
         }
 
         for (int i = 9; i < 36; i++) {
-            ItemStack s = mc.player.getInventory().getStack(i);
-            if (s.isEmpty() || s.contains(DataComponentTypes.CUSTOM_NAME)
-                || s.contains(DataComponentTypes.CUSTOM_DATA)
-                || s.hasEnchantments()) continue;
+            ItemStack s = mc.player.getInventory().getItem(i);
+            if (s.isEmpty() || s.has(DataComponents.CUSTOM_NAME)
+                || s.has(DataComponents.CUSTOM_DATA)
+                || s.isEnchanted()) continue;
             if (isTrash(s.getItem())) {
-                mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, i, 1, SlotActionType.THROW, mc.player);
+                mc.gameMode.handleContainerInput(mc.player.containerMenu.containerId, i, 1, ContainerInput.THROW, mc.player);
                 delayTimer = delay.getIntValue();
                 return;
             }

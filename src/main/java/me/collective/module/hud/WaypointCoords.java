@@ -5,7 +5,7 @@ import me.collective.module.client.HUD;
 import me.collective.module.exploit.WaypointCoordExploit;
 import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -31,7 +31,7 @@ public class WaypointCoords extends HudModule {
     }
 
     @Override
-    public void render(GuiGraphics context, float delta) {
+    public void render(GuiGraphicsExtractor context, float delta) {
         if (!isToggled() || mc.player == null) return;
 
         WaypointCoordExploit exploit = WaypointCoordExploit.INSTANCE;

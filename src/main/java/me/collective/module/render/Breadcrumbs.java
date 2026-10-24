@@ -44,12 +44,12 @@ public class Breadcrumbs extends Module {
 
     @EventHandler
     public void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         Vec3 current = new Vec3(mc.player.getX(), mc.player.getY() + 0.05, mc.player.getZ());
         long now = System.currentTimeMillis();
 
-        if (points.isEmpty() || points.get(points.size() - 1).pos.squaredDistanceTo(current) >= 0.04) {
+        if (points.isEmpty() || points.get(points.size() - 1).pos.distanceToSqr(current) >= 0.04) {
             points.add(new TrailPoint(current, now));
         }
 
@@ -70,7 +70,7 @@ public class Breadcrumbs extends Module {
 
     @EventHandler
     public void onRender3D(Render3DEvent event) {
-        if (mc.player == null || mc.world == null || points.size() < 2) return;
+        if (mc.player == null || mc.level == null || points.size() < 2) return;
 
         long now = System.currentTimeMillis();
         long maxAgeMs = (long) (timeout.getValue() * 1000L);

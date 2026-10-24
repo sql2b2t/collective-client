@@ -1,5 +1,6 @@
 package me.collective.util;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.world.phys.Vec3;
 
 public final class Utils {
@@ -33,7 +34,7 @@ public final class Utils {
     }
 
     public static Vec3 positionInDirection(Vec3 pos, double yaw, double distance) {
-        return pos.add(yawToDirection(yaw).multiply(distance));
+        return pos.add(yawToDirection(yaw).scale(distance));
     }
 
     /**
@@ -49,42 +50,42 @@ public final class Utils {
 
         Vec3 directionVec = point.subtract(start);
 
-        double projectionLength = directionVec.dotProduct(direction) / direction.lengthSquared();
-        Vec3 projection = direction.multiply(projectionLength);
+        double projectionLength = directionVec.dot(direction) / direction.lengthSqr();
+        Vec3 projection = direction.scale(projectionLength);
         Vec3 perp = directionVec.subtract(projection);
 
         return perp.length();
     }
 
     public static int firework(net.minecraft.client.Minecraft mc, boolean elytraRequired) {
-        if (mc.player == null || mc.interactionManager == null) return -1;
+        if (mc.player == null || mc.gameMode == null) return -1;
 
         int elytraSwapSlot = -1;
 
-        if (elytraRequired && !mc.player.getInventory().getStack(38).isOf(net.minecraft.item.Items.ELYTRA)) {
-            FindItemResult elytra = InventoryUtil.findInHotbar(net.minecraft.item.Items.ELYTRA);
+        if (elytraRequired && !mc.player.getInventory().getItem(38).is(net.minecraft.world.item.Items.ELYTRA)) {
+            FindItemResult elytra = InventoryUtil.findInHotbar(net.minecraft.world.item.Items.ELYTRA);
             if (!elytra.found()) return -1;
 
             elytraSwapSlot = elytra.slot();
 
             InventoryUtil.swap(elytra.slot(), true);
-            mc.interactionManager.interactItem(mc.player, net.minecraft.util.InteractionHand.MAIN_HAND);
+            mc.gameMode.useItem(mc.player, net.minecraft.world.InteractionHand.MAIN_HAND);
             InventoryUtil.swapBack();
 
-            mc.getNetworkHandler().sendPacket(new net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket(
-                mc.player, net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket.Mode.START_FALL_FLYING));
+            mc.getConnection().send(new net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket(
+                mc.player, net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket.Action.START_FALL_FLYING));
         }
 
-        FindItemResult rocket = InventoryUtil.findInHotbarOrOffhand(net.minecraft.item.Items.FIREWORK_ROCKET);
+        FindItemResult rocket = InventoryUtil.findInHotbarOrOffhand(net.minecraft.world.item.Items.FIREWORK_ROCKET);
 
         if (rocket.found()) {
             if (rocket.isOffhand()) {
-                mc.interactionManager.interactItem(mc.player, net.minecraft.util.InteractionHand.OFF_HAND);
-                mc.player.swingHand(net.minecraft.util.InteractionHand.OFF_HAND);
+                mc.gameMode.useItem(mc.player, net.minecraft.world.InteractionHand.OFF_HAND);
+                Utils.swingHand(net.minecraft.world.InteractionHand.OFF_HAND);
             } else {
                 InventoryUtil.swap(rocket.slot(), true);
-                mc.interactionManager.interactItem(mc.player, net.minecraft.util.InteractionHand.MAIN_HAND);
-                mc.player.swingHand(net.minecraft.util.InteractionHand.MAIN_HAND);
+                mc.gameMode.useItem(mc.player, net.minecraft.world.InteractionHand.MAIN_HAND);
+                Utils.swingHand(net.minecraft.world.InteractionHand.MAIN_HAND);
                 InventoryUtil.swapBack();
             }
 
@@ -93,22 +94,22 @@ public final class Utils {
 
         int movedSlot = -1;
 
-        for (int n = 9; n < mc.player.getInventory().main.size(); n++) {
-            net.minecraft.item.Item item = mc.player.getInventory().getStack(n).getItem();
-            if (item != net.minecraft.item.Items.FIREWORK_ROCKET) continue;
+        for (int n = 9; n < mc.player.getInventory().getNonEquipmentItems().size(); n++) {
+            net.minecraft.world.item.Item item = mc.player.getInventory().getItem(n).getItem();
+            if (item != net.minecraft.world.item.Items.FIREWORK_ROCKET) continue;
 
             if (!GrimUtils.inventoryClickClean()) return -2;
 
-            InventoryUtil.move().from(n).to(mc.player.getInventory().selectedSlot);
+            InventoryUtil.move().from(n).to(mc.player.getInventory().getSelectedSlot());
             movedSlot = n;
             break;
         }
 
         if (movedSlot != -1) {
-            mc.interactionManager.interactItem(mc.player, net.minecraft.util.InteractionHand.MAIN_HAND);
-            mc.player.swingHand(net.minecraft.util.InteractionHand.MAIN_HAND);
+            mc.gameMode.useItem(mc.player, net.minecraft.world.InteractionHand.MAIN_HAND);
+            Utils.swingHand(net.minecraft.world.InteractionHand.MAIN_HAND);
 
-            InventoryUtil.move().from(mc.player.getInventory().selectedSlot).to(movedSlot);
+            InventoryUtil.move().from(mc.player.getInventory().getSelectedSlot()).to(movedSlot);
 
             return elytraSwapSlot != -1 ? elytraSwapSlot : 200;
         }
@@ -116,12 +117,32 @@ public final class Utils {
         return -1;
     }
 
-    public static void setPressed(net.minecraft.client.option.KeyMapping key, boolean pressed) {
-        key.setPressed(pressed);
+    public static void setPressed(net.minecraft.client.KeyMapping key, boolean pressed) {
+        key.setDown(pressed);
+    }
+
+    public static void swingHand(net.minecraft.world.InteractionHand hand) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player != null) {
+            mc.player.swing(hand, mc.player.getItemInHand(hand).getAttackAnimation(), false);
+            if (mc.getConnection() != null) {
+                mc.getConnection().send(net.minecraft.network.protocol.game.ServerboundPunchPacket.INSTANCE);
+            }
+        }
+    }
+
+    public static void swingHand(net.minecraft.client.player.LocalPlayer player, net.minecraft.world.InteractionHand hand) {
+        if (player != null) {
+            player.swing(hand, player.getItemInHand(hand).getAttackAnimation(), false);
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.getConnection() != null) {
+                mc.getConnection().send(net.minecraft.network.protocol.game.ServerboundPunchPacket.INSTANCE);
+            }
+        }
     }
 
     public static boolean isPressed(int glfwKey) {
         return org.lwjgl.glfw.GLFW.glfwGetKey(
-            net.minecraft.client.Minecraft.getInstance().getWindow().getHandle(), glfwKey) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
+            net.minecraft.client.Minecraft.getInstance().getWindow().handle(), glfwKey) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
     }
 }

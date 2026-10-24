@@ -57,8 +57,8 @@ public final class PorpoiseSolver {
     public static Legs solve(double height, float yaw, double yawAlign, double pitchAlign,
                              double threshold, double anti, boolean asymmetric, boolean pump,
                              double gravity, boolean slowFalling) {
-        float key = MathHelper.floorMod(yaw, 90.0f);
-        int bucket = Math.min(7, MathHelper.floor(key / YAW_BUCKET));
+        float key = Mth.positiveModulo(yaw, 90.0f);
+        int bucket = Math.min(7, Mth.floor(key / YAW_BUCKET));
 
         boolean refine = asymmetric || pump;
 
@@ -316,8 +316,8 @@ public final class PorpoiseSolver {
         int legTick = 0;
 
         float pitch = legs.pitch(true, 0, 0.0, half);
-        Vec3 look = Vec3.fromPolar(pitch, yaw);
-        Vec3 v = look.multiply(0.5);
+        Vec3 look = Vec3.directionFromRotation(pitch, yaw);
+        Vec3 v = look.scale(0.5);
 
         double alt = 0.0;
         double travelledX = 0.0;
@@ -363,7 +363,7 @@ public final class PorpoiseSolver {
 
             if (wanted != pitch) {
                 pitch = wanted;
-                look = Vec3.fromPolar(wanted, yaw);
+                look = Vec3.directionFromRotation(wanted, yaw);
             }
 
             double g = slowFalling && v.y <= 0.0 ? Math.min(gravity, 0.01) : gravity;
@@ -379,7 +379,7 @@ public final class PorpoiseSolver {
             alt += v.y;
             travelledX += v.x;
             travelledZ += v.z;
-            legGround += v.horizontalLength();
+            legGround += v.horizontalDistance();
             legTick++;
         }
 

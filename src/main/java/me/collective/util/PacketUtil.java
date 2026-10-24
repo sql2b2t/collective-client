@@ -13,8 +13,8 @@ public class PacketUtil {
     public static void sendSilently(Packet<?> packet) {
         SILENT_PACKETS.add(packet);
         Minecraft mc = Minecraft.getInstance();
-        if (mc.getNetworkHandler() != null && mc.getNetworkHandler().getConnection() != null) {
-            mc.getNetworkHandler().getConnection().send(packet);
+        if (mc.getConnection() != null && mc.getConnection().getConnection() != null) {
+            mc.getConnection().getConnection().send(packet);
         }
     }
 

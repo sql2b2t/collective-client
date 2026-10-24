@@ -6,7 +6,7 @@ import me.collective.module.client.UI;
 import me.collective.render.RenderUtil;
 import me.collective.render.SoundUtil;
 import me.collective.setting.IntegerSetting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -31,7 +31,7 @@ public class IntegerComponent extends Component {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         if (!setting.isVisible()) return;
 
         if (dragging) {

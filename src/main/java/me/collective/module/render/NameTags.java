@@ -8,7 +8,7 @@ import me.collective.module.client.UI;
 import me.collective.render.RenderUtil3D;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -51,23 +51,23 @@ public class NameTags extends Module {
     }
 
     @Override
-    public void onRender2D(GuiGraphics context, float delta) {
-        if (!isToggled() || mc.world == null || mc.player == null) return;
+    public void onRender2D(GuiGraphicsExtractor context, float delta) {
+        if (!isToggled() || mc.level == null || mc.player == null) return;
 
-        int sw = mc.getWindow().getScaledWidth();
-        int sh = mc.getWindow().getScaledHeight();
+        int sw = mc.getWindow().getGuiScaledWidth();
+        int sh = mc.getWindow().getGuiScaledHeight();
         double cullSq = this.cullDist.getValue() * this.cullDist.getValue();
 
-        for (Player player : mc.world.getPlayers()) {
+        for (Player player : mc.level.players()) {
             if (player == null || !player.isAlive()) continue;
             if (player == mc.player && !self.getValue()) continue;
-            if (player != mc.player && mc.player.squaredDistanceTo(player) > cullSq) continue;
+            if (player != mc.player && mc.player.distanceToSqr(player) > cullSq) continue;
 
             TagData data = this.tagCache.get(player.getId());
             if (data == null) continue; // выйдет из кэша на следующем тике
 
-            Vec3 pos = player.getLerpedPos(delta);
-            Vector2f screen = RenderUtil3D.worldToScreen(pos.x, pos.y + player.getHeight() + 0.25, pos.z, sw, sh);
+            Vec3 pos = player.getPosition(delta);
+            Vector2f screen = RenderUtil3D.worldToScreen(pos.x, pos.y + player.getBbHeight() + 0.25, pos.z, sw, sh);
             if (screen == null) continue;
 
             renderTag(context, player, screen.x, screen.y, data);
@@ -97,19 +97,19 @@ public class NameTags extends Module {
     @Override
     public void onUpdate() {
         this.tagCache.clear();
-        if (!isToggled() || mc.world == null || mc.player == null) return;
+        if (!isToggled() || mc.level == null || mc.player == null) return;
 
         FontManager fm = FontManager.INSTANCE;
         float s = scale.getFloatValue();
 
-        for (Player player : mc.world.getPlayers()) {
+        for (Player player : mc.level.players()) {
             if (player == null || !player.isAlive()) continue;
 
             TagData d = new TagData();
             d.name = player.getName().getString();
 
-            if (ping.getValue() && mc.getNetworkHandler() != null) {
-                var entry = mc.getNetworkHandler().getPlayerListEntry(player.getUuid());
+            if (ping.getValue() && mc.getConnection() != null) {
+                var entry = mc.getConnection().getPlayerInfo(player.getUUID());
                 if (entry != null) d.ping = entry.getLatency();
             }
             d.pingStr = d.ping >= 0 ? d.ping + "ms" : "";
@@ -121,7 +121,7 @@ public class NameTags extends Module {
             d.hpStr = health.getValue() ? String.valueOf((int) Math.ceil(hp)) : "";
 
             d.distStr = distance.getValue()
-                    ? Math.round(Math.sqrt(mc.player.squaredDistanceTo(player))) + "м" : "";
+                    ? Math.round(Math.sqrt(mc.player.distanceToSqr(player))) + "м" : "";
 
             d.nameW = fm.getStringWidthScaled(d.name, s);
             d.hpW = d.hpStr.isEmpty() ? 0 : fm.getStringWidthScaled(d.hpStr, s);
@@ -137,7 +137,7 @@ public class NameTags extends Module {
         return Math.max(3f, 4f * s);
     }
 
-    private void renderTag(GuiGraphics context, Player player, float x, float y, TagData d) {
+    private void renderTag(GuiGraphicsExtractor context, Player player, float x, float y, TagData d) {
         FontManager fm = FontManager.INSTANCE;
         float s = scale.getFloatValue();
 
@@ -177,12 +177,12 @@ public class NameTags extends Module {
         if (armor.getValue()) {
             ItemStack[] equipment = new ItemStack[6];
             int count = 0;
-            equipment[count++] = player.getEquippedStack(EquipmentSlot.MAINHAND);
-            equipment[count++] = player.getEquippedStack(EquipmentSlot.HEAD);
-            equipment[count++] = player.getEquippedStack(EquipmentSlot.CHEST);
-            equipment[count++] = player.getEquippedStack(EquipmentSlot.LEGS);
-            equipment[count++] = player.getEquippedStack(EquipmentSlot.FEET);
-            equipment[count++] = player.getEquippedStack(EquipmentSlot.OFFHAND);
+            equipment[count++] = player.getItemBySlot(EquipmentSlot.MAINHAND);
+            equipment[count++] = player.getItemBySlot(EquipmentSlot.HEAD);
+            equipment[count++] = player.getItemBySlot(EquipmentSlot.CHEST);
+            equipment[count++] = player.getItemBySlot(EquipmentSlot.LEGS);
+            equipment[count++] = player.getItemBySlot(EquipmentSlot.FEET);
+            equipment[count++] = player.getItemBySlot(EquipmentSlot.OFFHAND);
 
             int visible = 0;
             for (int i = 0; i < count; i++) {
@@ -198,8 +198,8 @@ public class NameTags extends Module {
                     if (equipment[i].isEmpty()) continue;
                     GuiGfx.fillRounded(context, ix, iy, slot, slot, 3, SLOT_BG.getRGB());
                     GuiGfx.outlineRounded(context, ix, iy, slot, slot, 3, BORDER.getRGB());
-                    context.drawItem(equipment[i], (int) ix + 1, (int) iy + 1);
-                    context.drawStackOverlay(mc.textRenderer, equipment[i], (int) ix + 1, (int) iy + 1);
+                    context.item(equipment[i], (int) ix + 1, (int) iy + 1);
+                    context.itemDecorations(mc.font, equipment[i], (int) ix + 1, (int) iy + 1);
                     ix += slot;
                 }
             }

@@ -25,7 +25,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Items;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.network.protocol.game.ServerboundInteractPacket;
 import net.minecraft.world.InteractionHand;
@@ -228,7 +228,7 @@ public class CrystalAura extends Module {
 
     @EventHandler
     private void onTickPre(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null || mc.getNetworkHandler() == null) return;
+        if (mc.player == null || mc.level == null || mc.getConnection() == null) return;
 
         this.aiming = false;
         pruneAttacked();
@@ -298,7 +298,7 @@ public class CrystalAura extends Module {
             return;
         }
 
-        if (this.pauseOnMine.getValue() && mc.interactionManager != null && mc.interactionManager.isBreakingBlock()) {
+        if (this.pauseOnMine.getValue() && mc.gameMode != null && mc.gameMode.isDestroying()) {
             cancelAction();
             return;
         }
@@ -311,7 +311,7 @@ public class CrystalAura extends Module {
                 // Заявку слота считаем «провод нужен»: отказ координации —
                 // не повод сбрасывать собственное наведение.
                 this.aiming = true;
-                if (AuraCoordination.claim(this, mc.world.getTime())) {
+                if (AuraCoordination.claim(this, mc.level.getDefaultClockTime())) {
                     applyAim(this.pendingAim);
                 }
             }
@@ -325,7 +325,7 @@ public class CrystalAura extends Module {
             return;
         }
 
-        EndCrystalEntity crystal = bestAttackableCrystal();
+        EndCrystal crystal = bestAttackableCrystal();
         if (crystal == null && !InventoryUtil.findInHotbarOrOffhand(Items.END_CRYSTAL).found()) {
             cancelAction();
             return;
@@ -335,7 +335,7 @@ public class CrystalAura extends Module {
         // действует одна, иначе две одновременно перезаписывают серверный
         // угол и сбивают друг другу проверки прицела.
         this.aiming = true;
-        if (!AuraCoordination.claim(this, mc.world.getTime())) return;
+        if (!AuraCoordination.claim(this, mc.level.getDefaultClockTime())) return;
 
         // 1. Атака существующего кристалла — самый быстрый путь урона.
         this.placeBox = crystal != null ? null : this.placeBox;
@@ -360,16 +360,16 @@ public class CrystalAura extends Module {
     // Атака: выбор и исполнение
     // ─────────────────────────────────────────────────────────────────
 
-    private EndCrystalEntity bestAttackableCrystal() {
+    private EndCrystal bestAttackableCrystal() {
         double reachSq = this.attackRange.getValue() * this.attackRange.getValue();
         LivingEntity target = livingTarget();
 
-        EndCrystalEntity best = null;
+        EndCrystal best = null;
         float bestValue = Float.NEGATIVE_INFINITY;
         double bestDist = Double.MAX_VALUE;
 
-        for (Entity entity : mc.world.getEntities()) {
-            if (!(entity instanceof EndCrystalEntity crystal)) continue;
+        for (Entity entity : mc.level.entitiesForRendering()) {
+            if (!(entity instanceof EndCrystal crystal)) continue;
             if (!crystal.isAlive() || crystal.isRemoved()) continue;
             if (isRecentlyAttacked(crystal.getId())) continue;
 
@@ -379,7 +379,7 @@ public class CrystalAura extends Module {
 
             Vec3 center = crystalCenter(crystal);
             float targetDmg = target != null
-                    ? ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, target)
+                    ? ExplosionDamageUtil.getDamage(mc.level, center, ExplosionDamageUtil.CRYSTAL_POWER, target)
                     : 0.0f;
 
             if (target != null && !damageAcceptable(center, target, targetDmg)) continue;
@@ -394,7 +394,7 @@ public class CrystalAura extends Module {
         return best;
     }
 
-    private void handleAttack(EndCrystalEntity crystal) {
+    private void handleAttack(EndCrystal crystal) {
         // Наведение заказывается ДО проверок луча: без этого отправленный
         // угол никогда не дойдёт до кристалла и атаа не выстрелит.
         // Держим прицел на центре хитбокса кристалла даже пока луч не дошёл.
@@ -403,7 +403,7 @@ public class CrystalAura extends Module {
 
         // Удар уходит только когда луч по отправленному углу уже пересекает
         // расширенный хитбокс кристалла; дубль наведения выше гонит доворот.
-        AABB hitBox = crystal.getBoundingBox().expand(ENTITY_BOX_EXPAND);
+        AABB hitBox = crystal.getBoundingBox().inflate(ENTITY_BOX_EXPAND);
         if (!aimAtEntityBox(hitBox)) {
             return;
         }
@@ -411,9 +411,9 @@ public class CrystalAura extends Module {
         RotationUtils rot = RotationUtils.getInstance();
         rot.keepWireFresh();
 
-        mc.getNetworkHandler().sendPacket(
-                PlayerInteractEntityC2SPacket.attack(crystal, mc.player.isSneaking()));
-        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
+        mc.getConnection().send(
+                new net.minecraft.network.protocol.game.ServerboundAttackPacket(crystal.getId()));
+        mc.getConnection().send(ServerboundPunchPacket.INSTANCE);
 
         if (this.predict.getValue()) {
             crystal.discard();
@@ -438,7 +438,7 @@ public class CrystalAura extends Module {
     }
 
     /** Центр взрыва кристалла — позиция сущности (проверено по байткоду). */
-    private static Vec3 crystalCenter(EndCrystalEntity crystal) {
+    private static Vec3 crystalCenter(EndCrystal crystal) {
         return new Vec3(crystal.getX(), crystal.getY(), crystal.getZ());
     }
 
@@ -458,10 +458,10 @@ public class CrystalAura extends Module {
             return;
         }
 
-        BlockState supportState = mc.world.getBlockState(cell.down());
+        BlockState supportState = mc.level.getBlockState(cell.below());
         if (!isCrystalSupport(supportState)) {
             if (this.autoSupport.getValue()) {
-                this.pendingSupportCell = cell.down();
+                this.pendingSupportCell = cell.below();
                 this.supportWaitTicks = 0;
                 handleSupportBuild();
             } else {
@@ -477,13 +477,13 @@ public class CrystalAura extends Module {
         BlockPos supportCell = this.pendingSupportCell;
 
         // Ожидание подтверждения: обсидиан встал — дальше кристалл.
-        BlockState state = mc.world.getBlockState(supportCell);
-        if (state.isOf(Blocks.OBSIDIAN)) {
+        BlockState state = mc.level.getBlockState(supportCell);
+        if (state.is(Blocks.OBSIDIAN)) {
             this.pendingSupportCell = null;
             this.supportWaitTicks = 0;
             return;
         }
-        if (!state.isReplaceable()) {
+        if (!state.canBeReplaced()) {
             this.pendingSupportCell = null;
             cancelAction();
             return;
@@ -502,9 +502,9 @@ public class CrystalAura extends Module {
         }
 
         // Обсидиан ставим кликом по верхней грани блока под опорной клеткой.
-        BlockPos under = supportCell.down();
-        BlockState underState = mc.world.getBlockState(under);
-        if (underState.isReplaceable() || !underState.isSolidBlock(mc.world, under)) {
+        BlockPos under = supportCell.below();
+        BlockState underState = mc.level.getBlockState(under);
+        if (underState.canBeReplaced() || !underState.isSolid()) {
             this.pendingSupportCell = null;
             cancelAction();
             return;
@@ -520,8 +520,8 @@ public class CrystalAura extends Module {
             }
         }
 
-        this.pendingAim = hit.getPos();
-        applyAim(hit.getPos());
+        this.pendingAim = hit.getLocation();
+        applyAim(hit.getLocation());
 
         if (!isAimedViaSentRot(hit, this.placeReach.getValue())) return;
         if (SwapManager.getInstance().isActionConflictTick()) return;
@@ -533,11 +533,11 @@ public class CrystalAura extends Module {
         InteractionHand hand = obsidian.getHand();
         BlockHitResult finalHit = randomizeCursor(hit);
         int seq = GrimUtils.nextSequence();
-        mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(hand, finalHit, seq));
-        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
+        mc.getConnection().send(new ServerboundUseItemOnPacket(hand, finalHit, seq));
+        mc.getConnection().send(ServerboundPunchPacket.INSTANCE);
 
-        if (this.predict.getValue() && isFaceFacingEye(mc.player.getEyePos(), under, Direction.UP)) {
-            mc.world.setBlockState(supportCell, Blocks.OBSIDIAN.getDefaultState());
+        if (this.predict.getValue() && isFaceFacingEye(mc.player.getEyePosition(), under, Direction.UP)) {
+            mc.level.setBlock(supportCell, Blocks.OBSIDIAN.defaultBlockState(), 3);
         }
 
         this.supportWaitTicks = SUPPORT_CONFIRM_TICKS;
@@ -551,9 +551,9 @@ public class CrystalAura extends Module {
     private BlockHitResult findSupportSideHit(BlockPos supportCell) {
         double reach = Math.min(this.placeReach.getValue(), SERVER_BLOCK_REACH);
         for (Direction dir : Direction.values()) {
-            BlockPos neighbor = supportCell.offset(dir);
-            BlockState neighborState = mc.world.getBlockState(neighbor);
-            if (neighborState.isReplaceable() || !neighborState.isSolidBlock(mc.world, neighbor)) continue;
+            BlockPos neighbor = supportCell.relative(dir);
+            BlockState neighborState = mc.level.getBlockState(neighbor);
+            if (neighborState.canBeReplaced() || !neighborState.isSolid()) continue;
 
             BlockHitResult hit = findFaceHit(neighbor, dir.getOpposite(), reach);
             if (hit != null) return hit;
@@ -568,22 +568,22 @@ public class CrystalAura extends Module {
         double reach = Math.min(this.placeReach.getValue(), SERVER_BLOCK_REACH);
         double reachSq = reach * reach;
 
-        BlockPos origin = mc.player.getBlockPos();
+        BlockPos origin = mc.player.blockPosition();
         int r = (int) Math.ceil(reach);
 
         List<BlockPos> valid = new ArrayList<>();
         for (int dx = -r; dx <= r; dx++) {
             for (int dy = -2; dy <= 3; dy++) {
                 for (int dz = -r; dz <= r; dz++) {
-                    BlockPos cell = origin.add(dx, dy, dz);
-                    if (!mc.world.getBlockState(cell).isAir()) continue;
+                    BlockPos cell = origin.offset(dx, dy, dz);
+                    if (!mc.level.getBlockState(cell).isAir()) continue;
 
-                    BlockState supportState = mc.world.getBlockState(cell.down());
+                    BlockState supportState = mc.level.getBlockState(cell.below());
                     boolean supportReady = isCrystalSupport(supportState);
                     if (!supportReady) {
                         if (!this.autoSupport.getValue()) continue;
                         // AutoSupport: обсидиан поставим позже, клетка опоры — заменяемая.
-                        if (!supportState.isReplaceable()) continue;
+                        if (!supportState.canBeReplaced()) continue;
                     }
 
                     // Симуляция серверного EndCrystalItem: бокс 1×2×1 пуст от сущностей.
@@ -591,8 +591,8 @@ public class CrystalAura extends Module {
                             cell.getX(), cell.getY(), cell.getZ(),
                             cell.getX() + 1.0, cell.getY() + 2.0, cell.getZ() + 1.0);
                     boolean occupied = false;
-                    for (Entity e : mc.world.getOtherEntities(null, space)) {
-                        if (e instanceof EndCrystalEntity cr && (isRecentlyAttacked(cr.getId()) || cr.isRemoved())) {
+                    for (Entity e : mc.level.getEntities(null, space)) {
+                        if (e instanceof EndCrystal cr && (isRecentlyAttacked(cr.getId()) || cr.isRemoved())) {
                             continue;
                         }
                         occupied = true;
@@ -630,11 +630,11 @@ public class CrystalAura extends Module {
 
         for (BlockPos p : pool) {
             Vec3 center = bottomCenter(p);
-            float targetDmg = ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, target);
+            float targetDmg = ExplosionDamageUtil.getDamage(mc.level, center, ExplosionDamageUtil.CRYSTAL_POWER, target);
             if (targetDmg < minDmg) continue;
             if (this.antiFriend.getValue() && isFriendDamaged(center)) continue;
 
-            float selfDmg = ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, mc.player);
+            float selfDmg = ExplosionDamageUtil.getDamage(mc.level, center, ExplosionDamageUtil.CRYSTAL_POWER, mc.player);
             if (selfDmg > maxSelf) continue;
             if (this.antiSuicide.getValue()) {
                 float totalHp = mc.player.getHealth() + mc.player.getAbsorptionAmount();
@@ -672,15 +672,15 @@ public class CrystalAura extends Module {
         this.stickyTargetId = this.currentTarget.getId();
         this.stickyMs = now;
 
-        if (pinned != null && (!pool.contains(pinned) || !mc.world.getBlockState(pinned).isAir())) {
+        if (pinned != null && (!pool.contains(pinned) || !mc.level.getBlockState(pinned).isAir())) {
             this.stickyCell = null;
             pinned = null;
         }
 
         if (pinned != null) {
             Vec3 center = bottomCenter(pinned);
-            float score = ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, target) * 2.0f
-                    - ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, mc.player);
+            float score = ExplosionDamageUtil.getDamage(mc.level, center, ExplosionDamageUtil.CRYSTAL_POWER, target) * 2.0f
+                    - ExplosionDamageUtil.getDamage(mc.level, center, ExplosionDamageUtil.CRYSTAL_POWER, mc.player);
             if (score >= bestScore * STICKY_KEEP_RATIO) return pinned;
         }
 
@@ -689,8 +689,8 @@ public class CrystalAura extends Module {
     }
 
     private void aimPlacement(BlockPos cell) {
-        BlockPos support = cell.down();
-        BlockState supportState = mc.world.getBlockState(support);
+        BlockPos support = cell.below();
+        BlockState supportState = mc.level.getBlockState(support);
 
         BlockHitResult hit = null;
         if (isCrystalSupport(supportState)) {
@@ -706,8 +706,8 @@ public class CrystalAura extends Module {
             return;
         }
 
-        this.pendingAim = hit.getPos();
-        applyAim(hit.getPos());
+        this.pendingAim = hit.getLocation();
+        applyAim(hit.getLocation());
         this.placeBox = new AABB(
                 cell.getX(), cell.getY(), cell.getZ(),
                 cell.getX() + 1.0, cell.getY() + 2.0, cell.getZ() + 1.0);
@@ -730,15 +730,15 @@ public class CrystalAura extends Module {
         InteractionHand hand = crystals.getHand();
         BlockHitResult finalHit = randomizeCursor(hit);
         int seq = GrimUtils.nextSequence();
-        mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(hand, finalHit, seq));
-        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
+        mc.getConnection().send(new ServerboundUseItemOnPacket(hand, finalHit, seq));
+        mc.getConnection().send(ServerboundPunchPacket.INSTANCE);
 
         this.actionTimer = this.placeDelay.getValue().intValue();
         cancelAction();
     }
 
     private boolean isCrystalSupport(BlockState state) {
-        return state.isOf(Blocks.OBSIDIAN) || state.isOf(Blocks.BEDROCK);
+        return state.is(Blocks.OBSIDIAN) || state.is(Blocks.BEDROCK);
     }
 
     /**
@@ -746,22 +746,22 @@ public class CrystalAura extends Module {
      * GrimAnchorAura для физической поддержки placement-лучей.
      */
     private BlockHitResult findFaceHit(BlockPos pos, Direction face, double reach) {
-        Vec3 eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePosition();
 
         if (!isFaceFacingEye(eye, pos, face)) return null;
 
         Vec3 sample = faceCenter(pos, face);
         Vec3 dir = sample.subtract(eye);
-        if (dir.lengthSquared() < 1.0E-6) return null;
+        if (dir.lengthSqr() < 1.0E-6) return null;
 
-        Vec3 end = eye.add(dir.normalize().multiply(reach + 0.1));
+        Vec3 end = eye.add(dir.normalize().scale(reach + 0.1));
 
-        BlockHitResult clip = mc.world.raycast(new RaycastContext(
-                eye, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, mc.player));
+        BlockHitResult clip = mc.level.clip(new ClipContext(
+                eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, mc.player));
 
         if (clip.getType() != HitResult.Type.BLOCK) return null;
-        if (!clip.getBlockPos().equals(pos) || clip.getSide() != face) return null;
-        return eye.squaredDistanceTo(clip.getPos()) > reach * reach ? null : clip;
+        if (!clip.getBlockPos().equals(pos) || clip.getDirection() != face) return null;
+        return eye.distanceToSqr(clip.getLocation()) > reach * reach ? null : clip;
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -771,22 +771,22 @@ public class CrystalAura extends Module {
     private void applyAim(Vec3 targetPos) {
         this.aiming = true;
 
-        float[] rot = RotationUtils.getRotationsTo(mc.player.getEyePos(), targetPos);
+        float[] rot = RotationUtils.getRotationsTo(mc.player.getEyePosition(), targetPos);
         double maxSpeed = this.turnSpeed.getValue();
         double smooth = this.smoothness.getValue();
         RotationMode mode = this.rotationMode.getValue();
 
         if (mode == RotationMode.CLIENT || mode == RotationMode.BOTH) {
-            float curYaw = mc.player.getYaw();
-            float curPitch = mc.player.getPitch();
+            float curYaw = mc.player.getYRot();
+            float curPitch = mc.player.getXRot();
 
-            float dy = MathHelper.wrapDegrees(rot[0] - curYaw);
+            float dy = Mth.wrapDegrees(rot[0] - curYaw);
             float dp = rot[1] - curPitch;
             double totalDist = Math.hypot(dy, dp);
 
             if (maxSpeed >= 180.0 && smooth <= 0.0) {
-                mc.player.setYaw(curYaw + dy);
-                mc.player.setPitch(MathHelper.clamp(rot[1], -90.0f, 90.0f));
+                mc.player.setYRot(curYaw + dy);
+                mc.player.setXRot(Mth.clamp(rot[1], -90.0f, 90.0f));
             } else if (totalDist > 0.0001) {
                 double decelRange = Math.max(16.0, maxSpeed * 0.40);
                 double easePow = 0.50 + smooth * 0.30;
@@ -798,7 +798,7 @@ public class CrystalAura extends Module {
                 double stepP = dp / totalDist * step;
 
                 // GCD-квантование под мышачий ввод.
-                double sens = mc.options.getMouseSensitivity().getValue();
+                double sens = mc.options.sensitivity().get();
                 double f = sens * 0.6 + 0.2;
                 double gcd = f * f * f * 8.0 * 0.15;
                 if (gcd > 0.001) {
@@ -810,15 +810,15 @@ public class CrystalAura extends Module {
                     stepP = qP;
                 }
 
-                mc.player.setYaw(curYaw + (float) stepY);
-                mc.player.setPitch(MathHelper.clamp(curPitch + (float) stepP, -90.0f, 90.0f));
+                mc.player.setYRot(curYaw + (float) stepY);
+                mc.player.setXRot(Mth.clamp(curPitch + (float) stepP, -90.0f, 90.0f));
             }
         }
 
         if (mode == RotationMode.SILENT || mode == RotationMode.BOTH) {
             RotationUtils rotUtils = RotationUtils.getInstance();
             if (mode == RotationMode.BOTH) {
-                rotUtils.setRotationFullInstant(this, ROTATION_PRIORITY, mc.player.getYaw(), mc.player.getPitch());
+                rotUtils.setRotationFullInstant(this, ROTATION_PRIORITY, mc.player.getYRot(), mc.player.getXRot());
             } else if (maxSpeed >= 180.0 && smooth <= 0.0) {
                 rotUtils.setRotationInstant(this, ROTATION_PRIORITY, rot[0], rot[1], this.syncMovement.getValue());
             } else {
@@ -832,44 +832,44 @@ public class CrystalAura extends Module {
 
     /** Проверка прицела по отправленному углу: луч обязан попасть в блок и грань. */
     private boolean isAimedViaSentRot(BlockHitResult expected, double reach) {
-        if (mc.player == null || mc.world == null || expected == null) return false;
+        if (mc.player == null || mc.level == null || expected == null) return false;
 
         RotationUtils rotUtils = RotationUtils.getInstance();
-        Vec3 eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePosition();
 
         float yaw, pitch;
         if (this.rotationMode.getValue() == RotationMode.CLIENT) {
-            yaw = mc.player.getYaw();
-            pitch = mc.player.getPitch();
+            yaw = mc.player.getYRot();
+            pitch = mc.player.getXRot();
         } else {
             yaw = rotUtils.getSentYaw();
             pitch = rotUtils.getSentPitch();
         }
 
         Vec3 look = RotationUtils.getRotationVector(pitch, yaw);
-        Vec3 end = eye.add(look.multiply(reach + 0.1));
+        Vec3 end = eye.add(look.scale(reach + 0.1));
 
         // GrimAC валидирует интеракции через OUTLINE-форму блока.
-        BlockHitResult clip = mc.world.raycast(new RaycastContext(
-                eye, end, RaycastContext.ShapeType.OUTLINE, RaycastContext.FluidHandling.NONE, mc.player));
+        BlockHitResult clip = mc.level.clip(new ClipContext(
+                eye, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, mc.player));
 
         if (clip == null || clip.getType() != HitResult.Type.BLOCK) return false;
         if (!clip.getBlockPos().equals(expected.getBlockPos())) return false;
-        if (clip.getSide() != expected.getSide()) return false;
-        return eye.squaredDistanceTo(clip.getPos()) <= reach * reach;
+        if (clip.getDirection() != expected.getDirection()) return false;
+        return eye.distanceToSqr(clip.getLocation()) <= reach * reach;
     }
 
     /** Проверка, что по отправленному углу луч пересекает хитбокс кристалла. */
     private boolean aimAtEntityBox(AABB hitBox) {
         double reach = this.attackRange.getValue();
-        Vec3 eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePosition();
 
         if (GrimUtils.closestEyeDistanceSqTo(mc.player, hitBox) > reach * reach) return false;
 
         float yaw, pitch;
         if (this.rotationMode.getValue() == RotationMode.CLIENT) {
-            yaw = mc.player.getYaw();
-            pitch = mc.player.getPitch();
+            yaw = mc.player.getYRot();
+            pitch = mc.player.getXRot();
         } else {
             RotationUtils rotUtils = RotationUtils.getInstance();
             yaw = rotUtils.getSentYaw();
@@ -877,8 +877,8 @@ public class CrystalAura extends Module {
         }
 
         Vec3 look = RotationUtils.getRotationVector(pitch, yaw);
-        Vec3 end = eye.add(look.multiply(reach + 0.2));
-        return hitBox.raycast(eye, end).isPresent();
+        Vec3 end = eye.add(look.scale(reach + 0.2));
+        return hitBox.clip(eye, end).isPresent();
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -887,7 +887,7 @@ public class CrystalAura extends Module {
 
     /** Гейт урона: минДмг / соотношение / фейсплейс / самоподрыв / друзья. */
     private boolean damageAcceptable(Vec3 center, LivingEntity target, float targetDmg) {
-        float selfDmg = ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, mc.player);
+        float selfDmg = ExplosionDamageUtil.getDamage(mc.level, center, ExplosionDamageUtil.CRYSTAL_POWER, mc.player);
 
         boolean facePlace = isFacePlace(target);
         if (!facePlace) {
@@ -917,14 +917,14 @@ public class CrystalAura extends Module {
         if (limit <= 0.0f) return false;
 
         for (String name : FriendManager.INSTANCE.getFriends()) {
-            for (Player player : mc.world.getPlayers()) {
+            for (Player player : mc.level.players()) {
                 if (!player.getName().getString().equals(name)) continue;
-                if (player == mc.player || !player.isAlive() || player.isDead()) continue;
+                if (player == mc.player || !player.isAlive() || player.isDeadOrDying()) continue;
 
                 float upper = ExplosionDamageUtil.getDamageUpperBound(center, ExplosionDamageUtil.CRYSTAL_POWER, player);
                 if (upper <= limit) continue;
 
-                float dmg = ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, player);
+                float dmg = ExplosionDamageUtil.getDamage(mc.level, center, ExplosionDamageUtil.CRYSTAL_POWER, player);
                 if (dmg > limit) return true;
             }
         }
@@ -940,8 +940,8 @@ public class CrystalAura extends Module {
 
         if (selfDmg <= 6.0f) return true;
 
-        boolean hasTotem = mc.player.getMainHandStack().isOf(Items.TOTEM_OF_UNDYING)
-                || mc.player.getOffHandStack().isOf(Items.TOTEM_OF_UNDYING);
+        boolean hasTotem = mc.player.getMainHandItem().is(Items.TOTEM_OF_UNDYING)
+                || mc.player.getOffhandItem().is(Items.TOTEM_OF_UNDYING);
         if (hasTotem) return true;
 
         return totalHp > selfDmg;
@@ -958,13 +958,13 @@ public class CrystalAura extends Module {
         double bestValue = Double.MAX_VALUE;      // для DISTANCE/HEALTH — меньше, тем лучше
         float bestDamage = Float.NEGATIVE_INFINITY;
 
-        for (Player player : mc.world.getPlayers()) {
+        for (Player player : mc.level.players()) {
             if (player == mc.player) continue;
-            if (player.isSpectator() || player.isDead() || !player.isAlive()) continue;
+            if (player.isSpectator() || player.isDeadOrDying() || !player.isAlive()) continue;
             if (!this.targetCreative.getValue() && player.isCreative()) continue;
             if (this.antiFriend.getValue() && FriendManager.INSTANCE.isFriend(player)) continue;
 
-            double dist = mc.player.squaredDistanceTo(player);
+            double dist = mc.player.distanceToSqr(player);
             if (dist > rangeSq) continue;
 
             switch (this.targetMode.getValue()) {
@@ -983,7 +983,7 @@ public class CrystalAura extends Module {
                 }
                 case DAMAGE -> {
                     float upper = ExplosionDamageUtil.getDamageUpperBound(
-                            mc.player.getEntityPos().add(0.0, 1.0, 0.0), ExplosionDamageUtil.CRYSTAL_POWER, player);
+                            mc.player.position().add(0.0, 1.0, 0.0), ExplosionDamageUtil.CRYSTAL_POWER, player);
                     if (upper > bestDamage) {
                         bestDamage = upper;
                         best = player;
@@ -993,13 +993,13 @@ public class CrystalAura extends Module {
         }
 
         if (best == null && this.targetMobs.getValue()) {
-            for (Entity entity : mc.world.getEntities()) {
+            for (Entity entity : mc.level.entitiesForRendering()) {
                 if (!(entity instanceof LivingEntity living)
                         || living instanceof Player
                         || !living.isAlive()
-                        || living.isDead()) continue;
+                        || living.isDeadOrDying()) continue;
 
-                double dist = mc.player.squaredDistanceTo(living);
+                double dist = mc.player.distanceToSqr(living);
                 if (dist > rangeSq) continue;
 
                 if (this.targetMode.getValue() == TargetMode.HEALTH) {
@@ -1022,7 +1022,7 @@ public class CrystalAura extends Module {
                 && best.getId() != this.currentTarget.getId()
                 && this.targetHoldTicks > 0
                 && this.currentTarget.isAlive()
-                && mc.player.squaredDistanceTo(this.currentTarget) <= rangeSq) {
+                && mc.player.distanceToSqr(this.currentTarget) <= rangeSq) {
             this.targetHoldTicks--;
             best = this.currentTarget;
         }
@@ -1036,7 +1036,7 @@ public class CrystalAura extends Module {
     }
 
     private LivingEntity livingTarget() {
-        return this.currentTarget instanceof LivingEntity living && living.isAlive() && !living.isDead()
+        return this.currentTarget instanceof LivingEntity living && living.isAlive() && !living.isDeadOrDying()
                 ? living : null;
     }
 
@@ -1076,7 +1076,7 @@ public class CrystalAura extends Module {
      * и для атаки. Сбоку — когда верхняя не видна. Снизу — из-под опоры.
      */
     private Direction[] facePreferenceOrder(BlockPos support) {
-        Vec3 eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePosition();
         Direction[] topFirst = {Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, Direction.DOWN};
         Direction[] bottomFirst = {Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, Direction.UP};
 
@@ -1096,7 +1096,7 @@ public class CrystalAura extends Module {
      */
     private BlockHitResult randomizeCursor(BlockHitResult original) {
         BlockPos blockPos = original.getBlockPos();
-        Direction face = original.getSide();
+        Direction face = original.getDirection();
 
         double bx = blockPos.getX();
         double by = blockPos.getY();
@@ -1140,7 +1140,7 @@ public class CrystalAura extends Module {
             }
         }
 
-        return new BlockHitResult(new Vec3(rx, ry, rz), face, blockPos, original.isInsideBlock());
+        return new BlockHitResult(new Vec3(rx, ry, rz), face, blockPos, original.isInside());
     }
 
     private static double jitter() {

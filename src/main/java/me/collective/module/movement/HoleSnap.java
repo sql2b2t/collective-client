@@ -49,7 +49,7 @@ public class HoleSnap extends Module {
     public final NumberSetting searchRadius = add(new NumberSetting("SearchRadius", 4, 1, 12, 1));
 
     private final List<Hole> holes = new ArrayList<>();
-    private final BlockPos.Mutable searchCursor = new BlockPos.Mutable();
+    private final BlockPos.MutableBlockPos searchCursor = new BlockPos.MutableBlockPos();
 
     private long lastHoleTime = NEVER;
     private volatile long lastTeleportTime = NEVER;
@@ -78,14 +78,14 @@ public class HoleSnap extends Module {
 
     @EventHandler
     private void onPacketReceive(PacketEvent.Receive event) {
-        if (event.packet instanceof PlayerPositionLookS2CPacket) {
+        if (event.packet instanceof ClientboundPlayerPositionPacket) {
             this.lastTeleportTime = System.currentTimeMillis();
         }
     }
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) {
+        if (mc.player == null || mc.level == null) {
             stop();
             return;
         }
@@ -127,7 +127,7 @@ public class HoleSnap extends Module {
 
         double hDistSq = (this.target.x - mc.player.getX()) * (this.target.x - mc.player.getX())
                 + (this.target.z - mc.player.getZ()) * (this.target.z - mc.player.getZ());
-        if (hDistSq < 0.08 && mc.player.getY() > this.target.y && !mc.player.isOnGround()) {
+        if (hDistSq < 0.08 && mc.player.getY() > this.target.y && !mc.player.onGround()) {
             event.movement = new Vec3(0, Math.min(event.movement.y, -0.4), 0);
             return;
         }
@@ -136,7 +136,7 @@ public class HoleSnap extends Module {
         double length = delta.length();
         if (length < 1.0E-4) return;
 
-        Vec3 motion = delta.normalize().multiply(Math.min(baseSpeed() * this.speedMult.getValue(), length));
+        Vec3 motion = delta.normalize().scale(Math.min(baseSpeed() * this.speedMult.getValue(), length));
         event.movement = new Vec3(motion.x, event.movement.y, motion.z);
     }
 
@@ -151,10 +151,10 @@ public class HoleSnap extends Module {
     }
 
     private boolean blocked() {
-        if (mc.player.isSpectator() || mc.player.isGliding()) return true;
+        if (mc.player.isSpectator() || mc.player.isFallFlying()) return true;
 
         double limit = this.maxPitch.getValue();
-        if (limit != 0.0 && mc.player.getPitch() < limit) return true;
+        if (limit != 0.0 && mc.player.getXRot() < limit) return true;
 
         return System.currentTimeMillis() - this.lastTeleportTime < TELEPORT_COOLDOWN;
     }
@@ -162,11 +162,11 @@ public class HoleSnap extends Module {
     private double baseSpeed() {
         double speed = BASE_SPEED;
 
-        if (mc.player.hasStatusEffect(StatusEffects.SPEED)) {
-            speed *= 1.0 + 0.2 * (mc.player.getStatusEffect(StatusEffects.SPEED).getAmplifier() + 1);
+        if (mc.player.hasEffect(MobEffects.SPEED)) {
+            speed *= 1.0 + 0.2 * (mc.player.getEffect(MobEffects.SPEED).getAmplifier() + 1);
         }
-        if (mc.player.hasStatusEffect(StatusEffects.SLOWNESS)) {
-            speed /= 1.0 + 0.2 * (mc.player.getStatusEffect(StatusEffects.SLOWNESS).getAmplifier() + 1);
+        if (mc.player.hasEffect(MobEffects.SLOWNESS)) {
+            speed /= 1.0 + 0.2 * (mc.player.getEffect(MobEffects.SLOWNESS).getAmplifier() + 1);
         }
 
         return speed;
@@ -175,9 +175,9 @@ public class HoleSnap extends Module {
     private void searchHoles() {
         this.holes.clear();
 
-        BlockPos origin = mc.player.getBlockPos();
+        BlockPos origin = mc.player.blockPosition();
         int radius = this.searchRadius.getIntValue();
-        BlockPos.Mutable cursor = this.searchCursor;
+        BlockPos.MutableBlockPos cursor = this.searchCursor;
 
         for (int x = -radius; x <= radius; x++) {
             for (int y = -2; y <= 2; y++) {
@@ -200,45 +200,45 @@ public class HoleSnap extends Module {
     }
 
     private Hole getHoleData(BlockPos pos, Direction direction) {
-        if (isSolid(pos) || !isSolid(pos.down()) || isSolid(pos.up())) return null;
-        if (mc.world.getBlockState(pos.down()).isOf(Blocks.END_PORTAL)) return null;
+        if (isSolid(pos) || !isSolid(pos.below()) || isSolid(pos.above())) return null;
+        if (mc.level.getBlockState(pos.below()).is(Blocks.END_PORTAL)) return null;
 
-        boolean covered = isSolid(pos.up(2));
+        boolean covered = isSolid(pos.above(2));
         Direction stretch = null;
 
-        for (Direction side : Direction.Type.HORIZONTAL) {
+        for (Direction side : Direction.Plane.HORIZONTAL) {
             if (direction != null && side == direction.getOpposite()) continue;
 
-            BlockPos offset = pos.offset(side);
+            BlockPos offset = pos.relative(side);
             if (isSolid(offset)) {
-                BlockState state = mc.world.getBlockState(offset);
+                BlockState state = mc.level.getBlockState(offset);
 
-                if (state.isOf(Blocks.RESPAWN_ANCHOR)) return null;
+                if (state.is(Blocks.RESPAWN_ANCHOR)) return null;
 
-                float resistance = state.getBlock().getBlastResistance();
-                float hardness = state.getHardness(mc.world, offset);
+                float resistance = state.getBlock().getExplosionResistance();
+                float hardness = state.getDestroySpeed(mc.level, offset);
                 if (resistance < 600.0f && resistance >= 0.0f || hardness == 0.0f) return null;
             } else {
                 if (stretch != null || direction != null || getHoleData(offset, side) == null) return null;
-                if (!isSolid(offset.up(2))) covered = false;
+                if (!isSolid(offset.above(2))) covered = false;
 
                 stretch = side;
             }
         }
 
-        AABB box = stretch == null ? new AABB(pos) : new AABB(pos).stretch(stretch.getOffsetX(), 0.0, stretch.getOffsetZ());
-        return new Hole(pos.toImmutable(), box, covered);
+        AABB box = stretch == null ? new AABB(pos) : new AABB(pos).expandTowards(stretch.getStepX(), 0.0, stretch.getStepZ());
+        return new Hole(pos.immutable(), box, covered);
     }
 
     private boolean isSolid(BlockPos pos) {
-        BlockState state = mc.world.getBlockState(pos);
+        BlockState state = mc.level.getBlockState(pos);
         return !state.isAir()
-            && !state.isOf(Blocks.FIRE)
-            && !state.isOf(Blocks.SOUL_FIRE)
+            && !state.is(Blocks.FIRE)
+            && !state.is(Blocks.SOUL_FIRE)
             && !(state.getBlock() instanceof ButtonBlock)
             && !(state.getBlock() instanceof TorchBlock)
             && !(state.getBlock() instanceof RailBlock)
-            && !state.isOf(Blocks.LIGHT);
+            && !state.is(Blocks.LIGHT);
     }
 
     private Vec3 findHole() {
@@ -247,16 +247,16 @@ public class HoleSnap extends Module {
         Vec3 result = null;
 
         for (Hole hole : this.holes) {
-            if (hole.pos().getY() >= pos.getY() || hole.covered()) continue;
+            if (hole.pos().getY() >= pos.y || hole.covered()) continue;
 
             Vec3 center = hole.box().getCenter();
-            Vec3 target = center.withAxis(Direction.Axis.Y, MathHelper.clamp(pos.getY(), center.y, center.y + this.height.getValue() - 0.5));
+            Vec3 target = center.with(Direction.Axis.Y, Mth.clamp(pos.y, center.y, center.y + this.height.getValue() - 0.5));
 
             double distance = pos.distanceTo(target);
             if (distance > this.range.getValue()) continue;
             if (this.directional.getValue() && !movingTowards(target) && distance > 0.05) continue;
 
-            if (!mc.world.isSpaceEmpty(hole.box().withMaxY(mc.player.getBoundingBox().maxY))) continue;
+            if (!mc.level.noCollision(hole.box().setMaxY(mc.player.getBoundingBox().maxY))) continue;
 
             if (blockedBetween(pos, target)) continue;
             if (blockedBetween(pos.add(0.0, 1.8, 0.0), target.add(0.0, 1.8, 0.0))) continue;
@@ -271,34 +271,34 @@ public class HoleSnap extends Module {
     }
 
     private boolean movingTowards(Vec3 target) {
-        Vec2f input = mc.player.input.getMovementInput();
+        Vec2 input = mc.player.input.getMoveVector();
         if (input.x == 0.0f && input.y == 0.0f) return false;
 
-        Vec3 velocity = mc.player.getVelocity();
+        Vec3 velocity = mc.player.getDeltaMovement();
         Vec3 pos = playerPos();
-        return pos.add(velocity.x * 10000.0, 0.0, velocity.z * 10000.0).squaredDistanceTo(target)
-            < pos.add(velocity.x * -10000.0, 0.0, velocity.z * -10000.0).squaredDistanceTo(target);
+        return pos.add(velocity.x * 10000.0, 0.0, velocity.z * 10000.0).distanceToSqr(target)
+            < pos.add(velocity.x * -10000.0, 0.0, velocity.z * -10000.0).distanceToSqr(target);
     }
 
     private boolean blockedBetween(Vec3 from, Vec3 to) {
-        return mc.world.raycast(new RaycastContext(from, to,
-            RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, mc.player
+        return mc.level.clip(new ClipContext(from, to,
+            ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, mc.player
         )).getType() != HitResult.Type.MISS;
     }
 
     private float[] rotationTo(Vec3 target) {
-        Vec3 eye = mc.player.getCameraPosVec(1.0f);
+        Vec3 eye = mc.player.getEyePosition();
         double dx = target.x - eye.x;
         double dy = target.y - eye.y;
         double dz = target.z - eye.z;
 
-        float yaw = (float) MathHelper.wrapDegrees(Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
-        float pitch = (float) MathHelper.wrapDegrees(Math.toDegrees(Math.atan2(-dy, Math.sqrt(dx * dx + dz * dz))));
+        float yaw = (float) Mth.wrapDegrees(Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
+        float pitch = (float) Mth.wrapDegrees(Math.toDegrees(Math.atan2(-dy, Math.sqrt(dx * dx + dz * dz))));
         return new float[]{yaw, pitch};
     }
 
     private boolean isInHole() {
-        BlockPos pos = BlockPos.ofFloored(mc.player.getX(), Math.round(mc.player.getY()), mc.player.getZ());
+        BlockPos pos = BlockPos.containing(mc.player.getX(), Math.round(mc.player.getY()), mc.player.getZ());
         for (Hole hole : this.holes) {
             if (hole.box().intersects(new AABB(pos))) return true;
         }

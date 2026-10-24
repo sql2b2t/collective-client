@@ -13,7 +13,7 @@ import me.collective.util.SwapManager;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.SpawnEggItem;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.world.InteractionHand;
@@ -54,40 +54,40 @@ public class GrimAirPlace extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         if (this.delay < this.placeDelay.getIntValue()) this.delay++;
 
-        double distance = this.customRange.getValue() ? this.range.getValue() : mc.player.getBlockInteractionRange();
-        this.hitResult = mc.player.raycast(distance, 0.0f, false);
+        double distance = this.customRange.getValue() ? this.range.getValue() : mc.player.blockInteractionRange();
+        this.hitResult = mc.player.pick(distance, 0.0f, false);
 
         if (!(this.hitResult instanceof BlockHitResult blockHit) || !placeable()) {
             this.wasPressed = false;
             return;
         }
 
-        boolean isPressed = mc.options.useKey.isPressed();
-        if (mc.currentScreen != null) {
+        boolean isPressed = mc.options.keyUse.isDown();
+        if (mc.gui.screen() != null) {
             this.wasPressed = isPressed;
             return;
         }
 
         if (isPressed && !this.wasPressed && this.delay >= this.placeDelay.getIntValue()) {
             BlockPos targetPos = blockHit.getBlockPos();
-            if (!mc.world.getBlockState(targetPos).isReplaceable()) {
+            if (!mc.level.getBlockState(targetPos).canBeReplaced()) {
                 this.wasPressed = isPressed;
                 return;
             }
 
-            if (!SwapManager.getInstance().hold(this, mc.player.getInventory().selectedSlot, SwapManager.Priority.PLACE, 2)) return;
+            if (!SwapManager.getInstance().hold(this, mc.player.getInventory().getSelectedSlot(), SwapManager.Priority.PLACE, 2)) return;
 
-            mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
-                PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, new BlockPos(0, 0, 0), Direction.DOWN));
-            mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(
+            mc.getConnection().send(new ServerboundPlayerActionPacket(
+                ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, new BlockPos(0, 0, 0), Direction.DOWN));
+            mc.getConnection().send(new ServerboundUseItemOnPacket(
                 InteractionHand.MAIN_HAND, blockHit, GrimUtils.nextSequence()));
-            mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
-            mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
-                PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, new BlockPos(0, 0, 0), Direction.DOWN));
+            mc.getConnection().send(ServerboundPunchPacket.INSTANCE);
+            mc.getConnection().send(new ServerboundPlayerActionPacket(
+                ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, new BlockPos(0, 0, 0), Direction.DOWN));
 
             this.delay = 0;
         }
@@ -97,7 +97,7 @@ public class GrimAirPlace extends Module {
 
     private boolean placeable() {
         if (mc.player == null) return false;
-        Item item = mc.player.getMainHandStack().getItem();
+        Item item = mc.player.getMainHandItem().getItem();
         return item instanceof BlockItem || item instanceof SpawnEggItem;
     }
 

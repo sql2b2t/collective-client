@@ -18,48 +18,52 @@ public class HandShaderBuffer implements VertexConsumer {
     }
 
     @Override
-    public VertexConsumer vertex(float x, float y, float z) {
-        return delegate.vertex(x, y, z);
+    public VertexConsumer addVertex(float x, float y, float z) {
+        return delegate.addVertex(x, y, z);
     }
 
     @Override
-    public VertexConsumer color(int r, int g, int b, int a) {
-        return delegate.color(r, g, b, a);
+    public VertexConsumer setColor(int r, int g, int b, int a) {
+        return delegate.setColor(r, g, b, a);
     }
 
     @Override
-    public VertexConsumer color(int color) {
-        // Color set explicitly through the shaded vertex path; pass through otherwise.
-        return delegate.color(color);
+    public VertexConsumer setColor(int color) {
+        return delegate.setColor(color);
     }
 
     @Override
-    public VertexConsumer texture(float u, float v) {
-        return delegate.texture(u, v);
+    public VertexConsumer setUv(float u, float v) {
+        return delegate.setUv(u, v);
     }
 
     @Override
-    public VertexConsumer overlay(int u, int v) {
-        return delegate.overlay(u, v);
+    public VertexConsumer setUv1(int u, int v) {
+        return delegate.setUv1(u, v);
     }
 
     @Override
-    public VertexConsumer light(int u, int v) {
-        return delegate.light(u, v);
+    public VertexConsumer setUv2(int u, int v) {
+        return delegate.setUv2(u, v);
     }
 
     @Override
-    public VertexConsumer normal(float x, float y, float z) {
-        return delegate.normal(x, y, z);
+    public VertexConsumer setUv3(float u, float v) {
+        return delegate.setUv3(u, v);
     }
 
     @Override
-    public VertexConsumer lineWidth(float width) {
-        return delegate.lineWidth(width);
+    public VertexConsumer setNormal(float x, float y, float z) {
+        return delegate.setNormal(x, y, z);
     }
 
     @Override
-    public void vertex(float x, float y, float z, int color, float u, float v, int overlay, int light, float nx, float ny, float nz) {
-        delegate.vertex(x, y, z, HandsShader.shade(x, y, z, u, v, color, nx, ny, nz), u, v, overlay, light, nx, ny, nz);
+    public VertexConsumer setLineWidth(float width) {
+        return delegate.setLineWidth(width);
+    }
+
+    @Override
+    public void addVertex(float x, float y, float z, int color, float u, float v, int overlay, int light, float nx, float ny, float nz) {
+        delegate.addVertex(x, y, z, HandsShader.shade(x, y, z, u, v, color, nx, ny, nz), u, v, overlay, light, nx, ny, nz);
     }
 }

@@ -32,7 +32,7 @@ public class WebAura extends Module {
 
     @Override
     public void onUpdate() {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
         if (delayTimer > 0) {
             delayTimer--;
             return;
@@ -44,15 +44,15 @@ public class WebAura extends Module {
         FindItemResult web = InventoryUtil.findInHotbarOrOffhand(Items.COBWEB);
         if (!web.found()) return;
 
-        BlockPos feet = target.getBlockPos();
+        BlockPos feet = target.blockPosition();
         boolean placed = false;
         String m = targetMode.compute().trim();
 
         if ((m.equals("Feet") || m.equals("Both")) && PlacementUtils.canPlace(feet, false)) {
             placed = PlacementUtils.placeBlock(feet, web, rotate.getValue(), true, false);
         }
-        if (!placed && (m.equals("Head") || m.equals("Both")) && PlacementUtils.canPlace(feet.up(1), false)) {
-            placed = PlacementUtils.placeBlock(feet.up(1), web, rotate.getValue(), true, false);
+        if (!placed && (m.equals("Head") || m.equals("Both")) && PlacementUtils.canPlace(feet.above(1), false)) {
+            placed = PlacementUtils.placeBlock(feet.above(1), web, rotate.getValue(), true, false);
         }
 
         if (placed) delayTimer = delay.getIntValue();
@@ -61,7 +61,7 @@ public class WebAura extends Module {
     private Player getTarget() {
         Player best = null;
         double bestDist = range.getFloatValue();
-        for (Player p : mc.world.getPlayers()) {
+        for (Player p : mc.level.players()) {
             if (p == mc.player || !p.isAlive() || p.isSpectator() || p.isCreative()) continue;
             if (FriendManager.getInstance().isFriend(p)) continue;
             double d = mc.player.distanceTo(p);

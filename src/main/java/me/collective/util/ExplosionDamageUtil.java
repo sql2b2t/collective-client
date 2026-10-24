@@ -29,7 +29,7 @@ import java.util.Map;
  * <pre>
  *   float exposure = ExplosionImpl.calculateReceivedDamage(center, entity);
  *   float radius   = explosion.getPower() * 2.0f;            // power 5.0 → 10.0
- *   double d       = Math.sqrt(entity.squaredDistanceTo(center)) / radius;
+ *   double d       = Math.sqrt(entity.distanceToSqr(center)) / radius;
  *   double impact  = (1.0 - d) * exposure;
  *   float raw      = (float) ((impact * impact + impact) / 2.0 * 7.0 * radius + 1.0);
  * </pre>
@@ -96,7 +96,7 @@ public final class ExplosionDamageUtil {
     }
 
     private static long key(Vec3 center, float power, LivingEntity entity, BlockPos transparentBlock) {
-        long h = BlockPos.ofFloored(center).asLong() * 31L + entity.getId();
+        long h = BlockPos.containing(center).asLong() * 31L + entity.getId();
         h = h * 31L + (long) (power * 8.0f);          // 6.0 и 5.0 разводятся по разным битам
         if (transparentBlock != null) h = h * 31L + transparentBlock.asLong();
         return h;
@@ -108,7 +108,7 @@ public final class ExplosionDamageUtil {
 
     /** Полный расчёт урона с учётом брони и Blast Protection. */
     public static float getDamage(Level world, BlockPos anchorPos, LivingEntity entity) {
-        return getDamage(world, anchorPos.toCenterPos(), ANCHOR_POWER, entity, null);
+        return getDamage(world, net.minecraft.world.phys.Vec3.atCenterOf(anchorPos), ANCHOR_POWER, entity, null);
     }
 
     public static float getDamage(Level world, Vec3 center, float power, LivingEntity entity) {
@@ -123,7 +123,7 @@ public final class ExplosionDamageUtil {
      */
     public static float getDamage(Level world, Vec3 center, float power, LivingEntity entity,
                                   BlockPos transparentBlock) {
-        if (world == null || entity == null || entity.isDead()) return 0.0f;
+        if (world == null || entity == null || entity.isDeadOrDying()) return 0.0f;
 
         float raw = cachedRaw(world, center, power, entity, transparentBlock);
         if (raw <= 0.0f) return 0.0f;
@@ -131,7 +131,7 @@ public final class ExplosionDamageUtil {
         float afterArmor = applyArmor(entity, raw);
         float afterBlast = applyBlastProtection(world, entity, afterArmor);
 
-        return MathHelper.clamp(afterBlast, 0.0f, raw);
+        return Mth.clamp(afterBlast, 0.0f, raw);
     }
 
     /**
@@ -144,8 +144,8 @@ public final class ExplosionDamageUtil {
 
     public static float getDamageRaw(Level world, BlockPos anchorPos, LivingEntity entity,
                                      BlockPos transparentBlock) {
-        if (world == null || entity == null || entity.isDead()) return 0.0f;
-        return cachedRaw(world, anchorPos.toCenterPos(), ANCHOR_POWER, entity, transparentBlock);
+        if (world == null || entity == null || entity.isDeadOrDying()) return 0.0f;
+        return cachedRaw(world, net.minecraft.world.phys.Vec3.atCenterOf(anchorPos), ANCHOR_POWER, entity, transparentBlock);
     }
 
     /**
@@ -154,7 +154,7 @@ public final class ExplosionDamageUtil {
      */
     public static float getDamageRaw(Level world, Vec3 center, float power, LivingEntity entity,
                                      BlockPos transparentBlock) {
-        if (world == null || entity == null || entity.isDead()) return 0.0f;
+        if (world == null || entity == null || entity.isDeadOrDying()) return 0.0f;
         return cachedRaw(world, center, power, entity, transparentBlock);
     }
 
@@ -165,7 +165,7 @@ public final class ExplosionDamageUtil {
      */
     public static float getDamageUpperBound(Vec3 center, float power, LivingEntity entity) {
         float radius = power * 2.0f;
-        double d = Math.sqrt(entity.squaredDistanceTo(center)) / radius;
+        double d = Math.sqrt(entity.distanceToSqr(center)) / radius;
         if (d >= 2.0) return MIN_RAW_DAMAGE;
 
         double impact = 1.0 - d; // exposure == 1.0
@@ -181,7 +181,7 @@ public final class ExplosionDamageUtil {
         float radius = power * 2.0f;
 
         // squaredDistanceTo использует getX/getY/getZ — это позиция НОГ сущности.
-        double d = Math.sqrt(entity.squaredDistanceTo(center)) / radius;
+        double d = Math.sqrt(entity.distanceToSqr(center)) / radius;
 
         // При d >= 2 impact <= -1 и (impact^2 + impact)/2 >= 0 — результат
         // ровно 1.0 независимо от видимости. Raycast'ы можно не делать.
@@ -229,14 +229,14 @@ public final class ExplosionDamageUtil {
             for (double y = 0.0; y <= 1.0; y += stepY) {
                 for (double z = 0.0; z <= 1.0; z += stepZ) {
                     Vec3 sample = new Vec3(
-                            MathHelper.lerp(x, box.minX, box.maxX) + offsetX,
-                            MathHelper.lerp(y, box.minY, box.maxY),
-                            MathHelper.lerp(z, box.minZ, box.maxZ) + offsetZ);
+                            Mth.lerp(x, box.minX, box.maxX) + offsetX,
+                            Mth.lerp(y, box.minY, box.maxY),
+                            Mth.lerp(z, box.minZ, box.maxZ) + offsetZ);
 
-                    BlockHitResult hit = world.raycast(new RaycastContext(
+                    BlockHitResult hit = world.clip(new ClipContext(
                             sample, explosionPos,
-                            RaycastContext.ShapeType.COLLIDER,
-                            RaycastContext.FluidHandling.NONE,
+                            ClipContext.Block.COLLIDER,
+                            ClipContext.Fluid.NONE,
                             entity));
 
                     // Прозрачный блок не считается препятствием: обсидиан, который
@@ -260,11 +260,11 @@ public final class ExplosionDamageUtil {
 
     /** {@code DamageUtil.getDamageLeft(damage, armor, armorToughness)}. */
     private static float applyArmor(LivingEntity entity, float damage) {
-        float armor     = (float) entity.getAttributeValue(EntityAttributes.ARMOR);
-        float toughness = (float) entity.getAttributeValue(EntityAttributes.ARMOR_TOUGHNESS);
+        float armor     = (float) entity.getAttributeValue(Attributes.ARMOR);
+        float toughness = (float) entity.getAttributeValue(Attributes.ARMOR_TOUGHNESS);
 
         float f = armor - damage / (2.0f + toughness / 4.0f);
-        f = MathHelper.clamp(f, armor * 0.2f, 20.0f);
+        f = Mth.clamp(f, armor * 0.2f, 20.0f);
 
         return damage * (1.0f - f / 25.0f);
     }
@@ -274,17 +274,16 @@ public final class ExplosionDamageUtil {
      * {@code min(level * 2, 20) / 25} — максимум 80%.
      */
     private static float applyBlastProtection(Level world, LivingEntity entity, float damage) {
-        Registry<Enchantment> registry = world.getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT);
-        RegistryEntry<Enchantment> blast =
-                registry.getEntry(registry.getValueOrThrow(Enchantments.BLAST_PROTECTION));
+        var lookup = world.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
+        net.minecraft.core.Holder<Enchantment> blast = lookup.getOrThrow(Enchantments.BLAST_PROTECTION);
 
         int totalLevel = 0;
         for (EquipmentSlot slot : new EquipmentSlot[]{
                 EquipmentSlot.HEAD, EquipmentSlot.CHEST,
                 EquipmentSlot.LEGS, EquipmentSlot.FEET}) {
-            ItemStack stack = entity.getEquippedStack(slot);
+            ItemStack stack = entity.getItemBySlot(slot);
             if (stack.isEmpty()) continue;
-            totalLevel += EnchantmentHelper.getLevel(blast, stack);
+            totalLevel += EnchantmentHelper.getItemEnchantmentLevel(blast, stack);
         }
 
         if (totalLevel <= 0) return damage;

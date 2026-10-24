@@ -47,18 +47,18 @@ public class InventoryManager {
         if (this.currentPriority <= 0) return;
 
         Packet<?> packet = event.packet;
-        if (packet instanceof ClickSlotC2SPacket || packet instanceof CloseHandledScreenC2SPacket) {
+        if (packet instanceof ServerboundContainerClickPacket || packet instanceof ServerboundContainerClosePacket) {
             if (mc.player != null && mc.player.isSprinting()) {
                 mc.player.setSprinting(false);
             }
             return;
         }
 
-        if (!(packet instanceof UpdateSelectedSlotC2SPacket update)) return;
+        if (!(packet instanceof ServerboundSetCarriedItemPacket update)) return;
 
-        int packetSlot = update.getSelectedSlot();
+        int packetSlot = update.getSlot();
 
-        if (!Inventory.isValidHotbarIndex(packetSlot) || this.serverSlot == packetSlot) {
+        if (!Inventory.isHotbarSlot(packetSlot) || this.serverSlot == packetSlot) {
             event.cancel();
             return;
         }
@@ -76,7 +76,7 @@ public class InventoryManager {
     @EventHandler(priority = 200)
     public void onPacketReceive(PacketEvent.Receive event) {
         // зеркало обновляем всегда — иначе после простоя свап стартует с устаревшего слота
-        if (event.packet instanceof UpdateSelectedSlotS2CPacket update) {
+        if (event.packet instanceof ClientboundSetHeldSlotPacket update) {
             this.serverSlot = update.slot();
         }
     }
@@ -84,7 +84,7 @@ public class InventoryManager {
     @EventHandler
     public void onTick(TickEvent.Post event) {
         if (mc.player != null && this.serverSlot == -1) {
-            this.serverSlot = mc.player.getInventory().selectedSlot;
+            this.serverSlot = mc.player.getInventory().getSelectedSlot();
         }
 
         if (!this.isEating && this.currentPriority > 0) this.currentPriority = 0;
@@ -106,22 +106,22 @@ public class InventoryManager {
     }
 
     public void setSlot(int barSlot, int priority) {
-        if (mc.player == null || mc.getNetworkHandler() == null) return;
+        if (mc.player == null || mc.getConnection() == null) return;
         if (priority < this.currentPriority) return;
 
         if (this.serverSlot == -1) {
-            this.serverSlot = mc.player.getInventory().selectedSlot;
+            this.serverSlot = mc.player.getInventory().getSelectedSlot();
         }
 
-        if (this.serverSlot != barSlot && Inventory.isValidHotbarIndex(barSlot)) {
+        if (this.serverSlot != barSlot && Inventory.isHotbarSlot(barSlot)) {
             setSlotForced(barSlot);
             this.currentPriority = priority;
         }
     }
 
     public void setSlotForced(int barSlot) {
-        if (mc.getNetworkHandler() == null) return;
-        if (!Inventory.isValidHotbarIndex(barSlot)) return;
+        if (mc.getConnection() == null) return;
+        if (!Inventory.isHotbarSlot(barSlot)) return;
         if (this.serverSlot == barSlot) return;
 
         this.sendingPacket = true;
@@ -129,11 +129,11 @@ public class InventoryManager {
         try {
             if (this.lastSentSlot == barSlot) {
                 int bounce = (barSlot + 1) % 9;
-                mc.getNetworkHandler().sendPacket(new UpdateSelectedSlotC2SPacket(bounce));
+                mc.getConnection().send(new ServerboundSetCarriedItemPacket(bounce));
                 this.lastSentSlot = bounce;
             }
 
-            mc.getNetworkHandler().sendPacket(new UpdateSelectedSlotC2SPacket(barSlot));
+            mc.getConnection().send(new ServerboundSetCarriedItemPacket(barSlot));
 
             this.lastSentSlot = barSlot;
             this.serverSlot = barSlot;
@@ -144,17 +144,17 @@ public class InventoryManager {
 
     public void syncToClient() {
         if (mc.player == null) return;
-        if (isDesynced()) setSlotForced(mc.player.getInventory().selectedSlot);
+        if (isDesynced()) setSlotForced(mc.player.getInventory().getSelectedSlot());
     }
 
     public boolean isDesynced() {
         if (mc.player == null) return false;
-        return mc.player.getInventory().selectedSlot != this.serverSlot;
+        return mc.player.getInventory().getSelectedSlot() != this.serverSlot;
     }
 
     public int getServerSlot() {
         if (mc.player == null) return -1;
-        return this.serverSlot == -1 ? mc.player.getInventory().selectedSlot : this.serverSlot;
+        return this.serverSlot == -1 ? mc.player.getInventory().getSelectedSlot() : this.serverSlot;
     }
 
     public int getLastSentSlot() {

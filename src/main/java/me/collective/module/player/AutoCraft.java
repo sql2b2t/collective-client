@@ -10,7 +10,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.inventory.InventoryMenu;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerInput;
 
 /**
  * Порт AutoCraft из Meteor Client (рецепты 2x2 для инвентаря).
@@ -38,11 +38,11 @@ public class AutoCraft extends Module {
 
     @Override
     public void onUpdate() {
-        if (mc.player == null || mc.interactionManager == null) return;
-        if (!(mc.player.currentScreenHandler instanceof PlayerScreenHandler)) return;
-        if (mc.currentScreen != null) return;
+        if (mc.player == null || mc.gameMode == null) return;
+        if (!(mc.player.containerMenu instanceof InventoryMenu)) return;
+        if (mc.gui.screen() != null) return;
         // Занятый курсор может затереть предметы — не крафтим с ним.
-        if (!mc.player.currentScreenHandler.getCursorStack().isEmpty()) return;
+        if (!mc.player.containerMenu.getCarried().isEmpty()) return;
         if (delayTimer > 0) {
             delayTimer--;
             return;
@@ -114,9 +114,9 @@ public class AutoCraft extends Module {
 
     private int findInMain(Item... items) {
         for (int i = 0; i < 36; i++) {
-            ItemStack s = mc.player.getInventory().getStack(i);
+            ItemStack s = mc.player.getInventory().getItem(i);
             for (Item it : items) {
-                if (s.isOf(it) && s.getCount() > 0) return i;
+                if (s.is(it) && s.getCount() > 0) return i;
             }
         }
         return -1;
@@ -124,39 +124,39 @@ public class AutoCraft extends Module {
 
     private int findPlanks() {
         for (int i = 0; i < 36; i++) {
-            ItemStack s = mc.player.getInventory().getStack(i);
-            if (!s.isEmpty() && s.isIn(ItemTags.PLANKS) && s.getCount() > 0) return i;
+            ItemStack s = mc.player.getInventory().getItem(i);
+            if (!s.isEmpty() && s.is(ItemTags.PLANKS) && s.getCount() > 0) return i;
         }
         return -1;
     }
 
     /** Кладёт 1 предмет из инвентаря в клетку сетки (1-4). */
     private void putOne(int invSlot, int craftSlot) {
-        int sync = mc.player.currentScreenHandler.syncId;
-        // Хотбарные слоты в PlayerScreenHandler идут ПОСЛЕ основного
+        int sync = mc.player.containerMenu.containerId;
+        // Хотбарные слоты в InventoryMenu идут ПОСЛЕ основного
         // инвентаря: инв. индекс 0-8 = хендлер 36-44, 9-35 = 9-35.
         int handlerSlot = invSlot < 9 ? 36 + invSlot : invSlot;
-        mc.interactionManager.clickSlot(sync, handlerSlot, 0, SlotActionType.PICKUP, mc.player);
-        mc.interactionManager.clickSlot(sync, craftSlot, 1, SlotActionType.PICKUP, mc.player);
+        mc.gameMode.handleContainerInput(sync, handlerSlot, 0, ContainerInput.PICKUP, mc.player);
+        mc.gameMode.handleContainerInput(sync, craftSlot, 1, ContainerInput.PICKUP, mc.player);
         // остаток — обратно
-        mc.interactionManager.clickSlot(sync, handlerSlot, 0, SlotActionType.PICKUP, mc.player);
+        mc.gameMode.handleContainerInput(sync, handlerSlot, 0, ContainerInput.PICKUP, mc.player);
     }
 
     private void clearGrid() {
-        int sync = mc.player.currentScreenHandler.syncId;
+        int sync = mc.player.containerMenu.containerId;
         for (int c = 1; c <= 4; c++) {
-            if (mc.player.currentScreenHandler.getSlot(c).getStack().isEmpty()) continue;
+            if (mc.player.containerMenu.getSlot(c).getItem().isEmpty()) continue;
             // Shift-клик возвращает крафт-слот прямо в инвентарь: курсор не
             // трогаем, иначе либо застрянет, либо затрёт поднятый предмет.
-            mc.interactionManager.clickSlot(sync, c, 0, SlotActionType.QUICK_MOVE, mc.player);
+            mc.gameMode.handleContainerInput(sync, c, 0, ContainerInput.QUICK_MOVE, mc.player);
         }
     }
 
     private boolean takeResult() {
-        int sync = mc.player.currentScreenHandler.syncId;
-        ItemStack result = mc.player.currentScreenHandler.getSlot(0).getStack();
+        int sync = mc.player.containerMenu.containerId;
+        ItemStack result = mc.player.containerMenu.getSlot(0).getItem();
         if (result.isEmpty()) return false;
-        mc.interactionManager.clickSlot(sync, 0, 0, SlotActionType.QUICK_MOVE, mc.player);
+        mc.gameMode.handleContainerInput(sync, 0, 0, ContainerInput.QUICK_MOVE, mc.player);
         return true;
     }
 }

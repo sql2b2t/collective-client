@@ -4,11 +4,9 @@ import me.collective.module.movement.ElytraBounce;
 import me.collective.module.render.NameTags;
 import me.collective.util.RotationUtils;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
-import net.minecraft.client.renderer.state.CameraRenderState;
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Avatar;
 import net.minecraft.world.entity.player.Player;
@@ -19,59 +17,51 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(PlayerEntityRenderer.class)
+@Mixin(AvatarRenderer.class)
 public abstract class MixinPlayerEntityRenderer {
-    @Inject(method = "updateRenderState(Lnet/minecraft/entity/PlayerLikeEntity;Lnet/minecraft/client/render/entity/state/PlayerEntityRenderState;F)V", at = @At("TAIL"))
+    @Inject(method = "extractRenderState(Lnet/minecraft/world/entity/Avatar;Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;F)V", at = @At("TAIL"))
     private void collective$updateRenderState(
-        PlayerLikeEntity player, PlayerEntityRenderState state, float tickDelta, CallbackInfo ci) {
+        Avatar player, AvatarRenderState state, float tickDelta, CallbackInfo ci) {
         if (!(player instanceof Player self)) return;
         if (self != Minecraft.getInstance().player) return;
 
         // ShowChestplate: render chestplate instead of elytra
         if (ElytraBounce.showChestplate()) {
-            ItemStack chest = self.getEquippedStack(EquipmentSlot.CHEST);
-            if (!chest.isEmpty() && (chest.isOf(Items.ELYTRA) || chest.getItem().getName().getString().toLowerCase().contains("elytra"))) {
-                state.equippedChestStack = new ItemStack(Items.IRON_CHESTPLATE);
+            ItemStack chest = self.getItemBySlot(EquipmentSlot.CHEST);
+            if (!chest.isEmpty() && (chest.is(Items.ELYTRA) || chest.getHoverName().getString().toLowerCase().contains("elytra"))) {
+                state.chestEquipment = new ItemStack(Items.IRON_CHESTPLATE);
             }
         }
 
         // LookLikeFalling: reset gliding flag
         if (ElytraBounce.lookLikeFalling()) {
-            state.isGliding = false;
-            state.glidingTicks = 0.0F;
+            state.fallFlyingTimeInTicks = 0.0F;
         }
 
         // F5 Rotations visualizer: align third person view with server-side rotation
         RotationUtils rot = RotationUtils.getInstance();
         if (rot.isRotating()) {
-            float yaw = MathHelper.lerpAngleDegrees(tickDelta, rot.getPrevSentYaw(), rot.getSentYaw());
-            float pitch = MathHelper.lerp(tickDelta, rot.getPrevSentPitch(), rot.getSentPitch());
-            state.pitch = pitch;
-            state.bodyYaw = yaw;
-            state.relativeHeadYaw = 0.0F;
+            float yaw = Mth.rotLerp(tickDelta, rot.getPrevSentYaw(), rot.getSentYaw());
+            float pitch = Mth.lerp(tickDelta, rot.getPrevSentPitch(), rot.getSentPitch());
+            state.xRot = pitch;
+            state.bodyRot = yaw;
+            state.yRot = yaw;
         }
 
-        // ElytraBounce SmoothCamera in F5: the player model glides smoothly too,
-        // without the jump arc — the same cutoff that the camera got.
-        // The filter makes the frame advance in Camera.update, here we read it.
+        // ElytraBounce SmoothCamera in F5: the player model glides smoothly too
         ElytraBounce bounce = ElytraBounce.INSTANCE;
         if (bounce != null && bounce.isToggled() && bounce.smoothCamera.getValue()) {
-            double realY = self.getLerpedPos(tickDelta).y;
+            double realY = self.position().y;
             state.y -= bounce.smoothVisualDeltaY(realY, false);
         }
     }
 
     // HideVanillaLabel: при включённом NameTags ванильный неймтег не рисуется
-    @Inject(
-        method = "renderLabelIfPresent(Lnet/minecraft/client/render/entity/state/PlayerEntityRenderState;Lnet/minecraft/client/util/math/PoseStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;Lnet/minecraft/client/render/state/CameraRenderState;)V",
-        at = @At("HEAD"),
-        cancellable = true
-    )
-    private void collective$hideVanillaLabel(
-        PlayerEntityRenderState state, PoseStack matrices,
-        OrderedRenderCommandQueue queue, CameraRenderState camera, CallbackInfo ci) {
+    @Inject(method = "getNameTag", at = @At("HEAD"), cancellable = true)
+    private void collective$hideVanillaLabel(CallbackInfoReturnable<Component> cir) {
         NameTags nametags = NameTags.INSTANCE;
-        if (nametags != null && nametags.isToggled()) ci.cancel();
+        if (nametags != null && nametags.isToggled()) cir.setReturnValue(null);
     }
 }

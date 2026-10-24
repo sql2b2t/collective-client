@@ -7,7 +7,6 @@ import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
-import me.collective.util.IPlayerInteractEntity;
 import me.collective.util.RotationUtils;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.Blocks;
@@ -15,7 +14,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.item.Items;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.network.protocol.game.ServerboundInteractPacket;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.world.InteractionHand;
@@ -68,21 +67,21 @@ public class CrystalOptimizer extends Module {
 
     @EventHandler
     private void onPacketReceive(PacketEvent.Receive event) {
-        if (mc.player == null || mc.world == null) return;
-        if (!(event.getPacket() instanceof EntitySpawnS2CPacket spawnPacket)) return;
-        if (spawnPacket.getEntityType() != EntityType.END_CRYSTAL) return;
+        if (mc.player == null || mc.level == null) return;
+        if (!(event.getPacket() instanceof net.minecraft.network.protocol.game.ClientboundAddEntityPacket spawnPacket)) return;
+        if (spawnPacket.getType() != net.minecraft.world.entity.EntityTypes.END_CRYSTAL) return;
 
         handleSpawnPacket(spawnPacket);
     }
 
-    private void handleSpawnPacket(EntitySpawnS2CPacket spawnPacket) {
+    private void handleSpawnPacket(net.minecraft.network.protocol.game.ClientboundAddEntityPacket spawnPacket) {
         if (!instantBreak.getValue()) return;
         if (onlyHolding.getValue() && !isCrystalHeld()) return;
 
-        int entityId = spawnPacket.getEntityId();
+        int entityId = spawnPacket.getId();
         if (antiGhost.getValue() && attackedCrystals.containsKey(entityId)) return;
 
-        Vec3 eyePos = mc.player.getEyePos();
+        Vec3 eyePos = mc.player.getEyePosition();
         double dx = spawnPacket.getX() - eyePos.x;
         double dy = spawnPacket.getY() - eyePos.y;
         double dz = spawnPacket.getZ() - eyePos.z;
@@ -95,12 +94,12 @@ public class CrystalOptimizer extends Module {
             rotateTo(spawnPacket.getX(), spawnPacket.getY(), spawnPacket.getZ());
         }
 
-        mc.getNetworkHandler().sendPacket(IPlayerInteractEntity.createAttack(entityId, mc.player.isSneaking()));
-        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
+        mc.getConnection().send(new net.minecraft.network.protocol.game.ServerboundAttackPacket(entityId));
+        mc.getConnection().send(net.minecraft.network.protocol.game.ServerboundPunchPacket.INSTANCE);
         attackedCrystals.put(entityId, System.currentTimeMillis());
 
         if (fastDespawn.getValue()) {
-            Entity existing = mc.world.getEntityById(entityId);
+            Entity existing = mc.level.getEntity(entityId);
             if (existing != null) {
                 existing.discard();
             } else {
@@ -111,12 +110,10 @@ public class CrystalOptimizer extends Module {
 
     @EventHandler
     private void onPacketSend(PacketEvent.Send event) {
-        if (mc.player == null || mc.world == null) return;
-        if (!(event.getPacket() instanceof PlayerInteractEntityC2SPacket) || !(event.getPacket() instanceof IPlayerInteractEntity packet)) return;
-
-        if (packet.collective$getType() == PlayerInteractEntityC2SPacket.InteractType.ATTACK) {
-            Entity target = packet.collective$getEntity();
-            if (target instanceof EndCrystalEntity crystal) {
+        if (mc.player == null || mc.level == null) return;
+        if (event.getPacket() instanceof net.minecraft.network.protocol.game.ServerboundAttackPacket attackPacket) {
+            Entity target = mc.level.getEntity(attackPacket.entityId());
+            if (target instanceof EndCrystal crystal) {
                 attackedCrystals.put(crystal.getId(), System.currentTimeMillis());
                 if (fastDespawn.getValue()) {
                     crystal.discard();
@@ -127,13 +124,13 @@ public class CrystalOptimizer extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         cleanupExpiredCrystals();
         flushDespawnQueue();
         handleFastPlace();
 
-        if (autoPlace.getValue() && mc.options.useKey.isPressed() && isCrystalHeld()) {
+        if (autoPlace.getValue() && mc.options.keyUse.isDown() && isCrystalHeld()) {
             handleAutoPlace();
         }
 
@@ -150,7 +147,7 @@ public class CrystalOptimizer extends Module {
     private void flushDespawnQueue() {
         if (despawnQueue.isEmpty()) return;
         for (Iterator<Integer> it = despawnQueue.iterator(); it.hasNext(); ) {
-            Entity entity = mc.world.getEntityById(it.next());
+            Entity entity = mc.level.getEntity(it.next());
             if (entity != null) {
                 entity.discard();
                 it.remove();
@@ -165,31 +162,31 @@ public class CrystalOptimizer extends Module {
         if (onlyHolding.getValue() && !crystalHeld) return;
 
         if (crystalHeld || isTargetingBaseBlock()) {
-            if (mc.itemUseCooldown > 0) {
-                mc.itemUseCooldown = 0;
+            if (((me.collective.mixin.MinecraftAccessor) mc).collective$getRightClickDelay() > 0) {
+                ((me.collective.mixin.MinecraftAccessor) mc).collective$setRightClickDelay(0);
             }
         }
     }
 
     private void handleAutoPlace() {
-        if (mc.crosshairTarget instanceof EntityHitResult ehr && ehr.getEntity() instanceof EndCrystalEntity) {
-            Vec3 eyePos = mc.player.getEyePos();
-            Vec3 lookVec = mc.player.getRotationVec(1.0f);
-            double reachDist = mc.player.getBlockInteractionRange();
-            Vec3 endPos = eyePos.add(lookVec.multiply(reachDist));
+        if (mc.hitResult instanceof EntityHitResult ehr && ehr.getEntity() instanceof EndCrystal) {
+            Vec3 eyePos = mc.player.getEyePosition();
+            Vec3 lookVec = mc.player.getViewVector(1.0f);
+            double reachDist = mc.player.blockInteractionRange();
+            Vec3 endPos = eyePos.add(lookVec.scale(reachDist));
 
-            BlockHitResult bhr = mc.world.raycast(new RaycastContext(
-                    eyePos, endPos, RaycastContext.ShapeType.OUTLINE, RaycastContext.FluidHandling.NONE, mc.player
+            BlockHitResult bhr = mc.level.clip(new ClipContext(
+                    eyePos, endPos, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, mc.player
             ));
 
             if (bhr != null && bhr.getType() == HitResult.Type.BLOCK) {
                 BlockPos pos = bhr.getBlockPos();
-                BlockState state = mc.world.getBlockState(pos);
-                if (state.isOf(Blocks.OBSIDIAN) || state.isOf(Blocks.BEDROCK)) {
-                    InteractionHand hand = mc.player.getMainHandStack().isOf(Items.END_CRYSTAL) ? InteractionHand.MAIN_HAND
-                            : mc.player.getOffHandStack().isOf(Items.END_CRYSTAL) ? InteractionHand.OFF_HAND : null;
-                    if (hand != null && mc.interactionManager != null) {
-                        mc.interactionManager.interactBlock(mc.player, hand, bhr);
+                BlockState state = mc.level.getBlockState(pos);
+                if (state.is(Blocks.OBSIDIAN) || state.is(Blocks.BEDROCK)) {
+                    InteractionHand hand = mc.player.getMainHandItem().is(Items.END_CRYSTAL) ? InteractionHand.MAIN_HAND
+                            : mc.player.getOffhandItem().is(Items.END_CRYSTAL) ? InteractionHand.OFF_HAND : null;
+                    if (hand != null && mc.gameMode != null) {
+                        mc.gameMode.useItemOn(mc.player, hand, bhr);
                     }
                 }
             }
@@ -200,16 +197,16 @@ public class CrystalOptimizer extends Module {
         if (onlyHolding.getValue() && !isCrystalHeld()) return;
 
         double maxReachSq = reach.getValue() * reach.getValue();
-        Vec3 eyePos = mc.player.getEyePos();
-        EndCrystalEntity best = null;
+        Vec3 eyePos = mc.player.getEyePosition();
+        EndCrystal best = null;
         double bestDistSq = Double.MAX_VALUE;
 
-        for (Entity entity : mc.world.getEntities()) {
-            if (!(entity instanceof EndCrystalEntity crystal)) continue;
+        for (Entity entity : mc.level.entitiesForRendering()) {
+            if (!(entity instanceof EndCrystal crystal)) continue;
             if (!crystal.isAlive() || crystal.isRemoved()) continue;
             if (antiGhost.getValue() && attackedCrystals.containsKey(crystal.getId())) continue;
 
-            double dSq = eyePos.squaredDistanceTo(crystal.getX(), crystal.getY(), crystal.getZ());
+            double dSq = eyePos.distanceToSqr(crystal.getX(), crystal.getY(), crystal.getZ());
             if (dSq <= maxReachSq && dSq < bestDistSq) {
                 bestDistSq = dSq;
                 best = crystal;
@@ -220,8 +217,8 @@ public class CrystalOptimizer extends Module {
             if (rotate.getValue()) {
                 rotateTo(best.getX(), best.getY(), best.getZ());
             }
-            mc.getNetworkHandler().sendPacket(IPlayerInteractEntity.createAttack(best.getId(), mc.player.isSneaking()));
-            mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
+            mc.getConnection().send(new net.minecraft.network.protocol.game.ServerboundAttackPacket(best.getId()));
+            mc.getConnection().send(net.minecraft.network.protocol.game.ServerboundPunchPacket.INSTANCE);
             attackedCrystals.put(best.getId(), System.currentTimeMillis());
 
             if (fastDespawn.getValue()) {
@@ -231,7 +228,7 @@ public class CrystalOptimizer extends Module {
     }
 
     private void rotateTo(double x, double y, double z) {
-        Vec3 eyePos = mc.player.getEyePos();
+        Vec3 eyePos = mc.player.getEyePosition();
         double diffX = x - eyePos.x;
         double diffY = y - eyePos.y;
         double diffZ = z - eyePos.z;
@@ -246,14 +243,14 @@ public class CrystalOptimizer extends Module {
 
     private boolean isCrystalHeld() {
         if (mc.player == null) return false;
-        return mc.player.getMainHandStack().isOf(Items.END_CRYSTAL)
-                || mc.player.getOffHandStack().isOf(Items.END_CRYSTAL);
+        return mc.player.getMainHandItem().is(Items.END_CRYSTAL)
+                || mc.player.getOffhandItem().is(Items.END_CRYSTAL);
     }
 
     private boolean isTargetingBaseBlock() {
-        if (mc.crosshairTarget instanceof BlockHitResult bhr && bhr.getType() == HitResult.Type.BLOCK) {
-            BlockState state = mc.world.getBlockState(bhr.getBlockPos());
-            return state.isOf(Blocks.OBSIDIAN) || state.isOf(Blocks.BEDROCK);
+        if (mc.hitResult instanceof BlockHitResult bhr && bhr.getType() == HitResult.Type.BLOCK) {
+            BlockState state = mc.level.getBlockState(bhr.getBlockPos());
+            return state.is(Blocks.OBSIDIAN) || state.is(Blocks.BEDROCK);
         }
         return false;
     }

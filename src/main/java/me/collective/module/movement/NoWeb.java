@@ -32,7 +32,7 @@ public class NoWeb extends Module {
     public final BooleanSetting grim = add(new BooleanSetting("Grim", false, (v) -> this.mode.getValue() == Mode.Игнор));
     public final BooleanSetting jumpBypass = add(new BooleanSetting("JumpBypass", false, (v) -> this.mode.getValue() == Mode.Игнор));
 
-    private static final BlockPos.Mutable MUTABLE_POS = new BlockPos.Mutable();
+    private static final BlockPos.MutableBlockPos MUTABLE_POS = new BlockPos.MutableBlockPos();
     private boolean sprintBlocked;
 
     public NoWeb() {
@@ -49,17 +49,15 @@ public class NoWeb extends Module {
         NoWeb module = INSTANCE;
         if (module == null || !module.isToggled() || module.mode.getValue() != Mode.Игнор) return;
         if (!module.grim.getValue()) return;
-        if (module.mc.player == null || !(module.mc.world instanceof ClientLevel world)) return;
+        if (module.mc.player == null || !(module.mc.level instanceof ClientLevel world)) return;
 
-        PendingUpdateManager pending = world.getPendingUpdateManager();
-        try (PendingUpdateManager updates = pending.incrementSequence()) {
-            module.mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
-                PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK,
-                pos,
-                Direction.UP,
-                updates.getSequence()
-            ));
-        }
+        int seq = me.collective.util.GrimUtils.nextSequence();
+        module.mc.getConnection().send(new ServerboundPlayerActionPacket(
+            ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK,
+            pos,
+            Direction.UP,
+            seq
+        ));
     }
 
     @Override
@@ -69,7 +67,7 @@ public class NoWeb extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (this.mc.player == null || this.mc.world == null) return;
+        if (this.mc.player == null || this.mc.level == null) return;
 
         if (this.mode.getValue() == Mode.Игнор) {
             if (this.jumpBypass.getValue()) this.handleJumpBypass();
@@ -79,28 +77,28 @@ public class NoWeb extends Module {
         if (!isInWeb()) return;
 
         double targetY = 0.0;
-        if (this.mc.options.jumpKey.isPressed()) {
+        if (this.mc.options.keyJump.isDown()) {
             targetY = VERTICAL_SPEED;
-        } else if (this.mc.options.sneakKey.isPressed()) {
+        } else if (this.mc.options.keyShift.isDown()) {
             targetY = -VERTICAL_SPEED;
         }
 
-        this.mc.player.setVelocity(0.0, targetY, 0.0);
+        this.mc.player.setDeltaMovement(0.0, targetY, 0.0);
         setSpeed(HORIZONTAL_SPEED);
     }
 
     private void handleJumpBypass() {
         if (isNearCobweb(2.0)) {
-            if (this.mc.options.jumpKey.isPressed()) {
+            if (this.mc.options.keyJump.isDown()) {
                 if (this.mc.player.isSprinting()) {
                     this.mc.player.setSprinting(false);
                     this.sprintBlocked = true;
                 }
-            } else if (this.mc.player.isOnGround() && this.sprintBlocked) {
+            } else if (this.mc.player.onGround() && this.sprintBlocked) {
                 this.mc.player.setSprinting(true);
                 this.sprintBlocked = false;
             }
-        } else if (this.sprintBlocked && this.mc.player.isOnGround()) {
+        } else if (this.sprintBlocked && this.mc.player.onGround()) {
             this.sprintBlocked = false;
         }
     }
@@ -108,10 +106,10 @@ public class NoWeb extends Module {
     private void setSpeed(double speed) {
         if (this.mc.player == null) return;
 
-        Vec2f input = this.mc.player.input.getMovementInput();
+        Vec2 input = this.mc.player.input.getMoveVector();
         float forward = input.y;
         float strafe = input.x;
-        double yaw = this.mc.player.getYaw();
+        double yaw = this.mc.player.getYRot();
 
         if (forward != 0) {
             if (strafe > 0) {
@@ -129,9 +127,9 @@ public class NoWeb extends Module {
         }
 
         double radians = Math.toRadians(yaw + 90);
-        double velocityY = this.mc.player.getVelocity().y;
+        double velocityY = this.mc.player.getDeltaMovement().y;
 
-        this.mc.player.setVelocity(
+        this.mc.player.setDeltaMovement(
             forward * speed * Math.cos(radians) + strafe * speed * Math.sin(radians),
             velocityY,
             forward * speed * Math.sin(radians) - strafe * speed * Math.cos(radians)
@@ -139,7 +137,7 @@ public class NoWeb extends Module {
     }
 
     private boolean isNearCobweb(double maxDistance) {
-        if (this.mc.player == null || this.mc.world == null) return false;
+        if (this.mc.player == null || this.mc.level == null) return false;
 
         double playerX = this.mc.player.getX();
         double playerY = this.mc.player.getY();
@@ -156,7 +154,7 @@ public class NoWeb extends Module {
                     int cy = blockY + y;
                     int cz = blockZ + z;
                     MUTABLE_POS.set(cx, cy, cz);
-                    if (this.mc.world.getBlockState(MUTABLE_POS).getBlock() instanceof CobwebBlock) {
+                    if (this.mc.level.getBlockState(MUTABLE_POS).getBlock() instanceof net.minecraft.world.level.block.WebBlock) {
                         double dx = playerX - (cx + 0.5);
                         double dy = playerY - (cy + 0.5);
                         double dz = playerZ - (cz + 0.5);
@@ -170,17 +168,17 @@ public class NoWeb extends Module {
     }
 
     private boolean isInWeb() {
-        if (this.mc.player == null || this.mc.world == null) return false;
+        if (this.mc.player == null || this.mc.level == null) return false;
 
         AABB playerBox = this.mc.player.getBoundingBox();
-        BlockPos playerPosition = this.mc.player.getBlockPos();
+        BlockPos playerPosition = this.mc.player.blockPosition();
 
         for (int x = -1; x <= 1; x++) {
             for (int y = -1; y <= 1; y++) {
                 for (int z = -1; z <= 1; z++) {
-                    BlockPos pos = playerPosition.add(x, y, z);
+                    BlockPos pos = playerPosition.offset(x, y, z);
                     if (playerBox.intersects(new AABB(pos))
-                        && this.mc.world.getBlockState(pos).isOf(Blocks.COBWEB)) return true;
+                        && this.mc.level.getBlockState(pos).is(Blocks.COBWEB)) return true;
                 }
             }
         }

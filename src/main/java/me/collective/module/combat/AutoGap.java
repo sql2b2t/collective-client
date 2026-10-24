@@ -47,10 +47,10 @@ public class AutoGap extends Module {
         }
 
         // 1. Offhand check
-        var offhand = mc.player.getOffHandStack();
-        if (offhand.isOf(Items.ENCHANTED_GOLDEN_APPLE) || (!preferEnchanted.getValue() && offhand.isOf(Items.GOLDEN_APPLE))) {
+        var offhand = mc.player.getOffhandItem();
+        if (offhand.is(Items.ENCHANTED_GOLDEN_APPLE) || (!preferEnchanted.getValue() && offhand.is(Items.GOLDEN_APPLE))) {
             prevSlot = -1;
-            mc.options.useKey.setPressed(true);
+            mc.options.keyUse.setDown(true);
             eating = true;
             waitTicks = 0;
             return;
@@ -61,7 +61,7 @@ public class AutoGap extends Module {
         if (gap.found()) {
             prevSlot = mc.player.getInventory().getSelectedSlot();
             InventoryUtil.swap(gap.slot());
-            mc.options.useKey.setPressed(true);
+            mc.options.keyUse.setDown(true);
             eating = true;
             waitTicks = 0;
         }
@@ -77,7 +77,7 @@ public class AutoGap extends Module {
 
     private void stopEating() {
         if (eating) {
-            mc.options.useKey.setPressed(false);
+            mc.options.keyUse.setDown(false);
             if (prevSlot != -1 && mc.player != null) {
                 InventoryUtil.swap(prevSlot);
                 prevSlot = -1;

@@ -13,8 +13,9 @@
     "MixinClientPlayerEntity",
     "MixinEntity",
     "EntityVelocityUpdateS2CPacketAccessor",
+    "EntityAccessor",
+    "BaseSpawnerAccessor",
     "ExplosionS2CPacketAccessor",
-    "MixinPlayerInteractEntityC2SPacket",
     "MixinKeyBinding",
     "MixinSoundSystem",
     "MixinElytraFeatureRenderer",
@@ -28,8 +29,6 @@
     "MixinGameRenderer",
     "MixinWorldRenderer",
     "MixinHeldItemRenderer",
-    "MixinItemRenderer",
-    "MixinModelPartCommandRenderer",
     "AbstractTextureAccessor",
     "MixinInGameOverlayRenderer",
     "MixinInGameHud",
@@ -59,9 +58,11 @@
     "MixinClientPlayNetworkHandler",
     "MixinWorld",
     "MixinFogRenderer",
-    "MixinEndCrystalEntityRenderer"
+    "MixinEndCrystalEntityRenderer",
+    "FireworkRocketEntityAccessor",
+    "ClientLevelAccessor",
+    "MinecraftAccessor"
   ],
-
   "injectors": {
     "defaultRequire": 1
   }

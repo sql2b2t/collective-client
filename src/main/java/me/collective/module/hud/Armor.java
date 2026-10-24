@@ -3,7 +3,7 @@ package me.collective.module.hud;
 import me.collective.font.FontManager;
 import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.item.ItemStack;
 
 import java.awt.Color;
@@ -20,19 +20,19 @@ public class Armor extends HudModule {
     }
 
     @Override
-    public void render(GuiGraphics context, float delta) {
+    public void render(GuiGraphicsExtractor context, float delta) {
         if (!isToggled() || mc.player == null) return;
 
         List<ItemStack> items = new ArrayList<>();
         if (showHands.getValue()) {
-            items.add(mc.player.getMainHandStack());
+            items.add(mc.player.getMainHandItem());
         }
-        items.add(mc.player.getEquippedStack(net.minecraft.entity.EquipmentSlot.FEET));
-        items.add(mc.player.getEquippedStack(net.minecraft.entity.EquipmentSlot.LEGS));
-        items.add(mc.player.getEquippedStack(net.minecraft.entity.EquipmentSlot.CHEST));
-        items.add(mc.player.getEquippedStack(net.minecraft.entity.EquipmentSlot.HEAD));
+        items.add(mc.player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.FEET));
+        items.add(mc.player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.LEGS));
+        items.add(mc.player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST));
+        items.add(mc.player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD));
         if (showHands.getValue()) {
-            items.add(mc.player.getOffHandStack());
+            items.add(mc.player.getOffhandItem());
         }
         Collections.reverse(items);
 
@@ -47,12 +47,12 @@ public class Armor extends HudModule {
 
         for (ItemStack stack : items) {
             if (!stack.isEmpty()) {
-                context.drawItem(stack, itemX, itemY);
-                context.drawStackOverlay(mc.textRenderer, stack, itemX, itemY);
+                context.item(stack, itemX, itemY);
+                context.itemDecorations(mc.font, stack, itemX, itemY);
 
-                if (showDamage.getValue() && stack.isDamageable()) {
+                if (showDamage.getValue() && stack.isDamageableItem()) {
                     int maxDamage = stack.getMaxDamage();
-                    int damage = stack.getDamage();
+                    int damage = stack.getDamageValue();
                     int percent = (int) (((maxDamage - damage) / (float) maxDamage) * 100);
 
                     Color dmgColor = percent > 50 ? Color.GREEN : (percent > 25 ? Color.YELLOW : Color.RED);

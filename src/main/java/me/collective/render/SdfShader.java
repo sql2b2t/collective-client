@@ -177,8 +177,8 @@ public class SdfShader {
 
     private void setupDraw(float x, float y, float width, float height) {
         Minecraft mc = Minecraft.getInstance();
-        int sw = mc.getWindow().getScaledWidth();
-        int sh = mc.getWindow().getScaledHeight();
+        int sw = mc.getWindow().getGuiScaledWidth();
+        int sh = mc.getWindow().getGuiScaledHeight();
 
         GL20.glUseProgram(programId);
         GL20.glUniform2f(uWindowSize, sw, sh);

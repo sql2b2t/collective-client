@@ -38,7 +38,7 @@ public class AutoXp extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
         if (timer > 0) {
             timer--;
             return;
@@ -51,26 +51,26 @@ public class AutoXp extends Module {
         if (!needsMending()) return;
 
         if (lookDown.getValue()) {
-            me.collective.util.RotationUtils.setServerRotation(mc.player.getYaw(), 90.0f);
+            me.collective.util.RotationUtils.setServerRotation(mc.player.getYRot(), 90.0f);
         }
 
         InventoryUtil.swap(bottle.slot(), true);
-        mc.interactionManager.interactItem(mc.player, InteractionHand.MAIN_HAND);
-        mc.player.swingHand(InteractionHand.MAIN_HAND);
+        mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
+        me.collective.util.Utils.swingHand(InteractionHand.MAIN_HAND);
         InventoryUtil.swapBack();
         timer = cooldown.getIntValue();
     }
 
     private boolean needsMending() {
-        var reg = mc.world.getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT);
-        for (net.minecraft.entity.EquipmentSlot slot : net.minecraft.entity.EquipmentSlot.values()) {
-            if (!slot.isArmorSlot()) continue;
-            var stack = mc.player.getEquippedStack(slot);
-            if (stack.isEmpty() || !stack.isDamageable()) continue;
+        var reg = mc.level.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
+        for (net.minecraft.world.entity.EquipmentSlot slot : net.minecraft.world.entity.EquipmentSlot.values()) {
+            if (!slot.isArmor()) continue;
+            var stack = mc.player.getItemBySlot(slot);
+            if (stack.isEmpty() || !stack.isDamageableItem()) continue;
             int max = stack.getMaxDamage();
-            int dmg = stack.getDamage();
+            int dmg = stack.getDamageValue();
             if (max <= 0 || (max - dmg) * 100 / max >= durabilityThreshold.getIntValue()) continue;
-            if (EnchantmentHelper.getLevel(reg.getEntry(reg.getValueOrThrow(Enchantments.MENDING)), stack) > 0) return true;
+            if (EnchantmentHelper.getEnchantmentsForCrafting(stack).getLevel(reg.getOrThrow(Enchantments.MENDING)) > 0) return true;
         }
         return false;
     }

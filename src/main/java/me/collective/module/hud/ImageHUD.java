@@ -6,7 +6,7 @@ import me.collective.setting.ColorSetting;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.resources.Identifier;
 
 import java.awt.Color;
@@ -19,10 +19,10 @@ public class ImageHUD extends HudModule {
         Komod3
     }
 
-    private static final Identifier TEXTURE_COLLECTIVE = Identifier.of("collective", "textures/collective_rpc.png");
-    private static final Identifier TEXTURE_KOMOD1 = Identifier.of("collective", "textures/komod1.png");
-    private static final Identifier TEXTURE_KOMOD2 = Identifier.of("collective", "textures/komod2.png");
-    private static final Identifier TEXTURE_KOMOD3 = Identifier.of("collective", "textures/komod3.png");
+    private static final Identifier TEXTURE_COLLECTIVE = Identifier.fromNamespaceAndPath("collective", "textures/collective_rpc.png");
+    private static final Identifier TEXTURE_KOMOD1 = Identifier.fromNamespaceAndPath("collective", "textures/komod1.png");
+    private static final Identifier TEXTURE_KOMOD2 = Identifier.fromNamespaceAndPath("collective", "textures/komod2.png");
+    private static final Identifier TEXTURE_KOMOD3 = Identifier.fromNamespaceAndPath("collective", "textures/komod3.png");
 
     public final EnumSetting<Image> image = add(new EnumSetting<>("Image", Image.Collective));
     public final NumberSetting widthSetting = add(new NumberSetting("Width", 64.0, 16.0, 256.0, 1.0));
@@ -52,7 +52,7 @@ public class ImageHUD extends HudModule {
     }
 
     @Override
-    public void render(GuiGraphics context, float delta) {
+    public void render(GuiGraphicsExtractor context, float delta) {
         if (!isToggled()) return;
 
         float w = widthSetting.getFloatValue();
@@ -69,7 +69,7 @@ public class ImageHUD extends HudModule {
             RenderUtil.drawRotatedImage(context, getTexture(), x, y, w, h, angle, 0xFFFFFFFF, textureSize(), textureSize());
         } else {
             int ts = textureSize();
-            context.drawTexture(
+            context.blit(
                 RenderPipelines.GUI_TEXTURED,
                 getTexture(),
                 (int) x,

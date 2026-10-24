@@ -15,7 +15,7 @@ import me.collective.setting.ColorSetting;
 import me.collective.setting.ItemListSetting;
 import me.collective.setting.ModeSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
@@ -51,7 +51,7 @@ public class ItemESP extends Module {
     public final ActionSetting selectAll = add(new ActionSetting("Все предметы", 0)
             .handle(() -> {
                 List<Item> all = new ArrayList<>();
-                for (Item item : Registries.ITEM) {
+                for (Item item : BuiltInRegistries.ITEM) {
                     if (item != Items.AIR) all.add(item);
                 }
                 items.setValue(all);
@@ -87,32 +87,32 @@ public class ItemESP extends Module {
     @Override
     public void onUpdate() {
         this.cachedItems.clear();
-        if (!isToggled() || mc.world == null || mc.player == null) return;
+        if (!isToggled() || mc.level == null || mc.player == null) return;
 
         double rangeSq = this.range.getValue() * this.range.getValue();
-        for (Entity entity : mc.world.getEntities()) {
+        for (Entity entity : mc.level.entitiesForRendering()) {
             if (!(entity instanceof ItemEntity itemEntity)) continue;
-            ItemStack stack = itemEntity.getStack();
+            ItemStack stack = itemEntity.getItem();
             if (stack.isEmpty() || !passesFilter(stack.getItem())) continue;
-            if (mc.player.squaredDistanceTo(itemEntity) > rangeSq) continue;
+            if (mc.player.distanceToSqr(itemEntity) > rangeSq) continue;
             this.cachedItems.add(itemEntity);
         }
     }
 
     @EventHandler
     public void onRender3D(Render3DEvent event) {
-        if (!isToggled() || mc.world == null || mc.player == null || this.cachedItems.isEmpty()) return;
+        if (!isToggled() || mc.level == null || mc.player == null || this.cachedItems.isEmpty()) return;
 
         double rangeBlocks = range.getValue();
         double rangeSq = rangeBlocks * rangeBlocks;
         ShapeMode mode = currentShape();
         Vec3 cam = event.camera != null
-                ? event.camera.getCameraPos()
-                : mc.gameRenderer.getCamera().getCameraPos();
+                ? event.camera.position()
+                : mc.gameRenderer.mainCamera().position();
         float delta = event.tickDelta;
 
         for (ItemEntity itemEntity : this.cachedItems) {
-            double distSq = mc.player.squaredDistanceTo(itemEntity);
+            double distSq = mc.player.distanceToSqr(itemEntity);
             if (distSq > rangeSq) continue;
             double dist = Math.sqrt(distSq);
 
@@ -121,7 +121,7 @@ public class ItemESP extends Module {
             Color line = fade(lineColor.getValue(), factor);
             if (side.getAlpha() <= 2 && line.getAlpha() <= 2) continue;
 
-            AABB box = lerpedBox(itemEntity, delta).expand(0.06);
+            AABB box = lerpedBox(itemEntity, delta).inflate(0.06);
             Renderer3D.box(box, side, line, mode, true);
 
             if (tracers.getValue()) {
@@ -133,8 +133,8 @@ public class ItemESP extends Module {
 
     /** Бокс по интерполированной позиции кадра — без рывков тикового обновления. */
     private static AABB lerpedBox(ItemEntity entity, float delta) {
-        Vec3 lerped = entity.getLerpedPos(delta);
-        return entity.getBoundingBox().offset(
+        Vec3 lerped = entity.getPosition(delta);
+        return entity.getBoundingBox().move(
                 lerped.x - entity.getX(),
                 lerped.y - entity.getY(),
                 lerped.z - entity.getZ());
@@ -143,12 +143,12 @@ public class ItemESP extends Module {
     // ------------------------------------------------------------- 2D-таблички
 
     @Override
-    public void onRender2D(GuiGraphics context, float delta) {
-        if (!isToggled() || !names.getValue() || mc.world == null || mc.player == null
+    public void onRender2D(GuiGraphicsExtractor context, float delta) {
+        if (!isToggled() || !names.getValue() || mc.level == null || mc.player == null
                 || this.cachedItems.isEmpty()) return;
 
-        int sw = mc.getWindow().getScaledWidth();
-        int sh = mc.getWindow().getScaledHeight();
+        int sw = mc.getWindow().getGuiScaledWidth();
+        int sh = mc.getWindow().getGuiScaledHeight();
         double rangeBlocks = range.getValue();
 
         // Список собран раз в тик в onUpdate — здесь только отрисовка.
@@ -158,17 +158,17 @@ public class ItemESP extends Module {
             Vector2f screen = RenderUtil3D.worldToScreen(label.x, label.y + 0.3, label.z, sw, sh);
             if (screen == null) continue;
 
-            double dist = Math.sqrt(mc.player.squaredDistanceTo(label.x, label.y, label.z));
+            double dist = Math.sqrt(mc.player.distanceToSqr(label.x, label.y, label.z));
             renderLabel(context, label, screen.x, screen.y, dist, fadeFactor(dist, rangeBlocks));
         }
     }
 
-    private void renderLabel(GuiGraphics context, ItemLabel label, float cx, float cy, double dist, double fadeFactor) {
+    private void renderLabel(GuiGraphicsExtractor context, ItemLabel label, float cx, float cy, double dist, double fadeFactor) {
         FontManager fm = FontManager.INSTANCE;
         float fs = nameScale.getFloatValue();
         double textFactor = 0.25 + 0.75 * fadeFactor;
 
-        String nameText = label.display.getName().getString();
+        String nameText = label.display.getHoverName().getString();
         String countText = label.count > 1 ? " ×" + label.count : "";
         String distSegment = showDistance.getValue() ? "  " + (int) Math.round(dist) + "м" : "";
 
@@ -192,7 +192,7 @@ public class ItemESP extends Module {
 
         float tx = bx + padX;
         if (icons.getValue()) {
-            context.drawItem(label.display, (int) (bx + padX), Math.round(by + (boxH - 16f) / 2f));
+            context.item(label.display, (int) (bx + padX), Math.round(by + (boxH - 16f) / 2f));
             tx += iconW;
         }
 
@@ -216,7 +216,7 @@ public class ItemESP extends Module {
         double mergeDistSq = MERGE_RADIUS * MERGE_RADIUS;
 
         for (ItemEntity entity : entities) {
-            ItemStack stack = entity.getStack();
+            ItemStack stack = entity.getItem();
             ItemLabel target = null;
             if (mergeOn) {
                 for (ItemLabel label : labels) {
@@ -277,9 +277,9 @@ public class ItemESP extends Module {
         }
 
         private void add(ItemEntity entity, float delta) {
-            ItemStack stack = entity.getStack();
-            Vec3 lerped = entity.getLerpedPos(delta);
-            double top = lerped.y + entity.getBoundingBox().getLengthY();
+            ItemStack stack = entity.getItem();
+            Vec3 lerped = entity.getPosition(delta);
+            double top = lerped.y + entity.getBoundingBox().getYsize();
             if (parts.isEmpty()) {
                 x = lerped.x;
                 y = top;
@@ -296,8 +296,8 @@ public class ItemESP extends Module {
         }
 
         private double distanceSqTo(ItemEntity entity, float delta) {
-            Vec3 lerped = entity.getLerpedPos(delta);
-            double top = lerped.y + entity.getBoundingBox().getLengthY();
+            Vec3 lerped = entity.getPosition(delta);
+            double top = lerped.y + entity.getBoundingBox().getYsize();
             double dx = x - lerped.x;
             double dy = y - top;
             double dz = z - lerped.z;

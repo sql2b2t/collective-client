@@ -26,13 +26,17 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
-import net.minecraft.util.math.*;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 
@@ -204,7 +208,7 @@ public class GrimAnchorAura extends Module {
 
     @EventHandler
     private void onTickPre(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null || mc.getNetworkHandler() == null) return;
+        if (mc.player == null || mc.level == null || mc.getConnection() == null) return;
 
         // Кэш ExplosionDamageUtil сбрасывается централизованно в CollectiveClient
         // на START_CLIENT_TICK — до всех модулей.
@@ -288,14 +292,14 @@ public class GrimAnchorAura extends Module {
             return;
         }
 
-        if (this.pauseOnMine.getValue() && mc.interactionManager != null && mc.interactionManager.isBreakingBlock()) {
+        if (this.pauseOnMine.getValue() && mc.gameMode != null && mc.gameMode.isDestroying()) {
             cancelPending();
             RotationUtils.getInstance().release(this);
             return;
         }
 
         // Якорь взрыва работает только вне Незера
-        if (this.checkDimension.getValue() && mc.world.getRegistryKey() == Level.NETHER) {
+        if (this.checkDimension.getValue() && mc.level.dimension() == Level.NETHER) {
             cancelPending();
             RotationUtils.getInstance().release(this);
             return;
@@ -311,8 +315,8 @@ public class GrimAnchorAura extends Module {
             // Провод не отпускаем: серверный угол остаётся у грани действия,
             // следующий шаг цепочки (заряд/взрыв) не заводится заново.
             this.aiming = true;
-            if (this.pendingHit != null && AuraCoordination.claim(this, mc.world.getTime())) {
-                applyAim(this.pendingHit.getPos());
+            if (this.pendingHit != null && AuraCoordination.claim(this, mc.level.getDefaultClockTime())) {
+                applyAim(this.pendingHit.getLocation());
             }
             return;
         }
@@ -346,7 +350,7 @@ public class GrimAnchorAura extends Module {
         }
 
         this.aiming = true;
-        if (!AuraCoordination.claim(this, mc.world.getTime())) return;
+        if (!AuraCoordination.claim(this, mc.level.getDefaultClockTime())) return;
 
         if (existingAnchor != null) {
             this.currentAnchorPos = existingAnchor;
@@ -366,7 +370,7 @@ public class GrimAnchorAura extends Module {
         // Ждём подтверждения размещённого якоря с сервера
         if (this.lastPlacedAnchorPos != null && this.placedWaitTimer > 0) {
             if (this.pendingHit != null) {
-                applyAim(this.pendingHit.getPos());
+                applyAim(this.pendingHit.getLocation());
             }
             return;
         }
@@ -388,20 +392,20 @@ public class GrimAnchorAura extends Module {
     // ─────────────────────────────────────────────────────────────
 
     private void handleAnchorInteraction(BlockPos anchorPos, double reach) {
-        BlockState state = mc.world.getBlockState(anchorPos);
-        if (!state.isOf(Blocks.RESPAWN_ANCHOR)) {
+        BlockState state = mc.level.getBlockState(anchorPos);
+        if (!state.is(Blocks.RESPAWN_ANCHOR)) {
             cancelPending();
             return;
         }
 
-        int charges = state.get(RespawnAnchorBlock.CHARGES);
+        int charges = state.getValue(RespawnAnchorBlock.CHARGE);
 
         if (charges == 0) {
             // Якорь пустой — нужно зарядить световым камнем
             if (this.lastChargedAnchorPos != null
                     && this.lastChargedAnchorPos.equals(anchorPos)
                     && this.chargedWaitTimer > 0) {
-                if (this.pendingHit != null) applyAim(this.pendingHit.getPos());
+                if (this.pendingHit != null) applyAim(this.pendingHit.getLocation());
                 return;
             }
 
@@ -439,7 +443,7 @@ public class GrimAnchorAura extends Module {
             if (this.lastExplodedAnchorPos != null
                     && this.lastExplodedAnchorPos.equals(anchorPos)
                     && this.explodedWaitTimer > 0) {
-                if (this.pendingHit != null) applyAim(this.pendingHit.getPos());
+                if (this.pendingHit != null) applyAim(this.pendingHit.getLocation());
                 return;
             }
 
@@ -453,8 +457,8 @@ public class GrimAnchorAura extends Module {
                 // Считаем сколько реально нанесём цели и себе
                 if (this.currentTarget instanceof LivingEntity livingTarget) {
                     boolean elevated = isTargetElevated(livingTarget);
-                    float targetDmg = ExplosionDamageUtil.getDamage(mc.world, anchorPos, livingTarget);
-                    float selfDmg   = ExplosionDamageUtil.getDamage(mc.world, anchorPos, mc.player);
+                    float targetDmg = ExplosionDamageUtil.getDamage(mc.level, anchorPos, livingTarget);
+                    float selfDmg   = ExplosionDamageUtil.getDamage(mc.level, anchorPos, mc.player);
 
                     float minDmg  = effectiveMinTargetDamage(livingTarget);
                     double ratio  = effectiveDamageRatio(livingTarget);
@@ -527,8 +531,8 @@ public class GrimAnchorAura extends Module {
             if (isUnsafeToExplode(anchorPos)) return;
             if (this.currentTarget instanceof LivingEntity livingTarget) {
                 boolean elevated = isTargetElevated(livingTarget);
-                float targetDmg = ExplosionDamageUtil.getDamage(mc.world, anchorPos, livingTarget);
-                float selfDmg   = ExplosionDamageUtil.getDamage(mc.world, anchorPos, mc.player);
+                float targetDmg = ExplosionDamageUtil.getDamage(mc.level, anchorPos, livingTarget);
+                float selfDmg   = ExplosionDamageUtil.getDamage(mc.level, anchorPos, mc.player);
                 float minDmg  = effectiveMinTargetDamage(livingTarget);
                 double ratio  = effectiveDamageRatio(livingTarget);
 
@@ -606,36 +610,36 @@ public class GrimAnchorAura extends Module {
      * взаимодействий (interact), поэтому используем OUTLINE, а не COLLIDER.
      */
     private boolean isAimedViaSentRot(BlockHitResult expected, double reach) {
-        if (mc.player == null || mc.world == null || expected == null) return false;
+        if (mc.player == null || mc.level == null || expected == null) return false;
 
         RotationUtils rotUtils = RotationUtils.getInstance();
-        Vec3 eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePosition();
 
         float yaw, pitch;
         if (this.rotationMode.getValue() == RotationMode.CLIENT) {
-            yaw   = mc.player.getYaw();
-            pitch = mc.player.getPitch();
+            yaw   = mc.player.getYRot();
+            pitch = mc.player.getXRot();
         } else {
             yaw   = rotUtils.getSentYaw();
             pitch = rotUtils.getSentPitch();
         }
 
         Vec3 look = RotationUtils.getRotationVector(pitch, yaw);
-        Vec3 end  = eye.add(look.multiply(reach + 0.1));
+        Vec3 end  = eye.add(look.scale(reach + 0.1));
 
         // GrimAC использует OUTLINE для interact-пакетов
-        BlockHitResult clip = mc.world.raycast(new RaycastContext(
-            eye, end, RaycastContext.ShapeType.OUTLINE, RaycastContext.FluidHandling.NONE, mc.player
+        BlockHitResult clip = mc.level.clip(new ClipContext(
+            eye, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, mc.player
         ));
 
         if (clip == null || clip.getType() != HitResult.Type.BLOCK) return false;
         if (!clip.getBlockPos().equals(expected.getBlockPos()))      return false;
-        if (eye.squaredDistanceTo(clip.getPos()) > reach * reach)    return false;
+        if (eye.distanceToSqr(clip.getLocation()) > reach * reach)    return false;
 
         // Для плейсмента — грань должна совпасть, для interact — не важно
         if (this.pendingAction == ActionType.PLACE
-                && expected.getSide() != null
-                && clip.getSide() != expected.getSide()) {
+                && expected.getDirection() != null
+                && clip.getDirection() != expected.getDirection()) {
             return false;
         }
 
@@ -649,23 +653,23 @@ public class GrimAnchorAura extends Module {
     private void applyAim(Vec3 targetPos) {
         this.aiming = true;
 
-        float[] rot      = RotationUtils.getRotationsTo(mc.player.getEyePos(), targetPos);
+        float[] rot      = RotationUtils.getRotationsTo(mc.player.getEyePosition(), targetPos);
         double maxSpeed  = this.turnSpeed.getValue();
         double smooth    = this.smoothness.getValue();
         RotationMode mode = this.rotationMode.getValue();
 
         if (mode == RotationMode.CLIENT || mode == RotationMode.BOTH) {
-            float curYaw   = mc.player.getYaw();
-            float curPitch = mc.player.getPitch();
+            float curYaw   = mc.player.getYRot();
+            float curPitch = mc.player.getXRot();
 
-            float dy = MathHelper.wrapDegrees(rot[0] - curYaw);
+            float dy = Mth.wrapDegrees(rot[0] - curYaw);
             float dp = rot[1] - curPitch;
 
             double totalDist = Math.hypot(dy, dp);
 
             if (maxSpeed >= 180.0 && smooth <= 0.0) {
-                mc.player.setYaw(curYaw + dy);
-                mc.player.setPitch(MathHelper.clamp(rot[1], -90.0f, 90.0f));
+                mc.player.setYRot(curYaw + dy);
+                mc.player.setXRot(Mth.clamp(rot[1], -90.0f, 90.0f));
             } else if (totalDist > 0.0001) {
                 double decelRange = Math.max(16.0, maxSpeed * 0.40);
                 double easePow    = 0.50 + (smooth * 0.30);
@@ -681,7 +685,7 @@ public class GrimAnchorAura extends Module {
                 double stepP = dirP * step;
 
                 // GCD-квантование для имитации реального мышиного ввода
-                double sens = mc.options.getMouseSensitivity().getValue();
+                double sens = mc.options.sensitivity().get();
                 double f    = sens * 0.6 + 0.2;
                 double gcd  = f * f * f * 8.0 * 0.15;
                 if (gcd > 0.001) {
@@ -693,8 +697,8 @@ public class GrimAnchorAura extends Module {
                     stepP = qP;
                 }
 
-                mc.player.setYaw(curYaw + (float) stepY);
-                mc.player.setPitch(MathHelper.clamp(curPitch + (float) stepP, -90.0f, 90.0f));
+                mc.player.setYRot(curYaw + (float) stepY);
+                mc.player.setXRot(Mth.clamp(curPitch + (float) stepP, -90.0f, 90.0f));
             }
         }
 
@@ -704,7 +708,7 @@ public class GrimAnchorAura extends Module {
                 // BOTH: клиентский угол уже обновлён выше, серверный равен ему —
                 // setRotationFullInstant сам ставит syncMovement = true.
                 rotUtils.setRotationFullInstant(this, ROTATION_PRIORITY,
-                    mc.player.getYaw(), mc.player.getPitch());
+                    mc.player.getYRot(), mc.player.getXRot());
             } else if (maxSpeed >= 180.0 && smooth <= 0.0) {
                 rotUtils.setRotationInstant(this, ROTATION_PRIORITY,
                     rot[0], rot[1], this.syncMovement.getValue());
@@ -746,11 +750,11 @@ public class GrimAnchorAura extends Module {
 
         InteractionHand hand = anchor.getHand();
         int seq = GrimUtils.nextSequence();
-        mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(hand, finalHit, seq));
-        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
+        mc.getConnection().send(new ServerboundUseItemOnPacket(hand, finalHit, seq));
+        mc.getConnection().send(ServerboundPunchPacket.INSTANCE);
 
         if (this.predict.getValue()) {
-            mc.world.setBlockState(placePos, Blocks.RESPAWN_ANCHOR.getDefaultState());
+            mc.level.setBlock(placePos, Blocks.RESPAWN_ANCHOR.defaultBlockState(), 3);
         }
 
         this.lastPlacedAnchorPos = placePos;
@@ -779,12 +783,11 @@ public class GrimAnchorAura extends Module {
 
         InteractionHand hand = glowstone.getHand();
         int seq = GrimUtils.nextSequence();
-        mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(hand, finalHit, seq));
-        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
+        mc.getConnection().send(new ServerboundUseItemOnPacket(hand, finalHit, seq));
+        mc.getConnection().send(ServerboundPunchPacket.INSTANCE);
 
         if (this.predict.getValue()) {
-            mc.world.setBlockState(anchorPos,
-                Blocks.RESPAWN_ANCHOR.getDefaultState().with(RespawnAnchorBlock.CHARGES, 1));
+            mc.level.setBlock(anchorPos, Blocks.RESPAWN_ANCHOR.defaultBlockState().setValue(RespawnAnchorBlock.CHARGE, 1), 3);
         }
 
         this.lastChargedAnchorPos = anchorPos;
@@ -813,11 +816,11 @@ public class GrimAnchorAura extends Module {
 
         InteractionHand hand = breakItem.getHand();
         int seq = GrimUtils.nextSequence();
-        mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(hand, finalHit, seq));
-        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
+        mc.getConnection().send(new ServerboundUseItemOnPacket(hand, finalHit, seq));
+        mc.getConnection().send(ServerboundPunchPacket.INSTANCE);
 
         if (this.predict.getValue()) {
-            mc.world.setBlockState(anchorPos, Blocks.AIR.getDefaultState());
+            mc.level.setBlock(anchorPos, Blocks.AIR.defaultBlockState(), 3);
         }
 
         this.lastExplodedAnchorPos = anchorPos;
@@ -843,13 +846,13 @@ public class GrimAnchorAura extends Module {
      * GrimAC фиксирует, если курсор взаимодействия всегда равно центру грани (0.5, 0.5).
      * Добавляем случайное смещение в пределах ±0.35 от центра, имитируя реального игрока.
      *
-     * Оффсет передаётся в поле cursorOnFace пакета PlayerInteractBlockC2SPacket
+     * Оффсет передаётся в поле cursorOnFace пакета ServerboundUseItemOnPacket
      * как Vec3 с координатами [0..1] относительно блока.
      */
     private BlockHitResult randomizeCursor(BlockHitResult original) {
-        Vec3 hitPos = original.getPos();
+        Vec3 hitPos = original.getLocation();
         BlockPos blockPos = original.getBlockPos();
-        Direction face = original.getSide();
+        Direction face = original.getDirection();
 
         // Базовые координаты центра грани
         double bx = blockPos.getX();
@@ -895,7 +898,7 @@ public class GrimAnchorAura extends Module {
             default -> { return original; }
         }
 
-        return new BlockHitResult(new Vec3(rx, ry, rz), face, blockPos, original.isInsideBlock());
+        return new BlockHitResult(new Vec3(rx, ry, rz), face, blockPos, original.isInside());
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -903,26 +906,26 @@ public class GrimAnchorAura extends Module {
     // ─────────────────────────────────────────────────────────────
 
     private BlockHitResult findBestSupportHit(BlockPos placePos, double reach) {
-        if (mc.player == null || mc.world == null) return null;
+        if (mc.player == null || mc.level == null) return null;
 
-        Vec3 eye    = mc.player.getEyePos();
+        Vec3 eye    = mc.player.getEyePosition();
         double reachSq = reach * reach;
 
         BlockHitResult best     = null;
         double bestDist         = Double.MAX_VALUE;
 
         for (Direction dir : Direction.values()) {
-            BlockPos neighbor = placePos.offset(dir);
+            BlockPos neighbor = placePos.relative(dir);
 
             // Не кликаем по только что взорванной позиции — GrimAC флагует
             if (neighbor.equals(this.lastExplodedAnchorPos) && this.explodedWaitTimer > 0) continue;
 
-            BlockState state = mc.world.getBlockState(neighbor);
+            BlockState state = mc.level.getBlockState(neighbor);
             // Блок должен быть твёрдым, не заменяемым и не быть якорём
-            if (state.isReplaceable()) continue;
-            if (state.getCollisionShape(mc.world, neighbor).isEmpty()) continue;
-            if (state.isOf(Blocks.RESPAWN_ANCHOR)) continue;
-            if (!state.isSolidBlock(mc.world, neighbor)) continue;
+            if (state.canBeReplaced()) continue;
+            if (state.getCollisionShape(mc.level, neighbor).isEmpty()) continue;
+            if (state.is(Blocks.RESPAWN_ANCHOR)) continue;
+            if (!state.isSolid()) continue;
 
             Direction clickFace = dir.getOpposite();
 
@@ -932,19 +935,19 @@ public class GrimAnchorAura extends Module {
             // Используем центр грани для raycast-проверки
             Vec3 sample = getFaceSamplePoint(neighbor, clickFace);
             Vec3 dirVec = sample.subtract(eye);
-            if (dirVec.lengthSquared() < 1.0E-6) continue;
+            if (dirVec.lengthSqr() < 1.0E-6) continue;
 
-            Vec3 end = eye.add(dirVec.normalize().multiply(reach + 0.1));
+            Vec3 end = eye.add(dirVec.normalize().scale(reach + 0.1));
 
             // COLLIDER — для физических взаимодействий (совместимо с Grim-placecheck)
-            BlockHitResult clip = mc.world.raycast(new RaycastContext(
-                eye, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, mc.player
+            BlockHitResult clip = mc.level.clip(new ClipContext(
+                eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, mc.player
             ));
 
             if (clip.getType() == HitResult.Type.BLOCK
                     && clip.getBlockPos().equals(neighbor)
-                    && clip.getSide() == clickFace) {
-                double d = eye.squaredDistanceTo(clip.getPos());
+                    && clip.getDirection() == clickFace) {
+                double d = eye.distanceToSqr(clip.getLocation());
                 if (d <= reachSq && d < bestDist) {
                     bestDist = d;
                     best = clip;
@@ -960,9 +963,9 @@ public class GrimAnchorAura extends Module {
     // ─────────────────────────────────────────────────────────────
 
     private BlockHitResult findBestInteractionHit(BlockPos anchorPos, double reach) {
-        if (mc.player == null || mc.world == null) return null;
+        if (mc.player == null || mc.level == null) return null;
 
-        Vec3 eye    = mc.player.getEyePos();
+        Vec3 eye    = mc.player.getEyePosition();
         double reachSq = reach * reach;
 
         BlockHitResult best     = null;
@@ -973,19 +976,19 @@ public class GrimAnchorAura extends Module {
 
             Vec3 sample = getFaceSamplePoint(anchorPos, side);
             Vec3 dirVec = sample.subtract(eye);
-            if (dirVec.lengthSquared() < 1.0E-6) continue;
+            if (dirVec.lengthSqr() < 1.0E-6) continue;
 
-            Vec3 end = eye.add(dirVec.normalize().multiply(reach + 0.1));
+            Vec3 end = eye.add(dirVec.normalize().scale(reach + 0.1));
 
             // Для взаимодействия с уже установленным блоком используем OUTLINE
-            BlockHitResult clip = mc.world.raycast(new RaycastContext(
-                eye, end, RaycastContext.ShapeType.OUTLINE, RaycastContext.FluidHandling.NONE, mc.player
+            BlockHitResult clip = mc.level.clip(new ClipContext(
+                eye, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, mc.player
             ));
 
             if (clip.getType() == HitResult.Type.BLOCK
                     && clip.getBlockPos().equals(anchorPos)
-                    && clip.getSide() == side) {
-                double d = eye.squaredDistanceTo(clip.getPos());
+                    && clip.getDirection() == side) {
+                double d = eye.distanceToSqr(clip.getLocation());
                 if (d <= reachSq && d < bestDist) {
                     bestDist = d;
                     best = clip;
@@ -1002,8 +1005,8 @@ public class GrimAnchorAura extends Module {
 
     /** Фиксированная точка наведения — центр грани блока. */
     private Vec3 faceCenter(BlockHitResult hit) {
-        Direction side = hit.getSide();
-        return side != null ? getFaceSamplePoint(hit.getBlockPos(), side) : hit.getPos();
+        Direction side = hit.getDirection();
+        return side != null ? getFaceSamplePoint(hit.getBlockPos(), side) : hit.getLocation();
     }
 
     /**
@@ -1047,28 +1050,28 @@ public class GrimAnchorAura extends Module {
     private boolean isUnsafeToExplode(BlockPos anchorPos) {
         if (this.testAlone.getValue()) return false;
 
-        if (mc.player == null || mc.world == null) return true;
+        if (mc.player == null || mc.level == null) return true;
 
-        boolean hasTotem = mc.player.getMainHandStack().isOf(Items.TOTEM_OF_UNDYING)
-                || mc.player.getOffHandStack().isOf(Items.TOTEM_OF_UNDYING);
+        boolean hasTotem = mc.player.getMainHandItem().is(Items.TOTEM_OF_UNDYING)
+                || mc.player.getOffhandItem().is(Items.TOTEM_OF_UNDYING);
 
         if (this.antiSuicide.getValue() && !hasTotem) {
             float totalHp = mc.player.getHealth() + mc.player.getAbsorptionAmount();
-            float selfDmg = ExplosionDamageUtil.getDamageRaw(mc.world, anchorPos, mc.player);
+            float selfDmg = ExplosionDamageUtil.getDamageRaw(mc.level, anchorPos, mc.player);
             if (selfDmg >= totalHp - 0.5f) return true;
         }
 
         if (!this.selfDamageSafety.getValue()) return false;
 
-        Vec3 center     = anchorPos.toCenterPos();
-        double playerDist = mc.player.getEyePos().distanceTo(center);
+        Vec3 center     = net.minecraft.world.phys.Vec3.atCenterOf(anchorPos);
+        double playerDist = mc.player.getEyePosition().distanceTo(center);
 
         if (hasTotem && playerDist >= 1.2) return false;
 
         double safeDist = this.minSafeDistance.getValue();
         if (playerDist < safeDist) {
             if (this.currentTarget != null) {
-                double targetDist = this.currentTarget.getEyePos().distanceTo(center);
+                double targetDist = this.currentTarget.getEyePosition().distanceTo(center);
                 if (playerDist <= targetDist - 0.5) return true;
             } else {
                 return true;
@@ -1084,7 +1087,7 @@ public class GrimAnchorAura extends Module {
      * от падёжных дропов до мобов, иначе клик молча отлетит.
      */
     private boolean entityBlocksCell(AABB cell) {
-        for (Entity other : mc.world.getOtherEntities(null, cell)) {
+        for (Entity other : mc.level.getEntities(null, cell)) {
             if (other.getBoundingBox().intersects(cell)) return true;
         }
         return false;
@@ -1099,15 +1102,15 @@ public class GrimAnchorAura extends Module {
         float limit = this.friendDamageLimit.getValue().floatValue();
         if (!this.antiFriend.getValue() || limit <= 0.0f) return false;
 
-        Vec3 center = pos.toCenterPos();
-        for (Player player : mc.world.getPlayers()) {
-            if (player == mc.player || !player.isAlive() || player.isDead()) continue;
+        Vec3 center = Vec3.atCenterOf(pos);
+        for (Player player : mc.level.players()) {
+            if (player == mc.player || !player.isAlive() || player.isDeadOrDying()) continue;
             if (!FriendManager.INSTANCE.isFriend(player)) continue;
 
             float upper = ExplosionDamageUtil.getDamageUpperBound(center, ExplosionDamageUtil.ANCHOR_POWER, player);
             if (upper <= limit) continue;
 
-            float dmg = ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.ANCHOR_POWER, player);
+            float dmg = ExplosionDamageUtil.getDamage(mc.level, center, ExplosionDamageUtil.ANCHOR_POWER, player);
             if (dmg > limit) return true;
         }
         return false;
@@ -1124,26 +1127,26 @@ public class GrimAnchorAura extends Module {
         // клиентский мир обновляется с задержкой, и полный скан в эти тики
         // всё равно ничего не находит — только тратит 1331 getBlockState.
         if (this.lastPlacedAnchorPos != null && this.placedWaitTimer > 0) {
-            BlockState placed = mc.world.getBlockState(this.lastPlacedAnchorPos);
-            if (placed.isOf(Blocks.RESPAWN_ANCHOR)
-                    && GrimUtils.closestEyeDistanceSqTo(mc.player, this.lastPlacedAnchorPos.toCenterPos()) <= reachSq) {
+            BlockState placed = mc.level.getBlockState(this.lastPlacedAnchorPos);
+            if (placed.is(Blocks.RESPAWN_ANCHOR)
+                    && GrimUtils.closestEyeDistanceSqTo(mc.player, Vec3.atCenterOf(lastPlacedAnchorPos)) <= reachSq) {
                 return this.lastPlacedAnchorPos;
             }
         }
 
         // Сначала проверяем текущий закешированный якорь
         if (this.currentAnchorPos != null) {
-            BlockState curState = mc.world.getBlockState(this.currentAnchorPos);
-            if (curState.isOf(Blocks.RESPAWN_ANCHOR)
-                    && GrimUtils.closestEyeDistanceSqTo(mc.player, this.currentAnchorPos.toCenterPos()) <= reachSq) {
+            BlockState curState = mc.level.getBlockState(this.currentAnchorPos);
+            if (curState.is(Blocks.RESPAWN_ANCHOR)
+                    && GrimUtils.closestEyeDistanceSqTo(mc.player, Vec3.atCenterOf(currentAnchorPos)) <= reachSq) {
                 return this.currentAnchorPos;
             }
         }
 
         // Скан вокруг цели: якорь ставится у неё, вокруг игрока пришлось бы
         // перебирать сильно больше пустых клеток с прежним радиусом.
-        BlockPos playerPos = mc.player.getBlockPos();
-        BlockPos scanCenter = target != null ? target.getBlockPos() : playerPos;
+        BlockPos playerPos = mc.player.blockPosition();
+        BlockPos scanCenter = target != null ? target.blockPosition() : playerPos;
         int r = (int) Math.ceil(reach) + (target != null ? 1 : 0);
         BlockPos best     = null;
         double closestDist = Double.MAX_VALUE;
@@ -1153,14 +1156,14 @@ public class GrimAnchorAura extends Module {
             // не дотянется — вдвое меньше getBlockState на просмотр.
             for (int y = -3; y <= 3; y++) {
                 for (int z = -r; z <= r; z++) {
-                    BlockPos p = scanCenter.add(x, y, z);
-                    if (GrimUtils.closestEyeDistanceSqTo(mc.player, p.toCenterPos()) > reachSq) continue;
+                    BlockPos p = scanCenter.offset(x, y, z);
+                    if (GrimUtils.closestEyeDistanceSqTo(mc.player, Vec3.atCenterOf(p)) > reachSq) continue;
 
-                    BlockState state = mc.world.getBlockState(p);
-                    if (state.isOf(Blocks.RESPAWN_ANCHOR)) {
+                    BlockState state = mc.level.getBlockState(p);
+                    if (state.is(Blocks.RESPAWN_ANCHOR)) {
                         double d = target != null
-                            ? target.squaredDistanceTo(p.toCenterPos())
-                            : mc.player.squaredDistanceTo(p.toCenterPos());
+                            ? target.distanceToSqr(Vec3.atCenterOf(p))
+                            : mc.player.distanceToSqr(Vec3.atCenterOf(p));
                         if (target == null || d <= 36.0) {
                             if (d < closestDist) {
                                 closestDist = d;
@@ -1215,8 +1218,8 @@ public class GrimAnchorAura extends Module {
     private boolean selfDamageSurvivable(float selfDmg) {
         if (selfDmg <= 6.0f) return true;
 
-        boolean hasTotem = mc.player.getMainHandStack().isOf(Items.TOTEM_OF_UNDYING)
-                || mc.player.getOffHandStack().isOf(Items.TOTEM_OF_UNDYING);
+        boolean hasTotem = mc.player.getMainHandItem().is(Items.TOTEM_OF_UNDYING)
+                || mc.player.getOffhandItem().is(Items.TOTEM_OF_UNDYING);
         if (hasTotem) return true;
 
         return (mc.player.getHealth() + mc.player.getAbsorptionAmount()) > selfDmg;
@@ -1224,7 +1227,7 @@ public class GrimAnchorAura extends Module {
 
     private BlockPos findPlacementPosition(Entity target, double reach) {
         double reachSq = reach * reach;
-        BlockPos targetPos = target.getBlockPos();
+        BlockPos targetPos = target.blockPosition();
         boolean elevated = isTargetElevated(target);
 
         // ── Пул кандидатов ─────────────────────────────────────────────
@@ -1242,16 +1245,16 @@ public class GrimAnchorAura extends Module {
             candidates.add(targetPos.north().west());
             candidates.add(targetPos.south().east());
             candidates.add(targetPos.south().west());
-            candidates.add(targetPos.up(1));
+            candidates.add(targetPos.above(1));
         } else {
             candidates.add(targetPos);
-            candidates.add(targetPos.up(1));
-            candidates.add(targetPos.up(2));
+            candidates.add(targetPos.above(1));
+            candidates.add(targetPos.above(2));
             candidates.add(targetPos.north());
             candidates.add(targetPos.south());
             candidates.add(targetPos.east());
             candidates.add(targetPos.west());
-            candidates.add(targetPos.down());
+            candidates.add(targetPos.below());
             // Диагонали
             candidates.add(targetPos.north().east());
             candidates.add(targetPos.north().west());
@@ -1267,8 +1270,8 @@ public class GrimAnchorAura extends Module {
         // Фильтр: только доступные позиции
         List<BlockPos> valid = new ArrayList<>();
         for (BlockPos p : candidates) {
-            if (GrimUtils.closestEyeDistanceSqTo(mc.player, p.toCenterPos()) > reachSq) continue;
-            if (!mc.world.getBlockState(p).isReplaceable()) continue;
+            if (GrimUtils.closestEyeDistanceSqTo(mc.player, Vec3.atCenterOf(p)) > reachSq) continue;
+            if (!mc.level.getBlockState(p).canBeReplaced()) continue;
 
             AABB box = new AABB(p);
             if (mc.player.getBoundingBox().intersects(box)) continue;
@@ -1304,11 +1307,11 @@ public class GrimAnchorAura extends Module {
                 float bestTarget = Float.NEGATIVE_INFINITY;
                 for (BlockPos p : pool) {
                     if (this.antiSuicide.getValue()) {
-                        float selfDmg = ExplosionDamageUtil.getDamage(mc.world, p, mc.player);
+                        float selfDmg = ExplosionDamageUtil.getDamage(mc.level, p, mc.player);
                         float totalHp = mc.player.getHealth() + mc.player.getAbsorptionAmount();
                         if (selfDmg >= totalHp - 0.5f) continue;
                     }
-                    float targetDmg = ExplosionDamageUtil.getDamage(mc.world, p, livingTarget);
+                    float targetDmg = ExplosionDamageUtil.getDamage(mc.level, p, livingTarget);
                     if (targetDmg > bestTarget) {
                         bestTarget = targetDmg;
                         bestPos = p;
@@ -1326,8 +1329,8 @@ public class GrimAnchorAura extends Module {
             float bestScore = Float.NEGATIVE_INFINITY;
 
             for (BlockPos p : pool) {
-                float targetDmg = ExplosionDamageUtil.getDamage(mc.world, p, livingTarget);
-                float selfDmg   = ExplosionDamageUtil.getDamage(mc.world, p, mc.player);
+                float targetDmg = ExplosionDamageUtil.getDamage(mc.level, p, livingTarget);
+                float selfDmg   = ExplosionDamageUtil.getDamage(mc.level, p, mc.player);
 
                 // Отбрасываем позиции где нам плохо
                 if (targetDmg < minDmg) continue;
@@ -1358,10 +1361,10 @@ public class GrimAnchorAura extends Module {
             BlockPos fallback = null;
             float bestTarget  = Float.NEGATIVE_INFINITY;
             for (BlockPos p : pool) {
-                float selfDmg = ExplosionDamageUtil.getDamage(mc.world, p, mc.player);
+                float selfDmg = ExplosionDamageUtil.getDamage(mc.level, p, mc.player);
                 if (!selfDamageSurvivable(selfDmg)) continue;
 
-                float targetDmg = ExplosionDamageUtil.getDamage(mc.world, p, livingTarget);
+                float targetDmg = ExplosionDamageUtil.getDamage(mc.level, p, livingTarget);
                 if (targetDmg > bestTarget) {
                     bestTarget = targetDmg;
                     fallback = p;
@@ -1371,7 +1374,7 @@ public class GrimAnchorAura extends Module {
         }
 
         // SmartPlacement выключен → старый режим: ближайшая к цели
-        valid.sort(Comparator.comparingDouble(p -> target.squaredDistanceTo(p.toCenterPos())));
+        valid.sort(Comparator.comparingDouble(p -> target.distanceToSqr(Vec3.atCenterOf(p))));
         BlockPos nearest = valid.get(0);
         return valid.contains(this.stickyPos) ? this.stickyPos : nearest;
     }
@@ -1393,8 +1396,8 @@ public class GrimAnchorAura extends Module {
             // Сравниваем по тому же критерию, по которому шло ранжирование:
             // иначе закреп держится на заведомо худшей позиции.
             float score = elevated
-                    ? ExplosionDamageUtil.getDamageRaw(mc.world, pinned, target)
-                    : scorePosition(mc.world, pinned, target);
+                    ? ExplosionDamageUtil.getDamageRaw(mc.level, pinned, target)
+                    : scorePosition(mc.level, pinned, target);
 
             if (score >= threshold * STICKY_KEEP_RATIO) return pinned;
         }
@@ -1404,7 +1407,7 @@ public class GrimAnchorAura extends Module {
     }
 
     /** Та же оценка, что и в основном подборе: 2×урон цели минус самоурон. */
-    private float scorePosition(net.minecraft.world.Level world, BlockPos pos, LivingEntity target) {
+    private float scorePosition(net.minecraft.world.level.Level world, BlockPos pos, LivingEntity target) {
         float targetDmg = ExplosionDamageUtil.getDamageRaw(world, pos, target);
         float selfDmg   = ExplosionDamageUtil.getDamageRaw(world, pos, mc.player);
         return targetDmg * 2.0f - selfDmg;
@@ -1425,8 +1428,8 @@ public class GrimAnchorAura extends Module {
 
         List<BlockPos> pool = new ArrayList<>(valid);
         pool.sort(Comparator.comparingDouble(p -> -(
-                ExplosionDamageUtil.getDamageUpperBound(p.toCenterPos(), ExplosionDamageUtil.ANCHOR_POWER, livingTarget)
-              + 0.001 * ExplosionDamageUtil.getDamageUpperBound(p.toCenterPos(), ExplosionDamageUtil.ANCHOR_POWER, mc.player)
+                ExplosionDamageUtil.getDamageUpperBound(Vec3.atCenterOf(p), ExplosionDamageUtil.ANCHOR_POWER, livingTarget)
+              + 0.001 * ExplosionDamageUtil.getDamageUpperBound(Vec3.atCenterOf(p), ExplosionDamageUtil.ANCHOR_POWER, mc.player)
         )));
 
         return pool.subList(0, Math.max(1, limit));
@@ -1439,13 +1442,13 @@ public class GrimAnchorAura extends Module {
         Entity best     = null;
         double minDist  = Double.MAX_VALUE;
 
-        for (Player player : mc.world.getPlayers()) {
+        for (Player player : mc.level.players()) {
             if (player == mc.player) continue;
             if (FriendManager.INSTANCE.isFriend(player)) continue;
-            if (player.isSpectator() || player.isDead() || !player.isAlive()) continue;
+            if (player.isSpectator() || player.isDeadOrDying() || !player.isAlive()) continue;
             if (!this.targetCreative.getValue() && player.isCreative()) continue;
 
-            double d = mc.player.squaredDistanceTo(player);
+            double d = mc.player.distanceToSqr(player);
             if (d <= rangeSq && d < minDist) {
                 minDist = d;
                 best    = player;
@@ -1453,11 +1456,11 @@ public class GrimAnchorAura extends Module {
         }
 
         if (best == null && this.targetMobs.getValue()) {
-            for (Entity entity : mc.world.getEntities()) {
+            for (Entity entity : mc.level.entitiesForRendering()) {
                 if (!(entity instanceof LivingEntity living)
                         || living instanceof Player
                         || !living.isAlive()) continue;
-                double d = mc.player.squaredDistanceTo(entity);
+                double d = mc.player.distanceToSqr(entity);
                 if (d <= rangeSq && d < minDist) {
                     minDist = d;
                     best    = entity;
@@ -1509,14 +1512,14 @@ public class GrimAnchorAura extends Module {
     private FindItemResult findBreakItem() {
         if (mc.player == null) return new FindItemResult(-1, 0);
 
-        ItemStack offhand = mc.player.getOffHandStack();
-        if (!offhand.isEmpty() && !offhand.isOf(Items.GLOWSTONE)) {
+        ItemStack offhand = mc.player.getOffhandItem();
+        if (!offhand.isEmpty() && !offhand.is(Items.GLOWSTONE)) {
             return new FindItemResult(40, offhand.getCount());
         }
 
         int current       = mc.player.getInventory().getSelectedSlot();
-        ItemStack curStack = mc.player.getInventory().getStack(current);
-        if (!curStack.isOf(Items.GLOWSTONE)) {
+        ItemStack curStack = mc.player.getInventory().getItem(current);
+        if (!curStack.is(Items.GLOWSTONE)) {
             return new FindItemResult(current, curStack.getCount());
         }
 
@@ -1524,13 +1527,13 @@ public class GrimAnchorAura extends Module {
         int fallbackSlot  = -1;
 
         for (int i = 0; i < 9; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
-            if (!stack.isOf(Items.GLOWSTONE)) {
+            ItemStack stack = mc.player.getInventory().getItem(i);
+            if (!stack.is(Items.GLOWSTONE)) {
                 if (stack.isEmpty()
-                        || stack.isIn(ItemTags.SWORDS)
-                        || stack.isIn(ItemTags.AXES)
-                        || stack.isOf(Items.TOTEM_OF_UNDYING)
-                        || stack.isOf(Items.RESPAWN_ANCHOR)) {
+                        || stack.is(ItemTags.SWORDS)
+                        || stack.is(ItemTags.AXES)
+                        || stack.is(Items.TOTEM_OF_UNDYING)
+                        || stack.is(Items.RESPAWN_ANCHOR)) {
                     preferredSlot = i;
                     break;
                 }
@@ -1540,7 +1543,7 @@ public class GrimAnchorAura extends Module {
 
         int targetSlot = preferredSlot != -1 ? preferredSlot : fallbackSlot;
         if (targetSlot != -1) {
-            return new FindItemResult(targetSlot, mc.player.getInventory().getStack(targetSlot).getCount());
+            return new FindItemResult(targetSlot, mc.player.getInventory().getItem(targetSlot).getCount());
         }
 
         return new FindItemResult(-1, 0);

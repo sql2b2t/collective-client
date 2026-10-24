@@ -68,7 +68,7 @@ public class LightOverlay extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         // Мигание было из-за безусловного clear() каждый тик: между
         // сканами список оказывался пуст и крестики пропадали на кадры.
@@ -88,19 +88,19 @@ public class LightOverlay extends Module {
         int v = this.verticalRange.getIntValue();
         int limit = this.lightLevel.getIntValue();
 
-        BlockPos.Mutable cursor = new BlockPos.Mutable();
-        int baseX = mc.player.getBlockPos().getX();
-        int baseY = mc.player.getBlockPos().getY();
-        int baseZ = mc.player.getBlockPos().getZ();
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        int baseX = mc.player.blockPosition().getX();
+        int baseY = mc.player.blockPosition().getY();
+        int baseZ = mc.player.blockPosition().getZ();
 
         for (int dy = -v; dy <= v; dy++) {
             for (int dx = -h; dx <= h; dx++) {
                 for (int dz = -h; dz <= h; dz++) {
                     cursor.set(baseX + dx, baseY + dy, baseZ + dz);
 
-                    if (!mc.world.isChunkLoaded(cursor.getX() >> 4, cursor.getZ() >> 4)) continue;
+                    if (!mc.level.hasChunk(cursor.getX() >> 4, cursor.getZ() >> 4)) continue;
 
-                    switch (isValidMobSpawn(cursor.toImmutable(), limit)) {
+                    switch (isValidMobSpawn(cursor.immutable(), limit)) {
                         case Potential -> out.add(new Cross(cursor, true));
                         case Always -> out.add(new Cross(cursor, false));
                         case Never -> { }
@@ -112,7 +112,7 @@ public class LightOverlay extends Module {
 
     @EventHandler
     private void onRender(Render3DEvent event) {
-        if (mc.player == null || mc.world == null || this.crosses.isEmpty()) return;
+        if (mc.player == null || mc.level == null || this.crosses.isEmpty()) return;
 
         Color cSpawn = this.color.getValue();
         Color cPotential = this.potentialColor.getValue();
@@ -121,7 +121,7 @@ public class LightOverlay extends Module {
 
         for (Cross cross : this.crosses) {
             Color base = cross.potential ? cPotential : cSpawn;
-            double dist = mc.player.squaredDistanceTo(
+            double dist = mc.player.distanceToSqr(
                 cross.x + 0.5, cross.y, cross.z + 0.5);
             dist = Math.sqrt(dist);
             Color c = ColorUtil.fadeLineByDistance(dist, rangeBlocks, base, base.getAlpha());
@@ -132,19 +132,9 @@ public class LightOverlay extends Module {
     }
 
     private void drawLine(double x1, double y1, double z1, double x2, double y2, double z2, Color c) {
-        if (this.seeThroughBlocks.getValue()) {
-            if (mc.worldRenderer == null) return;
-            try (var scope = mc.worldRenderer.startDrawingGizmos()) {
-                int rgba = (c.getAlpha() & 0xFF) << 24 | (c.getRed() & 0xFF) << 16
-                    | (c.getGreen() & 0xFF) << 8 | (c.getBlue() & 0xFF);
-                GizmoDrawing.line(new Vec3(x1, y1, z1), new Vec3(x2, y2, z2), rgba)
-                    .ignoreOcclusion();
-            } catch (Exception ignored) {
-            }
-        } else {
-            Renderer3D.line(x1, y1, z1, x2, y2, z2, c);
-        }
+        Renderer3D.line(x1, y1, z1, x2, y2, z2, c, this.seeThroughBlocks.getValue());
     }
+
 
     /**
      * Порт Meteor BlockUtils.isValidMobSpawn: воздух (или одиночный слой
@@ -152,22 +142,23 @@ public class LightOverlay extends Module {
      * выше порога — спавн только ночью (Potential), иначе — всегда (Always).
      */
     public Spawn isValidMobSpawn(BlockPos pos, int spawnLightLimit) {
-        net.minecraft.block.BlockState state = mc.world.getBlockState(pos);
+        net.minecraft.world.level.block.state.BlockState state = mc.level.getBlockState(pos);
 
-        boolean snow = state.contains(SnowBlock.LAYERS) && state.get(SnowBlock.LAYERS) == 1;
+        boolean snow = state.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.LAYERS)
+            && state.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.LAYERS) == 1;
         if (!state.isAir() && !snow) return Spawn.Never;
 
-        if (!isValidSpawnBlock(pos.down())) return Spawn.Never;
+        if (!isValidSpawnBlock(pos.below())) return Spawn.Never;
 
-        if (getLight(LightType.BLOCK, pos) > spawnLightLimit) return Spawn.Never;
-        if (getLight(LightType.SKY, pos) > spawnLightLimit) return Spawn.Potential;
+        if (getLight(net.minecraft.world.level.LightLayer.BLOCK, pos) > spawnLightLimit) return Spawn.Never;
+        if (getLight(net.minecraft.world.level.LightLayer.SKY, pos) > spawnLightLimit) return Spawn.Potential;
 
         return Spawn.Always;
     }
 
     /** Порт Meteor BlockUtils.isValidSpawnBlock под Yarn 1.21.11. */
     public boolean isValidSpawnBlock(BlockPos pos) {
-        net.minecraft.block.BlockState state = mc.world.getBlockState(pos);
+        net.minecraft.world.level.block.state.BlockState state = mc.level.getBlockState(pos);
         Block block = state.getBlock();
 
         if (block == Blocks.BEDROCK
@@ -176,14 +167,14 @@ public class LightOverlay extends Module {
             || block instanceof ScaffoldingBlock) return false;
 
         if (block == Blocks.SOUL_SAND || block == Blocks.MUD) return true;
-        if (block instanceof SlabBlock && state.get(SlabBlock.TYPE) == SlabType.TOP) return true;
-        if (block instanceof StairsBlock && state.get(StairsBlock.HALF) == BlockHalf.TOP) return true;
+        if (block instanceof SlabBlock && state.getValue(SlabBlock.TYPE) == SlabType.TOP) return true;
+        if (block instanceof StairBlock && state.getValue(StairBlock.HALF) == Half.TOP) return true;
 
-        return Block.isShapeFullCube(state.getCollisionShape(mc.world, pos));
+        return Block.isShapeFullBlock(state.getCollisionShape(mc.level, pos));
     }
 
-    private int getLight(LightType type, BlockPos pos) {
-        return mc.world.getLightingProvider().get(type).getLightLevel(pos);
+    private int getLight(net.minecraft.world.level.LightLayer type, BlockPos pos) {
+        return mc.level.getLightEngine().getLayerListener(type).getLightValue(pos);
     }
 
     private static final class Cross {

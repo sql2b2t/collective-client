@@ -27,7 +27,7 @@ public class BetterF5 extends Module {
     private double targetHeight;
     private float targetYawOffset;
     private long jumpTime;
-    private Perspective lastPerspective;
+    private CameraType lastPerspective;
     private boolean needsInit;
     private long lastFrame;
     private boolean breakingBlock;
@@ -68,25 +68,25 @@ public class BetterF5 extends Module {
             return;
         }
 
-        Perspective perspective = mc.options.getPerspective();
+        CameraType perspective = mc.options.getCameraType();
         if (perspective != this.lastPerspective) {
-            if (perspective != Perspective.FIRST_PERSON) {
+            if (perspective != CameraType.FIRST_PERSON) {
                 this.needsInit = true;
             }
             this.lastPerspective = perspective;
         }
 
-        if (perspective == Perspective.FIRST_PERSON) {
+        if (perspective == CameraType.FIRST_PERSON) {
             return;
         }
 
         long now = System.currentTimeMillis();
         float delta = this.lastFrame == 0L
             ? 0.016F
-            : MathHelper.clamp((float) (now - this.lastFrame) / 1000.0F, 0.001F, 0.1F);
+            : Mth.clamp((float) (now - this.lastFrame) / 1000.0F, 0.001F, 0.1F);
         this.lastFrame = now;
 
-        if (camera.getFocusedEntity() instanceof Player player) {
+        if (camera.entity() instanceof Player player) {
             if (this.needsInit) {
                 init(camera);
                 this.needsInit = false;
@@ -133,7 +133,7 @@ public class BetterF5 extends Module {
         double d = this.distance.getValue();
         double h = this.height.getValue();
 
-        Vec3 pos = camera.getCameraPos();
+        Vec3 pos = camera.position();
         this.currentDistance = d;
         this.currentHeight = h;
         this.smoothX = pos.x;
@@ -150,20 +150,20 @@ public class BetterF5 extends Module {
     private void computeTargets(Player player) {
         double baseDist = this.distance.getValue();
         double baseHeight = this.height.getValue();
-        boolean frontView = mc.options.getPerspective() == Perspective.THIRD_PERSON_FRONT;
+        boolean frontView = mc.options.getCameraType() == CameraType.THIRD_PERSON_FRONT;
 
         double dist = baseDist;
         double h = baseHeight;
         float yawOff = 0.0F;
 
-        Vec3 vel = player.getVelocity();
+        Vec3 vel = player.getDeltaMovement();
         double speed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
 
         if (player.isSprinting() && speed > 0.100000001116534) {
-            double t = MathHelper.clamp(speed / 0.30000002483330174, 0.0, 1.0);
+            double t = Mth.clamp(speed / 0.30000002483330174, 0.0, 1.0);
             dist += (frontView ? 1.2000005543231964 : 0.7999999) * easeOutQuart(t);
         } else if (speed > 0.010000003756227357) {
-            double t = MathHelper.clamp(speed / 0.1500000901677722, 0.0, 1.0);
+            double t = Mth.clamp(speed / 0.1500000901677722, 0.0, 1.0);
             dist += (frontView ? 0.47999983021081966 : 0.4) * easeInOutCos(t);
         }
 
@@ -174,25 +174,25 @@ public class BetterF5 extends Module {
             h += 0.5 * v * 2.0;
         }
 
-        if (!player.isOnGround() && vel.y < -0.10000000304602849) {
-            double t = MathHelper.clamp(Math.abs(vel.y) / 0.5, 0.0, 1.0);
+        if (!player.onGround() && vel.y < -0.10000000304602849) {
+            double t = Mth.clamp(Math.abs(vel.y) / 0.5, 0.0, 1.0);
             h += 0.25 * easeOutQuart(t);
         }
 
-        if (!player.isOnGround() && vel.y > 0.1000000000116534) {
-            double t = MathHelper.clamp(vel.y / 0.39999996007461613, 0.0, 1.0);
+        if (!player.onGround() && vel.y > 0.1000000000116534) {
+            double t = Mth.clamp(vel.y / 0.39999996007461613, 0.0, 1.0);
             h += 0.1500000901677722 * t;
         }
 
-        this.breakingBlock = mc.interactionManager != null && mc.interactionManager.isBreakingBlock();
+        this.breakingBlock = mc.gameMode != null && mc.gameMode.isDestroying();
         if (this.breakingBlock) {
             BlockHitResult blockHit = getCrosshairBlockHit();
             if (blockHit != null) {
-                Direction side = blockHit.getSide();
+                Direction side = blockHit.getDirection();
                 yawOff = switch (side) {
                     case NORTH, EAST -> -40.0F;
                     case SOUTH, WEST -> 40.0F;
-                    default -> player.bodyYaw > player.getYaw() ? -40.0F : 40.0F;
+                    default -> player.yBodyRot > player.getYRot() ? -40.0F : 40.0F;
                 };
                 dist += 0.60000026;
                 h += 0.1500000901677722;
@@ -234,7 +234,7 @@ public class BetterF5 extends Module {
     private void apply(Camera camera) {
         this.resultDistance = (float) this.currentDistance;
 
-        Vec3 pos = camera.getCameraPos();
+        Vec3 pos = camera.position();
         double targetX = pos.x;
         double targetY = pos.y + this.currentHeight;
         double targetZ = pos.z;
@@ -255,8 +255,8 @@ public class BetterF5 extends Module {
         }
 
         if (Math.abs(this.currentYawOffset) > 0.5F) {
-            this.resultYaw = camera.getYaw() + this.currentYawOffset;
-            this.resultPitch = camera.getPitch();
+            this.resultYaw = camera.yRot() + this.currentYawOffset;
+            this.resultPitch = camera.xRot();
             this.rotationModified = true;
         }
     }
@@ -286,7 +286,7 @@ public class BetterF5 extends Module {
     }
 
     private BlockHitResult getCrosshairBlockHit() {
-        if (mc.crosshairTarget instanceof BlockHitResult blockHit) {
+        if (mc.hitResult instanceof BlockHitResult blockHit) {
             return blockHit;
         }
         return null;

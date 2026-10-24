@@ -12,7 +12,7 @@ import me.collective.util.InventoryUtil;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
@@ -50,10 +50,10 @@ public class HotbarManager extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        if (mc.player == null || mc.interactionManager == null) return;
-        if (mc.currentScreen != null) return;
+        if (mc.player == null || mc.gameMode == null) return;
+        if (mc.gui.screen() != null) return;
         // Занятый курсор может затереть предметы — не раскладываем с ним.
-        if (!mc.player.currentScreenHandler.getCursorStack().isEmpty()) return;
+        if (!mc.player.containerMenu.getCarried().isEmpty()) return;
         if (waitTicks > 0) {
             waitTicks--;
             return;
@@ -65,11 +65,11 @@ public class HotbarManager extends Module {
             Item want = parseItem(slotSettings.get(i).getValue());
             if (want == null || want == Items.AIR) continue;
 
-            Item slotItem = mc.player.getInventory().getStack(i).getItem();
+            Item slotItem = mc.player.getInventory().getItem(i).getItem();
             if (slotItem != Items.AIR && !replace.getValue()) continue;
-            if (mc.player.getInventory().getStack(i).isOf(want)) continue;
+            if (mc.player.getInventory().getItem(i).is(want)) continue;
 
-            FindItemResult result = InventoryUtil.find(stack -> stack.isOf(want), i, 35);
+            FindItemResult result = InventoryUtil.find(stack -> stack.is(want), i, 35);
             if (!result.found()) continue;
 
             moveClick(result.slot(), i);
@@ -83,8 +83,8 @@ public class HotbarManager extends Module {
     /** Безопасный SWAP в 1 пакет: идентичен нажатию хоткей-цифры в инвентаре. */
     private void moveClick(int fromInv, int toHotbar) {
         int from = fromInv < 9 ? 36 + fromInv : fromInv;
-        int syncId = mc.player.currentScreenHandler.syncId;
-        mc.interactionManager.clickSlot(syncId, from, toHotbar, SlotActionType.SWAP, mc.player);
+        int syncId = mc.player.containerMenu.containerId;
+        mc.gameMode.handleContainerInput(syncId, from, toHotbar, ContainerInput.SWAP, mc.player);
     }
 
     private static Item parseItem(String raw) {
@@ -92,7 +92,7 @@ public class HotbarManager extends Module {
         if (id.isEmpty()) return Items.AIR;
         if (!id.contains(":")) id = "minecraft:" + id;
         Identifier ident = Identifier.tryParse(id);
-        if (ident == null || !Registries.ITEM.containsId(ident)) return null;
-        return Registries.ITEM.get(ident);
+        if (ident == null || !BuiltInRegistries.ITEM.containsKey(ident)) return null;
+        return BuiltInRegistries.ITEM.getValue(ident);
     }
 }

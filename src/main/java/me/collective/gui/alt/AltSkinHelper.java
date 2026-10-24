@@ -3,8 +3,8 @@ package me.collective.gui.alt;
 import com.mojang.authlib.GameProfile;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.PlayerFaceRenderer;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.PlayerFaceExtractor;
 import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.resources.DefaultPlayerSkin;
@@ -35,7 +35,7 @@ public final class AltSkinHelper {
             .getGameDir().resolve("collective").resolve("skins");
 
     private static final Map<String, Identifier> CUSTOM_SKINS = new ConcurrentHashMap<>();
-    private static final Map<String, Supplier<SkinTextures>> SUPPLIERS = new ConcurrentHashMap<>();
+    private static final Map<String, Supplier<PlayerSkin>> SUPPLIERS = new ConcurrentHashMap<>();
     private static final Set<String> PENDING = ConcurrentHashMap.newKeySet();
 
     private static final ExecutorService POOL = Executors.newFixedThreadPool(4, r -> {
@@ -49,9 +49,9 @@ public final class AltSkinHelper {
     /**
      * Отрисовка головы игрока с поддержкой реальных скинов и слоя шапки.
      */
-    public static void drawSkinHead(GuiGraphics ctx, String username, UUID uuid, int x, int y, int size) {
+    public static void drawSkinHead(GuiGraphicsExtractor ctx, String username, UUID uuid, int x, int y, int size) {
         if (username == null || username.isBlank()) {
-            PlayerSkinDrawer.draw(ctx, DefaultSkinHelper.getSkinTextures(uuid != null ? uuid : UUID.randomUUID()), x, y, size);
+            PlayerFaceExtractor.extractRenderState(ctx, DefaultPlayerSkin.get(uuid != null ? uuid : UUID.randomUUID()), x, y, size);
             return;
         }
 
@@ -61,7 +61,7 @@ public final class AltSkinHelper {
         Identifier customId = CUSTOM_SKINS.get(key);
         if (customId != null) {
             try {
-                PlayerSkinDrawer.draw(ctx, customId, x, y, size, true, false, -1);
+                PlayerFaceExtractor.extractRenderState(ctx, customId, x, y, size, true, false, -1);
                 return;
             } catch (Throwable ignored) {}
         }
@@ -70,12 +70,12 @@ public final class AltSkinHelper {
         ensureLoading(username, uuid);
 
         // 3. Если готов Supplier от Mojang PlayerSkinProvider
-        Supplier<SkinTextures> sup = SUPPLIERS.get(key);
+        Supplier<PlayerSkin> sup = SUPPLIERS.get(key);
         if (sup != null) {
             try {
-                SkinTextures textures = sup.get();
+                PlayerSkin textures = sup.get();
                 if (textures != null) {
-                    PlayerSkinDrawer.draw(ctx, textures, x, y, size);
+                    PlayerFaceExtractor.extractRenderState(ctx, textures, x, y, size);
                     return;
                 }
             } catch (Throwable ignored) {}
@@ -83,7 +83,7 @@ public final class AltSkinHelper {
 
         // 4. Fallback на Steve/Alex
         UUID safeUuid = uuid != null ? uuid : UUID.nameUUIDFromBytes(("OfflinePlayer:" + username).getBytes(StandardCharsets.UTF_8));
-        PlayerSkinDrawer.draw(ctx, DefaultSkinHelper.getSkinTextures(safeUuid), x, y, size);
+        PlayerFaceExtractor.extractRenderState(ctx, DefaultPlayerSkin.get(safeUuid), x, y, size);
     }
 
     private static void ensureLoading(String username, UUID uuid) {
@@ -115,9 +115,9 @@ public final class AltSkinHelper {
                 UUID realMojangUuid = resolveMojangUuid(username);
                 if (realMojangUuid != null) {
                     Minecraft mc = Minecraft.getInstance();
-                    if (mc != null && mc.getSkinProvider() != null) {
-                        Supplier<SkinTextures> sup = mc.getSkinProvider()
-                                .supplySkinTextures(new GameProfile(realMojangUuid, username), false);
+                    if (mc != null && mc.getSkinManager() != null) {
+                        Supplier<PlayerSkin> sup = mc.getSkinManager()
+                                .createLookup(new GameProfile(realMojangUuid, username), false);
                         SUPPLIERS.put(key, sup);
                     }
                 }
@@ -142,7 +142,7 @@ public final class AltSkinHelper {
                 try (InputStream is = conn.getInputStream()) {
                     NativeImage img = NativeImage.read(is);
                     try {
-                        img.writeTo(cachedFile);
+                        img.writeToFile(cachedFile);
                     } catch (Throwable ignored) {}
                     registerNativeSkin(username.trim().toLowerCase(), img);
                     return true;
@@ -157,10 +157,10 @@ public final class AltSkinHelper {
         if (mc == null) return;
         mc.execute(() -> {
             try {
-                NativeImageBackedTexture tex = new NativeImageBackedTexture(() -> "alt_skin_" + key, img);
+                DynamicTexture tex = new DynamicTexture(() -> "alt_skin_" + key, img);
                 tex.upload();
-                Identifier id = Identifier.of("collective", "skins/" + key);
-                mc.getTextureManager().registerTexture(id, tex);
+                Identifier id = Identifier.fromNamespaceAndPath("collective", "skins/" + key);
+                mc.getTextureManager().register(id, tex);
                 CUSTOM_SKINS.put(key, id);
             } catch (Throwable t) {
                 t.printStackTrace();

@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class MixinWorld {
     @Inject(method = "getTimeOfDay", at = @At("RETURN"), cancellable = true)
     private void collective$onGetTimeOfDay(CallbackInfoReturnable<Long> cir) {
-        if (!((Level) (Object) this).isClient()) return;
+        if (!((Level) (Object) this).isClientSide()) return;
 
         Ambience ambience = Ambience.INSTANCE;
         if (ambience != null && ambience.isToggled()) {
@@ -24,7 +24,7 @@ public class MixinWorld {
 
     @Inject(method = "getRainGradient", at = @At("HEAD"), cancellable = true)
     private void collective$onGetRainGradient(float delta, CallbackInfoReturnable<Float> cir) {
-        if (!((Level) (Object) this).isClient()) return;
+        if (!((Level) (Object) this).isClientSide()) return;
 
         Ambience ambience = Ambience.INSTANCE;
         if (ambience != null && ambience.isToggled()) {
@@ -37,7 +37,7 @@ public class MixinWorld {
 
     @Inject(method = "getThunderGradient", at = @At("HEAD"), cancellable = true)
     private void collective$onGetThunderGradient(float delta, CallbackInfoReturnable<Float> cir) {
-        if (!((Level) (Object) this).isClient()) return;
+        if (!((Level) (Object) this).isClientSide()) return;
 
         Ambience ambience = Ambience.INSTANCE;
         if (ambience != null && ambience.isToggled()) {

@@ -28,8 +28,8 @@ public class AutoArmor extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null || mc.interactionManager == null) return;
-        if (mc.currentScreen != null || !InventoryUtil.canUsePlayerInventory()) return;
+        if (mc.player == null || mc.level == null || mc.gameMode == null) return;
+        if (mc.gui.screen() != null || !InventoryUtil.canUsePlayerInventory()) return;
 
         if (delayTimer > 0) {
             delayTimer--;
@@ -43,9 +43,9 @@ public class AutoArmor extends Module {
             EquipmentSlot slot = slots[i];
             int screenSlot = screenSlots[i];
 
-            ItemStack current = mc.player.getEquippedStack(slot);
+            ItemStack current = mc.player.getItemBySlot(slot);
             if (slot == EquipmentSlot.CHEST && elytraProtect.getValue()) {
-                if (current.contains(DataComponentTypes.GLIDER) || mc.player.isGliding()) {
+                if (current.has(DataComponents.GLIDER) || mc.player.isFallFlying()) {
                     continue;
                 }
             }
@@ -54,14 +54,14 @@ public class AutoArmor extends Module {
             int bestScore = getScore(current);
 
             for (int invSlot = 0; invSlot < 36; invSlot++) {
-                ItemStack stack = mc.player.getInventory().getStack(invSlot);
-                if (stack.contains(DataComponentTypes.EQUIPPABLE)) {
-                    var equippable = stack.get(DataComponentTypes.EQUIPPABLE);
+                ItemStack stack = mc.player.getInventory().getItem(invSlot);
+                if (stack.has(DataComponents.EQUIPPABLE)) {
+                    var equippable = stack.get(DataComponents.EQUIPPABLE);
                     if (equippable != null && equippable.slot() == slot) {
                         // Защита от поломки редкой брони
-                        if (saveDurability.getValue() && stack.isDamageable()) {
+                        if (saveDurability.getValue() && stack.isDamageableItem()) {
                             int maxDmg = stack.getMaxDamage();
-                            int curDmg = stack.getDamage();
+                            int curDmg = stack.getDamageValue();
                             if ((maxDmg - curDmg) < 15) continue; // менее 15 прочности
                         }
 
@@ -75,7 +75,7 @@ public class AutoArmor extends Module {
             }
 
             if (bestInvSlot != -1) {
-                if (!current.isEmpty() && !mc.player.playerScreenHandler.getSlot(screenSlot).canTakeItems(mc.player)) continue;
+                if (!current.isEmpty() && !mc.player.inventoryMenu.getSlot(screenSlot).mayPickup(mc.player)) continue;
                 InventoryUtil.move().from(bestInvSlot).to(39 - i);
 
                 delayTimer = delay.getValue().intValue();
@@ -85,8 +85,8 @@ public class AutoArmor extends Module {
     }
 
     private int getScore(ItemStack stack) {
-        if (stack.isEmpty() || !stack.contains(DataComponentTypes.EQUIPPABLE)) return -1;
-        if (mc.world == null) return 0;
+        if (stack.isEmpty() || !stack.has(DataComponents.EQUIPPABLE)) return -1;
+        if (mc.level == null) return 0;
 
         int score = 0;
 
@@ -101,19 +101,13 @@ public class AutoArmor extends Module {
 
         // Расчёт зачарований под 2b2t анархию
         try {
-            var reg = mc.world.getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT);
+            var reg = mc.level.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
+            var enchs = EnchantmentHelper.getEnchantmentsForCrafting(stack);
 
-            var blastProtEntry = reg.getEntry(reg.getValueOrThrow(Enchantments.BLAST_PROTECTION));
-            int blastProt = EnchantmentHelper.getLevel(blastProtEntry, stack);
-
-            var protEntry = reg.getEntry(reg.getValueOrThrow(Enchantments.PROTECTION));
-            int prot = EnchantmentHelper.getLevel(protEntry, stack);
-
-            var unbreakingEntry = reg.getEntry(reg.getValueOrThrow(Enchantments.UNBREAKING));
-            int unbreaking = EnchantmentHelper.getLevel(unbreakingEntry, stack);
-
-            var mendingEntry = reg.getEntry(reg.getValueOrThrow(Enchantments.MENDING));
-            int mending = EnchantmentHelper.getLevel(mendingEntry, stack);
+            int blastProt = enchs.getLevel(reg.getOrThrow(Enchantments.BLAST_PROTECTION));
+            int prot = enchs.getLevel(reg.getOrThrow(Enchantments.PROTECTION));
+            int unbreaking = enchs.getLevel(reg.getOrThrow(Enchantments.UNBREAKING));
+            int mending = enchs.getLevel(reg.getOrThrow(Enchantments.MENDING));
 
             // На 2b2t защита от взрывов (кристаллы/анчоры) имеет наивысший приоритет
             if (preferBlastProt.getValue()) {

@@ -55,8 +55,8 @@ public class AutoWither extends Module {
         int skullCount = 0;
 
         if (mc.player != null) {
-            for (int i = 0; i < mc.player.getInventory().size(); i++) {
-                ItemStack stack = mc.player.getInventory().getStack(i);
+            for (int i = 0; i < mc.player.getInventory().getContainerSize(); i++) {
+                ItemStack stack = mc.player.getInventory().getItem(i);
                 if (stack.isEmpty()) continue;
 
                 if (stack.getItem() == Items.SOUL_SAND || stack.getItem() == Items.SOUL_SOIL) {
@@ -80,11 +80,11 @@ public class AutoWither extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
         hasMaterials = hasWitherMaterials();
 
-        boolean isUsePressed = mc.options.useKey.isPressed();
-        if (mc.currentScreen == null && isUsePressed && !wasUsePressed && !isBuilding) {
+        boolean isUsePressed = mc.options.keyUse.isDown();
+        if (mc.gui.screen() == null && isUsePressed && !wasUsePressed && !isBuilding) {
             if (!hasMaterials) {
                 sendClientMessage("У вас недостаточно материалов для постройки визера в хотбаре");
             } else if (previewPos != null) {
@@ -97,19 +97,19 @@ public class AutoWither extends Module {
 
     @EventHandler
     private void onTickPost(TickEvent.Post event) {
-        if (!renderPreview.getValue() || mc.world == null) return;
-        if (mc.crosshairTarget instanceof BlockHitResult hit) {
+        if (!renderPreview.getValue() || mc.level == null) return;
+        if (mc.hitResult instanceof BlockHitResult hit) {
             BlockPos pos = hit.getBlockPos();
-            BlockState state = mc.world.getBlockState(pos);
+            BlockState state = mc.level.getBlockState(pos);
             if (airPlace.getValue()) {
-                if (state.isSolidBlock(mc.world, pos)) {
-                    previewPos = pos.up();
+                if (state.isSolid()) {
+                    previewPos = pos.above();
                 } else {
                     previewPos = pos;
                 }
             } else {
-                if (state.isSolidBlock(mc.world, pos)) {
-                    previewPos = pos.up();
+                if (state.isSolid()) {
+                    previewPos = pos.above();
                 } else {
                     previewPos = null;
                 }
@@ -126,30 +126,30 @@ public class AutoWither extends Module {
             return;
         }
 
-        int originalSlot = mc.player.getInventory().selectedSlot;
+        int originalSlot = mc.player.getInventory().getSelectedSlot();
         Direction direction;
         if (lockRotation.getValue()) {
             direction = chosenDirection.getValue().toMcDirection();
         } else {
-            direction = mc.player.getHorizontalFacing();
+            direction = mc.player.getDirection();
         }
         List<BlockPos> blockPositions = new ArrayList<>();
         List<BlockPos> skullPositions = new ArrayList<>();
         if (direction == Direction.NORTH || direction == Direction.SOUTH) {
-            blockPositions.add(basePos.up().west());
-            blockPositions.add(basePos.up().east());
-            skullPositions.add(basePos.up().west());
-            skullPositions.add(basePos.up().east());
+            blockPositions.add(basePos.above().west());
+            blockPositions.add(basePos.above().east());
+            skullPositions.add(basePos.above().west());
+            skullPositions.add(basePos.above().east());
         } else {
-            blockPositions.add(basePos.up().south());
-            blockPositions.add(basePos.up().north());
-            skullPositions.add(basePos.up().south());
-            skullPositions.add(basePos.up().north());
+            blockPositions.add(basePos.above().south());
+            blockPositions.add(basePos.above().north());
+            skullPositions.add(basePos.above().south());
+            skullPositions.add(basePos.above().north());
         }
         blockPositions.add(basePos);
-        blockPositions.add(basePos.up());
+        blockPositions.add(basePos.above());
         if (placeCenterSkull.getValue()) {
-            skullPositions.add(basePos.up());
+            skullPositions.add(basePos.above());
         }
 
         mc.execute(() -> {
@@ -159,8 +159,8 @@ public class AutoWither extends Module {
             for (BlockPos pos : skullPositions) {
                 placeBlock(pos, Items.WITHER_SKELETON_SKULL);
             }
-            mc.player.getInventory().selectedSlot = originalSlot;
-            if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
+            mc.player.getInventory().setSelectedSlot(originalSlot);
+            me.collective.util.InventoryUtil.syncSelectedSlot();
             onComplete.run();
         });
     }
@@ -171,27 +171,27 @@ public class AutoWither extends Module {
         if (lockRotation.getValue()) {
             direction = chosenDirection.getValue().toMcDirection();
         } else {
-            direction = mc.player.getHorizontalFacing();
+            direction = mc.player.getDirection();
         }
         if (direction == Direction.NORTH || direction == Direction.SOUTH) {
-            blockPositions.add(basePos.up().west());
-            blockPositions.add(basePos.up().east());
-            blockPositions.add(basePos.up(2).west());
-            blockPositions.add(basePos.up(2).east());
+            blockPositions.add(basePos.above().west());
+            blockPositions.add(basePos.above().east());
+            blockPositions.add(basePos.above(2).west());
+            blockPositions.add(basePos.above(2).east());
             blockPositions.add(basePos.west());
             blockPositions.add(basePos.east());
         } else {
-            blockPositions.add(basePos.up().south());
-            blockPositions.add(basePos.up().north());
-            blockPositions.add(basePos.up(2).south());
-            blockPositions.add(basePos.up(2).north());
+            blockPositions.add(basePos.above().south());
+            blockPositions.add(basePos.above().north());
+            blockPositions.add(basePos.above(2).south());
+            blockPositions.add(basePos.above(2).north());
             blockPositions.add(basePos.south());
             blockPositions.add(basePos.north());
         }
         blockPositions.add(basePos);
-        blockPositions.add(basePos.up());
+        blockPositions.add(basePos.above());
         if (placeCenterSkull.getValue()) {
-            blockPositions.add(basePos.up(2));
+            blockPositions.add(basePos.above(2));
         }
         for (BlockPos pos : blockPositions) {
             if (!checkBlockPlaceable(pos)) {
@@ -209,14 +209,14 @@ public class AutoWither extends Module {
     }
 
     private boolean checkBlockPlaceable(BlockPos pos) {
-        return mc.world.getBlockState(pos).isAir();
+        return mc.level.getBlockState(pos).isAir();
     }
 
     private boolean checkBlockForEntity(BlockPos pos) {
-        List<Entity> entities = mc.world.getOtherEntities(
+        List<Entity> entities = mc.level.getEntities(
             mc.player,
             new AABB(pos),
-            e -> !(e instanceof ItemEntity || e instanceof ExperienceOrbEntity)
+            e -> !(e instanceof ItemEntity || e instanceof ExperienceOrb)
         );
         return entities.isEmpty();
     }
@@ -231,16 +231,16 @@ public class AutoWither extends Module {
     private void placeBlock(BlockPos pos, Item item) {
         int slot = findHotbarSlot(item);
         if (slot == -1) return;
-        mc.player.getInventory().selectedSlot = slot;
-        mc.interactionManager.syncSelectedSlot();
-        mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND, new BlockHitResult(Vec3.ofCenter(pos), Direction.UP, pos, false));
+        mc.player.getInventory().setSelectedSlot(slot);
+        me.collective.util.InventoryUtil.syncSelectedSlot();
+        mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false));
         if (!swingHand.getValue()) return;
-        mc.player.swingHand(InteractionHand.MAIN_HAND);
+        me.collective.util.Utils.swingHand(InteractionHand.MAIN_HAND);
     }
 
     private int findHotbarSlot(Item item) {
         for (int i = 0; i < 9; i++) {
-            if (mc.player.getInventory().getStack(i).getItem() == item) return i;
+            if (mc.player.getInventory().getItem(i).getItem() == item) return i;
         }
         return -1;
     }
@@ -250,7 +250,7 @@ public class AutoWither extends Module {
         int skullCount = 0;
 
         for (int i = 0; i < 9; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
+            ItemStack stack = mc.player.getInventory().getItem(i);
             if (stack.isEmpty()) continue;
 
             Item item = stack.getItem();
@@ -273,14 +273,14 @@ public class AutoWither extends Module {
 
     private boolean hasSoulSandHotbar() {
         for (int i = 0; i < 9; i++) {
-            if (mc.player.getInventory().getStack(i).getItem() == Items.SOUL_SAND) return true;
+            if (mc.player.getInventory().getItem(i).getItem() == Items.SOUL_SAND) return true;
         }
         return false;
     }
 
     private void sendClientMessage(String msg) {
         if (mc.player != null) {
-            mc.player.sendMessage(net.minecraft.text.Component.literal("§7[§5AutoWither§7] §f" + msg), false);
+            mc.player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§7[§5AutoWither§7] §f" + msg));
         }
     }
 

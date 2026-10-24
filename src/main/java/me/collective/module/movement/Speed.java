@@ -28,23 +28,23 @@ public class Speed extends Module {
 
     @Override
     public void onUpdate() {
-        if (!isToggled() || mc.player == null || mc.world == null) return;
+        if (!isToggled() || mc.player == null || mc.level == null) return;
 
-        if (pauseInWater.getValue() && mc.player.isTouchingWater()) return;
-        if (pauseSneak.getValue() && mc.player.isSneaking()) return;
+        if (pauseInWater.getValue() && mc.player.isInWater()) return;
+        if (pauseSneak.getValue() && mc.player.isShiftKeyDown()) return;
 
-        boolean moving = mc.player.input != null && (mc.player.input.getMovementInput().y != 0.0f || mc.player.input.getMovementInput().x != 0.0f);
+        boolean moving = mc.player.input != null && (mc.player.input.getMoveVector().y != 0.0f || mc.player.input.getMoveVector().x != 0.0f);
         if (!moving) return;
 
-        if (autoJump.getValue() && mc.player.isOnGround()) {
-            mc.player.jump();
+        if (autoJump.getValue() && mc.player.onGround()) {
+            mc.player.jumpFromGround();
         }
 
         switch (mode.getValue()) {
             case GRIM_BHOP -> {
                 mc.player.setSprinting(true);
-                if (mc.player.isOnGround()) {
-                    mc.player.jump();
+                if (mc.player.onGround()) {
+                    mc.player.jumpFromGround();
                 }
             }
             case VANILLA -> {
@@ -52,7 +52,7 @@ public class Speed extends Module {
                 strafe(speed);
             }
             case NCP -> {
-                if (mc.player.isOnGround()) {
+                if (mc.player.onGround()) {
                     double speed = getBaseSpeed() * 1.35;
                     strafe(speed);
                 } else {
@@ -68,7 +68,7 @@ public class Speed extends Module {
                 if (mc.player.hurtTime > 0) {
                     double boost = getBaseSpeed() * speedMultiplier.getValue();
                     strafe(boost);
-                } else if (mc.player.isOnGround()) {
+                } else if (mc.player.onGround()) {
                     strafe(getBaseSpeed() * 1.15);
                 }
             }
@@ -77,8 +77,8 @@ public class Speed extends Module {
 
     public static double getBaseSpeed() {
         double base = 0.2873;
-        if (mc.player != null && mc.player.hasStatusEffect(StatusEffects.SPEED)) {
-            int amp = mc.player.getStatusEffect(StatusEffects.SPEED).getAmplifier();
+        if (mc.player != null && mc.player.hasEffect(MobEffects.SPEED)) {
+            int amp = mc.player.getEffect(MobEffects.SPEED).getAmplifier();
             base *= 1.0 + 0.2 * (amp + 1);
         }
         return base;
@@ -86,21 +86,21 @@ public class Speed extends Module {
 
     public static double getSpeed() {
         if (mc.player == null) return 0.0;
-        Vec3 vel = mc.player.getVelocity();
+        Vec3 vel = mc.player.getDeltaMovement();
         return Math.sqrt(vel.x * vel.x + vel.z * vel.z);
     }
 
     public static void strafe(double speed) {
         if (mc.player == null || mc.player.input == null) return;
 
-        net.minecraft.util.math.Vec2f mov = mc.player.input.getMovementInput();
+        net.minecraft.world.phys.Vec2 mov = mc.player.input.getMoveVector();
         float forward = mov.y;
         float sideways = mov.x;
-        float yaw = mc.player.getYaw();
+        float yaw = mc.player.getYRot();
 
         if (forward == 0.0f && sideways == 0.0f) {
-            Vec3 v = mc.player.getVelocity();
-            mc.player.setVelocity(0.0, v.y, 0.0);
+            Vec3 v = mc.player.getDeltaMovement();
+            mc.player.setDeltaMovement(0.0, v.y, 0.0);
             return;
         }
 
@@ -125,7 +125,7 @@ public class Speed extends Module {
         double x = forward * speed * cos + sideways * speed * sin;
         double z = forward * speed * sin - sideways * speed * cos;
 
-        Vec3 v = mc.player.getVelocity();
-        mc.player.setVelocity(x, v.y, z);
+        Vec3 v = mc.player.getDeltaMovement();
+        mc.player.setDeltaMovement(x, v.y, z);
     }
 }

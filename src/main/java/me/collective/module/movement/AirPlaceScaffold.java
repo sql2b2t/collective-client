@@ -9,7 +9,7 @@ import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.AirPlaceExecutor;
 import me.collective.util.GrimUtils;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.core.Direction;
@@ -122,7 +122,7 @@ public class AirPlaceScaffold extends Module {
 
     @EventHandler
     private void onTickPre(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         this.tick++;
         this.cooldown.values().removeIf(expiry -> expiry <= this.tick);
@@ -138,7 +138,7 @@ public class AirPlaceScaffold extends Module {
         if (checkBlocksRunOut()) return;
 
         boolean towering = this.tower.getValue() && shouldTower();
-        Vec3 basePos = mc.player.getEntityPos();
+        Vec3 basePos = mc.player.position();
         Vec3 aimCenter = towering ? basePos : predict(basePos);
 
         List<BlockPos> candidates = buildCandidates(basePos, aimCenter, towering);
@@ -156,7 +156,7 @@ public class AirPlaceScaffold extends Module {
 
     @EventHandler
     private void onTickPost(TickEvent.Post event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
         if (this.aimPos == null || this.aimHit == null) return;
 
         RotationUtils rot = RotationUtils.getInstance();
@@ -174,7 +174,7 @@ public class AirPlaceScaffold extends Module {
             return;
         }
 
-        if (!isReachable(this.aimHit.getPos())) {
+        if (!isReachable(this.aimHit.getLocation())) {
             dropAim();
             return;
         }
@@ -198,13 +198,13 @@ public class AirPlaceScaffold extends Module {
         List<BlockPos> positions = new ArrayList<>();
         int feetLevel = (int) Math.floor(basePos.y) - 1;
 
-        BlockPos.Mutable cursor = new BlockPos.Mutable();
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
 
         cursor.set((int) Math.floor(center.x), feetLevel, (int) Math.floor(center.z));
-        if (canPlace(cursor.toImmutable())) positions.add(cursor.toImmutable());
+        if (canPlace(cursor.immutable())) positions.add(cursor.immutable());
 
-        if (!towering && Math.abs(mc.player.getVelocity().y) > 0.4) {
-            BlockPos deep = cursor.toImmutable().down();
+        if (!towering && Math.abs(mc.player.getDeltaMovement().y) > 0.4) {
+            BlockPos deep = cursor.immutable().below();
             if (canPlace(deep)) positions.add(deep);
         }
 
@@ -214,7 +214,7 @@ public class AirPlaceScaffold extends Module {
         return positions;
     }
 
-    private void fillRadius(List<BlockPos> positions, BlockPos.Mutable cursor,
+    private void fillRadius(List<BlockPos> positions, BlockPos.MutableBlockPos cursor,
                             int feetLevel, Vec3 center, double radius) {
         int bound = (int) Math.ceil(radius - 1e-9);
         double radiusSq = radius * radius;
@@ -229,7 +229,7 @@ public class AirPlaceScaffold extends Module {
                 if (dx * dx + dz * dz > radiusSq) continue;
 
                 cursor.set(centerX + dx, feetLevel, centerZ + dz);
-                BlockPos pos = cursor.toImmutable();
+                BlockPos pos = cursor.immutable();
                 if (positions.contains(pos) || !canPlace(pos)) continue;
 
                 if (eyeCenterDistanceSq(pos) > reachSq) continue;
@@ -279,12 +279,12 @@ public class AirPlaceScaffold extends Module {
             return;
         }
 
-        if (!isReachable(hit.getPos())) {
+        if (!isReachable(hit.getLocation())) {
             dropAim();
             return;
         }
 
-        float[] rot = RotationUtils.getRotationsTo(mc.player.getEyePos(), hit.getPos());
+        float[] rot = RotationUtils.getRotationsTo(mc.player.getEyePosition(), hit.getLocation());
 
         boolean claimed;
         switch (this.rotationMode.getValue()) {
@@ -304,7 +304,7 @@ public class AirPlaceScaffold extends Module {
         }
 
         if (!pos.equals(this.aimPos)) this.alignTicks = 0;
-        this.aimPos = pos.toImmutable();
+        this.aimPos = pos.immutable();
         this.aimHit = hit;
     }
 
@@ -320,16 +320,16 @@ public class AirPlaceScaffold extends Module {
 
         BlockState predicted = predictedState(item);
 
-        if (hit.isInsideBlock()) {
+        if (hit.isInside()) {
             grimAirPlace(hit, pos, predicted, hand);
         } else {
             BlockHitResult wire = new BlockHitResult(
-                hit.getPos(), hit.getSide(), hit.getBlockPos(), false);
+                hit.getLocation(), hit.getDirection(), hit.getBlockPos(), false);
             AirPlaceExecutor.silentPlace(wire, pos, predicted, hand, true);
         }
 
         this.tickBudget--;
-        this.cooldown.put(pos.toImmutable(), this.tick + PLACE_COOLDOWN);
+        this.cooldown.put(pos.immutable(), this.tick + PLACE_COOLDOWN);
         this.window.addLast(this.tick);
         return true;
     }
@@ -340,27 +340,27 @@ public class AirPlaceScaffold extends Module {
      * с sequence, swing и второй START_DESTROY.
      */
     private void grimAirPlace(BlockHitResult hit, BlockPos pos, BlockState predicted, InteractionHand hand) {
-        var connection = mc.getNetworkHandler();
-        if (connection == null || mc.world == null) return;
+        var connection = mc.getConnection();
+        if (connection == null || mc.level == null) return;
 
-        BlockHitResult wire = new BlockHitResult(hit.getPos(), hit.getSide(), pos, false);
+        BlockHitResult wire = new BlockHitResult(hit.getLocation(), hit.getDirection(), pos, false);
 
-        connection.sendPacket(new PlayerInteractBlockC2SPacket(hand, wire, GrimUtils.nextSequence()));
-        connection.sendPacket(new HandSwingC2SPacket(hand));
+        connection.send(new ServerboundUseItemOnPacket(hand, wire, GrimUtils.nextSequence()));
+        connection.send(ServerboundPunchPacket.INSTANCE);
 
         if (predicted != null) {
-            mc.world.setBlockState(pos, predicted, 11);
+            mc.level.setBlock(pos, predicted, 11, 3);
         }
     }
 
 
     private BlockState predictedState(FindItemResult item) {
         ItemStack stack = item.isOffhand()
-            ? mc.player.getOffHandStack()
-            : mc.player.getInventory().getStack(item.slot());
+            ? mc.player.getOffhandItem()
+            : mc.player.getInventory().getItem(item.slot());
 
         return stack.getItem() instanceof BlockItem blockItem
-            ? blockItem.getBlock().getDefaultState()
+            ? blockItem.getBlock().defaultBlockState()
             : null;
     }
 
@@ -371,20 +371,20 @@ public class AirPlaceScaffold extends Module {
 
     private boolean canPlace(BlockPos pos) {
         if (this.cooldown.containsKey(pos)) return false;
-        if (mc.world.isOutOfHeightLimit(pos)) return false;
-        if (!mc.world.getBlockState(pos).isReplaceable()) return false;
+        if (mc.level.isOutsideBuildHeight(pos)) return false;
+        if (!mc.level.getBlockState(pos).canBeReplaced()) return false;
         if (mc.player.getBoundingBox().intersects(new AABB(pos))) return false;
 
-        return mc.world.getEntitiesByClass(Entity.class, new AABB(pos), e ->
+        return mc.level.getEntitiesOfClass(Entity.class, new AABB(pos), e ->
             e instanceof ItemEntity
-                || e instanceof ExperienceOrbEntity
-                || e instanceof ProjectileEntity
-                || e instanceof EndCrystalEntity
+                || e instanceof ExperienceOrb
+                || e instanceof Projectile
+                || e instanceof EndCrystal
                 || e == mc.player).isEmpty();
     }
 
     private boolean isReachable(Vec3 hitPos) {
-        return mc.player.getEyePos().squaredDistanceTo(hitPos)
+        return mc.player.getEyePosition().distanceToSqr(hitPos)
             <= Math.pow(REACH - REACH_MARGIN, 2);
     }
 
@@ -397,25 +397,25 @@ public class AirPlaceScaffold extends Module {
      */
     private boolean isAimValid(BlockHitResult hit) {
         RotationUtils rot = RotationUtils.getInstance();
-        Vec3 ray = Vec3.fromPolar(rot.getSentPitch(), rot.getSentYaw());
-        Vec3 eye = mc.player.getEyePos();
+        Vec3 ray = Vec3.directionFromRotation(rot.getSentPitch(), rot.getSentYaw());
+        Vec3 eye = mc.player.getEyePosition();
 
-        Vec3 normal = Vec3.of(hit.getSide().getVector());
-        Vec3 planePoint = hit.getPos();
+        Vec3 normal = hit.getDirection().getUnitVec3();
+        Vec3 planePoint = hit.getLocation();
 
-        double denom = normal.dotProduct(ray);
+        double denom = normal.dot(ray);
         if (Math.abs(denom) < 1e-6) return false;
 
-        double t = planePoint.subtract(eye).dotProduct(normal) / denom;
+        double t = planePoint.subtract(eye).dot(normal) / denom;
         if (t < 0.0 || t > REACH) return false;
 
-        Vec3 intersection = eye.add(ray.multiply(t));
-        return intersection.squaredDistanceTo(planePoint) <= 0.65 * 0.65;
+        Vec3 intersection = eye.add(ray.scale(t));
+        return intersection.distanceToSqr(planePoint) <= 0.65 * 0.65;
     }
 
 
     private double eyeCenterDistanceSq(BlockPos pos) {
-        return mc.player.getEyePos().squaredDistanceTo(
+        return mc.player.getEyePosition().distanceToSqr(
             new Vec3(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5));
     }
 
@@ -426,7 +426,7 @@ public class AirPlaceScaffold extends Module {
     }
 
     private Vec3 predict(Vec3 basePos) {
-        Vec3 velocity = mc.player.getVelocity();
+        Vec3 velocity = mc.player.getDeltaMovement();
         Vec3 center = basePos;
 
         if (this.velocityPredict.getValue() && Math.abs(velocity.y) > 0.1) {
@@ -436,46 +436,46 @@ public class AirPlaceScaffold extends Module {
 
         Vec3 move = movementVector();
         if (move != Vec3.ZERO && this.extendDistance.getValue() > 0.0) {
-            center = center.add(move.multiply(this.extendDistance.getValue()));
+            center = center.add(move.scale(this.extendDistance.getValue()));
         }
 
         return center;
     }
 
     private Vec3 movementVector() {
-        float yaw = mc.player.getYaw();
+        float yaw = mc.player.getYRot();
         Vec3 v = Vec3.ZERO;
 
-        if (mc.options.forwardKey.isPressed()) v = v.add(Vec3.fromPolar(0.0f, yaw));
-        if (mc.options.backKey.isPressed()) v = v.add(Vec3.fromPolar(0.0f, yaw + 180.0f));
-        if (mc.options.leftKey.isPressed()) v = v.add(Vec3.fromPolar(0.0f, yaw - 90.0f));
-        if (mc.options.rightKey.isPressed()) v = v.add(Vec3.fromPolar(0.0f, yaw + 90.0f));
+        if (mc.options.keyUp.isDown()) v = v.add(Vec3.directionFromRotation(0.0f, yaw));
+        if (mc.options.keyDown.isDown()) v = v.add(Vec3.directionFromRotation(0.0f, yaw + 180.0f));
+        if (mc.options.keyLeft.isDown()) v = v.add(Vec3.directionFromRotation(0.0f, yaw - 90.0f));
+        if (mc.options.keyRight.isDown()) v = v.add(Vec3.directionFromRotation(0.0f, yaw + 90.0f));
 
-        return v.lengthSquared() > 0.0 ? v.normalize() : v;
+        return v.lengthSqr() > 0.0 ? v.normalize() : v;
     }
 
     private boolean shouldTower() {
-        return mc.options.jumpKey.isPressed() && !mc.options.sneakKey.isPressed();
+        return mc.options.keyJump.isDown() && !mc.options.keyShift.isDown();
     }
 
     private FindItemResult findBlock() {
         BlockPos target = this.aimPos != null ? this.aimPos
             : new BlockPos(
-                (int) Math.floor(mc.player.getEntityPos().x),
-                (int) Math.floor(mc.player.getEntityPos().y) - 1,
-                (int) Math.floor(mc.player.getEntityPos().z));
+                (int) Math.floor(mc.player.position().x),
+                (int) Math.floor(mc.player.position().y) - 1,
+                (int) Math.floor(mc.player.position().z));
 
         Predicate<ItemStack> isScaffoldBlock = stack -> {
             if (!(stack.getItem() instanceof BlockItem blockItem)) return false;
 
             Block block = blockItem.getBlock();
-            BlockState state = block.getDefaultState();
+            BlockState state = block.defaultBlockState();
 
-            if (state.getCollisionShape(mc.world, target).isEmpty()) return false;
+            if (state.getCollisionShape(mc.level, target).isEmpty()) return false;
 
             return !(block instanceof FallingBlock)
-                || !FallingBlock.canFallThrough(mc.world.getBlockState(
-                    mc.player.getBlockPos().down()));
+                || !FallingBlock.isFree(mc.level.getBlockState(
+                    mc.player.blockPosition().below()));
         };
 
         return InventoryUtil.findInHotbarOrOffhand(isScaffoldBlock);
@@ -511,9 +511,9 @@ public class AirPlaceScaffold extends Module {
      * чтобы ванилла сама затормозила на кромке.
      */
     public boolean isAtEdge() {
-        if (mc.player == null || mc.world == null || !mc.player.isOnGround()) return false;
+        if (mc.player == null || mc.level == null || !mc.player.onGround()) return false;
 
-        AABB box = mc.player.getBoundingBox().expand(0.1);
+        AABB box = mc.player.getBoundingBox().inflate(0.1);
         double feetY = box.minY - 0.01;
         int y = (int) Math.floor(feetY);
         int minX = (int) Math.floor(box.minX);
@@ -524,7 +524,7 @@ public class AirPlaceScaffold extends Module {
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
                 BlockPos pos = new BlockPos(x, y, z);
-                if (mc.world.getBlockState(pos).getCollisionShape(mc.world, pos).isEmpty()) {
+                if (mc.level.getBlockState(pos).getCollisionShape(mc.level, pos).isEmpty()) {
                     return true;
                 }
             }

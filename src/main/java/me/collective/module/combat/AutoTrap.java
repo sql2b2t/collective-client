@@ -43,7 +43,7 @@ public class AutoTrap extends Module {
 
     @Override
     public void onUpdate() {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
         if (delay > 0) {
             delay--;
             return;
@@ -56,12 +56,12 @@ public class AutoTrap extends Module {
         if (!obby.found()) return;
 
         List<BlockPos> blocks = getBlocks(target);
-        blocks.sort(Comparator.comparing(b -> mc.player.squaredDistanceTo(b.toCenterPos())));
+        blocks.sort(Comparator.comparing(b -> mc.player.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(b))));
 
         int placed = 0;
         for (BlockPos pos : blocks) {
             if (placed >= blocksPerTick.getIntValue()) break;
-            if (pos.getSquaredDistance(mc.player.getEntityPos()) > range.getFloatValue() * range.getFloatValue()) continue;
+            if (pos.distToCenterSqr(mc.player.position()) > range.getFloatValue() * range.getFloatValue()) continue;
             if (!PlacementUtils.canPlace(pos, false)) continue;
             if (PlacementUtils.placeBlock(pos, obby, rotate.getValue(), true, false)) {
                 placed++;
@@ -73,11 +73,11 @@ public class AutoTrap extends Module {
     private Player getTarget() {
         Player best = null;
         double bestDist = range.getFloatValue();
-        for (Player p : mc.world.getPlayers()) {
+        for (Player p : mc.level.players()) {
             if (p == mc.player || !p.isAlive() || p.isSpectator() || p.isCreative()) continue;
             if (p.getHealth() + p.getAbsorptionAmount() <= 0) continue;
             if (FriendManager.getInstance().isFriend(p)) continue;
-            if (!targetMoving.getValue() && p.getVelocity().lengthSquared() > 0.08) continue;
+            if (!targetMoving.getValue() && p.getDeltaMovement().lengthSqr() > 0.08) continue;
             double d = mc.player.distanceTo(p);
             if (d < bestDist) {
                 bestDist = d;
@@ -89,26 +89,26 @@ public class AutoTrap extends Module {
 
     private List<BlockPos> getBlocks(Player target) {
         List<BlockPos> offsets = new ArrayList<>();
-        BlockPos base = target.getBlockPos();
+        BlockPos base = target.blockPosition();
         int[][] sides = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 
         switch (trapMode.compute().trim()) {
             case "Legs" -> {
-                for (int[] s : sides) offsets.add(base.add(s[0], 0, s[1]));
+                for (int[] s : sides) offsets.add(base.offset(s[0], 0, s[1]));
             }
             case "Head" -> {
                 for (int[] s : sides) {
-                    offsets.add(base.add(s[0], 1, s[1]));
-                    offsets.add(base.add(s[0], 2, s[1]));
+                    offsets.add(base.offset(s[0], 1, s[1]));
+                    offsets.add(base.offset(s[0], 2, s[1]));
                 }
             }
             default -> {
                 for (int[] s : sides) {
-                    offsets.add(base.add(s[0], 0, s[1]));
-                    offsets.add(base.add(s[0], 1, s[1]));
-                    offsets.add(base.add(s[0], 2, s[1]));
+                    offsets.add(base.offset(s[0], 0, s[1]));
+                    offsets.add(base.offset(s[0], 1, s[1]));
+                    offsets.add(base.offset(s[0], 2, s[1]));
                 }
-                offsets.add(base.add(0, 3, 0));
+                offsets.add(base.offset(0, 3, 0));
             }
         }
         return offsets;

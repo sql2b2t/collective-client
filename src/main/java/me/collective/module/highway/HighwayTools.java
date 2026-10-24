@@ -67,7 +67,7 @@ public class HighwayTools extends Module {
 
     @Override
     public void onEnable() {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         originX = Math.abs(mc.player.getX());
         originY = mc.player.getY();
@@ -129,7 +129,7 @@ public class HighwayTools extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         if (axisToggle.getValue()) {
             if (originX >= radius.getValue() && originZ >= radius.getValue() && originXZRatio >= 4) {
@@ -143,7 +143,7 @@ public class HighwayTools extends Module {
 
         if (pickToggle.getValue()) {
             FindItemResult pickaxe = InventoryUtil.find(stack ->
-                stack.isOf(Items.DIAMOND_PICKAXE) || stack.isOf(Items.NETHERITE_PICKAXE));
+                stack.is(Items.DIAMOND_PICKAXE) || stack.is(Items.NETHERITE_PICKAXE));
             if (!pickaxe.found()) {
                 error("No pickaxe found, disabling.");
                 setToggled(false);

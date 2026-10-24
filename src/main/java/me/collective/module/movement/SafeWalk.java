@@ -15,9 +15,9 @@ public class SafeWalk extends Module {
 
     @EventHandler
     private void onMove(PlayerMoveEvent event) {
-        if (mc.player == null || mc.world == null || !mc.player.isOnGround()
-            || mc.player.getAbilities().flying || mc.player.isGliding()
-            || event.type != MovementType.SELF) return;
+        if (mc.player == null || mc.level == null || !mc.player.onGround()
+            || mc.player.getAbilities().flying || mc.player.isFallFlying()
+            || event.type != MoverType.SELF) return;
         Vec3 movement = event.movement;
         double x = movement.x;
         double z = movement.z;
@@ -37,7 +37,7 @@ public class SafeWalk extends Module {
     }
 
     private boolean unsupported(double x, double z) {
-        return mc.world.isSpaceEmpty(mc.player, mc.player.getBoundingBox().offset(x, -0.5, z));
+        return mc.level.noCollision(mc.player, mc.player.getBoundingBox().move(x, -0.5, z));
     }
 
     private static double towardZero(double value) {

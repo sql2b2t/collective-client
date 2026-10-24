@@ -47,7 +47,7 @@ public class VoidESP extends Module {
 
     @EventHandler
     public void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         if (scanTimer-- <= 0) {
             scanTimer = 3;
@@ -58,12 +58,12 @@ public class VoidESP extends Module {
     private void scanVoidHoles() {
         voidHoles.clear();
 
-        BlockPos playerPos = mc.player.getBlockPos();
+        BlockPos playerPos = mc.player.blockPosition();
         int r = radius.getValue().intValue();
-        int bottomY = mc.world.getBottomY();
-        boolean isNether = mc.world.getRegistryKey() == Level.NETHER;
+        int bottomY = mc.level.getMinY();
+        boolean isNether = mc.level.dimension() == Level.NETHER;
 
-        BlockPos.Mutable mutable = new BlockPos.Mutable();
+        BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos();
 
         for (int x = -r; x <= r; x++) {
             for (int z = -r; z <= r; z++) {
@@ -87,20 +87,20 @@ public class VoidESP extends Module {
         }
     }
 
-    private boolean isVoidColumn(BlockPos.Mutable pos, int minY, int maxY) {
+    private boolean isVoidColumn(BlockPos.MutableBlockPos pos, int minY, int maxY) {
         for (int y = minY; y <= maxY; y++) {
             pos.setY(y);
-            if (mc.world.getBlockState(pos).isOf(Blocks.BEDROCK)) {
+            if (mc.level.getBlockState(pos).is(Blocks.BEDROCK)) {
                 return false;
             }
         }
         return true;
     }
 
-    private boolean isCeilingVoidColumn(BlockPos.Mutable pos) {
+    private boolean isCeilingVoidColumn(BlockPos.MutableBlockPos pos) {
         for (int y = 123; y <= 127; y++) {
             pos.setY(y);
-            if (mc.world.getBlockState(pos).isOf(Blocks.BEDROCK)) {
+            if (mc.level.getBlockState(pos).is(Blocks.BEDROCK)) {
                 return false;
             }
         }
@@ -109,7 +109,7 @@ public class VoidESP extends Module {
 
     @EventHandler
     public void onRender3D(Render3DEvent event) {
-        if (mc.player == null || mc.world == null || voidHoles.isEmpty()) return;
+        if (mc.player == null || mc.level == null || voidHoles.isEmpty()) return;
 
         Color fillColor = fill.getValue();
         Color lineColor = outline.getValue();

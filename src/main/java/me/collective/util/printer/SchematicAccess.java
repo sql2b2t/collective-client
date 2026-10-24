@@ -79,7 +79,7 @@ public final class SchematicAccess {
             Class<?> range = Class.forName("fi.dy.masa.malilib.util.LayerRange");
             rangeIsWithinMethod = resolveMethod(range, "isPositionWithinRange", BlockPos.class);
 
-            Class<?> worldHandler = Class.forName("fi.dy.masa.litematica.world.SchematicWorldHandler");
+            Class<?> worldHandler = Class.forName("fi.dy.masa.litematica.level.SchematicWorldHandler");
             getSchematicWorldMethod = resolveMethod(worldHandler, "getSchematicWorld");
 
             Class<?> materialCache = Class.forName("fi.dy.masa.litematica.materials.MaterialCache");

@@ -28,7 +28,7 @@ public class HUD extends Module {
         hudEditor.setChangeListener(val -> {
             if (val) {
                 hudEditor.setValue(false);
-                mc.setScreen(HudEditorScreen.getInstance());
+                mc.gui.setScreen(HudEditorScreen.getInstance());
             }
         });
     }

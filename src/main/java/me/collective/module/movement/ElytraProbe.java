@@ -40,7 +40,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *       отменяет позиционные пакеты на {@code SkipFor} тиков подряд. Грим считает
  *       скипы «нетаймовыми» ({@code TimerCheck} их не видит), но предсказание
  *       копит расхождение — смотрите, на каком бурсте приходит откат.</li>
- *   <li><b>Логгер откатов</b>: каждый {@code PlayerPositionLookS2CPacket} логируется
+ *   <li><b>Логгер откатов</b>: каждый {@code ClientboundPlayerPositionPacket} логируется
  *       с расстоянием, скоростью и состоянием скипов в момент телепорта.</li>
  *   <li><b>GlideClaim</b> (осторожно, выключен по умолчанию): после отката шлёт
  *       повторный {@code START_FALL_FLYING} — проверка на дубликат из BadPacketsJ.</li>
@@ -122,7 +122,7 @@ public class ElytraProbe extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) {
+        if (mc.player == null || mc.level == null) {
             this.skipActive = false;
             return;
         }
@@ -132,13 +132,13 @@ public class ElytraProbe extends Module {
         tickClaim();
 
         // ── Индикаторы ──
-        if (!mc.player.isGliding()) {
+        if (!mc.player.isFallFlying()) {
             this.boatNear = false;
             this.windowLikely = false;
             return;
         }
 
-        Vec3 velocity = mc.player.getVelocity();
+        Vec3 velocity = mc.player.getDeltaMovement();
         this.windowLikely = velocity.length() < 0.03;
 
         if (this.boatProbe.getValue()) {
@@ -189,13 +189,13 @@ public class ElytraProbe extends Module {
         this.claimPending = false;
 
         if (!this.glideClaim.getValue()) return;
-        if (mc.player == null || !mc.player.isGliding() || mc.getNetworkHandler() == null) return;
+        if (mc.player == null || !mc.player.isFallFlying() || mc.getConnection() == null) return;
 
         // Сервер только что прислал телепорт и, скорее всего, всё ещё считает нас
         // летящими: дубликат START_FALL_FLYING должен поймать BadPacketsJ — это и есть
         // предмет проверки.
-        mc.getNetworkHandler().sendPacket(new ClientCommandC2SPacket(
-            mc.player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
+        mc.getConnection().send(new ServerboundPlayerCommandPacket(
+            mc.player, ServerboundPlayerCommandPacket.Action.START_FALL_FLYING));
 
         if (this.verbose.getValue()) {
             ChatHelper.sendMessage("ElytraProbe: отослал повторный claim скольжения после отката "
@@ -212,12 +212,12 @@ public class ElytraProbe extends Module {
      * геометрию по своим данным — индикатор приблизителен.
      */
     private boolean isVehicleLenienceOpen(Vec3 velocity) {
-        if (mc.world == null || mc.player == null) return false;
+        if (mc.level == null || mc.player == null) return false;
 
-        AABB path = mc.player.getBoundingBox().stretch(velocity).expand(1.0);
+        AABB path = mc.player.getBoundingBox().expandTowards(velocity).inflate(1.0);
 
-        for (Entity entity : mc.world.getOtherEntities(mc.player, path.expand(4.0),
-            e -> (e instanceof AbstractBoatEntity || e instanceof ShulkerEntity) && e.isAlive())) {
+        for (Entity entity : mc.level.getEntities(mc.player, path.inflate(4.0),
+            e -> (e instanceof net.minecraft.world.entity.vehicle.boat.AbstractBoat || e instanceof net.minecraft.world.entity.monster.Shulker) && e.isAlive())) {
             if (entity.getBoundingBox().intersects(path)) return true;
         }
 
@@ -226,9 +226,9 @@ public class ElytraProbe extends Module {
 
     @EventHandler
     private void onPacketSend(PacketEvent.Send event) {
-        if (!(event.packet instanceof PlayerMoveC2SPacket move)) return;
-        if (!move.changesPosition()) return;
-        if (mc.player == null || !mc.player.isGliding() || mc.player.hasVehicle()) return;
+        if (!(event.packet instanceof ServerboundMovePlayerPacket move)) return;
+        if (!move.hasPosition()) return;
+        if (mc.player == null || !mc.player.isFallFlying() || mc.player.isPassenger()) return;
 
         // Не спорим с ControlFly: своего FREEZE-паркинга у него свои отмены.
         ControlFly fly = ControlFly.INSTANCE;
@@ -244,22 +244,22 @@ public class ElytraProbe extends Module {
     private void onPacketReceive(PacketEvent.Receive event) {
         if (!this.reportSetbacks.getValue() || mc.player == null) return;
 
-        if (!(event.getPacket() instanceof PlayerPositionLookS2CPacket positionLook)) return;
+        if (!(event.getPacket() instanceof ClientboundPlayerPositionPacket positionLook)) return;
 
         // Считаем на netty-треде, чат трогаем через mc.execute (как в GrimGlide).
-        Set<PositionFlag> relatives = positionLook.relatives();
+        Set<Relative> relatives = positionLook.relatives();
         Vec3 change = positionLook.change().position();
-        Vec3 current = mc.player.getEntityPos();
+        Vec3 current = mc.player.position();
         Vec3 target = new Vec3(
-            relatives.contains(PositionFlag.X) ? current.x + change.x : change.x,
-            relatives.contains(PositionFlag.Y) ? current.y + change.y : change.y,
-            relatives.contains(PositionFlag.Z) ? current.z + change.z : change.z);
+            relatives.contains(Relative.X) ? current.x + change.x : change.x,
+            relatives.contains(Relative.Y) ? current.y + change.y : change.y,
+            relatives.contains(Relative.Z) ? current.z + change.z : change.z);
 
         double distance = target.distanceTo(current);
-        Vec3 velocity = mc.player.getVelocity();
+        Vec3 velocity = mc.player.getDeltaMovement();
         boolean skipNow = this.skipActive;
         int skipped = this.skippedPackets.get();
-        boolean glide = mc.player.isGliding();
+        boolean glide = mc.player.isFallFlying();
 
         mc.execute(() -> {
             this.setbacks++;
@@ -267,7 +267,7 @@ public class ElytraProbe extends Module {
 
             ChatHelper.sendMessage(String.format(
                 "ElytraProbe: откат #%d — %.2f б, скорость %.1f б/с, глид=%b, скип=%s (всего %d).",
-                this.setbacks, distance, velocity.horizontalLength() * 20.0, glide,
+                this.setbacks, distance, velocity.horizontalDistance() * 20.0, glide,
                 skipNow ? "АКТИВЕН" : "нет", skipped));
         });
     }

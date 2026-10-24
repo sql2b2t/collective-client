@@ -4,7 +4,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.prediction.BlockStatePredictionHandler;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.world.InteractionHand;
@@ -19,7 +19,7 @@ public final class AirPlaceExecutor {
     }
 
     public static void place(BlockHitResult hit, BlockPos placePos, InteractionHand hand, BlockState predicted, Method method) {
-        if (hit.isInsideBlock()) {
+        if (hit.isInside()) {
             airPlace(hit, predicted, method);
         } else {
             silentPlace(hit, placePos, predicted, hand, true);
@@ -31,9 +31,9 @@ public final class AirPlaceExecutor {
     }
 
     public static void airPlace(BlockHitResult hit, BlockPos placePos, BlockState predicted, Method method) {
-        if (mc.player == null || mc.world == null || mc.getNetworkHandler() == null) return;
+        if (mc.player == null || mc.level == null || mc.getConnection() == null) return;
 
-        BlockHitResult wireHit = new BlockHitResult(hit.getPos(), hit.getSide(), hit.getBlockPos(), false);
+        BlockHitResult wireHit = new BlockHitResult(hit.getLocation(), hit.getDirection(), hit.getBlockPos(), false);
 
         if (method == Method.Grim) {
             grimAirPlace(wireHit, placePos, predicted);
@@ -43,41 +43,39 @@ public final class AirPlaceExecutor {
     }
 
     private static void grimAirPlace(BlockHitResult wireHit, BlockPos placePos, BlockState predicted) {
-        ClientPlayNetworkHandler connection = mc.getNetworkHandler();
-        if (connection == null || mc.world == null) return;
+        ClientPacketListener connection = mc.getConnection();
+        if (connection == null || mc.level == null) return;
 
-        try (PendingUpdateManager prediction = mc.world.getPendingUpdateManager().incrementSequence()) {
-            connection.sendPacket(new PlayerActionC2SPacket(
-                PlayerActionC2SPacket.Action.SWAP_ITEM_WITH_OFFHAND, BlockPos.ORIGIN, Direction.DOWN));
-            connection.sendPacket(new PlayerInteractBlockC2SPacket(
-                InteractionHand.OFF_HAND, wireHit, prediction.getSequence()));
-            connection.sendPacket(new HandSwingC2SPacket(InteractionHand.OFF_HAND));
-            connection.sendPacket(new PlayerActionC2SPacket(
-                PlayerActionC2SPacket.Action.SWAP_ITEM_WITH_OFFHAND, BlockPos.ORIGIN, Direction.DOWN));
+        int seq = GrimUtils.nextSequence();
+        connection.send(new ServerboundPlayerActionPacket(
+            ServerboundPlayerActionPacket.Action.SWAP_ITEM_WITH_OFFHAND, BlockPos.ZERO, Direction.DOWN));
+        connection.send(new ServerboundUseItemOnPacket(
+            InteractionHand.OFF_HAND, wireHit, seq));
+        connection.send(ServerboundPunchPacket.INSTANCE);
+        connection.send(new ServerboundPlayerActionPacket(
+            ServerboundPlayerActionPacket.Action.SWAP_ITEM_WITH_OFFHAND, BlockPos.ZERO, Direction.DOWN));
 
-            if (predicted != null) {
-                mc.world.setBlockState(placePos, predicted, 11);
-            }
+        if (predicted != null) {
+            mc.level.setBlock(placePos, predicted, 11, 3);
         }
     }
 
     public static void silentPlace(BlockHitResult hit, BlockPos placePos, BlockState predicted, InteractionHand hand, boolean visualSwing) {
-        if (mc.player == null || mc.world == null || mc.getNetworkHandler() == null) return;
+        if (mc.player == null || mc.level == null || mc.getConnection() == null) return;
 
-        ClientPlayNetworkHandler connection = mc.getNetworkHandler();
+        ClientPacketListener connection = mc.getConnection();
 
-        try (PendingUpdateManager prediction = mc.world.getPendingUpdateManager().incrementSequence()) {
-            connection.sendPacket(new PlayerInteractBlockC2SPacket(hand, hit, prediction.getSequence()));
+        int seq = GrimUtils.nextSequence();
+        connection.send(new ServerboundUseItemOnPacket(hand, hit, seq));
 
-            if (predicted != null) {
-                mc.world.setBlockState(placePos, predicted, 11);
-            }
+        if (predicted != null) {
+            mc.level.setBlock(placePos, predicted, 11, 3);
         }
 
         if (visualSwing && hand == InteractionHand.MAIN_HAND) {
-            mc.player.swingHand(InteractionHand.MAIN_HAND);
+            me.collective.util.Utils.swingHand(InteractionHand.MAIN_HAND);
         } else {
-            connection.sendPacket(new HandSwingC2SPacket(hand));
+            connection.send(ServerboundPunchPacket.INSTANCE);
         }
     }
 

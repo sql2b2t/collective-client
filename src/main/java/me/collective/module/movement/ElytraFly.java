@@ -29,19 +29,19 @@ public class ElytraFly extends Module {
 
     @Override
     public void onUpdate() {
-        if (mc.player == null || !mc.player.isGliding()) return;
+        if (mc.player == null || !mc.player.isFallFlying()) return;
 
-        Vec3 vel = mc.player.getVelocity();
-        Vec3 look = mc.player.getRotationVec(1.0f);
+        Vec3 vel = mc.player.getDeltaMovement();
+        Vec3 look = mc.player.getViewVector(1.0f);
 
         if (hover.getValue()) {
-            mc.player.setVelocity(vel.x * 0.9, 0, vel.z * 0.9);
+            mc.player.setDeltaMovement(vel.x * 0.9, 0, vel.z * 0.9);
             return;
         }
 
-        boolean forward = mc.options.forwardKey.isPressed();
-        boolean jump = mc.options.jumpKey.isPressed();
-        boolean sneak = mc.options.sneakKey.isPressed();
+        boolean forward = mc.options.keyUp.isDown();
+        boolean jump = mc.options.keyJump.isDown();
+        boolean sneak = mc.options.keyShift.isDown();
 
         double s = speed.getFloatValue();
         double motionX = vel.x;
@@ -62,18 +62,18 @@ public class ElytraFly extends Module {
             }
         }
 
-        mc.player.setVelocity(motionX, motionY, motionZ);
+        mc.player.setDeltaMovement(motionX, motionY, motionZ);
     }
 
     private boolean useFirework() {
         FindItemResult hotbar = InventoryUtil.findInHotbarOrOffhand(Items.FIREWORK_ROCKET);
         if (hotbar.isOffhand()) {
-            mc.interactionManager.interactItem(mc.player, InteractionHand.OFF_HAND);
+            mc.gameMode.useItem(mc.player, InteractionHand.OFF_HAND);
             return true;
         }
         if (hotbar.isHotbar()) {
             InventoryUtil.swap(hotbar.slot(), true);
-            mc.interactionManager.interactItem(mc.player, InteractionHand.MAIN_HAND);
+            mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
             InventoryUtil.swapBack();
             return true;
         }

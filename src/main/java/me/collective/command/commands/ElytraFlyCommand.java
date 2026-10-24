@@ -21,26 +21,26 @@ public class ElytraFlyCommand extends Command {
         // Класс OverworldElytraProcess недогружаем без Baritone (его интерфейсы
         // — из baritone.api) — сначала проверка доступности.
         if (!BaritoneHelper.isAvailable()) {
-            ChatHelper.sendMessage(Component.literal("Baritone не установлен - команда недоступна").styled(s -> s.withColor(ChatFormatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Baritone не установлен - команда недоступна").withStyle(s -> s.withColor(ChatFormatting.RED)));
             return;
         }
         OverworldElytraProcess.init();
         OverworldElytraProcess process = OverworldElytraProcess.getInstance();
 
         if (process == null) {
-            ChatHelper.sendMessage(Component.literal("Baritone не инициализирован!").styled(s -> s.withColor(ChatFormatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Baritone не инициализирован!").withStyle(s -> s.withColor(ChatFormatting.RED)));
             return;
         }
 
         if (args.length == 0) {
-            ChatHelper.sendMessage(Component.literal("Использование: " + getSyntax()).styled(s -> s.withColor(ChatFormatting.YELLOW)));
+            ChatHelper.sendMessage(Component.literal("Использование: " + getSyntax()).withStyle(s -> s.withColor(ChatFormatting.YELLOW)));
             return;
         }
 
         String sub = args[0].toLowerCase();
         if (sub.equals("cancel") || sub.equals("stop")) {
             process.cancel();
-            ChatHelper.sendMessage(Component.literal("Полет на элитрах остановлен.").styled(s -> s.withColor(ChatFormatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Полет на элитрах остановлен.").withStyle(s -> s.withColor(ChatFormatting.RED)));
             return;
         }
 
@@ -48,12 +48,12 @@ public class ElytraFlyCommand extends Command {
             try {
                 Goal currentGoal = BaritoneAPI.getProvider().getPrimaryBaritone().getCustomGoalProcess().getGoal();
                 if (currentGoal == null) {
-                    ChatHelper.sendMessage(Component.literal("В Baritone не установлена цель (#goal)!").styled(s -> s.withColor(ChatFormatting.RED)));
+                    ChatHelper.sendMessage(Component.literal("В Baritone не установлена цель (#goal)!").withStyle(s -> s.withColor(ChatFormatting.RED)));
                     return;
                 }
                 process.pathTo(currentGoal);
             } catch (Throwable t) {
-                ChatHelper.sendMessage(Component.literal("Ошибка взятия цели: " + t.getMessage()).styled(s -> s.withColor(ChatFormatting.RED)));
+                ChatHelper.sendMessage(Component.literal("Ошибка взятия цели: " + t.getMessage()).withStyle(s -> s.withColor(ChatFormatting.RED)));
             }
             return;
         }
@@ -75,7 +75,7 @@ public class ElytraFlyCommand extends Command {
             }
             process.pathTo(new BlockPos(x, y, z));
         } catch (NumberFormatException e) {
-            ChatHelper.sendMessage(Component.literal("Неверные координаты! Использование: " + getSyntax()).styled(s -> s.withColor(ChatFormatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Неверные координаты! Использование: " + getSyntax()).withStyle(s -> s.withColor(ChatFormatting.RED)));
         }
     }
 }

@@ -6,7 +6,7 @@ import me.collective.module.client.UI;
 import me.collective.render.RenderUtil;
 import me.collective.render.SoundUtil;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -30,7 +30,7 @@ public class SliderComponent extends Component {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         if (!setting.isVisible()) return;
 
         if (dragging) {
@@ -172,8 +172,8 @@ public class SliderComponent extends Component {
             } else if (key == GLFW.GLFW_KEY_ESCAPE) {
                 textEditing = false;
                 return true;
-            } else if (key == GLFW.GLFW_KEY_V && (GLFW.glfwGetKey(mc.getWindow().getHandle(), GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS || GLFW.glfwGetKey(mc.getWindow().getHandle(), GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS)) {
-                String clip = mc.keyboard.getClipboard();
+            } else if (key == GLFW.GLFW_KEY_V && (GLFW.glfwGetKey(mc.getWindow().handle(), GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS || GLFW.glfwGetKey(mc.getWindow().handle(), GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS)) {
+                String clip = mc.keyboardHandler.getClipboard();
                 if (clip != null && !clip.isEmpty()) {
                     StringBuilder sb = new StringBuilder();
                     for (char c : clip.toCharArray()) {

@@ -23,10 +23,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class MixinEntityHitbox {
 
     @Shadow
-    public abstract EntityPose getPose();
+    public abstract Pose getPose();
 
     @Shadow
-    public abstract EntityDimensions getDimensions(EntityPose pose);
+    public abstract EntityDimensions getDimensions(Pose pose);
 
     @Shadow
     public abstract Vec3 getEntityPos();
@@ -52,7 +52,7 @@ public abstract class MixinEntityHitbox {
         float y = mod.yExpand.compute();
         if (xz <= 0 && y <= 0) return;
 
-        AABB base = getDimensions(getPose()).getBoxAt(getEntityPos());
-        cir.setReturnValue(base.expand(xz, y, xz));
+        AABB base = getDimensions(getPose()).makeBoundingBox(getEntityPos());
+        cir.setReturnValue(base.inflate(xz, y, xz));
     }
 }

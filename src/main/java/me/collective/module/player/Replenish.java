@@ -38,7 +38,7 @@ import java.util.Map;
  *       {@code toString().contains("pickaxe")});</li>
  *   <li>в {@code attemptRefill} декомпиляция дважды звала {@code findSourceSlot} —
  *       второй вызов убран (первый же проверял кастомные имена);</li>
- *   <li>поля {@code currentScreenHandler}/{@code playerScreenHandler} — 1.21.11
+ *   <li>поля {@code containerMenu}/{@code inventoryMenu} — 1.21.11
  *       переименованы, syncId берётся из хендлера.</li>
  * </ul>
  */
@@ -222,8 +222,8 @@ public class Replenish extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (this.mc.player == null || this.mc.world == null || !InvUtils.canUsePlayerInventory()) return;
-        if (!this.silentRefill.get() && !(this.mc.currentScreen instanceof InventoryScreen)) return;
+        if (this.mc.player == null || this.mc.level == null || !InvUtils.canUsePlayerInventory()) return;
+        if (!this.silentRefill.get() && !(this.mc.gui.screen() instanceof InventoryScreen)) return;
 
         if (this.delayTicks > 0) {
             this.delayTicks--;
@@ -239,7 +239,7 @@ public class Replenish extends Module {
         int refillsThisTick = 0;
 
         for (int slot = 0; slot < 9 && refillsThisTick < this.maxRefillsPerTick.get(); slot++) {
-            ItemStack stack = this.mc.player.getInventory().getStack(slot);
+            ItemStack stack = this.mc.player.getInventory().getItem(slot);
             if (stack.isEmpty()) {
                 ItemStack lastStack = this.trackedSlotStacks.get(slot);
                 if (lastStack != null && !lastStack.isEmpty() && shouldRefill(lastStack)) {
@@ -259,7 +259,7 @@ public class Replenish extends Module {
             if (!shouldRefill(stack)) continue;
 
             int count = stack.getCount();
-            int maxCount = stack.getMaxCount();
+            int maxCount = stack.getMaxStackSize();
 
             if (this.smartRefill.get()) {
                 Integer lastSize = this.lastStackSizes.get(slot);
@@ -279,13 +279,13 @@ public class Replenish extends Module {
         Item item = stack.getItem();
         if (this.blacklist.get().contains(item)) return false;
 
-        if (this.refillAllStackable.get() && stack.getMaxCount() > 1) return true;
+        if (this.refillAllStackable.get() && stack.getMaxStackSize() > 1) return true;
         if (this.refillTotems.get() && item == Items.TOTEM_OF_UNDYING) return true;
         if (this.refillPearls.get() && item == Items.ENDER_PEARL) return true;
         if (this.refillGaps.get() && (item == Items.GOLDEN_APPLE || item == Items.ENCHANTED_GOLDEN_APPLE)) return true;
         if (this.refillFireworks.get() && item == Items.FIREWORK_ROCKET) return true;
         if (this.refillBlocks.get() && item instanceof BlockItem) return true;
-        if (this.refillFood.get() && item.getComponents().contains(DataComponentTypes.FOOD)) return true;
+        if (this.refillFood.get() && item.components().has(DataComponents.FOOD)) return true;
         if (this.refillTools.get() && isTool(item)) return true;
         if (this.refillWeapons.get() && isWeapon(item)) return true;
         if (this.refillProjectiles.get() && (item == Items.ARROW || item == Items.FIREWORK_ROCKET || item == Items.SPECTRAL_ARROW)) return true;
@@ -296,19 +296,19 @@ public class Replenish extends Module {
         // В 1.21.11 классов PickaxeItem/AxeItem/ShovelItem больше нет у кирки,
         // а у топоров/лопат/мотыг — есть, поэтому надёжнее проверять сам компонент
         // TOOL: он есть у любого инструмента (в том числе у кирки).
-        return item.getComponents().contains(DataComponentTypes.TOOL);
+        return item.components().has(DataComponents.TOOL);
     }
 
     private boolean isWeapon(Item item) {
         // Мечей как класса тоже не осталось: у клинкового оружия компонент WEAPON.
-        return item.getComponents().contains(DataComponentTypes.WEAPON)
+        return item.components().has(DataComponents.WEAPON)
             || item instanceof BowItem
             || item instanceof CrossbowItem
             || item instanceof TridentItem;
     }
 
     private boolean attemptRefill(int hotbarSlot, ItemStack hotbarStack) {
-        if (this.respectCustomNames.get() && hotbarStack.getMaxCount() > 1) {
+        if (this.respectCustomNames.get() && hotbarStack.getMaxStackSize() > 1) {
             String currentName = itemName(hotbarStack);
             String trackedName = this.hotbarItemNames.get(hotbarSlot);
             if (trackedName == null) {
@@ -322,7 +322,7 @@ public class Replenish extends Module {
                 return false;
             }
 
-            String sourceName = itemName(this.mc.player.getInventory().getStack(sourceSlot));
+            String sourceName = itemName(this.mc.player.getInventory().getItem(sourceSlot));
             if (!trackedName.equals(sourceName)) {
                 // Не выкидываем остаток стака ради предмета с другим именем.
                 if (hotbarStack.getCount() > 1) return false;
@@ -342,12 +342,12 @@ public class Replenish extends Module {
     }
 
     private String itemName(ItemStack stack) {
-        if (stack.contains(DataComponentTypes.CUSTOM_NAME)) {
-            Component customName = stack.get(DataComponentTypes.CUSTOM_NAME);
+        if (stack.has(DataComponents.CUSTOM_NAME)) {
+            Component customName = stack.get(DataComponents.CUSTOM_NAME);
             if (customName != null) return customName.getString();
         }
 
-        return stack.getItem().getName().getString();
+        return stack.getHoverName().getString();
     }
 
     private int findSourceSlot(ItemStack targetStack) {
@@ -358,7 +358,7 @@ public class Replenish extends Module {
         if (smallStacks) bestCount = Integer.MAX_VALUE;
 
         for (int i = 9; i < 36; i++) {
-            ItemStack stack = this.mc.player.getInventory().getStack(i);
+            ItemStack stack = this.mc.player.getInventory().getItem(i);
             if (stack.isEmpty() || !canStack(targetStack, stack)) continue;
             if (this.maintainTool.get() && isTool(targetStack.getItem()) && stack.getItem() != targetStack.getItem()) continue;
 
@@ -379,8 +379,8 @@ public class Replenish extends Module {
 
     private boolean canStack(ItemStack a, ItemStack b) {
         if (a.getItem() != b.getItem()) return false;
-        if (a.getMaxCount() == 1) return true;
-        return ItemStack.areItemsAndComponentsEqual(a, b);
+        if (a.getMaxStackSize() == 1) return true;
+        return ItemStack.isSameItemSameComponents(a, b);
     }
 
     /** Константы по-русски — EnumSetting показывает toString(). */

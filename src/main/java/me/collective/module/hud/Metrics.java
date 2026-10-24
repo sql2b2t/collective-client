@@ -4,7 +4,7 @@ import me.collective.font.FontManager;
 import me.collective.module.client.HUD;
 import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.PlayerInfo;
 
 import java.awt.Color;
@@ -19,22 +19,22 @@ public class Metrics extends HudModule {
     }
 
     @Override
-    public void render(GuiGraphics context, float delta) {
+    public void render(GuiGraphicsExtractor context, float delta) {
         if (!isToggled()) return;
 
         StringBuilder sb = new StringBuilder();
         if (fps.getValue()) {
-            sb.append("FPS: §f").append(mc.getCurrentFps()).append(" ");
+            sb.append("FPS: §f").append(mc.getFps()).append(" ");
         }
 
-        if (ping.getValue() && mc.player != null && mc.getNetworkHandler() != null) {
-            PlayerListEntry entry = mc.getNetworkHandler().getPlayerListEntry(mc.player.getUuid());
+        if (ping.getValue() && mc.player != null && mc.getConnection() != null) {
+            PlayerInfo entry = mc.getConnection().getPlayerInfo(mc.player.getUUID());
             int latency = entry != null ? entry.getLatency() : 0;
             sb.append("Ping: §f").append(latency).append("ms ");
         }
 
         if (server.getValue()) {
-            String ip = mc.getCurrentServerEntry() != null ? mc.getCurrentServerEntry().address : "Singleplayer";
+            String ip = mc.getCurrentServer() != null ? mc.getCurrentServer().ip : "Singleplayer";
             sb.append("Server: §f").append(ip);
         }
 

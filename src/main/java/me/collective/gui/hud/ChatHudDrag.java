@@ -28,17 +28,17 @@ public final class ChatHudDrag {
     private static long lastMoveNanos;
 
     /** Пытается захватить HUD-модуль под курсором. Возвращает true, если захватила. */
-    public static boolean tryBeginDrag(Click click) {
+    public static boolean tryBeginDrag(net.minecraft.client.input.MouseButtonEvent click) {
         if (click.button() != 0) return false;
 
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.world == null) return false;
+        if (mc.player == null || mc.level == null) return false;
 
         double mx = click.x();
         double my = click.y();
 
         // Зона чата (история + поле ввода) остаётся чату
-        if (my >= mc.getWindow().getScaledHeight() - CHAT_PROTECTED_ZONE) return false;
+        if (my >= mc.getWindow().getGuiScaledHeight() - CHAT_PROTECTED_ZONE) return false;
 
         HudModule target = findUnderCursor(mx, my);
         if (target == null) return false;
@@ -54,7 +54,7 @@ public final class ChatHudDrag {
     public static void update(double mouseX, double mouseY) {
         if (dragging == null) return;
 
-        long window = Minecraft.getInstance().getWindow().getHandle();
+        long window = Minecraft.getInstance().getWindow().handle();
         if (GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) != GLFW.GLFW_PRESS) {
             endDrag();
             return;
@@ -62,8 +62,8 @@ public final class ChatHudDrag {
 
         float mw = Math.max(20, dragging.getWidth());
         float mh = Math.max(10, dragging.getHeight());
-        float screenW = Minecraft.getInstance().getWindow().getScaledWidth();
-        float screenH = Minecraft.getInstance().getWindow().getScaledHeight();
+        float screenW = Minecraft.getInstance().getWindow().getGuiScaledWidth();
+        float screenH = Minecraft.getInstance().getWindow().getGuiScaledHeight();
 
         float nx = Math.max(2, Math.min(screenW - mw - 2, (float) mouseX - offsetX));
         float ny = Math.max(2, Math.min(screenH - mh - 2, (float) mouseY - offsetY));

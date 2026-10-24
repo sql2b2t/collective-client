@@ -43,9 +43,9 @@ public class AutoEat extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
-        boolean lowHunger = mc.player.getHungerManager().getFoodLevel() <= hungerThreshold.getValue().intValue();
+        boolean lowHunger = mc.player.getFoodData().getFoodLevel() <= hungerThreshold.getValue().intValue();
         boolean lowHealth = (mc.player.getHealth() + mc.player.getAbsorptionAmount()) <= healthThreshold.getValue().floatValue();
 
         if (!lowHunger && !lowHealth) {
@@ -64,9 +64,9 @@ public class AutoEat extends Module {
         boolean preferGapple = lowHealth && gapples.getValue();
 
         // 1. Check offhand first
-        if (isFood(mc.player.getOffHandStack(), preferGapple)) {
+        if (isFood(mc.player.getOffhandItem(), preferGapple)) {
             prevSlot = -1;
-            mc.options.useKey.setPressed(true);
+            mc.options.keyUse.setDown(true);
             eating = true;
             waitTicks = 0;
             return;
@@ -77,7 +77,7 @@ public class AutoEat extends Module {
         if (food.found()) {
             prevSlot = mc.player.getInventory().getSelectedSlot();
             InventoryUtil.swap(food.slot());
-            mc.options.useKey.setPressed(true);
+            mc.options.keyUse.setDown(true);
             eating = true;
             waitTicks = 0;
             return;
@@ -89,7 +89,7 @@ public class AutoEat extends Module {
             int currentHotbar = mc.player.getInventory().getSelectedSlot();
             InventoryUtil.move().from(invFood.slot()).to(currentHotbar);
             prevSlot = currentHotbar;
-            mc.options.useKey.setPressed(true);
+            mc.options.keyUse.setDown(true);
             eating = true;
             waitTicks = 0;
         }
@@ -102,7 +102,7 @@ public class AutoEat extends Module {
         if (preferGapple) {
             return item == Items.ENCHANTED_GOLDEN_APPLE || item == Items.GOLDEN_APPLE;
         }
-        return stack.contains(DataComponentTypes.FOOD);
+        return stack.has(DataComponents.FOOD);
     }
 
     private FindItemResult findFood(boolean preferGapple) {
@@ -125,7 +125,7 @@ public class AutoEat extends Module {
 
     private void stopEating() {
         if (eating) {
-            mc.options.useKey.setPressed(false);
+            mc.options.keyUse.setDown(false);
             if (prevSlot != -1 && mc.player != null) {
                 InventoryUtil.swap(prevSlot);
                 prevSlot = -1;

@@ -9,12 +9,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(KeyMapping.class)
 public abstract class MixinKeyBinding {
-    @Inject(method = "isPressed", at = @At("RETURN"), cancellable = true)
+    @Inject(method = "isDown", at = @At("RETURN"), cancellable = true)
     private void collective$isPressed(CallbackInfoReturnable<Boolean> cir) {
         ElytraBounce efly = ElytraBounce.INSTANCE;
         if (efly != null && efly.isToggled() && efly.enabled()) {
             KeyMapping self = (KeyMapping) (Object) this;
-            String id = self.getId();
+            String id = self.getName();
             if ("key.forward".equals(id)) {
                 cir.setReturnValue(true);
             } else if ("key.jump".equals(id) && efly.shouldAutoJump()) {

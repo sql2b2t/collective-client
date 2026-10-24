@@ -9,7 +9,8 @@ import me.collective.util.InventoryUtil;
 import me.collective.util.PlacementUtils;
 import me.collective.manager.FriendManager;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.BedItem;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.phys.BlockHitResult;
@@ -44,7 +45,7 @@ public class BedAura extends Module {
 
     @Override
     public void onUpdate() {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         // Подрыв на следующий тик: сервер уже подтвердил кровать, и Grim не
         // увидит interact по блоку, которого у него ещё нет.
@@ -54,11 +55,11 @@ public class BedAura extends Module {
 
             if (delayTimer > 0) {
                 delayTimer--;
-            } else if (mc.interactionManager != null
-                && mc.world.getBlockState(place).getBlock() instanceof net.minecraft.block.BedBlock) {
-                BlockHitResult hit = new BlockHitResult(Vec3.ofCenter(place), Direction.UP, place, false);
-                mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND, hit);
-                mc.player.swingHand(InteractionHand.MAIN_HAND);
+            } else if (mc.gameMode != null
+                && mc.level.getBlockState(place).getBlock() instanceof net.minecraft.world.level.block.BedBlock) {
+                BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(place), Direction.UP, place, false);
+                mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, hit);
+                me.collective.util.Utils.swingHand(InteractionHand.MAIN_HAND);
             }
             delayTimer = delay.getIntValue();
             return;
@@ -70,20 +71,20 @@ public class BedAura extends Module {
         }
 
         if (dimensionCheck.getValue()) {
-            RegistryKey<Level> dim = mc.world.getRegistryKey();
+            ResourceKey<Level> dim = mc.level.dimension();
             if (dim != Level.NETHER && dim != Level.END) return;
         }
 
         Player target = getTarget(range.getFloatValue());
         if (target == null) return;
 
-        FindItemResult bed = InventoryUtil.findInHotbarOrOffhand(stack -> stack.getItem() instanceof BedItem);
+        FindItemResult bed = InventoryUtil.findInHotbarOrOffhand(stack -> stack.getItem() instanceof BlockItem bi && bi.getBlock() instanceof BedBlock);
         if (!bed.found()) return;
 
-        BlockPos feet = target.getBlockPos();
+        BlockPos feet = target.blockPosition();
         BlockPos place = null;
         if (PlacementUtils.canPlace(feet, false)) place = feet;
-        else if (PlacementUtils.canPlace(feet.up(1), false)) place = feet.up(1);
+        else if (PlacementUtils.canPlace(feet.above(1), false)) place = feet.above(1);
         if (place == null) return;
 
         if (!PlacementUtils.placeBlock(place, bed, rotate.getValue(), true, false)) return;
@@ -93,7 +94,7 @@ public class BedAura extends Module {
     private Player getTarget(double range) {
         Player best = null;
         double bestDist = range;
-        for (Player p : mc.world.getPlayers()) {
+        for (Player p : mc.level.players()) {
             if (p == mc.player || !p.isAlive() || p.isSpectator() || p.isCreative()) continue;
             if (FriendManager.getInstance().isFriend(p)) continue;
             double d = mc.player.distanceTo(p);

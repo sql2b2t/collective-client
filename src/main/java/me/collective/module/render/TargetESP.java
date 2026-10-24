@@ -13,10 +13,9 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.ColorSetting;
 import me.collective.setting.ModeSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.renderer.MultiBufferSource;
 import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -57,12 +56,12 @@ public class TargetESP extends Module {
     private float markSpeed = 1f;
     private boolean markFlip = false;
 
-    private static final Identifier GHOST_TEXTURE = Identifier.of("collective", "textures/esp/ghost.png");
-    private static final Identifier GLOW_TEXTURE = Identifier.of("collective", "textures/esp/glow.png");
-    private static final Identifier STAR_TEXTURE = Identifier.of("collective", "textures/esp/star.png");
-    private static final Identifier FIREFLY_TEXTURE = Identifier.of("collective", "textures/esp/firefly.png");
-    private static final Identifier CAPTURE_TEXTURE = Identifier.of("collective", "textures/esp/capture.png");
-    private static final Identifier SWORD_TEXTURE_ID = Identifier.of("collective", "textures/dynamic/sword");
+    private static final Identifier GHOST_TEXTURE = Identifier.fromNamespaceAndPath("collective", "textures/esp/ghost.png");
+    private static final Identifier GLOW_TEXTURE = Identifier.fromNamespaceAndPath("collective", "textures/esp/glow.png");
+    private static final Identifier STAR_TEXTURE = Identifier.fromNamespaceAndPath("collective", "textures/esp/star.png");
+    private static final Identifier FIREFLY_TEXTURE = Identifier.fromNamespaceAndPath("collective", "textures/esp/firefly.png");
+    private static final Identifier CAPTURE_TEXTURE = Identifier.fromNamespaceAndPath("collective", "textures/esp/capture.png");
+    private static final Identifier SWORD_TEXTURE_ID = Identifier.fromNamespaceAndPath("collective", "textures/dynamic/sword");
 
     private static final int MAX_SWORDS = 8;
     private static final float SWORDS_TAU = (float) (Math.PI * 2.0);
@@ -109,7 +108,7 @@ public class TargetESP extends Module {
     private final float[] swordPitchs = new float[MAX_SWORDS];
     private float swordHalfW;
     private float swordHalfH;
-    private NativeImageBackedTexture swordTexture;
+    private DynamicTexture swordTexture;
     private boolean swordTextureRegistered = false;
 
     private long animationChangedAt = System.currentTimeMillis();
@@ -158,7 +157,7 @@ public class TargetESP extends Module {
         this.lastFrame = this.epoch;
         this.resetGhostMotion();
         this.ghostVisibility = 0.0F;
-        this.ghostWorld = mc.world;
+        this.ghostWorld = mc.level;
         super.onEnable();
     }
 
@@ -178,7 +177,7 @@ public class TargetESP extends Module {
         if (KillAura.textureRun != null && KillAura.textureRun.isAlive() && !KillAura.textureRun.isRemoved()) {
             return KillAura.textureRun;
         }
-        if (mc.targetedEntity instanceof LivingEntity living && living.isAlive() && !living.isRemoved() && !(living == mc.player)) {
+        if (mc.crosshairPickEntity instanceof LivingEntity living && living.isAlive() && !living.isRemoved() && !(living == mc.player)) {
             return living;
         }
         return null;
@@ -186,10 +185,10 @@ public class TargetESP extends Module {
 
     @EventHandler
     public void onRender(Render3DEvent event) {
-        if (event == null || mc.player == null || mc.world == null) return;
+        if (event == null || mc.player == null || mc.level == null) return;
 
         long now = System.currentTimeMillis();
-        if (this.ghostWorld != mc.world) {
+        if (this.ghostWorld != mc.level) {
             this.displayedTarget = null;
             this.appearing = false;
             this.animationChangedAt = now;
@@ -197,10 +196,10 @@ public class TargetESP extends Module {
             this.resetSwords();
             this.resetLightning();
             this.ghostVisibility = 0.0F;
-            this.ghostWorld = mc.world;
+            this.ghostWorld = mc.level;
         }
 
-        float elapsedSeconds = MathHelper.clamp((float) (now - this.lastFrame) / 1000.0F, 0.001F, 0.1F);
+        float elapsedSeconds = Mth.clamp((float) (now - this.lastFrame) / 1000.0F, 0.001F, 0.1F);
         float frame = elapsedSeconds * 60.0F;
         this.lastFrame = now;
 
@@ -248,18 +247,18 @@ public class TargetESP extends Module {
     }
 
     @Override
-    public void onRender2D(GuiGraphics context, float delta) {
+    public void onRender2D(GuiGraphicsExtractor context, float delta) {
         if (!isToggled() || mc.player == null || this.displayedTarget == null) return;
 
         long now = System.currentTimeMillis();
         float alpha = "Призраки".equals(this.mode.getValue())
             ? this.ghostVisibility
-            : (this.appearing ? 1.0F : 1.0F - this.smoothStep(MathHelper.clamp((float) (now - this.animationChangedAt) / 300.0F, 0.0F, 1.0F)));
+            : (this.appearing ? 1.0F : 1.0F - this.smoothStep(Mth.clamp((float) (now - this.animationChangedAt) / 300.0F, 0.0F, 1.0F)));
 
         if (alpha <= 0.01F) return;
 
-        int width = mc.getWindow().getScaledWidth();
-        int height = mc.getWindow().getScaledHeight();
+        int width = mc.getWindow().getGuiScaledWidth();
+        int height = mc.getWindow().getGuiScaledHeight();
 
         String currentMode = this.mode.getValue();
         if ("Кольцо".equals(currentMode)) {
@@ -302,7 +301,7 @@ public class TargetESP extends Module {
             }
             return this.ghostVisibility;
         } else {
-            float t = MathHelper.clamp((float) (now - this.animationChangedAt) / 300.0F, 0.0F, 1.0F);
+            float t = Mth.clamp((float) (now - this.animationChangedAt) / 300.0F, 0.0F, 1.0F);
             if (!this.appearing && t >= 1.0F) {
                 this.displayedTarget = null;
                 this.resetGhostMotion();
@@ -314,11 +313,11 @@ public class TargetESP extends Module {
     // --- GHOSTS RENDERING ---
     private void renderGhosts(Render3DEvent event, LivingEntity target, float alpha, long now, float elapsedSeconds) {
         if (event.consumers == null) return;
-        VertexConsumer consumer = event.consumers.getBuffer(RenderLayers.entityTranslucentEmissive(GHOST_TEXTURE));
+        VertexConsumer consumer = event.consumers.getBuffer(net.minecraft.client.renderer.rendertype.RenderTypes.entityTranslucentEmissive(GHOST_TEXTURE));
         PoseStack stack = event.matrices;
         if (stack == null) return;
 
-        Vec3 camera = event.camera != null ? event.camera.getCameraPos() : Vec3.ZERO;
+        Vec3 camera = event.camera != null ? event.camera.position() : Vec3.ZERO;
         float flight = this.updateGhostMotion(target, event.tickDelta, elapsedSeconds, now);
         float time = (float) (now - this.ghostEpoch) / 1000.0F;
         float hurtScale = 1.0F + this.hurtProgress * 0.18F;
@@ -333,17 +332,17 @@ public class TargetESP extends Module {
                 float delayedTime = (float) (now - delay - this.ghostEpoch) / 1000.0F;
                 Vec3 base = this.sampleGhostHistory(now - delay);
                 float phase = delayedTime * (0.72F + flight * 0.1F) + laneOffset - trail * 0.32F;
-                float radius = (0.72F + 0.1F * MathHelper.sin(delayedTime * 1.4F + lane)) * hurtScale * (1.0F - flight * 0.18F);
-                double px = base.x + MathHelper.sin(phase) * radius;
-                double pz = base.z + MathHelper.cos(phase) * radius;
+                float radius = (0.72F + 0.1F * Mth.sin(delayedTime * 1.4F + lane)) * hurtScale * (1.0F - flight * 0.18F);
+                double px = base.x + Mth.sin(phase) * radius;
+                double pz = base.z + Mth.cos(phase) * radius;
                 double py = base.y
-                    + target.getHeight() * (0.24F + lane * 0.24F)
-                    + MathHelper.sin(delayedTime * 1.35F + particle * 0.12F + laneOffset) * (0.13F + flight * 0.05F);
-                float pulse = 0.94F + 0.06F * MathHelper.sin(time * 4.2F + laneOffset - trail * 2.0F);
+                    + target.getBbHeight() * (0.24F + lane * 0.24F)
+                    + Mth.sin(delayedTime * 1.35F + particle * 0.12F + laneOffset) * (0.13F + flight * 0.05F);
+                float pulse = 0.94F + 0.06F * Mth.sin(time * 4.2F + laneOffset - trail * 2.0F);
                 float size = (0.27F - trail * 0.16F) * pulse * (1.0F + this.hurtProgress * 0.22F + flight * (1.0F - trail) * 0.16F);
                 float tailAlpha = 0.08F + 0.92F * (float) Math.pow(1.0F - trail, 1.45F);
-                int color = ColorUtil.multiplyAlpha(ColorUtil.interpolate(palette[0], palette[1], 0.5F + 0.5F * MathHelper.sin(phase + trail * 2.0F)), tailAlpha);
-                float rotation = time * 16.0F + particle * 5.0F + lane * 18.0F + flight * MathHelper.sin(time * 1.4F + laneOffset) * 10.0F;
+                int color = ColorUtil.multiplyAlpha(ColorUtil.interpolate(palette[0], palette[1], 0.5F + 0.5F * Mth.sin(phase + trail * 2.0F)), tailAlpha);
+                float rotation = time * 16.0F + particle * 5.0F + lane * 18.0F + flight * Mth.sin(time * 1.4F + laneOffset) * 10.0F;
                 float stretchX = 1.0F + flight * (1.0F - trail) * 0.62F;
                 float stretchY = 1.0F - flight * (1.0F - trail) * 0.12F;
                 Vec3 particlePos = new Vec3(px, py, pz);
@@ -369,7 +368,7 @@ public class TargetESP extends Module {
                         Vec3 toTarget = targetPosition.subtract(this.ghostAnchor);
                         double distance = toTarget.length();
                         Vec3 side = new Vec3(-toTarget.z, 0.0, toTarget.x);
-                        if (side.lengthSquared() < 1.0E-6) {
+                        if (side.lengthSqr() < 1.0E-6) {
                             side = new Vec3((target.getId() & 1) == 0 ? 1.0 : -1.0, 0.0, 0.0);
                         } else {
                             side = side.normalize();
@@ -377,42 +376,42 @@ public class TargetESP extends Module {
 
                         double direction = (target.getId() & 1) == 0 ? 1.0 : -1.0;
                         this.ghostFlightFrom = this.ghostAnchor;
-                        this.ghostFlightSide = side.multiply(direction);
+                        this.ghostFlightSide = side.scale(direction);
                         this.ghostFlightStartedAt = now;
                         this.ghostFlightDurationMs = (long) Math.max(1150.0, Math.min(1900.0, 1050.0 + distance * 95.0));
                         this.ghostFlightSideAmount = (float) Math.min(1.35, 0.22 + distance * 0.14);
                         this.ghostFlightArcHeight = (float) Math.min(1.15, 0.24 + distance * 0.09);
                         this.ghostSwitching = true;
-                        this.ghostVelocity = this.ghostVelocity.multiply(0.2);
+                        this.ghostVelocity = this.ghostVelocity.scale(0.2);
                         this.ghostTrackedTarget = target;
                         this.ghostFlightStrength = Math.max(this.ghostFlightStrength, 0.25F);
                     }
 
-                    Vec3 targetMotion = target.getVelocity();
+                    Vec3 targetMotion = target.getDeltaMovement();
                     double targetMotionLength = targetMotion.length();
                     if (targetMotionLength > 0.8) {
-                        targetMotion = targetMotion.multiply(0.8 / targetMotionLength);
+                        targetMotion = targetMotion.scale(0.8 / targetMotionLength);
                     }
 
                     double distanceBefore = targetPosition.distanceTo(this.ghostAnchor);
                     double leadTicks = 2.1 + Math.min(distanceBefore * 0.16, 2.2);
-                    Vec3 desiredPosition = targetPosition.add(targetMotion.multiply(leadTicks));
+                    Vec3 desiredPosition = targetPosition.add(targetMotion.scale(leadTicks));
                     double totalStep = Math.max(0.001, Math.min(elapsedSeconds, 0.1));
                     float switchVisual = 0.0F;
 
                     if (this.ghostSwitching && this.ghostFlightFrom != null) {
-                        float progress = MathHelper.clamp((float) (now - this.ghostFlightStartedAt) / (float) this.ghostFlightDurationMs, 0.0F, 1.0F);
+                        float progress = Mth.clamp((float) (now - this.ghostFlightStartedAt) / (float) this.ghostFlightDurationMs, 0.0F, 1.0F);
                         float eased = this.smootherStep(progress);
-                        float arc = MathHelper.sin(progress * (float) Math.PI);
+                        float arc = Mth.sin(progress * (float) Math.PI);
                         Vec3 nextAnchor = this.lerp(this.ghostFlightFrom, desiredPosition, eased)
-                            .add(this.ghostFlightSide.multiply(arc * this.ghostFlightSideAmount))
+                            .add(this.ghostFlightSide.scale(arc * this.ghostFlightSideAmount))
                             .add(0.0, arc * this.ghostFlightArcHeight, 0.0);
-                        this.ghostVelocity = nextAnchor.subtract(this.ghostAnchor).multiply(1.0 / totalStep);
+                        this.ghostVelocity = nextAnchor.subtract(this.ghostAnchor).scale(1.0 / totalStep);
                         this.ghostAnchor = nextAnchor;
                         switchVisual = arc;
                         if (progress >= 1.0F) {
                             this.ghostSwitching = false;
-                            this.ghostVelocity = targetMotion.multiply(20.0);
+                            this.ghostVelocity = targetMotion.scale(20.0);
                         }
                     } else {
                         int subSteps = Math.max(1, (int) Math.ceil(totalStep / 0.016666666666666666));
@@ -423,20 +422,20 @@ public class TargetESP extends Module {
                             double distance = offset.length();
                             double stiffness = 25.0 + Math.min(distance * 2.0, 22.0);
                             double damping = 2.0 * Math.sqrt(stiffness) * 1.18;
-                            Vec3 acceleration = offset.multiply(stiffness).subtract(this.ghostVelocity.multiply(damping));
-                            this.ghostVelocity = this.ghostVelocity.add(acceleration.multiply(step));
+                            Vec3 acceleration = offset.scale(stiffness).subtract(this.ghostVelocity.scale(damping));
+                            this.ghostVelocity = this.ghostVelocity.add(acceleration.scale(step));
                             double speed = this.ghostVelocity.length();
                             double maxSpeed = 4.2 + Math.min(distance * 1.8, 14.0);
                             if (speed > maxSpeed) {
-                                this.ghostVelocity = this.ghostVelocity.multiply(maxSpeed / speed);
+                                this.ghostVelocity = this.ghostVelocity.scale(maxSpeed / speed);
                             }
-                            this.ghostAnchor = this.ghostAnchor.add(this.ghostVelocity.multiply(step));
+                            this.ghostAnchor = this.ghostAnchor.add(this.ghostVelocity.scale(step));
                         }
                     }
 
                     double remainingDistance = targetPosition.distanceTo(this.ghostAnchor);
                     double speed = this.ghostVelocity.length();
-                    float targetFlight = MathHelper.clamp((float) ((remainingDistance - 0.18) / 3.8 + speed / 28.0 * 0.55), 0.0F, 1.0F);
+                    float targetFlight = Mth.clamp((float) ((remainingDistance - 0.18) / 3.8 + speed / 28.0 * 0.55), 0.0F, 1.0F);
                     if (this.ghostSwitching) {
                         targetFlight = Math.max(targetFlight, 0.42F + switchVisual * 0.38F);
                     }
@@ -444,7 +443,7 @@ public class TargetESP extends Module {
                     float response = 1.0F - (float) Math.exp(-elapsedSeconds * (targetFlight > this.ghostFlightStrength ? 5.0F : 2.4F));
                     this.ghostFlightStrength = this.ghostFlightStrength + (targetFlight - this.ghostFlightStrength) * response;
                     this.rememberGhostAnchor(now);
-                    return MathHelper.clamp(this.ghostFlightStrength, 0.0F, 1.0F);
+                    return Mth.clamp(this.ghostFlightStrength, 0.0F, 1.0F);
                 } else {
                     this.ghostAnchor = targetPosition;
                     this.ghostVelocity = Vec3.ZERO;
@@ -470,11 +469,11 @@ public class TargetESP extends Module {
         } else {
             this.ghostSwitching = false;
             double damping = Math.exp(-elapsedSeconds * 6.0);
-            this.ghostVelocity = this.ghostVelocity.multiply(damping);
-            this.ghostAnchor = this.ghostAnchor.add(this.ghostVelocity.multiply(elapsedSeconds));
+            this.ghostVelocity = this.ghostVelocity.scale(damping);
+            this.ghostAnchor = this.ghostAnchor.add(this.ghostVelocity.scale(elapsedSeconds));
             this.ghostFlightStrength = this.ghostFlightStrength * (float) Math.exp(-elapsedSeconds * 2.5);
             this.rememberGhostAnchor(now);
-            return MathHelper.clamp(this.ghostFlightStrength, 0.0F, 1.0F);
+            return Mth.clamp(this.ghostFlightStrength, 0.0F, 1.0F);
         }
     }
 
@@ -520,22 +519,22 @@ public class TargetESP extends Module {
 
     private void drawGhostSprite(PoseStack stack, VertexConsumer consumer, Vec3 position, Vec3 camera, float width, float height, float rotation, int color) {
         Vec3 relative = position.subtract(camera);
-        stack.push();
+        stack.pushPose();
         try {
             stack.translate(relative.x, relative.y, relative.z);
-            if (mc.gameRenderer != null && mc.gameRenderer.getCamera() != null) {
-                stack.multiply(mc.gameRenderer.getCamera().getRotation());
+            if (mc.gameRenderer != null && mc.gameRenderer.mainCamera() != null) {
+                stack.rotate(mc.gameRenderer.mainCamera().rotation());
             }
-            stack.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(rotation));
+            stack.rotate(Axis.ZP.rotationDegrees(rotation));
             stack.scale(width, height, 1.0F);
-            PoseStack.Entry entry = stack.peek();
+            PoseStack.Pose entry = stack.last();
 
-            consumer.vertex(entry, -1.0F, -1.0F, 0.0F).color(color).texture(0.0F, 0.0F).overlay(0, 0).light(0xF000F0).normal(entry, 0.0f, 1.0f, 0.0f);
-            consumer.vertex(entry, -1.0F, 1.0F, 0.0F).color(color).texture(0.0F, 1.0F).overlay(0, 0).light(0xF000F0).normal(entry, 0.0f, 1.0f, 0.0f);
-            consumer.vertex(entry, 1.0F, 1.0F, 0.0F).color(color).texture(1.0F, 1.0F).overlay(0, 0).light(0xF000F0).normal(entry, 0.0f, 1.0f, 0.0f);
-            consumer.vertex(entry, 1.0F, -1.0F, 0.0F).color(color).texture(1.0F, 0.0F).overlay(0, 0).light(0xF000F0).normal(entry, 0.0f, 1.0f, 0.0f);
+            consumer.addVertex(entry, -1.0F, -1.0F, 0.0F).setColor(color).setUv(0.0F, 0.0F).setOverlay(0).setLight(0xF000F0).setNormal(entry, 0.0f, 1.0f, 0.0f);
+            consumer.addVertex(entry, -1.0F, 1.0F, 0.0F).setColor(color).setUv(0.0F, 1.0F).setOverlay(0).setLight(0xF000F0).setNormal(entry, 0.0f, 1.0f, 0.0f);
+            consumer.addVertex(entry, 1.0F, 1.0F, 0.0F).setColor(color).setUv(1.0F, 1.0F).setOverlay(0).setLight(0xF000F0).setNormal(entry, 0.0f, 1.0f, 0.0f);
+            consumer.addVertex(entry, 1.0F, -1.0F, 0.0F).setColor(color).setUv(1.0F, 0.0F).setOverlay(0).setLight(0xF000F0).setNormal(entry, 0.0f, 1.0f, 0.0f);
         } finally {
-            stack.pop();
+            stack.popPose();
         }
     }
 
@@ -543,10 +542,10 @@ public class TargetESP extends Module {
     private void renderMarker(Render3DEvent event, LivingEntity target, float alpha, long now) {
         if (event.consumers == null) return;
         Identifier texture = GLOW_TEXTURE;
-        VertexConsumer consumer = event.consumers.getBuffer(RenderLayers.entityTranslucentEmissive(texture));
+        VertexConsumer consumer = event.consumers.getBuffer(net.minecraft.client.renderer.rendertype.RenderTypes.entityTranslucentEmissive(texture));
         PoseStack stack = event.matrices;
         if (stack == null) return;
-        Vec3 camera = event.camera != null ? event.camera.getCameraPos() : Vec3.ZERO;
+        Vec3 camera = event.camera != null ? event.camera.position() : Vec3.ZERO;
         Vec3 pos = this.lerped(target, event.tickDelta).subtract(camera);
         float time = (float) (now - this.epoch) / 1000.0F;
         float omega = (float) ((Math.PI * 2) / 2.8F);
@@ -554,33 +553,33 @@ public class TargetESP extends Module {
         float size = 0.55F * (1.0F + 0.06F * (float) Math.sin(time * 1.6F * Math.PI * 2.0)) * (1.0F + 0.25F * this.hurtProgress);
         int[] colors = this.colors(alpha * (0.85F + 0.15F * (float) Math.sin(time * 1.6F * Math.PI * 2.0)));
 
-        stack.push();
+        stack.pushPose();
         try {
-            stack.translate(pos.x, pos.y + target.getHeight() * 0.5, pos.z);
-            if (mc.gameRenderer != null && mc.gameRenderer.getCamera() != null) {
-                stack.multiply(mc.gameRenderer.getCamera().getRotation());
+            stack.translate(pos.x, pos.y + target.getBbHeight() * 0.5, pos.z);
+            if (mc.gameRenderer != null && mc.gameRenderer.mainCamera() != null) {
+                stack.rotate(mc.gameRenderer.mainCamera().rotation());
             }
-            stack.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(angle));
+            stack.rotate(Axis.ZP.rotationDegrees(angle));
             stack.scale(size, size, 1.0F);
-            PoseStack.Entry entry = stack.peek();
+            PoseStack.Pose entry = stack.last();
 
-            consumer.vertex(entry, -1.0F, -1.0F, 0.0F).color(colors[1]).texture(0.0F, 0.0F).overlay(0, 0).light(0xF000F0).normal(entry, 0.0f, 1.0f, 0.0f);
-            consumer.vertex(entry, -1.0F, 1.0F, 0.0F).color(colors[0]).texture(0.0F, 1.0F).overlay(0, 0).light(0xF000F0).normal(entry, 0.0f, 1.0f, 0.0f);
-            consumer.vertex(entry, 1.0F, 1.0F, 0.0F).color(colors[1]).texture(1.0F, 1.0F).overlay(0, 0).light(0xF000F0).normal(entry, 0.0f, 1.0f, 0.0f);
-            consumer.vertex(entry, 1.0F, -1.0F, 0.0F).color(colors[0]).texture(1.0F, 0.0F).overlay(0, 0).light(0xF000F0).normal(entry, 0.0f, 1.0f, 0.0f);
+            consumer.addVertex(entry, -1.0F, -1.0F, 0.0F).setColor(colors[1]).setUv(0.0F, 0.0F).setOverlay(0).setLight(0xF000F0).setNormal(entry, 0.0f, 1.0f, 0.0f);
+            consumer.addVertex(entry, -1.0F, 1.0F, 0.0F).setColor(colors[0]).setUv(0.0F, 1.0F).setOverlay(0).setLight(0xF000F0).setNormal(entry, 0.0f, 1.0f, 0.0f);
+            consumer.addVertex(entry, 1.0F, 1.0F, 0.0F).setColor(colors[1]).setUv(1.0F, 1.0F).setOverlay(0).setLight(0xF000F0).setNormal(entry, 0.0f, 1.0f, 0.0f);
+            consumer.addVertex(entry, 1.0F, -1.0F, 0.0F).setColor(colors[0]).setUv(1.0F, 0.0F).setOverlay(0).setLight(0xF000F0).setNormal(entry, 0.0f, 1.0f, 0.0f);
         } finally {
-            stack.pop();
+            stack.popPose();
         }
     }
 
     // --- RING 2D OVERLAY RENDERING ---
-    private void renderRingOverlay(GuiGraphics context, LivingEntity target, float alpha, float tickDelta, int width, int height) {
+    private void renderRingOverlay(GuiGraphicsExtractor context, LivingEntity target, float alpha, float tickDelta, int width, int height) {
         Vec3 center = this.lerped(target, tickDelta);
-        float radius = target.getWidth();
+        float radius = target.getBbWidth();
         int[] palette = this.colors(alpha);
 
         double wave = 0.5 - 0.5 * Math.cos(this.circleStep);
-        this.smoothY = this.smoothY + (wave * target.getHeight() - this.smoothY) * 0.12;
+        this.smoothY = this.smoothY + (wave * target.getBbHeight() - this.smoothY) * 0.12;
 
         for (int i = 0; i < 48; i++) {
             double angle = i * (Math.PI * 2.0) / 48.0;
@@ -599,18 +598,18 @@ public class TargetESP extends Module {
         if (event.consumers == null) return;
         float tickDelta = event.tickDelta;
         Vec3 base = this.lerped(target, tickDelta);
-        float height = target.getHeight();
-        float width = target.getWidth();
+        float height = target.getBbHeight();
+        float width = target.getBbWidth();
         int[] palette = this.colors(alpha);
         int theme = ColorUtil.interpolate(palette[0], palette[1], 0.5F);
-        int particleColor = ColorUtil.interpolate(theme, ColorUtil.rgb(255, 85, 105), MathHelper.clamp(this.hurtProgress, 0.0F, 1.0F));
+        int particleColor = ColorUtil.interpolate(theme, ColorUtil.rgb(255, 85, 105), Mth.clamp(this.hurtProgress, 0.0F, 1.0F));
         double time = (System.currentTimeMillis() % 36000000L) / 1000.0 * 1.0;
         int count = MAX_BLOOM_PARTICLES;
         float userSize = 0.2F;
         PoseStack stack = event.matrices;
         if (stack == null) return;
-        Vec3 camera = event.camera != null ? event.camera.getCameraPos() : Vec3.ZERO;
-        VertexConsumer consumer = event.consumers.getBuffer(RenderLayers.entityTranslucentEmissive(GLOW_TEXTURE));
+        Vec3 camera = event.camera != null ? event.camera.position() : Vec3.ZERO;
+        VertexConsumer consumer = event.consumers.getBuffer(net.minecraft.client.renderer.rendertype.RenderTypes.entityTranslucentEmissive(GLOW_TEXTURE));
 
         for (int i = 0; i < count; i++) {
             BloomSeed seed = BLOOM_SEEDS[i];
@@ -660,8 +659,8 @@ public class TargetESP extends Module {
         try {
             NativeImage image = new NativeImage(32, 64, false);
             this.paintSwordSprite(image);
-            this.swordTexture = new NativeImageBackedTexture(() -> "collective_sword", image);
-            mc.getTextureManager().registerTexture(SWORD_TEXTURE_ID, this.swordTexture);
+            this.swordTexture = new DynamicTexture(() -> "collective_sword", image);
+            mc.getTextureManager().register(SWORD_TEXTURE_ID, this.swordTexture);
             this.swordTextureRegistered = true;
         } catch (Exception ignored) {}
     }
@@ -669,7 +668,7 @@ public class TargetESP extends Module {
     private void paintSwordSprite(NativeImage image) {
         for (int y = 0; y < 64; y++) {
             for (int x = 0; x < 32; x++) {
-                image.setColor(x, y, 0);
+                image.setPixel(x, y, 0);
             }
         }
         for (int y = 0; y <= 5; y++) {
@@ -716,7 +715,7 @@ public class TargetESP extends Module {
 
     private void swordPixel(NativeImage image, int x, int y, int r, int g, int b, int a) {
         if (x >= 0 && y >= 0 && x < image.getWidth() && y < image.getHeight()) {
-            image.setColor(x, y, (a << 24) | (b << 16) | (g << 8) | r);
+            image.setPixel(x, y, (a << 24) | (b << 16) | (g << 8) | r);
         }
     }
 
@@ -728,8 +727,8 @@ public class TargetESP extends Module {
         boolean physics = true;
         double speedVal = 1200.0;
         Vec3 base = this.lerped(target, tickDelta);
-        double centerY = base.y + target.getHeight() * 0.45;
-        double actualRadius = (target.getWidth() + 0.35) * radiusSetting;
+        double centerY = base.y + target.getBbHeight() * 0.45;
+        double actualRadius = (target.getBbWidth() + 0.35) * radiusSetting;
 
         if (this.swordLastUpdate == 0L) {
             this.swordLastUpdate = now;
@@ -761,7 +760,7 @@ public class TargetESP extends Module {
         boolean justDamaged = currentHurt > this.swordPrevHurt && currentHurt >= 9;
         this.swordPrevHurt = currentHurt;
         float hurtPC = currentHurt > 0 ? (float) Math.sin(currentHurt * (Math.PI / 10.0)) : 0.0F;
-        float camYaw = mc.gameRenderer != null && mc.gameRenderer.getCamera() != null ? mc.gameRenderer.getCamera().getYaw() : 0.0f;
+        float camYaw = mc.gameRenderer != null && mc.gameRenderer.mainCamera() != null ? mc.gameRenderer.mainCamera().yRot() : 0.0f;
         float yawRad = (float) Math.toRadians(camYaw);
         int[] palette = this.colors(alpha);
 
@@ -806,10 +805,10 @@ public class TargetESP extends Module {
                 s.y += s.vy * step;
                 s.z += s.vz * step;
                 double camRightVel = -s.vx * Math.cos(yawRad) - s.vz * Math.sin(yawRad);
-                float targetRoll = (float) MathHelper.clamp(camRightVel * 130.0, -42.0, 42.0);
-                float targetPitch = (float) MathHelper.clamp(-s.vy * 85.0, -32.0, 32.0);
-                s.roll = MathHelper.lerp(0.25F * step, s.roll, targetRoll);
-                s.pitch = MathHelper.lerp(0.25F * step, s.pitch, targetPitch);
+                float targetRoll = (float) Mth.clamp(camRightVel * 130.0, -42.0, 42.0);
+                float targetPitch = (float) Mth.clamp(-s.vy * 85.0, -32.0, 32.0);
+                s.roll = Mth.lerp(0.25F * step, s.roll, targetRoll);
+                s.pitch = Mth.lerp(0.25F * step, s.pitch, targetPitch);
             } else {
                 s.x = idealX;
                 s.y = idealY;
@@ -823,7 +822,7 @@ public class TargetESP extends Module {
             this.swordRolls[i] = s.roll;
             this.swordPitchs[i] = s.pitch;
             int theme = ColorUtil.interpolate(palette[0], palette[1], 0.5F + 0.5F * (float) Math.sin(i * 0.785F + now / 450.0));
-            this.swordColors[i] = ColorUtil.interpolate(theme, ColorUtil.rgb(255, 65, 120), MathHelper.clamp(hurtPC, 0.0F, 1.0F));
+            this.swordColors[i] = ColorUtil.interpolate(theme, ColorUtil.rgb(255, 65, 120), Mth.clamp(hurtPC, 0.0F, 1.0F));
         }
 
         this.swordHalfW = 0.20F * sizeSetting;
@@ -838,15 +837,15 @@ public class TargetESP extends Module {
         int count = this.simulateSwords(target, event.tickDelta, now, alpha);
         PoseStack stack = event.matrices;
         if (stack == null) return;
-        Vec3 camera = event.camera != null ? event.camera.getCameraPos() : Vec3.ZERO;
+        Vec3 camera = event.camera != null ? event.camera.position() : Vec3.ZERO;
 
-        VertexConsumer glowConsumer = event.consumers.getBuffer(RenderLayers.entityTranslucentEmissive(GLOW_TEXTURE));
+        VertexConsumer glowConsumer = event.consumers.getBuffer(net.minecraft.client.renderer.rendertype.RenderTypes.entityTranslucentEmissive(GLOW_TEXTURE));
         for (int i = 0; i < count; i++) {
             int glowCol = ColorUtil.withAlpha(this.swordColors[i], Math.round(115.0F * alpha));
             this.drawSwordSprite(stack, glowConsumer, this.swordWorld[i], camera, this.swordHalfW * 1.35F, this.swordHalfH * 1.35F, this.swordRolls[i], this.swordPitchs[i], glowCol);
         }
 
-        VertexConsumer swordConsumer = event.consumers.getBuffer(RenderLayers.entityTranslucentEmissive(SWORD_TEXTURE_ID));
+        VertexConsumer swordConsumer = event.consumers.getBuffer(net.minecraft.client.renderer.rendertype.RenderTypes.entityTranslucentEmissive(SWORD_TEXTURE_ID));
         for (int i = 0; i < count; i++) {
             this.drawSwordSprite(stack, swordConsumer, this.swordWorld[i], camera, this.swordHalfW, this.swordHalfH, this.swordRolls[i], this.swordPitchs[i], this.swordColors[i]);
         }
@@ -854,23 +853,23 @@ public class TargetESP extends Module {
 
     private void drawSwordSprite(PoseStack stack, VertexConsumer consumer, Vec3 position, Vec3 camera, float halfW, float halfH, float roll, float pitch, int color) {
         Vec3 relative = position.subtract(camera);
-        stack.push();
+        stack.pushPose();
         try {
             stack.translate(relative.x, relative.y, relative.z);
-            if (mc.gameRenderer != null && mc.gameRenderer.getCamera() != null) {
-                stack.multiply(mc.gameRenderer.getCamera().getRotation());
+            if (mc.gameRenderer != null && mc.gameRenderer.mainCamera() != null) {
+                stack.rotate(mc.gameRenderer.mainCamera().rotation());
             }
-            stack.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(roll));
-            stack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(pitch));
+            stack.rotate(Axis.ZP.rotationDegrees(roll));
+            stack.rotate(Axis.XP.rotationDegrees(pitch));
             stack.scale(halfW, halfH, 1.0F);
-            PoseStack.Entry entry = stack.peek();
+            PoseStack.Pose entry = stack.last();
 
-            consumer.vertex(entry, -1.0F, -1.0F, 0.0F).color(color).texture(0.0F, 1.0F).overlay(0, 0).light(0xF000F0).normal(entry, 0.0f, 1.0f, 0.0f);
-            consumer.vertex(entry, -1.0F, 1.0F, 0.0F).color(color).texture(0.0F, 0.0F).overlay(0, 0).light(0xF000F0).normal(entry, 0.0f, 1.0f, 0.0f);
-            consumer.vertex(entry, 1.0F, 1.0F, 0.0F).color(color).texture(1.0F, 0.0F).overlay(0, 0).light(0xF000F0).normal(entry, 0.0f, 1.0f, 0.0f);
-            consumer.vertex(entry, 1.0F, -1.0F, 0.0F).color(color).texture(1.0F, 1.0F).overlay(0, 0).light(0xF000F0).normal(entry, 0.0f, 1.0f, 0.0f);
+            consumer.addVertex(entry, -1.0F, -1.0F, 0.0F).setColor(color).setUv(0.0F, 1.0F).setOverlay(0).setLight(0xF000F0).setNormal(entry, 0.0f, 1.0f, 0.0f);
+            consumer.addVertex(entry, -1.0F, 1.0F, 0.0F).setColor(color).setUv(0.0F, 0.0F).setOverlay(0).setLight(0xF000F0).setNormal(entry, 0.0f, 1.0f, 0.0f);
+            consumer.addVertex(entry, 1.0F, 1.0F, 0.0F).setColor(color).setUv(1.0F, 0.0F).setOverlay(0).setLight(0xF000F0).setNormal(entry, 0.0f, 1.0f, 0.0f);
+            consumer.addVertex(entry, 1.0F, -1.0F, 0.0F).setColor(color).setUv(1.0F, 1.0F).setOverlay(0).setLight(0xF000F0).setNormal(entry, 0.0f, 1.0f, 0.0f);
         } finally {
-            stack.pop();
+            stack.popPose();
         }
     }
 
@@ -879,11 +878,11 @@ public class TargetESP extends Module {
     /** ThunderHack: три спиральные градиентные ленты вокруг цели. */
     private void renderThunderHack(Render3DEvent event, LivingEntity target, float alpha, long now) {
         if (event.consumers == null || event.matrices == null) return;
-        VertexConsumer consumer = event.consumers.getBuffer(RenderLayers.entityTranslucentEmissive(GLOW_TEXTURE));
-        PoseStack.Entry entry = event.matrices.peek();
+        VertexConsumer consumer = event.consumers.getBuffer(net.minecraft.client.renderer.rendertype.RenderTypes.entityTranslucentEmissive(GLOW_TEXTURE));
+        PoseStack.Pose entry = event.matrices.last();
 
         Vec3 base = this.lerped(target, event.tickDelta);
-        double height = target.getHeight();
+        double height = target.getBbHeight();
         float time = (float) (now - this.epoch) / 5.0F;
 
         for (int strip = 0; strip < 3; strip++) {
@@ -893,7 +892,7 @@ public class TargetESP extends Module {
                 double a2 = Math.toRadians(j + 1 + phase);
                 double h1 = height - j * 0.004;
                 double h2 = height - (j + 1) * 0.004;
-                float fade = MathHelper.clamp(1.0F - (((float) j + time) % 360.0F) / 60.0F, 0.0F, 1.0F);
+                float fade = Mth.clamp(1.0F - (((float) j + time) % 360.0F) / 60.0F, 0.0F, 1.0F);
                 int col = ColorUtil.multiplyAlpha(thBase(j / 20), fade * alpha);
                 float x1 = (float) (base.x + Math.cos(a1) * 0.5);
                 float z1 = (float) (base.z + Math.sin(a1) * 0.5);
@@ -901,8 +900,8 @@ public class TargetESP extends Module {
                 float z2 = (float) (base.z + Math.sin(a2) * 0.5);
                 float y1 = (float) (base.y + h1);
                 float y2 = (float) (base.y + h2 + 0.1);
-                consumer.vertex(entry, x1, y1, z1).color(col).texture(0.5F, 0.5F).overlay(0, 0).light(0xF000F0).normal(entry, 0.0F, 1.0F, 0.0F);
-                consumer.vertex(entry, x2, y2, z2).color(col).texture(0.5F, 0.5F).overlay(0, 0).light(0xF000F0).normal(entry, 0.0F, 1.0F, 0.0F);
+                consumer.addVertex(entry, x1, y1, z1).setColor(col).setUv(0.5F, 0.5F).setOverlay(0).setLight(0xF000F0).setNormal(entry, 0.0F, 1.0F, 0.0F);
+                consumer.addVertex(entry, x2, y2, z2).setColor(col).setUv(0.5F, 0.5F).setOverlay(0).setLight(0xF000F0).setNormal(entry, 0.0F, 1.0F, 0.0F);
             }
         }
     }
@@ -910,16 +909,16 @@ public class TargetESP extends Module {
     /** ThunderHackV2: рой светлячков по орбитам с параметрами длины/тряски. */
     private void renderThunderHackV2(Render3DEvent event, LivingEntity target, float alpha, long now) {
         if (event.consumers == null || event.matrices == null) return;
-        VertexConsumer consumer = event.consumers.getBuffer(RenderLayers.entityTranslucentEmissive(FIREFLY_TEXTURE));
-        Vec3 camera = event.camera != null ? event.camera.getCameraPos() : Vec3.ZERO;
+        VertexConsumer consumer = event.consumers.getBuffer(net.minecraft.client.renderer.rendertype.RenderTypes.entityTranslucentEmissive(FIREFLY_TEXTURE));
+        Vec3 camera = event.camera != null ? event.camera.position() : Vec3.ZERO;
         Vec3 base = this.lerped(target, event.tickDelta);
 
         int length = Math.max(1, this.espLength.getIntValue());
         float factor = Math.max(1.0F, this.espFactor.getFloatValue());
         float shaking = Math.max(1.0F, this.espShaking.getFloatValue());
         float amplitude = this.espAmplitude.getFloatValue();
-        float age = target.age + event.tickDelta;
-        float w = target.getWidth();
+        float age = target.tickCount + event.tickDelta;
+        float w = target.getBbWidth();
 
         for (int j = 0; j < 3; j++) {
             for (int i = 0; i <= length; i++) {
@@ -940,12 +939,12 @@ public class TargetESP extends Module {
     /** NurikZapen (CaptureMark): вращающаяся метка-захват на цели. */
     private void renderNurikZapen(Render3DEvent event, LivingEntity target, float alpha) {
         if (event.consumers == null || event.matrices == null) return;
-        VertexConsumer consumer = event.consumers.getBuffer(RenderLayers.entityTranslucentEmissive(CAPTURE_TEXTURE));
-        Vec3 camera = event.camera != null ? event.camera.getCameraPos() : Vec3.ZERO;
+        VertexConsumer consumer = event.consumers.getBuffer(net.minecraft.client.renderer.rendertype.RenderTypes.entityTranslucentEmissive(CAPTURE_TEXTURE));
+        Vec3 camera = event.camera != null ? event.camera.position() : Vec3.ZERO;
         Vec3 base = this.lerped(target, event.tickDelta);
 
         float roll = this.markPrev + (this.markValue - this.markPrev) * event.tickDelta;
-        Vec3 pos = new Vec3(base.x, base.y + target.getHeight() * 0.5, base.z);
+        Vec3 pos = new Vec3(base.x, base.y + target.getBbHeight() * 0.5, base.z);
         int col = ColorUtil.multiplyAlpha(thBase((int) roll), alpha);
         this.drawGhostSprite(event.matrices, consumer, pos, camera, 1.5F, 1.5F, roll, col);
     }
@@ -953,22 +952,22 @@ public class TargetESP extends Module {
     /** CelkaPasta: старое градиентное кольцо, качающееся по высоте. */
     private void renderCelkaPasta(Render3DEvent event, LivingEntity target, float alpha, long now) {
         if (event.consumers == null || event.matrices == null) return;
-        VertexConsumer consumer = event.consumers.getBuffer(RenderLayers.entityTranslucentEmissive(GLOW_TEXTURE));
-        PoseStack.Entry entry = event.matrices.peek();
+        VertexConsumer consumer = event.consumers.getBuffer(net.minecraft.client.renderer.rendertype.RenderTypes.entityTranslucentEmissive(GLOW_TEXTURE));
+        PoseStack.Pose entry = event.matrices.last();
 
         float t = (float) (now - this.epoch) / 1000.0F;
         float bob = Math.abs(1.0F + (float) Math.sin(t * 2.0)) / 2.0F;
         Vec3 base = this.lerped(target, event.tickDelta);
-        double y = base.y + bob * target.getHeight();
-        float r = target.getWidth() * 0.8F;
+        double y = base.y + bob * target.getBbHeight();
+        float r = target.getBbWidth() * 0.8F;
 
         for (int i = 0; i <= 30; i++) {
             double a1 = i * Math.PI * 2 / 30;
             double a2 = (i + 1) * Math.PI * 2 / 30;
             int top = ColorUtil.multiplyAlpha(thBase(i), 0.0F);
             int bottom = ColorUtil.multiplyAlpha(thBase(i), alpha * 0.67F);
-            consumer.vertex(entry, (float) (base.x + Math.cos(a1) * r), (float) y, (float) (base.z + Math.sin(a1) * r)).color(top).texture(0.5F, 0.5F).overlay(0, 0).light(0xF000F0).normal(entry, 0.0F, 1.0F, 0.0F);
-            consumer.vertex(entry, (float) (base.x + Math.cos(a2) * r), (float) (base.y), (float) (base.z + Math.sin(a2) * r)).color(bottom).texture(0.5F, 0.5F).overlay(0, 0).light(0xF000F0).normal(entry, 0.0F, 1.0F, 0.0F);
+            consumer.addVertex(entry, (float) (base.x + Math.cos(a1) * r), (float) y, (float) (base.z + Math.sin(a1) * r)).setColor(top).setUv(0.5F, 0.5F).setOverlay(0).setLight(0xF000F0).setNormal(entry, 0.0F, 1.0F, 0.0F);
+            consumer.addVertex(entry, (float) (base.x + Math.cos(a2) * r), (float) (base.y), (float) (base.z + Math.sin(a2) * r)).setColor(bottom).setUv(0.5F, 0.5F).setOverlay(0).setLight(0xF000F0).setNormal(entry, 0.0F, 1.0F, 0.0F);
         }
     }
 
@@ -978,8 +977,8 @@ public class TargetESP extends Module {
         Vec3 base = this.lerped(target, tickDelta);
         float tau = (float) (Math.PI * 2.0);
         float spin = time * 1.2F;
-        float orbit = 1.2F * target.getWidth();
-        float halfHeight = target.getHeight() * 0.5F;
+        float orbit = 1.2F * target.getBbWidth();
+        float halfHeight = target.getBbHeight() * 0.5F;
 
         for (int s = 0; s < stars; s++) {
             float frac = (float) s / stars;
@@ -1010,14 +1009,14 @@ public class TargetESP extends Module {
         int[] palette = this.colors(alpha);
         PoseStack stack = event.matrices;
         if (stack == null) return;
-        Vec3 camera = event.camera != null ? event.camera.getCameraPos() : Vec3.ZERO;
-        VertexConsumer sprites = event.consumers.getBuffer(RenderLayers.entityTranslucentEmissive(STAR_TEXTURE));
-        VertexConsumer glowSprites = event.consumers.getBuffer(RenderLayers.entityTranslucentEmissive(GLOW_TEXTURE));
+        Vec3 camera = event.camera != null ? event.camera.position() : Vec3.ZERO;
+        VertexConsumer sprites = event.consumers.getBuffer(net.minecraft.client.renderer.rendertype.RenderTypes.entityTranslucentEmissive(STAR_TEXTURE));
+        VertexConsumer glowSprites = event.consumers.getBuffer(net.minecraft.client.renderer.rendertype.RenderTypes.entityTranslucentEmissive(GLOW_TEXTURE));
 
         for (int s = 0; s < stars; s++) {
             float frac = (float) s / stars;
             int color = this.constellationColor(frac, time, palette);
-            float pulse = 0.75F + 0.25F * MathHelper.sin(time * 3.0F + frac * (float) (Math.PI * 2.0) * 1.7F);
+            float pulse = 0.75F + 0.25F * Mth.sin(time * 3.0F + frac * (float) (Math.PI * 2.0) * 1.7F);
             float size = 0.27F * pulse * 1.4F * (1.0F + this.hurtProgress * 0.2F);
             float rotation = time * 40.0F + s * 12.0F;
             this.drawGhostSprite(stack, sprites, points[s], camera, size, size, rotation, color);
@@ -1030,7 +1029,7 @@ public class TargetESP extends Module {
         if (event.consumers == null) return;
         float tickDelta = event.tickDelta;
         Vec3 base = this.lerped(target, tickDelta);
-        float entityHeight = target.getHeight();
+        float entityHeight = target.getBbHeight();
         float radius = 0.725F;
         float userSize = 1.0F;
         float time = (float) (System.currentTimeMillis() - this.epoch) / 1000.0F;
@@ -1040,8 +1039,8 @@ public class TargetESP extends Module {
         int theme = ColorUtil.interpolate(palette[0], palette[1], 0.5F);
         PoseStack stack = event.matrices;
         if (stack == null) return;
-        Vec3 camera = event.camera != null ? event.camera.getCameraPos() : Vec3.ZERO;
-        VertexConsumer consumer = event.consumers.getBuffer(RenderLayers.entityTranslucentEmissive(GLOW_TEXTURE));
+        Vec3 camera = event.camera != null ? event.camera.position() : Vec3.ZERO;
+        VertexConsumer consumer = event.consumers.getBuffer(net.minecraft.client.renderer.rendertype.RenderTypes.entityTranslucentEmissive(GLOW_TEXTURE));
 
         for (int i = 0; i < 3; i++) {
             float angleOffset = i * (SWORDS_TAU / 3.0F);
@@ -1091,10 +1090,10 @@ public class TargetESP extends Module {
         float len = 3.0F;
         Vec3 base = this.lerped(target, tickDelta);
         double topX = base.x + (Math.random() - 0.5) * 2.0 * size;
-        double topY = base.y + target.getHeight() + len * (0.7 + Math.random() * 0.6);
+        double topY = base.y + target.getBbHeight() + len * (0.7 + Math.random() * 0.6);
         double topZ = base.z + (Math.random() - 0.5) * 2.0 * size;
         double botX = base.x + (Math.random() - 0.5) * 0.6 * size;
-        double botY = base.y + target.getHeight() * 0.45;
+        double botY = base.y + target.getBbHeight() * 0.45;
         double botZ = base.z + (Math.random() - 0.5) * 0.6 * size;
         int segs = 9;
         Vec3[] pts = new Vec3[segs + 1];
@@ -1102,7 +1101,7 @@ public class TargetESP extends Module {
             double t = (double) i / segs;
             double ox = i != 0 && i != segs ? (Math.random() - 0.5) * 0.7 * size : 0.0;
             double oz = i != 0 && i != segs ? (Math.random() - 0.5) * 0.7 * size : 0.0;
-            pts[i] = new Vec3(MathHelper.lerp(t, topX, botX) + ox, MathHelper.lerp(t, topY, botY), MathHelper.lerp(t, topZ, botZ) + oz);
+            pts[i] = new Vec3(Mth.lerp(t, topX, botX) + ox, Mth.lerp(t, topY, botY), Mth.lerp(t, topZ, botZ) + oz);
         }
         Vec3[] branch = null;
         if (Math.random() < 0.7) {
@@ -1123,7 +1122,7 @@ public class TargetESP extends Module {
         return new Bolt(pts, branch, System.currentTimeMillis(), (long) (120.0 + Math.random() * 140.0));
     }
 
-    private void renderLightningOverlay(GuiGraphics context, LivingEntity target, float alpha, float tickDelta, int width, int height) {
+    private void renderLightningOverlay(GuiGraphicsExtractor context, LivingEntity target, float alpha, float tickDelta, int width, int height) {
         long now = System.currentTimeMillis();
         this.simulateLightning(target, tickDelta, now);
         if (this.bolts.isEmpty()) return;
@@ -1131,10 +1130,10 @@ public class TargetESP extends Module {
         int[] palette = this.colors(alpha);
         int theme = ColorUtil.interpolate(palette[0], palette[1], 0.5F);
         int white = ColorUtil.rgb(235, 242, 255);
-        Vec3 cameraPos = mc.gameRenderer != null && mc.gameRenderer.getCamera() != null ? mc.gameRenderer.getCamera().getCameraPos() : Vec3.ZERO;
+        Vec3 cameraPos = mc.gameRenderer != null && mc.gameRenderer.mainCamera() != null ? mc.gameRenderer.mainCamera().position() : Vec3.ZERO;
 
         for (Bolt bolt : this.bolts) {
-            float age = MathHelper.clamp((float) (now - bolt.born) / Math.max(1L, bolt.life), 0.0F, 1.0F);
+            float age = Mth.clamp((float) (now - bolt.born) / Math.max(1L, bolt.life), 0.0F, 1.0F);
             float a = (float) Math.sin(age * Math.PI) * alpha;
             if (a <= 0.01F) continue;
 
@@ -1152,8 +1151,8 @@ public class TargetESP extends Module {
             Vec3 bottom = bolt.points[bolt.points.length - 1];
             Vector2f point = RenderUtil3D.worldToScreen(bottom.x, bottom.y, bottom.z, width, height);
             if (point != null) {
-                double dist = Math.max(4.0, Math.sqrt(cameraPos.squaredDistanceTo(bottom.x, bottom.y, bottom.z)));
-                float px = MathHelper.clamp((float) (0.55F * 320.0F / dist), 3.0F, 22.0F);
+                double dist = Math.max(4.0, Math.sqrt(cameraPos.distanceToSqr(bottom.x, bottom.y, bottom.z)));
+                float px = Mth.clamp((float) (0.55F * 320.0F / dist), 3.0F, 22.0F);
                 RenderUtil.drawGlow(
                     context, point.x - px * 0.775F, point.y - px * 0.775F, px * 1.55F, px * 1.55F, px * 0.77F,
                     ColorUtil.multiplyAlpha(white, a), 1.0F, px * 1.5F
@@ -1164,7 +1163,7 @@ public class TargetESP extends Module {
 
     // --- UTILITIES ---
     private Vec3 lerp(Vec3 from, Vec3 to, double delta) {
-        return new Vec3(MathHelper.lerp(delta, from.x, to.x), MathHelper.lerp(delta, from.y, to.y), MathHelper.lerp(delta, from.z, to.z));
+        return new Vec3(Mth.lerp(delta, from.x, to.x), Mth.lerp(delta, from.y, to.y), Mth.lerp(delta, from.z, to.z));
     }
 
     private boolean finite(Vec3 value) {
@@ -1202,7 +1201,7 @@ public class TargetESP extends Module {
             second = ColorUtil.interpolate(second, 0xFFFF3333, this.hurtProgress);
         }
 
-        int a = MathHelper.clamp((int) (255.0F * alpha), 0, 255);
+        int a = Mth.clamp((int) (255.0F * alpha), 0, 255);
         return new int[]{ColorUtil.withAlpha(first, a), ColorUtil.withAlpha(second, a)};
     }
 
@@ -1218,7 +1217,7 @@ public class TargetESP extends Module {
     }
 
     private Vec3 lerped(LivingEntity entity, float delta) {
-        return entity.getLerpedPos(delta);
+        return entity.getPosition(delta);
     }
 
     private float easeOutBack(float x) {

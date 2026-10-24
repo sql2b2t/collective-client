@@ -53,7 +53,7 @@ public class Trajectories extends Module {
 
     @EventHandler
     public void onRender3D(Render3DEvent event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         ItemStack stack = getHeldProjectileStack();
         if (stack == null || stack.isEmpty()) return;
@@ -68,9 +68,9 @@ public class Trajectories extends Module {
     }
 
     private ItemStack getHeldProjectileStack() {
-        ItemStack main = mc.player.getMainHandStack();
+        ItemStack main = mc.player.getMainHandItem();
         if (getProjectileInfo(main) != null) return main;
-        ItemStack off = mc.player.getOffHandStack();
+        ItemStack off = mc.player.getOffhandItem();
         if (getProjectileInfo(off) != null) return off;
         return null;
     }
@@ -78,28 +78,28 @@ public class Trajectories extends Module {
     private ProjectileInfo getProjectileInfo(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return null;
 
-        if (stack.isOf(Items.ENDER_PEARL) && pearls.getValue()) {
+        if (stack.is(Items.ENDER_PEARL) && pearls.getValue()) {
             return new ProjectileInfo(1.5, 0.03, 0.99, 0.0f);
         }
-        if (stack.isOf(Items.BOW) && bows.getValue()) {
+        if (stack.is(Items.BOW) && bows.getValue()) {
             float pull = mc.player.isUsingItem() && mc.player.getActiveItem() == stack
-                    ? BowItem.getPullProgress(mc.player.getItemUseTime())
+                    ? BowItem.getPowerForTime(mc.player.getTicksUsingItem())
                     : 1.0f;
             return new ProjectileInfo(pull * 3.0, 0.05, 0.99, 0.0f);
         }
-        if (stack.isOf(Items.CROSSBOW) && bows.getValue()) {
+        if (stack.is(Items.CROSSBOW) && bows.getValue()) {
             return new ProjectileInfo(3.15, 0.05, 0.99, 0.0f);
         }
-        if (stack.isOf(Items.TRIDENT) && tridents.getValue()) {
+        if (stack.is(Items.TRIDENT) && tridents.getValue()) {
             return new ProjectileInfo(2.5, 0.05, 0.99, 0.0f);
         }
-        if ((stack.isOf(Items.SNOWBALL) || stack.isOf(Items.EGG)) && snowballs.getValue()) {
+        if ((stack.is(Items.SNOWBALL) || stack.is(Items.EGG)) && snowballs.getValue()) {
             return new ProjectileInfo(1.5, 0.03, 0.99, 0.0f);
         }
-        if ((stack.isOf(Items.SPLASH_POTION) || stack.isOf(Items.LINGERING_POTION)) && potions.getValue()) {
+        if ((stack.is(Items.SPLASH_POTION) || stack.is(Items.LINGERING_POTION)) && potions.getValue()) {
             return new ProjectileInfo(0.5, 0.05, 0.99, -20.0f);
         }
-        if (stack.isOf(Items.WIND_CHARGE) && windCharges.getValue()) {
+        if (stack.is(Items.WIND_CHARGE) && windCharges.getValue()) {
             return new ProjectileInfo(1.5, 0.0, 1.0, 0.0f);
         }
 
@@ -107,17 +107,17 @@ public class Trajectories extends Module {
     }
 
     private HitResult simulateTrajectory(ProjectileInfo info, List<Vec3> points) {
-        Vec3 eyePos = mc.player.getEyePos();
-        float pitch = mc.player.getPitch() + info.pitchOffset;
-        float yaw = mc.player.getYaw();
+        Vec3 eyePos = mc.player.getEyePosition();
+        float pitch = mc.player.getXRot() + info.pitchOffset;
+        float yaw = mc.player.getYRot();
 
-        float cosPitch = MathHelper.cos(-pitch * MathHelper.RADIANS_PER_DEGREE);
-        float sinPitch = MathHelper.sin(-pitch * MathHelper.RADIANS_PER_DEGREE);
-        float cosYaw = MathHelper.cos(-yaw * MathHelper.RADIANS_PER_DEGREE - MathHelper.PI);
-        float sinYaw = MathHelper.sin(-yaw * MathHelper.RADIANS_PER_DEGREE - MathHelper.PI);
+        float cosPitch = Mth.cos(-pitch * Mth.DEG_TO_RAD);
+        float sinPitch = Mth.sin(-pitch * Mth.DEG_TO_RAD);
+        float cosYaw = Mth.cos(-yaw * Mth.DEG_TO_RAD - Mth.PI);
+        float sinYaw = Mth.sin(-yaw * Mth.DEG_TO_RAD - Mth.PI);
 
         Vec3 dir = new Vec3(-sinYaw * cosPitch, sinPitch, cosYaw * cosPitch).normalize();
-        Vec3 velocity = dir.multiply(info.speed);
+        Vec3 velocity = dir.scale(info.speed);
         Vec3 pos = eyePos;
 
         points.add(pos);
@@ -126,25 +126,25 @@ public class Trajectories extends Module {
         for (int i = 0; i < 200; i++) {
             Vec3 nextPos = pos.add(velocity);
 
-            BlockHitResult bhr = mc.world.raycast(new RaycastContext(
-                    pos, nextPos, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, mc.player
+            BlockHitResult bhr = mc.level.clip(new ClipContext(
+                    pos, nextPos, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, mc.player
             ));
 
-            AABB stepBox = new AABB(pos, nextPos).expand(1.0);
-            EntityHitResult ehr = ProjectileUtil.raycast(
+            AABB stepBox = new AABB(pos, nextPos).inflate(1.0);
+            EntityHitResult ehr = ProjectileUtil.getEntityHitResult(
                     mc.player, pos, nextPos, stepBox,
                     entity -> !entity.isSpectator() && entity.isAlive() && entity != mc.player, 0.0
             );
 
             if (ehr != null) {
                 finalHit = ehr;
-                points.add(ehr.getPos());
+                points.add(ehr.getLocation());
                 break;
             }
 
             if (bhr != null && bhr.getType() == HitResult.Type.BLOCK) {
                 finalHit = bhr;
-                points.add(bhr.getPos());
+                points.add(bhr.getLocation());
                 break;
             }
 
@@ -152,7 +152,7 @@ public class Trajectories extends Module {
             pos = nextPos;
             velocity = new Vec3(velocity.x * info.drag, velocity.y * info.drag - info.gravity, velocity.z * info.drag);
 
-            if (pos.y < mc.world.getBottomY() - 30) {
+            if (pos.y < mc.level.getMinY() - 30) {
                 break;
             }
         }
@@ -176,14 +176,14 @@ public class Trajectories extends Module {
     private void renderHitBox(HitResult hit) {
         if (hit instanceof BlockHitResult bhr) {
             BlockPos pos = bhr.getBlockPos();
-            BlockState state = mc.world.getBlockState(pos);
+            BlockState state = mc.level.getBlockState(pos);
             Color targetColor = hitColor.getValue();
 
-            if (state.isOf(Blocks.LAVA) || state.isOf(Blocks.FIRE) || state.isOf(Blocks.SOUL_FIRE)) {
+            if (state.is(Blocks.LAVA) || state.is(Blocks.FIRE) || state.is(Blocks.SOUL_FIRE)) {
                 targetColor = dangerColor.getValue();
-            } else if (state.isOf(Blocks.WATER)) {
+            } else if (state.is(Blocks.WATER)) {
                 targetColor = waterColor.getValue();
-            } else if (pos.getY() < mc.world.getBottomY()) {
+            } else if (pos.getY() < mc.level.getMinY()) {
                 targetColor = dangerColor.getValue();
             }
 

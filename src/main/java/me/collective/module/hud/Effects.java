@@ -2,7 +2,7 @@ package me.collective.module.hud;
 
 import me.collective.font.FontManager;
 import me.collective.render.RenderUtil;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.effect.MobEffectInstance;
 
 import java.awt.Color;
@@ -14,10 +14,10 @@ public class Effects extends HudModule {
     }
 
     @Override
-    public void render(GuiGraphics context, float delta) {
+    public void render(GuiGraphicsExtractor context, float delta) {
         if (!isToggled() || mc.player == null) return;
 
-        Collection<StatusEffectInstance> effects = mc.player.getStatusEffects();
+        Collection<MobEffectInstance> effects = mc.player.getActiveEffects();
         if (effects.isEmpty()) {
             this.width = 0;
             this.height = 0;
@@ -28,8 +28,8 @@ public class Effects extends HudModule {
         float maxWidth = 50;
         int fontH = FontManager.INSTANCE.getFontHeight();
 
-        for (StatusEffectInstance effect : effects) {
-            String name = effect.getEffectType().value().getName().getString();
+        for (MobEffectInstance effect : effects) {
+            String name = effect.getEffect().value().getDisplayName().getString();
             int amp = effect.getAmplifier() + 1;
             int seconds = effect.getDuration() / 20;
             int mins = seconds / 60;

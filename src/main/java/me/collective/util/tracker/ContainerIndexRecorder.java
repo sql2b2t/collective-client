@@ -43,7 +43,7 @@ public final class ContainerIndexRecorder {
 
     private static BlockPos lastInteractedBlock = null;
     private static BlockPos pendingPos = null;
-    private static ScreenHandler lastScreenHandler = null;
+    private static AbstractContainerMenu lastAbstractContainerMenu = null;
     private static boolean wasInContainerScreen = false;
 
     private ContainerIndexRecorder() {
@@ -51,8 +51,8 @@ public final class ContainerIndexRecorder {
 
     /** Вызывается из миксина в момент попытки взаимодействия с блоком. */
     public static void onBlockInteract(BlockPos pos) {
-        if (MC.world == null) return;
-        if (isTrackableContainer(MC.world.getBlockState(pos).getBlock())) lastInteractedBlock = pos.toImmutable();
+        if (MC.level == null) return;
+        if (isTrackableContainer(MC.level.getBlockState(pos).getBlock())) lastInteractedBlock = pos.immutable();
     }
 
     public static void setOptions(boolean trackShulkerBoxes, boolean trackEnderChests, boolean autosaveInterval) {
@@ -62,7 +62,7 @@ public final class ContainerIndexRecorder {
     }
 
     public static void onTick() {
-        if (MC.player == null || MC.world == null) return;
+        if (MC.player == null || MC.level == null) return;
 
         if (autosave) ChestTrackerDataManager.tickAutosave();
         if (ChestTrackerDataManager.activeCount() <= 0) return;
@@ -71,9 +71,9 @@ public final class ContainerIndexRecorder {
         if (wasInContainerScreen && !currentlyInContainer) recordOnClose();
 
         if (currentlyInContainer) {
-            ScreenHandler handler = MC.player.currentScreenHandler;
-            if (handler != null && handler != MC.player.playerScreenHandler) {
-                lastScreenHandler = handler;
+            AbstractContainerMenu handler = MC.player.containerMenu;
+            if (handler != null && handler != MC.player.inventoryMenu) {
+                lastAbstractContainerMenu = handler;
                 if (pendingPos == null && lastInteractedBlock != null) pendingPos = lastInteractedBlock;
             }
         }
@@ -82,8 +82,8 @@ public final class ContainerIndexRecorder {
     }
 
     /** Основной путь: сервер прислал содержимое контейнера. */
-    public static void onInventoryPacket(InventoryS2CPacket packet) {
-        if (MC.player == null || MC.world == null) return;
+    public static void onInventoryPacket(ClientboundContainerSetContentPacket packet) {
+        if (MC.player == null || MC.level == null) return;
         if (ChestTrackerDataManager.activeCount() <= 0) return;
         // Прилетает с нетти-треда: состояние мира и стейт хендлера можно
         // читать только на главном; переносим и ещё раз проверяем syncId —
@@ -91,16 +91,16 @@ public final class ContainerIndexRecorder {
         MC.execute(() -> handleInventoryPacketOnMainThread(packet));
     }
 
-    private static void handleInventoryPacketOnMainThread(InventoryS2CPacket packet) {
-        if (MC.player == null || MC.world == null) return;
+    private static void handleInventoryPacketOnMainThread(ClientboundContainerSetContentPacket packet) {
+        if (MC.player == null || MC.level == null) return;
 
-        ScreenHandler handler = MC.player.currentScreenHandler;
-        if (handler == null || handler == MC.player.playerScreenHandler) return;
-        if (packet.syncId() != handler.syncId) return;
+        AbstractContainerMenu handler = MC.player.containerMenu;
+        if (handler == null || handler == MC.player.inventoryMenu) return;
+        if (packet.containerId() != handler.containerId) return;
 
         BlockPos pos = pendingPos != null ? pendingPos : lastInteractedBlock;
         if (pos == null) return;
-        if (!isTrackableContainer(MC.world.getBlockState(pos).getBlock())) {
+        if (!isTrackableContainer(MC.level.getBlockState(pos).getBlock())) {
             pendingPos = null;
             lastInteractedBlock = null;
             return;
@@ -108,55 +108,55 @@ public final class ContainerIndexRecorder {
 
         writeSnapshot(handler, pos);
         pendingPos = pos;
-        lastScreenHandler = handler;
+        lastAbstractContainerMenu = handler;
         lastInteractedBlock = null;
     }
 
     private static void recordOnClose() {
-        if (lastScreenHandler == null || pendingPos == null) {
+        if (lastAbstractContainerMenu == null || pendingPos == null) {
             reset();
             return;
         }
 
         BlockPos pos = pendingPos;
-        if (MC.world != null && !isTrackableContainer(MC.world.getBlockState(pos).getBlock())) {
+        if (MC.level != null && !isTrackableContainer(MC.level.getBlockState(pos).getBlock())) {
             // Блок разобрали, а сундук остался в индексе — это враньё индекса
             ChestTrackerDataManager.getData().removeContainer(pos, currentDimension());
         } else {
-            writeSnapshot(lastScreenHandler, pos);
+            writeSnapshot(lastAbstractContainerMenu, pos);
         }
 
         reset();
     }
 
-    private static void writeSnapshot(ScreenHandler handler, BlockPos pos) {
+    private static void writeSnapshot(AbstractContainerMenu handler, BlockPos pos) {
         List<ItemStack> items = readContainerSlots(handler);
         ChestTrackerDataManager.getData()
             .trackContainer(pos, currentDimension(), containerType(pos), items);
     }
 
     /** В инвентаре игрока всегда 36 слотов (27 + 9 хотбара) — отнимаем их. */
-    private static List<ItemStack> readContainerSlots(ScreenHandler handler) {
+    private static List<ItemStack> readContainerSlots(AbstractContainerMenu handler) {
         int containerSlots = Math.max(0, handler.slots.size() - 36);
         List<ItemStack> items = new ArrayList<>();
         for (int i = 0; i < containerSlots && i < handler.slots.size(); i++) {
             Slot slot = handler.slots.get(i);
-            ItemStack stack = slot.getStack();
+            ItemStack stack = slot.getItem();
             if (!stack.isEmpty()) items.add(stack.copy());
         }
         return items;
     }
 
     private static void reset() {
-        lastScreenHandler = null;
+        lastAbstractContainerMenu = null;
         pendingPos = null;
         lastInteractedBlock = null;
         wasInContainerScreen = false;
     }
 
     private static boolean isInContainerScreen() {
-        return MC.currentScreen != null && MC.player != null
-            && MC.player.currentScreenHandler != MC.player.playerScreenHandler;
+        return MC.gui.screen() != null && MC.player != null
+            && MC.player.containerMenu != MC.player.inventoryMenu;
     }
 
     public static boolean isTrackableContainer(Block block) {
@@ -172,8 +172,8 @@ public final class ContainerIndexRecorder {
 
     /** Тип контейнера строкой — хранится в индексе и влияет на оценку слотов. */
     public static String containerType(BlockPos pos) {
-        if (MC.world == null) return "container";
-        Block block = MC.world.getBlockState(pos).getBlock();
+        if (MC.level == null) return "container";
+        Block block = MC.level.getBlockState(pos).getBlock();
         if (block instanceof ChestBlock || block instanceof TrappedChestBlock) return "chest";
         if (block instanceof BarrelBlock) return "barrel";
         if (block instanceof ShulkerBoxBlock) return "shulker_box";
@@ -185,6 +185,6 @@ public final class ContainerIndexRecorder {
     }
 
     private static String currentDimension() {
-        return MC.world == null ? "unknown" : MC.world.getRegistryKey().getValue().toString();
+        return MC.level == null ? "unknown" : MC.level.dimension().identifier().toString();
     }
 }

@@ -5,11 +5,11 @@ import net.minecraft.client.Minecraft;
 public class ChatUtils {
     public static void sendPlayerMsg(String msg) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.getNetworkHandler() == null) return;
+        if (mc.getConnection() == null) return;
         if (msg.startsWith("/")) {
-            mc.getNetworkHandler().sendChatCommand(msg.substring(1));
+            mc.getConnection().sendCommand(msg.substring(1));
         } else {
-            mc.getNetworkHandler().sendChatMessage(msg);
+            mc.getConnection().sendChat(msg);
         }
     }
 }

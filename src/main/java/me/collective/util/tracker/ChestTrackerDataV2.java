@@ -59,7 +59,7 @@ public class ChestTrackerDataV2 {
     private void initializeFiles() {
         try {
             String serverIdentifier = getServerIdentifier();
-            File baseFolder = new File(new File(net.minecraft.client.Minecraft.getInstance().runDirectory, "collective"), "ChestTracker");
+            File baseFolder = new File(new File(net.minecraft.client.Minecraft.getInstance().gameDirectory, "collective"), "ChestTracker");
             if (!baseFolder.exists() && !baseFolder.mkdirs()) LOGGER.error("Не удалось создать папку ChestTracker");
 
             File folder = new File(baseFolder, serverIdentifier);
@@ -77,9 +77,9 @@ public class ChestTrackerDataV2 {
 
     private String getServerIdentifier() {
         if (mc == null) return "unknown";
-        if (mc.getCurrentServerEntry() != null) return ContainerGeometry.sanitizeFileName(mc.getCurrentServerEntry().address);
-        if (mc.isInSingleplayer() && mc.getServer() != null) {
-            return "singleplayer_" + ContainerGeometry.sanitizeFileName(mc.getServer().getSaveProperties().getLevelName());
+        if (mc.getCurrentServer() != null) return ContainerGeometry.sanitizeFileName(mc.getCurrentServer().ip);
+        if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
+            return "singleplayer_" + ContainerGeometry.sanitizeFileName(mc.getSingleplayerServer().getWorldData().getLevelName());
         }
         return "unknown";
     }
@@ -132,7 +132,7 @@ public class ChestTrackerDataV2 {
     }
 
     public List<TrackedContainer> searchItem(Item item, String dimension) {
-        String itemId = Registries.ITEM.getId(item).toString();
+        String itemId = BuiltInRegistries.ITEM.getKey(item).toString();
         lock.readLock().lock();
         try {
             Map<BlockPos, TrackedContainer> dimContainers = containers.get(dimension);
@@ -250,7 +250,7 @@ public class ChestTrackerDataV2 {
                 return;
             }
 
-            File oldFile = new File(new File(net.minecraft.client.Minecraft.getInstance().runDirectory, "collective"), "ChestTracker/tracked_containers.json");
+            File oldFile = new File(new File(net.minecraft.client.Minecraft.getInstance().gameDirectory, "collective"), "ChestTracker/tracked_containers.json");
             if (!oldFile.exists() || !loadFromFile(oldFile)) return;
 
             LOGGER.info("Данные перенесены из старого формата");
@@ -291,7 +291,7 @@ public class ChestTrackerDataV2 {
     public void exportData(String filename) throws java.io.IOException {
         lock.readLock().lock();
         try {
-            File exportFile = new File(new File(new File(net.minecraft.client.Minecraft.getInstance().runDirectory, "collective"), "ChestTracker"), filename);
+            File exportFile = new File(new File(new File(net.minecraft.client.Minecraft.getInstance().gameDirectory, "collective"), "ChestTracker"), filename);
             JsonObject export = new JsonObject();
             export.addProperty("version", 2);
             export.addProperty("exportTime", System.currentTimeMillis());
@@ -317,8 +317,8 @@ public class ChestTrackerDataV2 {
     }
 
     private String currentDimension() {
-        if (mc == null || mc.world == null) return "unknown";
-        RegistryKey<Level> key = mc.world.getRegistryKey();
-        return key.getValue().toString();
+        if (mc == null || mc.level == null) return "unknown";
+        ResourceKey<Level> key = mc.level.dimension();
+        return key.identifier().toString();
     }
 }

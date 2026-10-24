@@ -191,7 +191,7 @@ public final class GpuSdf {
      * Draw a multi-layer soft glow / shadow.
      */
     public static void softGlow(float gx, float gy, float gw, float gh, float gr, int color, float spread, float yOff) {
-        drawBox(gx, gy + yOff, gw, gh, gr, color, 0, 0f, Math.max(1f, spread * (float) mc.getWindow().getScaleFactor()));
+        drawBox(gx, gy + yOff, gw, gh, gr, color, 0, 0f, Math.max(1f, spread * (float) mc.getWindow().getGuiScale()));
     }
 
     private static void drawBox(float gx, float gy, float gw, float gh, float gr,
@@ -202,9 +202,9 @@ public final class GpuSdf {
             return;
         }
 
-        double scale = mc.getWindow().getScaleFactor();
-        int fbW = mc.getWindow().getFramebufferWidth();
-        int fbH = mc.getWindow().getFramebufferHeight();
+        double scale = mc.getWindow().getGuiScale();
+        int fbW = mc.getWindow().getWidth();
+        int fbH = mc.getWindow().getHeight();
         if (fbW <= 0 || fbH <= 0) return;
 
         // Convert GUI coordinates to physical screen pixels

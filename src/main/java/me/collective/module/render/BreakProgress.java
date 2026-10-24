@@ -35,14 +35,17 @@ public class BreakProgress extends Module {
 
     @EventHandler
     public void onRender3D(Render3DEvent event) {
-        if (mc.player == null || mc.world == null || mc.worldRenderer == null) return;
-        if (mc.worldRenderer.blockBreakingInfos == null || mc.worldRenderer.blockBreakingInfos.isEmpty()) return;
+        if (mc.player == null || mc.level == null) return;
+        var map = mc.level.destructionProgress();
+        if (map == null || map.isEmpty()) return;
 
-        for (BlockBreakingInfo info : mc.worldRenderer.blockBreakingInfos.values()) {
+        for (java.util.SortedSet<net.minecraft.server.level.BlockDestructionProgress> set : map.values()) {
+            if (set == null || set.isEmpty()) continue;
+            net.minecraft.server.level.BlockDestructionProgress info = set.last();
             if (info == null) continue;
-            if (info.getActorId() == mc.player.getId() && !self.getValue()) continue;
+            if (info.getId() == mc.player.getId() && !self.getValue()) continue;
 
-            int stage = info.getStage();
+            int stage = info.getProgress();
             if (stage < 0 || stage > 9) continue;
 
             float progress = (stage + 1) / 10.0f;

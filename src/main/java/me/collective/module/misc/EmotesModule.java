@@ -30,41 +30,41 @@ public class EmotesModule extends Module {
 
     @Override
     public void onEnable() {
-        playbackWorld = mc.world;
-        keyWasPressed = emoteMenu.isPressed();
+        playbackWorld = mc.level;
+        keyWasPressed = emoteMenu.isDown();
         ownedWheel = null;
     }
 
     @Override
     public void onUpdate() {
-        if (mc.world != playbackWorld || mc.player == null) {
+        if (mc.level != playbackWorld || mc.player == null) {
             EmoteEngine.stop();
-            if (ownedWheel != null && mc.currentScreen == ownedWheel) mc.setScreen(null);
+            if (ownedWheel != null && mc.gui.screen() == ownedWheel) mc.gui.setScreen(null);
             ownedWheel = null;
-            playbackWorld = mc.world;
-            keyWasPressed = emoteMenu.isPressed();
+            playbackWorld = mc.level;
+            keyWasPressed = emoteMenu.isDown();
         }
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
         EmoteEngine.tick();
-        boolean pressed = emoteMenu.isPressed();
-        if (pressed && !keyWasPressed && mc.currentScreen == null && EmoteEngine.millisSincePlay() > 500) {
+        boolean pressed = emoteMenu.isDown();
+        if (pressed && !keyWasPressed && mc.gui.screen() == null && EmoteEngine.millisSincePlay() > 500) {
             ownedWheel = new EmoteWheelScreen();
-            mc.setScreen(ownedWheel);
-        } else if (!pressed && keyWasPressed && ownedWheel != null && mc.currentScreen == ownedWheel) {
+            mc.gui.setScreen(ownedWheel);
+        } else if (!pressed && keyWasPressed && ownedWheel != null && mc.gui.screen() == ownedWheel) {
             me.collective.emotes.Emote selected = ownedWheel.getSelectedEmote();
-            mc.setScreen(null);
+            mc.gui.setScreen(null);
             ownedWheel = null;
             if (selected != null) EmoteEngine.play(selected);
         }
         // Escape or another screen cancels selection; holding the bind must not reopen it.
-        if (mc.currentScreen != ownedWheel) ownedWheel = null;
+        if (mc.gui.screen() != ownedWheel) ownedWheel = null;
         keyWasPressed = pressed;
     }
 
     @Override
     public void onDisable() {
         EmoteEngine.stop();
-        if (ownedWheel != null && mc.currentScreen == ownedWheel) mc.setScreen(null);
+        if (ownedWheel != null && mc.gui.screen() == ownedWheel) mc.gui.setScreen(null);
         ownedWheel = null;
         playbackWorld = null;
         keyWasPressed = false;

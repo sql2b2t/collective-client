@@ -6,7 +6,7 @@ import me.collective.event.EventHandler;
 import me.collective.event.events.*;
 import me.collective.module.Module;
 import me.collective.setting.*;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 
 import java.awt.Color;
@@ -25,7 +25,7 @@ public class ScriptModule extends Module {
     private Consumer<PacketEvent.Send> onPacketSendAction;
     private Consumer<PacketEvent.Receive> onPacketReceiveAction;
     private Consumer<Render3DEvent> onRender3DAction;
-    private BiConsumer<GuiGraphics, Float> onRender2DAction;
+    private BiConsumer<GuiGraphicsExtractor, Float> onRender2DAction;
     private Consumer<PlayerMoveEvent> onPlayerMoveAction;
     private Consumer<StartBreakingBlockEvent> onBreakBlockAction;
     private Consumer<SendMessageEvent> onSendMessageAction;
@@ -105,7 +105,7 @@ public class ScriptModule extends Module {
         return this;
     }
 
-    public ScriptModule onRender2D(BiConsumer<GuiGraphics, Float> action) {
+    public ScriptModule onRender2D(BiConsumer<GuiGraphicsExtractor, Float> action) {
         this.onRender2DAction = action;
         return this;
     }
@@ -153,7 +153,7 @@ public class ScriptModule extends Module {
     }
 
     @Override
-    public void onRender2D(GuiGraphics context, float delta) {
+    public void onRender2D(GuiGraphicsExtractor context, float delta) {
         if (onRender2DAction == null || !isToggled()) return;
         try {
             onRender2DAction.accept(context, delta);

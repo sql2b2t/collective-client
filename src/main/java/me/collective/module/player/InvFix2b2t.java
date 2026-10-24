@@ -47,20 +47,20 @@ public class InvFix2b2t extends Module {
     private void onPacketReceive(PacketEvent.Receive event) {
         if (!isToggled() || mc.player == null) return;
 
-        if (event.packet instanceof ScreenHandlerSlotUpdateS2CPacket packet) {
+        if (event.packet instanceof ClientboundContainerSetSlotPacket packet) {
             if (!autoResync.getValue() || resyncCooldown > 0) return;
 
             int slot = packet.getSlot();
-            int syncId = packet.getSyncId();
+            int syncId = packet.getContainerId();
 
             // Проверяем соответствие слота игрока
-            if (syncId == 0 && slot >= 0 && slot < mc.player.playerScreenHandler.slots.size()) {
-                ItemStack serverStack = packet.getStack();
-                ItemStack clientStack = mc.player.playerScreenHandler.getSlot(slot).getStack();
+            if (syncId == 0 && slot >= 0 && slot < mc.player.inventoryMenu.slots.size()) {
+                ItemStack serverStack = packet.getItem();
+                ItemStack clientStack = mc.player.inventoryMenu.getSlot(slot).getItem();
 
                 // Обнаружение ghost item: несовпадение количества или типа
                 if (serverStack.isEmpty() != clientStack.isEmpty() ||
-                    (!serverStack.isEmpty() && !ItemStack.areItemsAndComponentsEqual(serverStack, clientStack))) {
+                    (!serverStack.isEmpty() && !ItemStack.isSameItemSameComponents(serverStack, clientStack))) {
                     if (resyncCooldown <= 0) {
                         resyncCooldown = 10;
                         syncInventory();
@@ -79,17 +79,17 @@ public class InvFix2b2t extends Module {
     }
 
     public void syncInventory(boolean manual) {
-        if (mc.getNetworkHandler() == null || mc.player == null) return;
+        if (mc.getConnection() == null || mc.player == null) return;
 
-        mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
-            PlayerActionC2SPacket.Action.SWAP_ITEM_WITH_OFFHAND, BlockPos.ORIGIN, Direction.DOWN
+        mc.getConnection().send(new ServerboundPlayerActionPacket(
+            ServerboundPlayerActionPacket.Action.SWAP_ITEM_WITH_OFFHAND, BlockPos.ZERO, Direction.DOWN
         ));
-        mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
-            PlayerActionC2SPacket.Action.SWAP_ITEM_WITH_OFFHAND, BlockPos.ORIGIN, Direction.DOWN
+        mc.getConnection().send(new ServerboundPlayerActionPacket(
+            ServerboundPlayerActionPacket.Action.SWAP_ITEM_WITH_OFFHAND, BlockPos.ZERO, Direction.DOWN
         ));
 
-        if (mc.interactionManager != null) {
-            mc.interactionManager.syncSelectedSlot();
+        if (mc.gameMode != null) {
+            me.collective.util.InventoryUtil.syncSelectedSlot();
         }
 
         if (manual || notify.getValue()) {

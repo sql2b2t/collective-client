@@ -224,8 +224,8 @@ public class ScriptContext {
     // --- Game Automation & Actions API ---
 
     public void sendPacket(Packet<?> packet) {
-        if (mc.getNetworkHandler() != null && packet != null) {
-            mc.getNetworkHandler().sendPacket(packet);
+        if (mc.getConnection() != null && packet != null) {
+            mc.getConnection().send(packet);
         }
     }
 
@@ -263,9 +263,9 @@ public class ScriptContext {
     public void sendChatMessage(String message) {
         if (mc.player != null && message != null) {
             if (message.startsWith("/")) {
-                mc.player.networkHandler.sendChatCommand(message.substring(1));
+                mc.player.connection.sendCommand(message.substring(1));
             } else {
-                mc.player.networkHandler.sendChatMessage(message);
+                mc.player.connection.sendChat(message);
             }
         }
     }

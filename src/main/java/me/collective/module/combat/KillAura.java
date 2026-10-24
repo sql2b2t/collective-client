@@ -18,7 +18,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.ambient.AmbientCreature;
 import net.minecraft.world.entity.monster.Enemy;
-import net.minecraft.world.entity.monster.Slime;
+import net.minecraft.world.entity.monster.cubemob.Slime;
 import net.minecraft.world.entity.animal.fish.WaterAnimal;
 import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.npc.villager.AbstractVillager;
@@ -141,7 +141,7 @@ public class KillAura extends Module {
 
     @EventHandler
     public void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         aiming = false;
         tickOnce();
@@ -158,10 +158,10 @@ public class KillAura extends Module {
         if (textureRun == null) return;
 
         if (followTarget.getValue()) {
-            Vec3 diff = textureRun.getEntityPos().subtract(mc.player.getEntityPos());
-            if (diff.lengthSquared() > 1.0) {
-                float targetAngle = (float) MathHelper.wrapDegrees(Math.toDegrees(Math.atan2(diff.z, diff.x)) - 90.0);
-                mc.player.setYaw(MathHelper.lerpAngleDegrees(0.2f, mc.player.getYaw(), targetAngle));
+            Vec3 diff = textureRun.position().subtract(mc.player.position());
+            if (diff.lengthSqr() > 1.0) {
+                float targetAngle = (float) Mth.wrapDegrees(Math.toDegrees(Math.atan2(diff.z, diff.x)) - 90.0);
+                mc.player.setYRot(Mth.rotLerp(0.2f, mc.player.getYRot(), targetAngle));
             }
         }
 
@@ -169,7 +169,7 @@ public class KillAura extends Module {
         // Заявка считается «провод нужен»: отказ координации — не повод
         // сбрасывать собственное наведение (release погубил бы доворот).
         aiming = true;
-        if (!AuraCoordination.claim(this, mc.world.getTime())) return;
+        if (!AuraCoordination.claim(this, mc.level.getDefaultClockTime())) return;
 
         // Наведение. Без захвата провода не бьём: удар ушёл бы с чужим
         // серверным углом — мгновенный флаг проверки «взгляд — удар».
@@ -204,15 +204,15 @@ public class KillAura extends Module {
     private void findTarget() {
         LivingEntity best = null;
         double bestScore = Double.MAX_VALUE;
-        Vec3 eyePos = mc.player.getEyePos();
-        Vec3 lookVec = mc.player.getRotationVec(1.0F).normalize();
+        Vec3 eyePos = mc.player.getEyePosition();
+        Vec3 lookVec = mc.player.getViewVector(1.0F).normalize();
 
         // Ближайший отклонённый кандидат — чтобы отладка объясняла,
         // почему цели нет, а не просто констатировала факт.
         String nearestReject = null;
         double nearestRejectDist = Double.MAX_VALUE;
 
-        for (Entity e : mc.world.getEntities()) {
+        for (Entity e : mc.level.entitiesForRendering()) {
             if (!(e instanceof LivingEntity living)) continue;
 
             String reject = rejectReason(living);
@@ -231,7 +231,7 @@ public class KillAura extends Module {
             } else {
                 Vec3 targetCenter = living.getBoundingBox().getCenter();
                 Vec3 toTarget = targetCenter.subtract(eyePos).normalize();
-                score = Math.acos(MathHelper.clamp(lookVec.dotProduct(toTarget), -1.0, 1.0));
+                score = Math.acos(Mth.clamp(lookVec.dot(toTarget), -1.0, 1.0));
             }
 
             if (score < bestScore) {
@@ -259,7 +259,7 @@ public class KillAura extends Module {
         return boxDistance(a.getBoundingBox(), b.getBoundingBox());
     }
 
-    private static double boxDistance(net.minecraft.util.math.AABB ba, net.minecraft.util.math.AABB bb) {
+    private static double boxDistance(net.minecraft.world.phys.AABB ba, net.minecraft.world.phys.AABB bb) {
         double dx = Math.max(0.0, Math.max(ba.minX - bb.maxX, bb.minX - ba.maxX));
         double dy = Math.max(0.0, Math.max(ba.minY - bb.maxY, bb.minY - ba.maxY));
         double dz = Math.max(0.0, Math.max(ba.minZ - bb.maxZ, bb.minZ - ba.maxZ));
@@ -271,11 +271,11 @@ public class KillAura extends Module {
      * Реальный хитбокс сущности.
      *
      * <p>Модуль HitBox через {@code MixinEntityHitbox} расширяет
-     * {@code Entity.getBoundingBox()}, но сервер считает удары по настоящему
+     * {@code Entity.bounds()}, но сервер считает удары по настоящему
      * боксу — поэтому все боевые проверки (луч, дистанция) берут его отсюда.
      */
-    private static net.minecraft.util.math.AABB realBox(Entity entity) {
-        return entity.getDimensions(entity.getPose()).getBoxAt(entity.getEntityPos());
+    private static net.minecraft.world.phys.AABB realBox(Entity entity) {
+        return entity.getDimensions(entity.getPose()).makeBoundingBox(entity.position());
     }
 
     /** Почему сущность не годится в цель. {@code null} — годится. */
@@ -283,7 +283,7 @@ public class KillAura extends Module {
         if (entity == null || entity == mc.player || entity instanceof LocalPlayer) return "это мы сами";
         if (!entity.isAlive()) return "мёртв";
         if (entity.isInvulnerable()) return "неуязвим";
-        if (entity instanceof ArmorStandEntity) return "арморстенд";
+        if (entity instanceof net.minecraft.world.entity.decoration.ArmorStand) return "арморстенд";
 
         float maxDist = getAttackDistance(entity) + acquireRange.compute() + hitboxBonus();
         double dist = boxDistance(mc.player, entity);
@@ -293,7 +293,7 @@ public class KillAura extends Module {
                     getAttackDistance(entity), acquireRange.compute());
         }
 
-        if (!colorMeasure.process("Бить через блоки") && !mc.player.canSee(entity)) {
+        if (!colorMeasure.process("Бить через блоки") && !mc.player.hasLineOfSight(entity)) {
             return entity.getName().getString() + " не виден (нет видимости)";
         }
         if (!providerClose.process("NPC") && isNpc(entity)) {
@@ -319,9 +319,11 @@ public class KillAura extends Module {
             return (!naked || providerClose.process("Голые")) ? null : "фильтр «Голые»";
         }
 
-        boolean isMob     = entity instanceof Monster || entity instanceof SlimeEntity;
-        boolean isVillager = entity instanceof VillagerEntity || entity instanceof MerchantEntity;
-        boolean isAnimal   = entity instanceof AnimalEntity || entity instanceof WaterCreatureEntity || entity instanceof AmbientEntity;
+        boolean isMob     = entity instanceof net.minecraft.world.entity.monster.Monster || entity instanceof net.minecraft.world.entity.monster.cubemob.Slime;
+        boolean isVillager = entity instanceof net.minecraft.world.entity.npc.villager.AbstractVillager;
+        boolean isAnimal   = entity instanceof net.minecraft.world.entity.animal.Animal
+            || entity instanceof net.minecraft.world.entity.animal.fish.WaterAnimal
+            || entity instanceof net.minecraft.world.entity.ambient.AmbientCreature;
 
         if (isMob)     return providerClose.process("Мобы")     ? null : "мобы отключены";
         if (isVillager) return providerClose.process("Жители") ? null : "жители отключены";
@@ -334,10 +336,10 @@ public class KillAura extends Module {
     }
 
     private boolean isNaked(Player player) {
-        return player.getEquippedStack(EquipmentSlot.HEAD).isEmpty()
-            && player.getEquippedStack(EquipmentSlot.CHEST).isEmpty()
-            && player.getEquippedStack(EquipmentSlot.LEGS).isEmpty()
-            && player.getEquippedStack(EquipmentSlot.FEET).isEmpty();
+        return player.getItemBySlot(EquipmentSlot.HEAD).isEmpty()
+            && player.getItemBySlot(EquipmentSlot.CHEST).isEmpty()
+            && player.getItemBySlot(EquipmentSlot.LEGS).isEmpty()
+            && player.getItemBySlot(EquipmentSlot.FEET).isEmpty();
     }
 
     private boolean isNpc(LivingEntity entity) {
@@ -350,7 +352,7 @@ public class KillAura extends Module {
         }
 
         if (entity instanceof Player player) {
-            boolean noTabEntry = mc.getNetworkHandler() != null && mc.getNetworkHandler().getPlayerListEntry(player.getUuid()) == null;
+            boolean noTabEntry = mc.getConnection() != null && mc.getConnection().getPlayerInfo(player.getUUID()) == null;
             boolean numericOrCit = name.matches("\\d{1,8}") || name.startsWith("cit-");
             return noTabEntry || (numericOrCit && !display.equals(name));
         }
@@ -405,7 +407,7 @@ public class KillAura extends Module {
      */
     private boolean isAimReady() {
         RotationUtils rotUtils = RotationUtils.getInstance();
-        float dyaw = Math.abs(MathHelper.wrapDegrees(targetYaw - rotUtils.getSentYaw()));
+        float dyaw = Math.abs(Mth.wrapDegrees(targetYaw - rotUtils.getSentYaw()));
         float dpitch = Math.abs(targetPitch - rotUtils.getSentPitch());
         if (dyaw <= AIM_EPSILON && dpitch <= AIM_EPSILON) return true;
         // Если луч по отправленным углам уже попадает в хитбокс цели — наведение готово
@@ -417,7 +419,7 @@ public class KillAura extends Module {
 
         // Если включено авто-оружие, пустая рука или не-оружие не блокируют удар —
         // модуль сам сделает быстрый pulse-свап на меч перед атакой.
-        if (mc.player.getMainHandStack().isEmpty()) {
+        if (mc.player.getMainHandItem().isEmpty()) {
             if (!autoWeapon.getValue() || findBestWeaponInHotbar() == -1) {
                 report("в руке пусто — не бью");
                 return true;
@@ -428,13 +430,13 @@ public class KillAura extends Module {
             return true;
         }
 
-        if (colorMeasure.process("Не бить в контейнерах") && mc.currentScreen != null) {
+        if (colorMeasure.process("Не бить в контейнерах") && mc.gui.screen() != null) {
             return true;
         }
 
         if (colorMeasure.process("Бить только оружием")) {
-            ItemStack main = mc.player.getMainHandStack();
-            boolean isWeapon = main.isIn(ItemTags.SWORDS) || main.isIn(ItemTags.AXES) || main.getItem() == Items.MACE;
+            ItemStack main = mc.player.getMainHandItem();
+            boolean isWeapon = main.is(ItemTags.SWORDS) || main.is(ItemTags.AXES) || main.getItem() == Items.MACE;
             if (!isWeapon) {
                 if (!autoWeapon.getValue() || findBestWeaponInHotbar() == -1) {
                     return true;
@@ -447,9 +449,9 @@ public class KillAura extends Module {
 
     private boolean isRayBlocked() {
         if (!colorMeasure.process("Проверка на луч")) return false;
-        if (textureRun == null || mc.player == null || mc.world == null) return true;
+        if (textureRun == null || mc.player == null || mc.level == null) return true;
 
-        Vec3 eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePosition();
 
         // Луч строится строго по углу, который сервер уже видел: удар и луч
         // идут с одним углом — проверку «куда смотрели — туда ударили» не
@@ -460,15 +462,15 @@ public class KillAura extends Module {
 
         Vec3 look = RotationUtils.getRotationVector(pitch, yaw);
         double reach = getAttackDistance(textureRun);
-        Vec3 end = eye.add(look.multiply(reach));
+        Vec3 end = eye.add(look.scale(reach));
 
         // 1. Raycast to real target bounding box (сервер считает по настоящим)
-        net.minecraft.util.math.AABB targetBox = realBox(textureRun).expand(0.1);
-        java.util.Optional<Vec3> hit = targetBox.raycast(eye, end);
+        net.minecraft.world.phys.AABB targetBox = realBox(textureRun).inflate(0.1);
+        java.util.Optional<Vec3> hit = targetBox.clip(eye, end);
 
         if (hit.isEmpty()) {
-            net.minecraft.util.math.AABB searchBox = mc.player.getBoundingBox().stretch(look.multiply(reach)).expand(1.0, 1.0, 1.0);
-            net.minecraft.util.hit.EntityHitResult entityHit = net.minecraft.entity.projectile.ProjectileUtil.raycast(
+            net.minecraft.world.phys.AABB searchBox = mc.player.getBoundingBox().expandTowards(look.scale(reach)).inflate(1.0, 1.0, 1.0);
+            net.minecraft.world.phys.EntityHitResult entityHit = net.minecraft.world.entity.projectile.ProjectileUtil.getEntityHitResult(
                 mc.player, eye, end, searchBox, e -> e == textureRun, reach * reach
             );
             if (entityHit == null || entityHit.getEntity() != textureRun) {
@@ -480,13 +482,13 @@ public class KillAura extends Module {
 
         // 2. Block obstruction check if not hitting through blocks
         if (!colorMeasure.process("Бить через блоки")) {
-            net.minecraft.util.hit.BlockHitResult blockHit = mc.world.raycast(new net.minecraft.world.RaycastContext(
-                eye, end, net.minecraft.world.RaycastContext.ShapeType.COLLIDER,
-                net.minecraft.world.RaycastContext.FluidHandling.NONE, mc.player
+            net.minecraft.world.phys.BlockHitResult blockHit = mc.level.clip(new net.minecraft.world.level.ClipContext(
+                eye, end, net.minecraft.world.level.ClipContext.Block.COLLIDER,
+                net.minecraft.world.level.ClipContext.Fluid.NONE, mc.player
             ));
-            if (blockHit.getType() == net.minecraft.util.hit.HitResult.Type.BLOCK) {
-                double blockDistSq = eye.squaredDistanceTo(blockHit.getPos());
-                double targetDistSq = hit.map(eye::squaredDistanceTo).orElse(eye.squaredDistanceTo(textureRun.getEntityPos()));
+            if (blockHit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) {
+                double blockDistSq = eye.distanceToSqr(blockHit.getLocation());
+                double targetDistSq = hit.map(eye::distanceToSqr).orElse(eye.distanceToSqr(textureRun.position()));
                 if (blockDistSq < targetDistSq - 0.05) {
                     report("луч перекрыт блоком");
                     return true;
@@ -499,7 +501,7 @@ public class KillAura extends Module {
 
     /** Порог кулдауна с лёгким человеческим дрожанием момента. */
     private boolean isAttackReady() {
-        float progress = mc.player.getAttackCooldownProgress(0.5f);
+        float progress = mc.player.getAttackStrengthScale(0.5f);
         float gate = cooldownGate.compute() - ThreadLocalRandom.current().nextFloat() * 0.02f;
         return progress >= gate;
     }
@@ -510,23 +512,23 @@ public class KillAura extends Module {
      */
     private boolean canCrit() {
         if (mc.player == null) return false;
-        if (mc.player.isOnGround()) return false;
-        boolean falling = mc.player.fallDistance > 0.0f || mc.player.getVelocity().y < -0.0784;
+        if (mc.player.onGround()) return false;
+        boolean falling = mc.player.fallDistance > 0.0f || mc.player.getDeltaMovement().y < -0.0784;
         return falling
-                && !mc.player.isClimbing()
-                && !mc.player.isTouchingWater()
+                && !mc.player.onClimbable()
+                && !mc.player.isInWater()
                 && !isPlayerInWeb()
-                && !mc.player.hasStatusEffect(net.minecraft.entity.effect.StatusEffects.BLINDNESS);
+                && !mc.player.hasEffect(net.minecraft.world.effect.MobEffects.BLINDNESS);
     }
 
     private boolean isPlayerInWeb() {
-        BlockPos pos = mc.player.getBlockPos();
-        BlockState state = mc.world.getBlockState(pos);
-        return state.isOf(net.minecraft.block.Blocks.COBWEB);
+        BlockPos pos = mc.player.blockPosition();
+        BlockState state = mc.level.getBlockState(pos);
+        return state.is(net.minecraft.world.level.block.Blocks.COBWEB);
     }
 
     private void performAttack() {
-        if (textureRun == null || mc.player == null || mc.interactionManager == null) return;
+        if (textureRun == null || mc.player == null || mc.gameMode == null) return;
 
         // Свапы через SwapManager: слот уходит на сервер немедленно, в этом же
         // батче до удара — бонус булавы и разбивание щита засчитываются
@@ -550,8 +552,8 @@ public class KillAura extends Module {
         }
 
         if (!swapped && autoWeapon.getValue()) {
-            ItemStack main = mc.player.getMainHandStack();
-            boolean isWeapon = main.isIn(ItemTags.SWORDS) || main.isIn(ItemTags.AXES) || main.isOf(Items.MACE);
+            ItemStack main = mc.player.getMainHandItem();
+            boolean isWeapon = main.is(ItemTags.SWORDS) || main.is(ItemTags.AXES) || main.is(Items.MACE);
             if (!isWeapon) {
                 int bestWeapon = findBestWeaponInHotbar();
                 if (bestWeapon != -1) {
@@ -563,7 +565,7 @@ public class KillAura extends Module {
         // Отжим щита перед ударом.
         boolean wasUsingShield = false;
         if (colorMeasure.process("Отжим щита") && mc.player.isUsingItem() && mc.player.getActiveItem().getItem() == Items.SHIELD) {
-            mc.interactionManager.stopUsingItem(mc.player);
+            mc.gameMode.releaseUsingItem(mc.player);
             wasUsingShield = true;
         }
 
@@ -572,12 +574,12 @@ public class KillAura extends Module {
             mc.player.setSprinting(false);
         }
 
-        mc.interactionManager.attackEntity(mc.player, textureRun);
-        mc.player.swingHand(InteractionHand.MAIN_HAND);
+        mc.gameMode.attack(mc.player, textureRun);
+        me.collective.util.Utils.swingHand(InteractionHand.MAIN_HAND);
 
         // Отжим восстанавливаем тем же слотом предмета.
         if (wasUsingShield) {
-            mc.interactionManager.interactItem(mc.player, InteractionHand.OFF_HAND);
+            mc.gameMode.useItem(mc.player, InteractionHand.OFF_HAND);
         }
     }
 
@@ -591,10 +593,10 @@ public class KillAura extends Module {
         info("AttackAura: %s", reason);
     }
 
-    private int findItemInHotbar(net.minecraft.item.Item item) {
+    private int findItemInHotbar(net.minecraft.world.item.Item item) {
         if (mc.player == null) return -1;
         for (int i = 0; i < 9; i++) {
-            if (mc.player.getInventory().getStack(i).isOf(item)) {
+            if (mc.player.getInventory().getItem(i).is(item)) {
                 return i;
             }
         }
@@ -604,7 +606,7 @@ public class KillAura extends Module {
     private int findAxeInHotbar() {
         if (mc.player == null) return -1;
         for (int i = 0; i < 9; i++) {
-            if (mc.player.getInventory().getStack(i).isIn(ItemTags.AXES)) {
+            if (mc.player.getInventory().getItem(i).is(ItemTags.AXES)) {
                 return i;
             }
         }
@@ -617,18 +619,18 @@ public class KillAura extends Module {
         float bestDamage = -1.0f;
 
         for (int i = 0; i < 9; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
+            ItemStack stack = mc.player.getInventory().getItem(i);
             if (stack.isEmpty()) continue;
-            boolean isSword = stack.isIn(ItemTags.SWORDS);
-            boolean isAxe = stack.isIn(ItemTags.AXES);
+            boolean isSword = stack.is(ItemTags.SWORDS);
+            boolean isAxe = stack.is(ItemTags.AXES);
             if (isSword || isAxe) {
                 float dmg = 4.0f;
-                if (stack.isOf(Items.NETHERITE_SWORD)) dmg = 8.0f;
-                else if (stack.isOf(Items.DIAMOND_SWORD)) dmg = 7.0f;
-                else if (stack.isOf(Items.NETHERITE_AXE)) dmg = 7.5f;
-                else if (stack.isOf(Items.DIAMOND_AXE)) dmg = 6.5f;
-                else if (stack.isOf(Items.IRON_SWORD)) dmg = 6.0f;
-                else if (stack.isOf(Items.IRON_AXE)) dmg = 5.5f;
+                if (stack.is(Items.NETHERITE_SWORD)) dmg = 8.0f;
+                else if (stack.is(Items.DIAMOND_SWORD)) dmg = 7.0f;
+                else if (stack.is(Items.NETHERITE_AXE)) dmg = 7.5f;
+                else if (stack.is(Items.DIAMOND_AXE)) dmg = 6.5f;
+                else if (stack.is(Items.IRON_SWORD)) dmg = 6.0f;
+                else if (stack.is(Items.IRON_AXE)) dmg = 5.5f;
                 if (dmg > bestDamage) {
                     bestDamage = dmg;
                     bestSlot = i;

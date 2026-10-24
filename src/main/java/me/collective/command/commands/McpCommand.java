@@ -109,7 +109,7 @@ public class McpCommand extends Command {
 
         if (args[0].equalsIgnoreCase("copy")) {
             int port = currentPort(module);
-            mc.keyboard.setClipboard(McpServer.buildClientConfig(port));
+            mc.keyboardHandler.setClipboard(McpServer.buildClientConfig(port));
             ChatHelper.sendMessage(Component.literal("§a[Collective] Шаблон MCP без секрета скопирован. Подставьте локальный токен в защищённой конфигурации AI-клиента."));
             return;
         }

@@ -16,7 +16,7 @@ import java.nio.ByteBuffer;
  * текстуру. Захват — один раз при открытии экрана.
  */
 public final class BlurBackground {
-    private static final Identifier BLUR_ID = Identifier.of("collective", "dynamic/blur_bg");
+    private static final Identifier BLUR_ID = Identifier.fromNamespaceAndPath("collective", "dynamic/blur_bg");
     private static final int DOWNSCALE = 6;
     private static final int BLUR_RADIUS = 3;
     private static final int BLUR_PASSES = 2;
@@ -31,8 +31,8 @@ public final class BlurBackground {
     /** Захват фона. Null при любой ошибке (тогда экран рисует обычный фон). */
     public static Captured capture(Minecraft mc) {
         if (mc == null || mc.getWindow() == null) return null;
-        int fw = mc.getWindow().getFramebufferWidth();
-        int fh = mc.getWindow().getFramebufferHeight();
+        int fw = mc.getWindow().getWidth();
+        int fh = mc.getWindow().getHeight();
         if (fw <= 0 || fh <= 0) return null;
         ByteBuffer pixels = null;
         try {
@@ -60,7 +60,7 @@ public final class BlurBackground {
                                 n++;
                             }
                         }
-                        small.setColorArgb(x, y, 0xFF000000
+                        small.setPixel(x, y, 0xFF000000
                             | ((int) (r / n) << 16) | ((int) (g / n) << 8) | (int) (b / n));
                     }
                 }
@@ -74,13 +74,13 @@ public final class BlurBackground {
                 } finally {
                     small.close();
                 }
-                NativeImageBackedTexture tex =
-                    new NativeImageBackedTexture(() -> "collective-blur", big);
+                DynamicTexture tex =
+                    new DynamicTexture(() -> "collective-blur", big);
                 try {
-                    mc.getTextureManager().destroyTexture(BLUR_ID);
+                    mc.getTextureManager().release(BLUR_ID);
                 } catch (Throwable ignored) {
                 }
-                mc.getTextureManager().registerTexture(BLUR_ID, tex);
+                mc.getTextureManager().register(BLUR_ID, tex);
                 return new Captured(tw, th);
             } catch (Throwable t) {
                 try {
@@ -103,7 +103,7 @@ public final class BlurBackground {
     public static void release(Minecraft mc) {
         if (mc == null) return;
         try {
-            mc.getTextureManager().destroyTexture(BLUR_ID);
+            mc.getTextureManager().release(BLUR_ID);
         } catch (Throwable ignored) {
         }
     }
@@ -118,7 +118,7 @@ public final class BlurBackground {
                     int n = 0;
                     for (int k = -BLUR_RADIUS; k <= BLUR_RADIUS; k++) {
                         int sx = Math.min(w - 1, Math.max(0, x + k));
-                        int c = img.getColorArgb(sx, y);
+                        int c = img.getPixel(sx, y);
                         a += (c >>> 24);
                         r += (c >> 16) & 0xFF;
                         g += (c >> 8) & 0xFF;
@@ -143,7 +143,7 @@ public final class BlurBackground {
                         b += c & 0xFF;
                         n++;
                     }
-                    img.setColorArgb(x, y, ((int) (a / n) << 24) | ((int) (r / n) << 16)
+                    img.setPixel(x, y, ((int) (a / n) << 24) | ((int) (r / n) << 16)
                         | ((int) (g / n) << 8) | (int) (b / n));
                 }
             }
@@ -162,11 +162,11 @@ public final class BlurBackground {
                 int x0 = (int) sx;
                 int x1 = Math.min(sw - 1, x0 + 1);
                 float fx = sx - x0;
-                int c00 = src.getColorArgb(x0, y0);
-                int c10 = src.getColorArgb(x1, y0);
-                int c01 = src.getColorArgb(x0, y1);
-                int c11 = src.getColorArgb(x1, y1);
-                dst.setColorArgb(x, y, bilerp(c00, c10, c01, c11, fx, fy));
+                int c00 = src.getPixel(x0, y0);
+                int c10 = src.getPixel(x1, y0);
+                int c01 = src.getPixel(x0, y1);
+                int c11 = src.getPixel(x1, y1);
+                dst.setPixel(x, y, bilerp(c00, c10, c01, c11, fx, fy));
             }
         }
     }

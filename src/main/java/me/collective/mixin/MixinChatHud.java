@@ -1,7 +1,7 @@
 package me.collective.mixin;
 
 import me.collective.font.ChatFontUtil;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.util.FormattedCharSequence;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -18,14 +18,14 @@ public abstract class MixinChatHud {
 
     @Shadow
     @Final
-    private GuiGraphics context;
+    private GuiGraphicsExtractor context;
 
     @Inject(
-        method = "text(IFLnet/minecraft/text/OrderedText;)Z",
+        method = "text(IFLnet/minecraft/text/FormattedCharSequence;)Z",
         at = @At("HEAD"),
         cancellable = true
     )
-    private void drawCustomChatFont(int y, float opacity, OrderedText text, CallbackInfoReturnable<Boolean> cir) {
+    private void drawCustomChatFont(int y, float opacity, FormattedCharSequence text, CallbackInfoReturnable<Boolean> cir) {
         if (ChatFontUtil.drawCustomChat(context, y, opacity, text)) cir.setReturnValue(true);
     }
 }

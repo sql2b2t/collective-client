@@ -41,7 +41,7 @@ final class BlockScan {
             || Math.abs((long) playerPos.getZ() - center.getZ()) > range);
         if (changed || movedAway || (!scanning && now - completedAt >= 500L)) {
             world = currentWorld;
-            center = playerPos.toImmutable();
+            center = playerPos.immutable();
             radius = range;
             targets = Set.copyOf(selected);
             cursor = 0;
@@ -54,7 +54,7 @@ final class BlockScan {
         if (!scanning) return results;
 
         int width = radius * 2 + 1;
-        BlockPos.Mutable pos = new BlockPos.Mutable();
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         for (int work = 0; work < POSITIONS_PER_TICK && cursor < volume; work++) {
             int index = cursor++;
             int z = index % width - radius;
@@ -62,9 +62,9 @@ final class BlockScan {
             int x = index / (width * width) - radius;
             pos.set(center.getX() + x, center.getY() + y, center.getZ() + z);
             // Never ask the world for block state in an unloaded chunk.
-            if (!world.isChunkLoaded(pos.getX() >> 4, pos.getZ() >> 4)) continue;
+            if (!world.hasChunk(pos.getX() >> 4, pos.getZ() >> 4)) continue;
             if (targets.contains(world.getBlockState(pos).getBlock())) {
-                results.add(pos.toImmutable());
+                results.add(pos.immutable());
                 if (results.size() >= MAX_RESULTS) break;
             }
         }

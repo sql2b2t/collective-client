@@ -71,9 +71,9 @@ public class Ambience extends Module {
     }
 
     public boolean modifyFogBuffer(ByteBuffer buffer, int offset, Vector4f color, float envStart, float envEnd, float rdStart, float rdEnd, float skyEnd, float cloudEnd) {
-        if (mc.world == null) return false;
+        if (mc.level == null) return false;
 
-        boolean isNether = mc.world.getRegistryKey() == Level.NETHER;
+        boolean isNether = mc.level.dimension() == Level.NETHER;
         if (netherOnly.getValue() && !isNether) return false;
 
         boolean clearing = clearFog.getValue();

@@ -35,15 +35,15 @@ public class AntiVoid extends Module {
 
     @Override
     public void onUpdate() {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         if (rescueJumpTicks > 0) {
             // Прыжок случился (оттолкнулись) — отпускаем клавишу, чтобы не
             // залипнуть в бесконечных прыжках после первого спасения.
-            boolean jumped = mc.player.getVelocity().y > 0.3;
+            boolean jumped = mc.player.getDeltaMovement().y > 0.3;
             rescueJumpTicks--;
             if (jumped || rescueJumpTicks == 0) {
-                mc.options.jumpKey.setPressed(false);
+                mc.options.keyJump.setDown(false);
                 rescueJumpTicks = 0;
             }
         }
@@ -52,7 +52,7 @@ public class AntiVoid extends Module {
             cooldownTicks--;
             return;
         }
-        if (mc.player.isOnGround()) {
+        if (mc.player.onGround()) {
             cooldownTicks = 0;
             return;
         }
@@ -61,10 +61,10 @@ public class AntiVoid extends Module {
         if (!isOverVoid()) return;
 
         // Гасим падение, тянем вверх
-        Vec3 vel = mc.player.getVelocity();
-        mc.player.setVelocity(vel.x * 0.7, Math.max(vel.y, -0.15), vel.z * 0.7);
+        Vec3 vel = mc.player.getDeltaMovement();
+        mc.player.setDeltaMovement(vel.x * 0.7, Math.max(vel.y, -0.15), vel.z * 0.7);
         if (jump.getValue()) {
-            mc.options.jumpKey.setPressed(true);
+            mc.options.keyJump.setDown(true);
             rescueJumpTicks = 5;
         }
         cooldownTicks = cooldown.getIntValue();
@@ -74,16 +74,16 @@ public class AntiVoid extends Module {
     public void onDisable() {
         cooldownTicks = 0;
         rescueJumpTicks = 0;
-        if (mc.options != null) mc.options.jumpKey.setPressed(false);
+        if (mc.options != null) mc.options.keyJump.setDown(false);
     }
 
-    private final BlockPos.Mutable voidCheckPos = new BlockPos.Mutable();
+    private final BlockPos.MutableBlockPos voidCheckPos = new BlockPos.MutableBlockPos();
 
     private boolean isOverVoid() {
-        BlockPos pos = mc.player.getBlockPos();
-        for (int y = pos.getY(); y > mc.world.getBottomY() - 10; y--) {
+        BlockPos pos = mc.player.blockPosition();
+        for (int y = pos.getY(); y > mc.level.getMinY() - 10; y--) {
             voidCheckPos.set(pos.getX(), y, pos.getZ());
-            if (!mc.world.getBlockState(voidCheckPos).isAir()) return false;
+            if (!mc.level.getBlockState(voidCheckPos).isAir()) return false;
         }
         return true;
     }

@@ -20,7 +20,7 @@ public class ItemListSettingScreen extends CollectionListSettingScreen<Item> {
 
     @Override
     protected Iterable<Item> allValues() {
-        return Registries.ITEM;
+        return BuiltInRegistries.ITEM;
     }
 
     @Override
@@ -31,14 +31,14 @@ public class ItemListSettingScreen extends CollectionListSettingScreen<Item> {
     @Override
     protected String[] getValueNames(Item value) {
         return new String[]{
-                value.getName().getString(),
-                Registries.ITEM.getId(value).toString()
+                value.getName(value.getDefaultInstance()).getString(),
+                BuiltInRegistries.ITEM.getKey(value).toString()
         };
     }
 
     @Override
     protected String labelFor(Item value) {
-        return value.getName().getString();
+        return value.getName(value.getDefaultInstance()).getString();
     }
 
     @Override

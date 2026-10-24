@@ -60,7 +60,7 @@ public class McpModule extends Module {
 
     private void copyConfigToClipboard() {
         int currentPort = server != null ? server.getPort() : port.getIntValue();
-        mc.keyboard.setClipboard(McpServer.buildClientConfig(currentPort));
+        mc.keyboardHandler.setClipboard(McpServer.buildClientConfig(currentPort));
         info("Шаблон MCP скопирован (без секрета). Подставьте локальный токен из ~/.config/collective-private/mcp.token только в защищённой конфигурации AI-клиента.");
     }
 }

@@ -397,7 +397,7 @@ public class ScriptManager {
             val autoJump = ctx.module("AutoJump", me.collective.category.Category.MOVEMENT, "Автоматически прыгает при движении")
 
             autoJump.onTick { mod ->
-                if (mc.player != null && mc.player!!.isOnGround && mc.options.forwardKey.isPressed) {
+                if (mc.player != null && mc.player!!.isOnGround && mc.options.keyUp.isPressed) {
                     mc.player!!.jump()
                 }
             }
@@ -514,9 +514,9 @@ public class ScriptManager {
             Полезные методы ctx:
               ctx.print("msg")                             — сообщение в чат
               ctx.log("msg")                               — сообщение в консоль
-              ctx.sendChatMessage("привет")                — отправить в чат (или серверную /команду)
+              ctx.sendChat("привет")                — отправить в чат (или серверную /команду)
               ctx.executeClientCommand(".toggle AutoJump") — выполнить команду клиента
-              ctx.sendPacket(packet)                       — отправить пакет на сервер
+              ctx.send(packet)                       — отправить пакет на сервер
               ctx.rotateSilent(yaw, pitch)                 — тихая ротация через RotationUtils
               ctx.rotateTo(x, y, z)                        — навестись на точку
               ctx.pathTo(x, y, z), ctx.cancelPath()        — Baritone

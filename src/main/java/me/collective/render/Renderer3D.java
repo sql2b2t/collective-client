@@ -2,10 +2,11 @@ package me.collective.render;
 
 import me.collective.util.SettingColor;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
 import net.minecraft.gizmos.GizmoStyle;
+import net.minecraft.gizmos.Gizmos;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.minecraft.gizmos.Gizmos;
 
 import java.awt.Color;
 
@@ -15,7 +16,7 @@ public class Renderer3D {
      * box()/line() calls directly into the general collector, without their own try-with-resources
      * for each box. Outside of the frame — each call works on its own scope, as before.
      */
-    private static GizmoDrawing.CollectorScope frameScope;
+    private static Gizmos.TemporaryCollection frameScope;
 
     /** General instance for the {@code event.renderer} field — without allocating a new object every frame. */
     public static final Renderer3D SHARED = new Renderer3D();
@@ -26,16 +27,16 @@ public class Renderer3D {
 
     public static void beginFrameScope() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.worldRenderer == null) return;
+        if (mc.levelRenderer == null) return;
         try {
-            frameScope = mc.worldRenderer.startDrawingGizmos();
+            frameScope = mc.levelRenderer.collectPerFrameRenderThreadGizmos();
         } catch (Throwable t) {
             frameScope = null;
         }
     }
 
     public static void endFrameScope() {
-        GizmoDrawing.CollectorScope scope = frameScope;
+        Gizmos.TemporaryCollection scope = frameScope;
         frameScope = null;
         if (scope == null) return;
         try {
@@ -62,14 +63,13 @@ public class Renderer3D {
 
     public static void box(double x1, double y1, double z1, double x2, double y2, double z2, Color fill, Color line, ShapeMode shapeMode, boolean ignoreOcclusion) {
         if (frameScope != null) {
-            // Общий скоуп кадра уже открыт — рисуем напрямую, без своего на каждый бокс.
             drawBoxRaw(x1, y1, z1, x2, y2, z2, fill, line, shapeMode, ignoreOcclusion);
             return;
         }
 
         Minecraft mc = Minecraft.getInstance();
-        if (mc.worldRenderer == null) return;
-        try (var scope = mc.worldRenderer.startDrawingGizmos()) {
+        if (mc.levelRenderer == null) return;
+        try (var scope = mc.levelRenderer.collectPerFrameRenderThreadGizmos()) {
             drawBoxRaw(x1, y1, z1, x2, y2, z2, fill, line, shapeMode, ignoreOcclusion);
         } catch (Exception ignored) {
         }
@@ -94,23 +94,26 @@ public class Renderer3D {
         int lineRgba = line != null ? rgba(line) : 0;
         float lw = Math.max(0.1f, lineWidth);
 
+        GizmoStyle style;
         if (shapeMode == ShapeMode.Both && fill != null && line != null) {
-            var vis = GizmoDrawing.box(box, DrawStyle.filledAndStroked(fillRgba, lw, lineRgba));
-            if (ignoreOcclusion) vis.ignoreOcclusion();
+            style = GizmoStyle.strokeAndFill(lineRgba, lw, fillRgba);
         } else if ((shapeMode == ShapeMode.Sides || shapeMode == ShapeMode.Both) && fill != null) {
-            var vis = GizmoDrawing.box(box, DrawStyle.filled(fillRgba));
-            if (ignoreOcclusion) vis.ignoreOcclusion();
+            style = GizmoStyle.fill(fillRgba);
         } else if ((shapeMode == ShapeMode.Lines || shapeMode == ShapeMode.Both) && line != null) {
-            var vis = GizmoDrawing.box(box, DrawStyle.stroked(lineRgba, lw));
-            if (ignoreOcclusion) vis.ignoreOcclusion();
+            style = GizmoStyle.stroke(lineRgba, lw);
+        } else {
+            return;
         }
+
+        var vis = Gizmos.cuboid(box, style);
+        if (ignoreOcclusion) vis.setAlwaysOnTop();
     }
 
     public static void box(double x1, double y1, double z1, double x2, double y2, double z2, Object fill, Object line, ShapeMode shapeMode, int excludeDirs) {
         box(x1, y1, z1, x2, y2, z2, toAwt(fill), toAwt(line), shapeMode != null ? shapeMode : ShapeMode.Both);
     }
 
-    public static void box(net.minecraft.util.math.BlockPos pos, Object fill, Object line, ShapeMode shapeMode, int excludeDirs) {
+    public static void box(BlockPos pos, Object fill, Object line, ShapeMode shapeMode, int excludeDirs) {
         if (pos == null) return;
         box(pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1, fill, line, shapeMode, excludeDirs);
     }
@@ -141,27 +144,32 @@ public class Renderer3D {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
-        if (mc.worldRenderer == null) return;
-        try (var scope = mc.worldRenderer.startDrawingGizmos()) {
+        if (mc.levelRenderer == null) return;
+        try (var scope = mc.levelRenderer.collectPerFrameRenderThreadGizmos()) {
             drawBoxRaw(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ, fill, line, shapeMode, ignoreOcclusion, lineWidth);
         } catch (Exception ignored) {
         }
     }
 
     public static void line(double x1, double y1, double z1, double x2, double y2, double z2, Object color) {
+        line(x1, y1, z1, x2, y2, z2, color, false);
+    }
+
+    public static void line(double x1, double y1, double z1, double x2, double y2, double z2, Object color, boolean ignoreOcclusion) {
         Color c = toAwt(color);
         if (c == null) return;
 
         if (frameScope != null) {
-            // Общий скоуп кадра — без собственного try-with-resources на каждую линию.
-            GizmoDrawing.line(new Vec3(x1, y1, z1), new Vec3(x2, y2, z2), rgba(c), 1.5f);
+            var prop = Gizmos.line(new Vec3(x1, y1, z1), new Vec3(x2, y2, z2), rgba(c), 1.5f);
+            if (ignoreOcclusion) prop.setAlwaysOnTop();
             return;
         }
 
         Minecraft mc = Minecraft.getInstance();
-        if (mc.worldRenderer == null) return;
-        try (var scope = mc.worldRenderer.startDrawingGizmos()) {
-            GizmoDrawing.line(new Vec3(x1, y1, z1), new Vec3(x2, y2, z2), rgba(c), 1.5f);
+        if (mc.levelRenderer == null) return;
+        try (var scope = mc.levelRenderer.collectPerFrameRenderThreadGizmos()) {
+            var prop = Gizmos.line(new Vec3(x1, y1, z1), new Vec3(x2, y2, z2), rgba(c), 1.5f);
+            if (ignoreOcclusion) prop.setAlwaysOnTop();
         } catch (Exception ignored) {
         }
     }

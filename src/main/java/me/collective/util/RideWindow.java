@@ -52,12 +52,12 @@ public final class RideWindow {
 
         if (reach <= 1.0E-9) return null;
 
-        Vec3 ride = heading.multiply(Math.min(reach, cap));
+        Vec3 ride = heading.scale(Math.min(reach, cap));
 
         return new Vec3(
-            MathHelper.clamp(ride.x, w[0], w[3]),
-            MathHelper.clamp(ride.y, w[1], w[4]),
-            MathHelper.clamp(ride.z, w[2], w[5]));
+            Mth.clamp(ride.x, w[0], w[3]),
+            Mth.clamp(ride.y, w[1], w[4]),
+            Mth.clamp(ride.z, w[2], w[5]));
     }
 
     /** Направление езды с поправкой на угловой допуск. */
@@ -65,31 +65,31 @@ public final class RideWindow {
                                  double pitchAlignDeg, double anti) {
         if (yawAlignDeg <= 1.0E-6 && pitchAlignDeg <= 1.0E-6) return look;
 
-        boolean vertical = look.horizontalLength() < anti;
+        boolean vertical = look.horizontalDistance() < anti;
 
         Vec3 corner = new Vec3(
             axisEdge(look.x, predicted.x, w[0], w[3], anti, vertical),
             axisEdge(look.y, 0.0, w[1], w[4], anti, true),
             axisEdge(look.z, predicted.z, w[2], w[5], anti, vertical));
 
-        if (corner.lengthSquared() <= 1.0E-18) return look;
+        if (corner.lengthSqr() <= 1.0E-18) return look;
 
         double lookYaw = Math.toDegrees(Math.atan2(-look.x, look.z));
-        double lookPitch = Math.toDegrees(-Math.atan2(look.y, look.horizontalLength()));
+        double lookPitch = Math.toDegrees(-Math.atan2(look.y, look.horizontalDistance()));
 
-        double cornerYaw = corner.horizontalLength() <= 1.0E-9
+        double cornerYaw = corner.horizontalDistance() <= 1.0E-9
             ? lookYaw
             : Math.toDegrees(Math.atan2(-corner.x, corner.z));
 
-        double cornerPitch = Math.toDegrees(-Math.atan2(corner.y, corner.horizontalLength()));
+        double cornerPitch = Math.toDegrees(-Math.atan2(corner.y, corner.horizontalDistance()));
 
-        double yaw = lookYaw + MathHelper.clamp(MathHelper.wrapDegrees(cornerYaw - lookYaw),
+        double yaw = lookYaw + Mth.clamp(Mth.wrapDegrees(cornerYaw - lookYaw),
             -yawAlignDeg, yawAlignDeg);
 
-        double pitch = lookPitch + MathHelper.clamp(cornerPitch - lookPitch,
+        double pitch = lookPitch + Mth.clamp(cornerPitch - lookPitch,
             -pitchAlignDeg, pitchAlignDeg);
 
-        return Vec3.fromPolar((float) pitch, (float) yaw);
+        return Vec3.directionFromRotation((float) pitch, (float) yaw);
     }
 
     /** До какой границы коридора доходит луч. */
@@ -115,7 +115,7 @@ public final class RideWindow {
         if (dir > anti) return hi;
         if (dir < -anti) return lo;
 
-        return MathHelper.clamp(holdZero ? 0.0 : keep, lo, hi);
+        return Mth.clamp(holdZero ? 0.0 : keep, lo, hi);
     }
 
     /** Коридор допустимых направлений: грубый, по двум соседним взглядам. */
@@ -143,7 +143,7 @@ public final class RideWindow {
         float pitchRad = pitchDeg * ((float) Math.PI / 180);
 
         double horizSqrt = Math.sqrt(look.x * look.x + look.z * look.z);
-        double horizLen = old.horizontalLength();
+        double horizLen = old.horizontalDistance();
 
         double vertCos = Math.cos(pitchRad);
         vertCos = vertCos * vertCos * Math.min(1.0, look.length() / 0.4);
@@ -157,7 +157,7 @@ public final class RideWindow {
         }
 
         if (pitchRad < 0.0f && horizSqrt > 0.0) {
-            double d = horizLen * -MathHelper.sin(pitchRad) * 0.04;
+            double d = horizLen * -Mth.sin(pitchRad) * 0.04;
             v = v.add(-look.x * d / horizSqrt, d * 3.2, -look.z * d / horizSqrt);
         }
 

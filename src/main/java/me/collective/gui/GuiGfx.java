@@ -1,15 +1,10 @@
 package me.collective.gui;
 
-import com.mojang.blaze3d.systems.GpuDevice;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.AddressMode;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.TextureFormat;
 import net.minecraft.client.Minecraft;
-import com.mojang.blaze3d.textures.GpuSampler;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.texture.AbstractTexture;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.texture.DynamicTexture;
 import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.resources.Identifier;
 
@@ -52,26 +47,12 @@ public final class GuiGfx {
     private static final Map<Integer, Identifier> discMasks = new HashMap<>();
     private static final Map<Long, Identifier> ringMasks = new HashMap<>();
 
-    /** Текстура-маска: GL-текстура с линейной фильтрацией, зарегистрированная в менеджере текстур. */
-    private static final class MaskTexture extends AbstractTexture {
-        private MaskTexture(com.mojang.blaze3d.textures.GpuTexture texture,
-                            com.mojang.blaze3d.textures.GpuTextureView view, GpuSampler sampler) {
-            this.glTexture = texture;
-            this.glTextureView = view;
-            this.sampler = sampler;
-        }
+    private static void registerMask(Identifier id, String name, NativeImage image) {
+        DynamicTexture texture = new DynamicTexture(() -> name, image);
+        texture.upload();
+        Minecraft.getInstance().getTextureManager().register(id, texture);
     }
 
-    private static void registerMask(Identifier id, String name, NativeImage image) {
-        GpuDevice device = RenderSystem.getDevice();
-        com.mojang.blaze3d.textures.GpuTexture texture =
-            device.createTexture(name, 5, TextureFormat.RGBA8, image.getWidth(), image.getHeight(), 1, 1);
-        device.createCommandEncoder().writeToTexture(texture, image);
-        GpuSampler sampler = RenderSystem.getSamplerCache().get(
-            AddressMode.REPEAT, AddressMode.REPEAT, FilterMode.LINEAR, FilterMode.LINEAR, false);
-        Minecraft.getInstance().getTextureManager().registerTexture(id,
-            new MaskTexture(texture, device.createTextureView(texture), sampler));
-    }
 
     /**
      * Маска диска радиуса r: альфа текселя — аналитическое покрытие круга
@@ -90,10 +71,10 @@ public final class GuiGfx {
                     float dx = x + 0.5f - c;
                     float dy = y + 0.5f - c;
                     float cov = Math.max(0f, Math.min(1f, r + 0.5f - (float) Math.sqrt(dx * dx + dy * dy)));
-                    img.setColorArgb(x, y, (int) (cov * 255f + 0.5f) << 24 | 0x00FFFFFF);
+                    img.setPixel(x, y, (int) (cov * 255f + 0.5f) << 24 | 0x00FFFFFF);
                 }
             }
-            Identifier id = Identifier.of("collective", "gui/mask/disc_" + r);
+            Identifier id = Identifier.fromNamespaceAndPath("collective", "gui/mask/disc_" + r);
             registerMask(id, "collective_gui_mask_disc_" + r, img);
             discMasks.put(r, id);
             return id;
@@ -126,10 +107,10 @@ public final class GuiGfx {
                     float dy = y + 0.5f - c;
                     float cov = Math.max(0f, Math.min(1f,
                         h + 0.5f - Math.abs((float) Math.sqrt(dx * dx + dy * dy) - r)));
-                    img.setColorArgb(x, y, (int) (cov * 255f + 0.5f) << 24 | 0x00FFFFFF);
+                    img.setPixel(x, y, (int) (cov * 255f + 0.5f) << 24 | 0x00FFFFFF);
                 }
             }
-            Identifier id = Identifier.of("collective", "gui/mask/ring_" + r + "_" + halfHalves);
+            Identifier id = Identifier.fromNamespaceAndPath("collective", "gui/mask/ring_" + r + "_" + halfHalves);
             registerMask(id, "collective_gui_mask_ring_" + r + "_" + halfHalves, img);
             ringMasks.put(key, id);
             return id;
@@ -144,13 +125,13 @@ public final class GuiGfx {
      * Размер региона в текселях равен размеру квада в пикселях, поэтому
      * фрагменты сэмплируют центры текселей один к одному.
      */
-    private static void maskQuad(GuiGraphics ctx, Identifier mask, int texSize,
+    private static void maskQuad(GuiGraphicsExtractor ctx, Identifier mask, int texSize,
                                  int x, int y, int size, float u, float v, int argb) {
-        ctx.drawTexture(RenderPipelines.GUI_TEXTURED, mask, x, y, u, v, size, size, size, size, texSize, texSize, argb);
+        ctx.blit(RenderPipelines.GUI_TEXTURED, mask, x, y, u, v, size, size, size, size, texSize, texSize, argb);
     }
 
     /** Заливка угловой четверти (сторона size) маской диска. */
-    private static void discCorner(GuiGraphics ctx, Identifier mask, int r, int m,
+    private static void discCorner(GuiGraphicsExtractor ctx, Identifier mask, int r, int m,
                                    int x, int y, boolean right, boolean bottom, int argb) {
         int texSize = 2 * r + 2 * m;
         float u = (m + (right ? r : 0)) + 0.5f;
@@ -159,7 +140,7 @@ public final class GuiGfx {
     }
 
     /** Угловая заплатка обводки (сторона outer) маской кольца. */
-    private static void ringCorner(GuiGraphics ctx, Identifier mask, int outer, int m,
+    private static void ringCorner(GuiGraphicsExtractor ctx, Identifier mask, int outer, int m,
                                    int x, int y, boolean right, boolean bottom, int argb) {
         int texSize = 2 * outer + 2 * m;
         float u = (m + (right ? outer : 0)) + 0.5f;
@@ -187,7 +168,7 @@ public final class GuiGfx {
     }
 
     /** Скруглённый прямоугольник. radius ограничивается половиной меньшей стороны. */
-    public static void fillRounded(GuiGraphics ctx, float fx, float fy, float fw, float fh, float radius, int color) {
+    public static void fillRounded(GuiGraphicsExtractor ctx, float fx, float fy, float fw, float fh, float radius, int color) {
         if (fw <= 0f || fh <= 0f) return;
         int alphaBase = (color >>> 24) & 0xFF;
         if (alphaBase == 0) return;
@@ -226,12 +207,12 @@ public final class GuiGfx {
     }
 
     /** Скруглённая обводка 1px без заливки. */
-    public static void outlineRounded(GuiGraphics ctx, float fx, float fy, float fw, float fh, float radius, int color) {
+    public static void outlineRounded(GuiGraphicsExtractor ctx, float fx, float fy, float fw, float fh, float radius, int color) {
         strokeRounded(ctx, fx, fy, fw, fh, radius, 1f, color);
     }
 
     /** Обводка произвольной толщины по границе скруглённого прямоугольника. */
-    public static void strokeRounded(GuiGraphics ctx, float fx, float fy, float fw, float fh, float radius,
+    public static void strokeRounded(GuiGraphicsExtractor ctx, float fx, float fy, float fw, float fh, float radius,
                                      float thickness, int color) {
         if (fw <= 0f || fh <= 0f) return;
         int alphaBase = (color >>> 24) & 0xFF;
@@ -275,14 +256,14 @@ public final class GuiGfx {
     }
 
     /** Скруглённая панель: бордер плюс заливка с отступом 1px. */
-    public static void roundedBorder(GuiGraphics ctx, float x, float y, float w, float h, float r,
+    public static void roundedBorder(GuiGraphicsExtractor ctx, float x, float y, float w, float h, float r,
                                      int borderColor, int fillColor) {
         fillRounded(ctx, x, y, w, h, r, borderColor);
         fillRounded(ctx, x + 1, y + 1, w - 2, h - 2, Math.max(0f, r - 1f), fillColor);
     }
 
-    /** Диск с аналитическим сглаживанием (GuiGraphics, работает в GUI-пассах). */
-    public static void dot(GuiGraphics ctx, float cx, float cy, float r, int color) {
+    /** Диск с аналитическим сглаживанием (GuiGraphicsExtractor, работает в GUI-пассах). */
+    public static void dot(GuiGraphicsExtractor ctx, float cx, float cy, float r, int color) {
         if (r <= 0f) return;
         int alphaBase = (color >>> 24) & 0xFF;
         if (alphaBase == 0) return;
@@ -311,7 +292,7 @@ public final class GuiGfx {
     }
 
     /** Кольцо толщиной ~1.2px с аналитическим сглаживанием. */
-    public static void dotRing(GuiGraphics ctx, float cx, float cy, float r, int color) {
+    public static void dotRing(GuiGraphicsExtractor ctx, float cx, float cy, float r, int color) {
         if (r <= 1f) {
             dot(ctx, cx, cy, r, color);
             return;
@@ -346,7 +327,7 @@ public final class GuiGfx {
     // ==================== Попиксельный фолбэк ====================
 
     /** Фолбэк обводки: аналитический SDF-проход кольца вокруг границы. */
-    private static void strokeRoundedLegacy(GuiGraphics ctx, float fx, float fy, float fw, float fh,
+    private static void strokeRoundedLegacy(GuiGraphicsExtractor ctx, float fx, float fy, float fw, float fh,
                                             float radius, float half, int rgb, int alphaBase) {
         float x0 = fx, y0 = fy, x1 = fx + fw, y1 = fy + fh;
         float r = Math.max(0f, Math.min(radius, Math.min(fw, fh) * 0.5f));
@@ -372,7 +353,7 @@ public final class GuiGfx {
     }
 
     /** Попиксельный проход обводки по SDF (кольцо вокруг границы). */
-    private static void sweepStroke(GuiGraphics ctx, int from, int to, int y,
+    private static void sweepStroke(GuiGraphicsExtractor ctx, int from, int to, int y,
                                     float midX, float midY, float hw, float hh, float r, float half,
                                     int rgb, int alphaBase) {
         int run = -1;
@@ -399,7 +380,7 @@ public final class GuiGfx {
      * полосами по пикселю (визуально совпадает с кругом), крупные —
      * до 20 полос на угол; шаг >1px незаметен на мягких заливках.
      */
-    private static void coarseFillRounded(GuiGraphics ctx, float fx, float fy, float fw, float fh,
+    private static void coarseFillRounded(GuiGraphicsExtractor ctx, float fx, float fy, float fw, float fh,
                                           float radius, int rgb, int alphaBase) {
         float x0 = fx, y0 = fy, x1 = fx + fw, y1 = fy + fh;
         float r = Math.max(0f, Math.min(radius, Math.min(fw, fh) * 0.5f));
@@ -424,7 +405,7 @@ public final class GuiGfx {
      * наружу (к углу коробки). Хорда берётся на дальнем крае полосы —
      * заливка слегка внутрь диска, без наружного выпирания.
      */
-    private static void cornerStrips(GuiGraphics ctx, float cx, float cy, float r,
+    private static void cornerStrips(GuiGraphicsExtractor ctx, float cx, float cy, float r,
                                      float dirX, float dirY, int k, int rgb, int alphaBase) {
         float step = r / k;
         for (int i = 0; i < k; i++) {
@@ -456,7 +437,7 @@ public final class GuiGfx {
      * Прямоугольник с покрытием дробных граней: до 9 квадов (частичная колонка
      * слева, полный прогон, частичная колонка справа × три полосы по высоте).
      */
-    private static void fillStraight(GuiGraphics ctx, float x0, float y0, float x1, float y1, int rgb, int alphaBase) {
+    private static void fillStraight(GuiGraphicsExtractor ctx, float x0, float y0, float x1, float y1, int rgb, int alphaBase) {
         if (x1 <= x0 || y1 <= y0) return;
         int cx0 = (int) Math.floor(x0), cx1 = (int) Math.ceil(x1) - 1;
         int cy0 = (int) Math.floor(y0), cy1 = (int) Math.ceil(y1) - 1;
@@ -496,7 +477,7 @@ public final class GuiGfx {
     }
 
     /** Квад с умножением альфы на покрытие; пустые и прозрачные не рисуются. */
-    private static void quad(GuiGraphics ctx, int x0, int y0, int x1, int y1, int rgb, float alpha) {
+    private static void quad(GuiGraphicsExtractor ctx, int x0, int y0, int x1, int y1, int rgb, float alpha) {
         if (x1 <= x0 || y1 <= y0) return;
         int a = (int) (alpha + 0.5f);
         if (a <= 0) return;
@@ -508,7 +489,7 @@ public final class GuiGfx {
      * Мягкая тень/свечение: слои наружу с падающей альфой.
      * rgb — цвет без альфы (0xF59E0B), baseAlpha — альфа внутреннего слоя.
      */
-    public static void softGlow(GuiGraphics ctx, int x, int y, int w, int h, int r,
+    public static void softGlow(GuiGraphicsExtractor ctx, int x, int y, int w, int h, int r,
                                 int rgb, int baseAlpha, int layers, int yOff) {
         int pure = rgb & 0x00FFFFFF;
         for (int k = layers; k >= 1; k--) {
@@ -519,12 +500,12 @@ public final class GuiGfx {
     }
 
     /** Тень вниз для карточек. */
-    public static void shadow(GuiGraphics ctx, int x, int y, int w, int h, int r) {
+    public static void shadow(GuiGraphicsExtractor ctx, int x, int y, int w, int h, int r) {
         softGlow(ctx, x, y, w, h, r, 0x000000, 90, 3, 2);
     }
 
     /** Янтарное свечение для акцентов. */
-    public static void amberGlow(GuiGraphics ctx, int x, int y, int w, int h, int r) {
+    public static void amberGlow(GuiGraphicsExtractor ctx, int x, int y, int w, int h, int r) {
         softGlow(ctx, x, y, w, h, r, 0xF59E0B, 70, 4, 0);
     }
 }

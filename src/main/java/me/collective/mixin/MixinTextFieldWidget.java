@@ -4,7 +4,7 @@ import me.collective.font.FontManager;
 import me.collective.module.ModuleManager;
 import me.collective.module.client.Fonts;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 import org.spongepowered.asm.mixin.Mixin;
@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
  * <p>Подменяет отрисовку и измерение ширины, чтобы курсор совпадал
  * с кастомными глифами.
  */
-@Mixin(TextFieldWidget.class)
+@Mixin(EditBox.class)
 public abstract class MixinTextFieldWidget {
 
     private static long lastLog = 0L;
@@ -36,26 +36,26 @@ public abstract class MixinTextFieldWidget {
     @Redirect(
         method = "renderWidget",
         at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/GuiGraphics;drawTextWithShadow"
-                + "(Lnet/minecraft/client/font/TextRenderer;Lnet/minecraft/text/Component;III)V")
+            target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;drawTextWithShadow"
+                + "(Lnet/minecraft/client/font/Font;Lnet/minecraft/text/Component;III)V")
     )
-    private void drawCustomInputText(GuiGraphics context, TextRenderer renderer, Component text, int x, int y, int color) {
+    private void drawCustomInputText(GuiGraphicsExtractor context, Font renderer, Component text, int x, int y, int color) {
         if (useCustomFont()) {
             FontManager.INSTANCE.drawStringWithShadow(context, text.getString(), x, y, color);
         } else {
-            context.drawTextWithShadow(renderer, text, x, y, color);
+            context.text(renderer, text, x, y, color);
         }
     }
 
     @Redirect(
         method = "renderWidget",
         at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/font/TextRenderer;getWidth(Ljava/lang/String;)I")
+            target = "Lnet/minecraft/client/font/Font;getWidth(Ljava/lang/String;)I")
     )
-    private int customInputWidth(TextRenderer renderer, String text) {
+    private int customInputWidth(Font renderer, String text) {
         if (useCustomFont()) {
             return (int) FontManager.INSTANCE.getStringWidth(text);
         }
-        return renderer.getWidth(text);
+        return renderer.width(text);
     }
 }

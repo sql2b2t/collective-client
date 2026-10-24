@@ -20,7 +20,7 @@ public class FreeLook extends Module {
 
     public final NumberSetting distance = add(new NumberSetting("Distance", 6.0, 2.0, 15.0, 0.5));
 
-    private Perspective prevPerspective;
+    private CameraType prevPerspective;
     private float orbitYaw;
     private float orbitPitch;
 
@@ -35,16 +35,16 @@ public class FreeLook extends Module {
             setToggled(false);
             return;
         }
-        this.prevPerspective = mc.options.getPerspective();
-        mc.options.setPerspective(Perspective.THIRD_PERSON_BACK);
-        this.orbitYaw = mc.player.getYaw();
-        this.orbitPitch = mc.player.getPitch();
+        this.prevPerspective = mc.options.getCameraType();
+        mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+        this.orbitYaw = mc.player.getYRot();
+        this.orbitPitch = mc.player.getXRot();
     }
 
     @Override
     public void onDisable() {
         if (mc.options != null && this.prevPerspective != null) {
-            mc.options.setPerspective(this.prevPerspective);
+            mc.options.setCameraType(this.prevPerspective);
         }
         this.prevPerspective = null;
     }
@@ -52,19 +52,19 @@ public class FreeLook extends Module {
     /** Вызывается из MixinEntityLook: мOUTH двигает орбиту, игрок остаётся. */
     public void turn(double cursorDeltaX, double cursorDeltaY) {
         this.orbitYaw += (float) (cursorDeltaX * 0.15);
-        this.orbitPitch = MathHelper.clamp(this.orbitPitch + (float) (cursorDeltaY * 0.15), -90.0f, 90.0f);
+        this.orbitPitch = Mth.clamp(this.orbitPitch + (float) (cursorDeltaY * 0.15), -90.0f, 90.0f);
     }
 
     public boolean isActive() {
-        return isToggled() && mc.player != null && mc.world != null;
+        return isToggled() && mc.player != null && mc.level != null;
     }
 
     /** Точка, где должна висеть камера (за спиной по орбите). */
     public Vec3 orbitPos(float tickProgress) {
         float dist = this.distance.getFloatValue();
-        Vec3 eye = mc.player.getCameraPosVec(tickProgress);
-        Vec3 dir = Vec3.fromPolar(this.orbitPitch, this.orbitYaw);
-        return eye.add(dir.multiply(-dist));
+        Vec3 eye = mc.player.getEyePosition();
+        Vec3 dir = Vec3.directionFromRotation(this.orbitPitch, this.orbitYaw);
+        return eye.add(dir.scale(-dist));
     }
 
     public float getOrbitYaw() {

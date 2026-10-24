@@ -11,12 +11,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(ElytraFeatureRenderer.class)
+@Mixin(WingsLayer.class)
 public abstract class MixinElytraFeatureRenderer {
-    @Inject(method = "render(Lnet/minecraft/client/util/math/PoseStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;ILnet/minecraft/client/render/entity/state/BipedEntityRenderState;FF)V",
+    @Inject(method = "submit(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/client/renderer/entity/state/HumanoidRenderState;FF)V",
         at = @At("HEAD"), cancellable = true)
-    private void collective$hideOwnWings(PoseStack matrices, OrderedRenderCommandQueue queue, int light,
-        BipedEntityRenderState state, float tickDelta, float tickProgress, CallbackInfo ci) {
+    private void collective$hideOwnWings(PoseStack matrices, SubmitNodeCollector queue, int light,
+        HumanoidRenderState state, float tickDelta, float tickProgress, CallbackInfo ci) {
         if (ElytraBounce.lookLikeFalling() && Minecraft.getInstance().player != null) {
             if (me.collective.emotes.EmoteEngine.isLocal(state)) {
                 ci.cancel();

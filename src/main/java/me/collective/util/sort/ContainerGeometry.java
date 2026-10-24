@@ -35,16 +35,16 @@ public final class ContainerGeometry {
         Block block = state.getBlock();
         if (!(block instanceof ChestBlock) && !(block instanceof TrappedChestBlock)) return null;
 
-        if (!state.contains(Properties.CHEST_TYPE) || !state.contains(Properties.HORIZONTAL_FACING)) return null;
-        if (state.get(Properties.CHEST_TYPE) == ChestType.SINGLE) return null;
+        if (!state.hasProperty(BlockStateProperties.CHEST_TYPE) || !state.hasProperty(BlockStateProperties.HORIZONTAL_FACING)) return null;
+        if (state.getValue(BlockStateProperties.CHEST_TYPE) == net.minecraft.world.level.block.state.properties.ChestType.SINGLE) return null;
 
-        Direction connected = ChestBlock.getFacing(state);
-        Block otherBlock = level.getBlockState(pos.offset(connected)).getBlock();
+        Direction connected = ChestBlock.getConnectedDirection(state);
+        Block otherBlock = level.getBlockState(pos.relative(connected)).getBlock();
         if (!(otherBlock instanceof ChestBlock)) return null;
 
         // Половины обычного и зачарованного сундука не образуют двойной сундук
         return (block instanceof TrappedChestBlock) == (otherBlock instanceof TrappedChestBlock)
-            ? pos.offset(connected)
+            ? pos.relative(connected)
             : null;
     }
 
@@ -60,7 +60,7 @@ public final class ContainerGeometry {
     }
 
     public static boolean isShulkerItem(ItemStack stack) {
-        return stack != null && !stack.isEmpty() && stack.isIn(ItemTags.SHULKER_BOXES);
+        return stack != null && !stack.isEmpty() && stack.is(ItemTags.SHULKER_BOXES);
     }
 
     /** 54 слота у двойного сундука, 27 у одинарного. */
@@ -73,7 +73,7 @@ public final class ContainerGeometry {
      * иначе оцениваем по типу и занятым стопкам (чанк мог выгрузиться).
      */
     public static int slotCount(Level level, BlockPos canonical, String containerType, int usedStacks) {
-        return level != null && level.isPosLoaded(canonical) && isContainerBlock(level.getBlockState(canonical))
+        return level != null && level.isLoaded(canonical) && isContainerBlock(level.getBlockState(canonical))
             ? slotCount(level, canonical)
             : estimatedSlots(containerType, usedStacks);
     }
@@ -87,9 +87,9 @@ public final class ContainerGeometry {
     public static String serverId() {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null) return "unknown";
-        if (mc.getCurrentServerEntry() != null) return sanitizeFileName(mc.getCurrentServerEntry().address);
-        return mc.isInSingleplayer() && mc.getServer() != null
-            ? "singleplayer_" + sanitizeFileName(mc.getServer().getSaveProperties().getLevelName())
+        if (mc.getCurrentServer() != null) return sanitizeFileName(mc.getCurrentServer().ip);
+        return mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null
+            ? "singleplayer_" + sanitizeFileName(mc.getSingleplayerServer().getWorldData().getLevelName())
             : "unknown";
     }
 

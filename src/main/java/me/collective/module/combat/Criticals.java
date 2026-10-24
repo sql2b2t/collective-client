@@ -3,7 +3,6 @@ package me.collective.module.combat;
 import me.collective.category.Category;
 import me.collective.event.EventHandler;
 import me.collective.event.events.PacketEvent;
-import me.collective.util.IPlayerInteractEntity;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.EnumSetting;
@@ -11,7 +10,7 @@ import me.collective.setting.NumberSetting;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.MaceItem;
-import net.minecraft.network.protocol.game.ServerboundInteractPacket;
+import net.minecraft.network.protocol.game.ServerboundAttackPacket;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 
 public class Criticals extends Module {
@@ -29,15 +28,14 @@ public class Criticals extends Module {
 
     @EventHandler
     private void onPacketSend(PacketEvent.Send event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
-        if (event.getPacket() instanceof PlayerInteractEntityC2SPacket && event.getPacket() instanceof IPlayerInteractEntity packet) {
-            if (packet.collective$getType() == PlayerInteractEntityC2SPacket.InteractType.ATTACK) {
-                Entity entity = packet.collective$getEntity();
-                if (!(entity instanceof LivingEntity)) return;
+        if (event.getPacket() instanceof ServerboundAttackPacket attackPacket) {
+            Entity entity = mc.level.getEntity(attackPacket.entityId());
+            if (!(entity instanceof LivingEntity)) return;
 
-                if (mace.getValue() && mc.player.getMainHandStack().getItem() instanceof MaceItem) {
-                    if (mc.player.isGliding()) return;
+            if (mace.getValue() && mc.player.getMainHandItem().getItem() instanceof MaceItem) {
+                    if (mc.player.isFallFlying()) return;
                     sendPos(0.0);
                     sendPos(1.501 + extraHeight.getValue());
                     sendPos(0.0);
@@ -52,24 +50,23 @@ public class Criticals extends Module {
                         sendPos(0.0);
                     }
                     case GRIM -> {
-                        if (mc.player.isOnGround()) {
-                            mc.player.jump();
+                        if (mc.player.onGround()) {
+                            mc.player.jumpFromGround();
                         }
                     }
                     case JUMP -> {
-                        mc.player.jump();
+                        mc.player.jumpFromGround();
                     }
                     case MINI_JUMP -> {
-                        mc.player.setVelocity(mc.player.getVelocity().x, 0.25, mc.player.getVelocity().z);
+                        mc.player.setDeltaMovement(mc.player.getDeltaMovement().x, 0.25, mc.player.getDeltaMovement().z);
                     }
                 }
-            }
         }
     }
 
     private void sendPos(double offset) {
         if (mc.player == null) return;
-        me.collective.util.PacketUtil.sendSilently(new PlayerMoveC2SPacket.PositionAndOnGround(
+        me.collective.util.PacketUtil.sendSilently(new ServerboundMovePlayerPacket.Pos(
             mc.player.getX(),
             mc.player.getY() + offset,
             mc.player.getZ(),
@@ -80,6 +77,6 @@ public class Criticals extends Module {
 
     private boolean skipCrit() {
         if (mc.player == null) return true;
-        return !mc.player.isOnGround() || mc.player.isSubmergedInWater() || mc.player.isInLava() || mc.player.isClimbing();
+        return !mc.player.onGround() || mc.player.isUnderWater() || mc.player.isInLava() || mc.player.onClimbable();
     }
 }

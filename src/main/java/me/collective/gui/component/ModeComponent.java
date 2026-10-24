@@ -5,7 +5,7 @@ import me.collective.gui.ClickGuiTheme;
 import me.collective.module.client.UI;
 import me.collective.render.SoundUtil;
 import me.collective.setting.ModeSetting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.util.List;
 
@@ -40,7 +40,7 @@ public class ModeComponent extends Component {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         if (!setting.isVisible()) return;
 
         boolean hov = isHovered(mouseX, mouseY);

@@ -91,12 +91,12 @@ public class CommandManager {
             } catch (Throwable t) {
                 // Команда обязана никогда не ронять клиент: сваливаем в чат.
                 t.printStackTrace();
-                ChatHelper.sendMessage(Component.literal("Ошибка команды: " + t).styled(s -> s.withColor(ChatFormatting.RED)));
+                ChatHelper.sendMessage(Component.literal("Ошибка команды: " + t).withStyle(ChatFormatting.RED));
             }
             return true;
         }
 
-        ChatHelper.sendMessage(Component.literal("Unknown command. Type " + prefix + "help for a list of commands.").styled(s -> s.withColor(ChatFormatting.RED)));
+        ChatHelper.sendMessage(Component.literal("Unknown command. Type " + prefix + "help for a list of commands.").withStyle(ChatFormatting.RED));
         return true;
     }
 }

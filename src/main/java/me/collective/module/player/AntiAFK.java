@@ -21,14 +21,14 @@ public class AntiAFK extends Module {
         if (mc.player == null) return;
 
         if (spin.getValue()) {
-            mc.player.setYaw(mc.player.getYaw() + 1.0f);
+            mc.player.setYRot(mc.player.getYRot() + 1.0f);
         }
 
         if (jump.getValue()) {
             jumpTimer++;
             if (jumpTimer >= 200) { // jump every 10 seconds
-                if (mc.player.isOnGround()) {
-                    mc.player.jump();
+                if (mc.player.onGround()) {
+                    mc.player.jumpFromGround();
                 }
                 jumpTimer = 0;
             }

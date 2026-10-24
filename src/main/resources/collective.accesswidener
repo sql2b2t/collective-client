@@ -1,27 +1,17 @@
 accessWidener v2 official
-accessible field net/minecraft/client/option/KeyBinding boundKey Lnet/minecraft/client/util/InputUtil$Key;
-accessible field net/minecraft/client/gui/hud/ChatHud visibleMessages Ljava/util/List;
-accessible field net/minecraft/client/MinecraftClient itemUseCooldown I
-accessible field net/minecraft/client/network/ClientPlayerInteractionManager blockBreakingCooldown I
-accessible field net/minecraft/client/network/ClientPlayerInteractionManager currentBreakingProgress F
-accessible method net/minecraft/client/network/ClientPlayerInteractionManager syncSelectedSlot ()V
-accessible field net/minecraft/entity/player/PlayerInventory main Lnet/minecraft/util/collection/DefaultedList;
-accessible field net/minecraft/entity/player/PlayerInventory selectedSlot I
-accessible field net/minecraft/entity/projectile/FishingBobberEntity caughtFish Z
-accessible field net/minecraft/entity/projectile/FireworkRocketEntity life I
-accessible field net/minecraft/entity/projectile/FireworkRocketEntity lifeTime I
-accessible field net/minecraft/entity/projectile/FireworkRocketEntity shooter Lnet/minecraft/entity/LivingEntity;
-accessible method net/minecraft/client/world/ClientWorld getPendingUpdateManager ()Lnet/minecraft/client/network/PendingUpdateManager;
-accessible field net/minecraft/block/spawner/MobSpawnerLogic spawnDelay I
-accessible field net/minecraft/entity/Entity FLAGS Lnet/minecraft/entity/data/TrackedData;
-accessible field net/minecraft/entity/Entity POSE Lnet/minecraft/entity/data/TrackedData;
-accessible class net/minecraft/network/packet/c2s/play/PlayerInteractEntityC2SPacket$InteractType
-accessible class net/minecraft/network/packet/c2s/play/PlayerInteractEntityC2SPacket$InteractAtHandler
-accessible class net/minecraft/network/packet/c2s/play/PlayerInteractEntityC2SPacket$InteractTypeHandler
-accessible field net/minecraft/client/gui/screen/ChatInputSuggestor messages Ljava/util/List;
-accessible field net/minecraft/client/gui/screen/ChatInputSuggestor x I
-accessible field net/minecraft/client/gui/screen/ChatInputSuggestor width I
-accessible class net/minecraft/world/chunk/PalettedContainer$Data
-accessible field net/minecraft/world/chunk/PalettedContainer data Lnet/minecraft/world/chunk/PalettedContainer$Data;
-accessible field net/minecraft/client/render/WorldRenderer blockBreakingInfos Lit/unimi/dsi/fastutil/ints/Int2ObjectMap;
-
+accessible field net/minecraft/client/KeyMapping key Lcom/mojang/blaze3d/platform/InputConstants$Key;
+accessible field net/minecraft/client/gui/components/ChatComponent trimmedMessages Ljava/util/List;
+accessible field net/minecraft/client/Minecraft rightClickDelay I
+accessible field net/minecraft/client/multiplayer/MultiPlayerGameMode destroyDelay I
+accessible field net/minecraft/client/multiplayer/MultiPlayerGameMode destroyProgress F
+accessible method net/minecraft/client/multiplayer/MultiPlayerGameMode ensureHasSentCarriedItem ()V
+accessible field net/minecraft/world/entity/player/Inventory items Lnet/minecraft/core/NonNullList;
+accessible field net/minecraft/world/entity/player/Inventory selected I
+accessible field net/minecraft/world/entity/projectile/FishingHook biting Z
+accessible field net/minecraft/world/entity/projectile/FireworkRocketEntity life I
+accessible field net/minecraft/world/entity/projectile/FireworkRocketEntity lifetime I
+accessible field net/minecraft/world/entity/projectile/FireworkRocketEntity attachedToEntity Lnet/minecraft/world/entity/LivingEntity;
+accessible method net/minecraft/client/multiplayer/ClientLevel getBlockStatePredictionHandler ()Lnet/minecraft/client/multiplayer/prediction/BlockStatePredictionHandler;
+accessible field net/minecraft/world/level/BaseSpawner spawnDelay I
+accessible field net/minecraft/world/entity/Entity DATA_SHARED_FLAGS_ID Lnet/minecraft/network/syncher/EntityDataAccessor;
+accessible field net/minecraft/world/entity/Entity DATA_POSE Lnet/minecraft/network/syncher/EntityDataAccessor;

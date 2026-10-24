@@ -7,7 +7,7 @@ import me.collective.render.RenderUtil;
 import me.collective.render.SoundUtil;
 import me.collective.setting.StringSetting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -29,7 +29,7 @@ public class TextComponent extends Component {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         if (!setting.isVisible()) return;
 
         boolean hov = isHovered(mouseX, mouseY);
@@ -146,8 +146,8 @@ public class TextComponent extends Component {
         // Paste support: Ctrl+V
         if (key == GLFW.GLFW_KEY_V && isCtrlDown()) {
             Minecraft mc = Minecraft.getInstance();
-            if (mc != null && mc.keyboard != null) {
-                String clip = mc.keyboard.getClipboard();
+            if (mc != null && mc.keyboardHandler != null) {
+                String clip = mc.keyboardHandler.getClipboard();
                 if (clip != null && !clip.isEmpty()) {
                     clip = clip.replaceAll("[\\r\\n\\t]", "");
                     String next = val.substring(0, cursor) + clip + val.substring(cursor);
@@ -162,8 +162,8 @@ public class TextComponent extends Component {
         // Copy support: Ctrl+C
         if (key == GLFW.GLFW_KEY_C && isCtrlDown()) {
             Minecraft mc = Minecraft.getInstance();
-            if (mc != null && mc.keyboard != null) {
-                mc.keyboard.setClipboard(val);
+            if (mc != null && mc.keyboardHandler != null) {
+                mc.keyboardHandler.setClipboard(val);
             }
             return true;
         }
@@ -173,7 +173,7 @@ public class TextComponent extends Component {
     private boolean isCtrlDown() {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null || mc.getWindow() == null) return false;
-        long h = mc.getWindow().getHandle();
+        long h = mc.getWindow().handle();
         return GLFW.glfwGetKey(h, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS
                 || GLFW.glfwGetKey(h, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
     }

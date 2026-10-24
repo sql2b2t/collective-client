@@ -1,7 +1,7 @@
 package me.collective.gui.component;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 public abstract class Component {
     protected static final Minecraft mc = Minecraft.getInstance();
@@ -18,7 +18,12 @@ public abstract class Component {
         this.height = height;
     }
 
-    public abstract void render(GuiGraphics context, int mouseX, int mouseY, float delta);
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        extractRenderState(context, mouseX, mouseY, delta);
+    }
+
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+    }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         return false;

@@ -13,7 +13,7 @@ import java.util.List;
  * каждая аура перед своими действиями заявляет слот тика:
  *
  * <pre>{@code
- * if (!AuraCoordination.claim(this, mc.world.getTime())) return;
+ * if (!AuraCoordination.claim(this, mc.level.getDefaultClockTime())) return;
  * }</pre>
  *
  * <p>Слоты раздаются честно: победитель прошлого тика пропускает очередь,
@@ -36,7 +36,7 @@ public final class AuraCoordination {
      * Заявка слота действия в тике.
      *
      * @param module объект-владелец (обычно this модуля)
-     * @param time   монотонный счётчик тиков, {@code mc.world.getTime()}
+     * @param time   монотонный счётчик тиков, {@code mc.level.getDefaultClockTime()}
      * @return true — тик отдан модулю, можно наводиться и отправлять пакеты
      */
     public static synchronized boolean claim(Object module, long time) {

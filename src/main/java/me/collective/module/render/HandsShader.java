@@ -106,7 +106,7 @@ public class HandsShader extends Module {
         HandsShader module = INSTANCE;
         if (module == null || !handPass) return originalColor;
 
-        float time = Util.getMeasuringTimeMs() * 0.001f * module.speed.getFloatValue();
+        float time = Util.getMillis() * 0.001f * module.speed.getFloatValue();
         float sc = module.scale.getFloatValue();
         int alpha = Math.round(255.0f * module.opacity.getFloatValue());
 
@@ -121,7 +121,7 @@ public class HandsShader extends Module {
 
         switch (module.mode.getValue()) {
             case COLLECTIVE -> {
-                float wave = 0.5f + 0.5f * MathHelper.sin((u * 4.0f + y * 1.2f + x * 0.6f) * sc - time * 2.2f);
+                float wave = 0.5f + 0.5f * Mth.sin((u * 4.0f + y * 1.2f + x * 0.6f) * sc - time * 2.2f);
                 rgb = threeGradient(themeRgb, 0x6EDCFF, 0x9D65FF, wave);
             }
 
@@ -136,55 +136,55 @@ public class HandsShader extends Module {
             case ASTOLFO -> {
                 float phase = (time * 0.25f + (y * 0.4f + x * 0.2f) * sc) % 1.0f;
                 if (phase < 0) phase += 1.0f;
-                float hue = 0.54f + 0.38f * MathHelper.abs(MathHelper.sin(phase * 3.14159f));
+                float hue = 0.54f + 0.38f * Mth.abs(Mth.sin(phase * 3.14159f));
                 rgb = Color.HSBtoRGB(hue, 0.75f, 1.0f) & 0xFFFFFF;
             }
 
             case GRADIENT -> {
-                float wave = 0.5f + 0.5f * MathHelper.sin((u * 4.0f + y * 1.2f + x * 0.5f) * sc - time * 2.2f);
+                float wave = 0.5f + 0.5f * Mth.sin((u * 4.0f + y * 1.2f + x * 0.5f) * sc - time * 2.2f);
                 rgb = threeGradient(c1, c2, c3, wave);
             }
 
             case PULSE -> {
-                float pulse = 0.5f + 0.5f * MathHelper.sin(time * 2.8f);
+                float pulse = 0.5f + 0.5f * Mth.sin(time * 2.8f);
                 rgb = lerpRgb(c1, c2, pulse);
             }
 
             case NEBULA -> {
-                float w1 = MathHelper.sin((x * 1.6f + z * 0.8f) * sc - time * 1.5f);
-                float w2 = MathHelper.cos((y * 2.0f + u * 3.0f) * sc + time * 1.1f);
+                float w1 = Mth.sin((x * 1.6f + z * 0.8f) * sc - time * 1.5f);
+                float w2 = Mth.cos((y * 2.0f + u * 3.0f) * sc + time * 1.1f);
                 float phase = 0.5f + 0.25f * (w1 + w2);
                 rgb = threeGradient(0x4A0E4E, 0xD80064, 0x00F5D4, phase);
             }
 
             case FIRE -> {
                 float rise = (y * 3.0f + u * 2.0f) * sc - time * 4.0f;
-                float flicker = MathHelper.sin(rise) * 0.35f + MathHelper.sin(x * 3.5f * sc + time * 5.0f) * 0.15f;
-                float t = MathHelper.clamp(0.5f + flicker, 0.0f, 1.0f);
+                float flicker = Mth.sin(rise) * 0.35f + Mth.sin(x * 3.5f * sc + time * 5.0f) * 0.15f;
+                float t = Mth.clamp(0.5f + flicker, 0.0f, 1.0f);
                 rgb = fourGradient(0x7F0000, 0xFF3700, 0xFFB700, 0xFFFFE0, t);
             }
 
             case CYBERPUNK -> {
-                float wave = MathHelper.sin((x * 1.4f + y * 2.2f) * sc - time * 3.2f);
+                float wave = Mth.sin((x * 1.4f + y * 2.2f) * sc - time * 3.2f);
                 float sharp = (float) Math.pow(0.5f + 0.5f * wave, 1.8);
                 rgb = lerpRgb(0x00F0FF, 0xFF007F, sharp);
             }
 
             case MATRIX -> {
                 float drop = (y * 4.0f * sc - time * 6.0f);
-                float pulse = (float) Math.pow(Math.max(0.0f, MathHelper.sin(drop)), 4.0);
+                float pulse = (float) Math.pow(Math.max(0.0f, Mth.sin(drop)), 4.0);
                 rgb = lerpRgb(0x003810, 0x39FF14, pulse);
             }
 
             case AURORA -> {
-                float a1 = MathHelper.sin((x * 1.1f + z * 0.5f) * sc + time * 1.2f);
-                float a2 = MathHelper.sin((y * 1.8f) * sc - time * 1.6f);
+                float a1 = Mth.sin((x * 1.1f + z * 0.5f) * sc + time * 1.2f);
+                float a2 = Mth.sin((y * 1.8f) * sc - time * 1.6f);
                 float mix = 0.5f + 0.25f * (a1 + a2);
                 rgb = threeGradient(0x00E676, 0x00B0FF, 0x9C27B0, mix);
             }
 
             case HOLOGRAPHIC -> {
-                float scan = MathHelper.sin(y * 20.0f * sc - time * 4.5f) * 0.15f;
+                float scan = Mth.sin(y * 20.0f * sc - time * 4.5f) * 0.15f;
                 float hue = (u * 1.5f + v * 1.5f + scan + time * 0.12f) % 1.0f;
                 if (hue < 0) hue += 1.0f;
                 rgb = Color.HSBtoRGB(hue, 0.45f, 1.0f) & 0xFFFFFF;
@@ -193,24 +193,24 @@ public class HandsShader extends Module {
             case GLITCH -> {
                 float stepY = (float) Math.floor((y * 10.0f) * sc) / 10.0f;
                 float stepTime = (float) Math.floor(time * 7.0f) / 7.0f;
-                float g = MathHelper.sin(stepY * 6.0f + stepTime * 5.0f);
+                float g = Mth.sin(stepY * 6.0f + stepTime * 5.0f);
                 float hue = g > 0.35f ? 0.92f : (g < -0.35f ? 0.52f : 0.16f);
                 rgb = Color.HSBtoRGB(hue, 0.85f, 1.0f) & 0xFFFFFF;
             }
 
             case ELECTRIC -> {
-                float bolt = MathHelper.sin((x * 5.0f + z * 4.0f + y * 2.0f) * sc + time * 9.0f);
+                float bolt = Mth.sin((x * 5.0f + z * 4.0f + y * 2.0f) * sc + time * 9.0f);
                 float spike = (float) Math.pow(Math.max(0.0f, bolt), 5.0);
                 rgb = lerpRgb(0x0040B0, 0xE8F8FF, spike);
             }
 
             case SUNSET -> {
-                float mix = 0.5f + 0.5f * MathHelper.sin((u * 2.0f + y * 1.2f) * sc - time * 1.5f);
+                float mix = 0.5f + 0.5f * Mth.sin((u * 2.0f + y * 1.2f) * sc - time * 1.5f);
                 rgb = threeGradient(0xFF8F00, 0xFF3D00, 0x651FFF, mix);
             }
 
             case AMETHYST -> {
-                float facet = MathHelper.sin((x * 2.8f + y * 3.0f + z * 2.5f) * sc - time * 1.8f);
+                float facet = Mth.sin((x * 2.8f + y * 3.0f + z * 2.5f) * sc - time * 1.8f);
                 float mix = 0.5f + 0.5f * facet;
                 rgb = threeGradient(0x31004A, 0x8E24AA, 0xE1BEE7, mix);
             }
@@ -256,7 +256,7 @@ public class HandsShader extends Module {
     }
 
     private static int lerpRgb(int c1, int c2, float t) {
-        float f = MathHelper.clamp(t, 0.0f, 1.0f);
+        float f = Mth.clamp(t, 0.0f, 1.0f);
         int r1 = (c1 >> 16) & 0xFF, g1 = (c1 >> 8) & 0xFF, b1 = c1 & 0xFF;
         int r2 = (c2 >> 16) & 0xFF, g2 = (c2 >> 8) & 0xFF, b2 = c2 & 0xFF;
         int r = Math.round(r1 + (r2 - r1) * f);
@@ -277,7 +277,7 @@ public class HandsShader extends Module {
     }
 
     private static int fourGradient(int c1, int c2, int c3, int c4, float t) {
-        float f = MathHelper.clamp(t, 0.0f, 1.0f);
+        float f = Mth.clamp(t, 0.0f, 1.0f);
         if (f < 0.3333f) {
             return lerpRgb(c1, c2, f * 3.0f);
         } else if (f < 0.6666f) {

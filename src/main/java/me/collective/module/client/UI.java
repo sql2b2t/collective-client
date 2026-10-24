@@ -90,8 +90,8 @@ public class UI extends Module {
     public void openGui() {
         if (mc == null) return;
         mc.execute(() -> {
-            if (mc.currentScreen == null) {
-                mc.setScreen(ClickGuiScreen.getInstance());
+            if (mc.gui.screen() == null) {
+                mc.gui.setScreen(ClickGuiScreen.getInstance());
             }
         });
     }
@@ -101,9 +101,9 @@ public class UI extends Module {
 
     @Override
     public void onDisable() {
-        if (mc != null && (mc.currentScreen instanceof ClickGuiScreen
-                || mc.currentScreen instanceof me.collective.gui.hud.HudEditorScreen)) {
-            mc.execute(() -> mc.setScreen(null));
+        if (mc != null && (mc.gui.screen() instanceof ClickGuiScreen
+                || mc.gui.screen() instanceof me.collective.gui.hud.HudEditorScreen)) {
+            mc.execute(() -> mc.gui.setScreen(null));
         }
     }
 

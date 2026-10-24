@@ -23,20 +23,20 @@ public class BlockListSettingScreen extends CollectionListSettingScreen<Block> {
 
     @Override
     protected Iterable<Block> allValues() {
-        return Registries.BLOCK;
+        return BuiltInRegistries.BLOCK;
     }
 
     @Override
     protected boolean includeValue(Block value) {
         if (value == Blocks.AIR) return false;
-        return !Registries.BLOCK.getId(value).getPath().endsWith("_wall_banner");
+        return !BuiltInRegistries.BLOCK.getKey(value).getPath().endsWith("_wall_banner");
     }
 
     @Override
     protected String[] getValueNames(Block value) {
         return new String[]{
                 value.getName().getString(),
-                Registries.BLOCK.getId(value).toString()
+                BuiltInRegistries.BLOCK.getKey(value).toString()
         };
     }
 
@@ -52,11 +52,10 @@ public class BlockListSettingScreen extends CollectionListSettingScreen<Block> {
 
     @Override
     protected Block getAdditionalValue(Block value) {
-        Identifier id = Registries.BLOCK.getId(value);
+        Identifier id = BuiltInRegistries.BLOCK.getKey(value);
         String path = id.getPath();
         // Баннеры добавляются/удаляются вместе со стеновой версией (как в Meteor)
         if (path.endsWith("_wall_banner") || !path.endsWith("_banner")) return null;
-        return Registries.BLOCK.get(Identifier.of(id.getNamespace(),
-                path.substring(0, path.length() - 6) + "wall_banner"));
+        return BuiltInRegistries.BLOCK.getValue(Identifier.fromNamespaceAndPath(id.getNamespace(), path.substring(0, path.length() - 6) + "wall_banner"));
     }
 }

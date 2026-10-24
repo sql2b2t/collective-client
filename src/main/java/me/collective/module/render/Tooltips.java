@@ -52,10 +52,10 @@ import java.util.List;
  * {@link MapTooltipComponent}.
  *
  * <p>Архитектура оригинала — подмена вызова
- * {@code GuiGraphics.drawTooltip} через {@code @Redirect} с передачей готового
+ * {@code GuiGraphicsExtractor.drawTooltip} через {@code @Redirect} с передачей готового
  * списка компонентов в {@code drawTooltipsHook} — в Yarn 1.21.11 воспроизведена
  * один в один: тот же перехват и тот же
- * {@code GuiGraphics.drawTooltipImmediately}.
+ * {@code GuiGraphicsExtractor.drawTooltipImmediately}.
  *
  * <p>Тултип собирается как список компонентов: строки текста плюс наши
  * компоненты-сетка и карта. Отрисовку рамки в оригинале подкрашивали через
@@ -159,11 +159,11 @@ public class Tooltips extends Module {
             clearSnapshot();
             return;
         }
-        var slots = mc.player.currentScreenHandler.slots;
+        var slots = mc.player.containerMenu.slots;
         boolean changed = slots.size() != previousStacks.size();
         if (!changed) {
             for (int i = 0; i < slots.size(); i++) {
-                if (!ItemStack.areEqual(slots.get(i).getStack(), previousStacks.get(i))) {
+                if (!ItemStack.matches(slots.get(i).getItem(), previousStacks.get(i))) {
                     changed = true;
                     break;
                 }
@@ -173,7 +173,7 @@ public class Tooltips extends Module {
         List<ItemStack> stacks = new ArrayList<>(slots.size());
         List<DominantStacks.Entry> next = new ArrayList<>();
         for (Slot slot : slots) {
-            ItemStack copy = slot.getStack().copy();
+            ItemStack copy = slot.getItem().copy();
             stacks.add(copy);
             DominantStacks.Entry entry = DominantStacks.of(copy);
             if (entry != null) next.add(entry);
@@ -226,20 +226,20 @@ public class Tooltips extends Module {
      *
      * @return готовый список компонентов
      */
-    public List<TooltipComponent> buildComponents(List<Component> lines,
-                                                   net.minecraft.item.tooltip.TooltipData data,
+    public List<ClientTooltipComponent> buildComponents(List<Component> lines,
+                                                   net.minecraft.world.inventory.tooltip.TooltipComponent data,
                                                    ItemStack stack, int mouseX, int mouseY) {
-        List<TooltipComponent> components = new ArrayList<>();
+        List<ClientTooltipComponent> components = new ArrayList<>();
 
         for (Component line : lines) {
             // «3/27» и «и ещё N…» не показываем: содержимое уже видно сеткой
             if (isContainerLabel(line)) continue;
 
-            components.add(TooltipComponent.of(line.asOrderedText()));
+            components.add(ClientTooltipComponent.create(line.getVisualOrderText()));
         }
 
         if (data != null) {
-            components.add(TooltipComponent.of(data));
+            components.add(ClientTooltipComponent.create(data));
         }
 
         // цвет рамки — как в оригинале, с проверкой на шилкер
@@ -262,7 +262,7 @@ public class Tooltips extends Module {
                 components.add(new ContainerTooltipComponent(slots, mapOverlay.get(), mouseX, mouseY));
             } else {
                 components.clear();
-                components.add(TooltipComponent.of(stack.getName().asOrderedText()));
+                components.add(ClientTooltipComponent.create(stack.getHoverName().getVisualOrderText()));
                 components.add(new ContainerTooltipComponent(slots, mapOverlay.get(), mouseX, mouseY));
             }
 
@@ -270,38 +270,38 @@ public class Tooltips extends Module {
         }
 
         // карта
-        if (stack.isOf(Items.FILLED_MAP)) {
-            MapIdComponent mapId = stack.get(DataComponentTypes.MAP_ID);
-            MapState mapState = mapStateOf(stack, mapId);
+        if (stack.is(Items.FILLED_MAP)) {
+            MapId mapId = stack.get(DataComponents.MAP_ID);
+            MapItemSavedData mapState = mapStateOf(stack, mapId);
 
             if (mapState != null) {
                 if (keepText.get()) {
                     components.add(new MapTooltipComponent(mapId.id(), mapState));
                 } else {
                     components.clear();
-                    components.add(TooltipComponent.of(stack.getName().asOrderedText()));
+                    components.add(ClientTooltipComponent.create(stack.getHoverName().getVisualOrderText()));
                     components.add(new MapTooltipComponent(mapId.id(), mapState));
                 }
 
                 if (mapOverlay.get()) {
-                    components.add(TooltipComponent.of(
-                            Component.literal(ALT_HINT).formatted(ChatFormatting.YELLOW).asOrderedText()));
+                    components.add(ClientTooltipComponent.create(
+                            Component.literal(ALT_HINT).withStyle(ChatFormatting.YELLOW).getVisualOrderText()));
                 }
             }
         }
 
         // улей: позиции цветков
         if (beeNest.get()) {
-            BeesComponent bees = stack.get(DataComponentTypes.BEES);
+            Bees bees = stack.get(DataComponents.BEES);
             if (bees != null) {
                 for (var bee : bees.bees()) {
-                    NbtCompound nbt = bee.entityData().getNbtWithoutId();
+                    CompoundTag nbt = bee.entityData().copyTagWithoutId();
                     if (nbt == null || !nbt.contains("FlowerPos")) continue;
 
                     BlockPos pos = flowerPos(nbt);
                     if (pos != null) {
-                        components.add(TooltipComponent.of(
-                                Component.literal("Position " + pos.toShortString()).asOrderedText()));
+                        components.add(ClientTooltipComponent.create(
+                                Component.literal("Position " + pos.toShortString()).getVisualOrderText()));
                     }
                 }
             }
@@ -311,7 +311,7 @@ public class Tooltips extends Module {
         if (size.get()) {
             String sizeText = sizeOf(stack);
             if (sizeText != null) {
-                components.add(TooltipComponent.of(Component.literal(sizeText).asOrderedText()));
+                components.add(ClientTooltipComponent.create(Component.literal(sizeText).getVisualOrderText()));
             }
         }
 
@@ -321,13 +321,13 @@ public class Tooltips extends Module {
     /**
      * Строки ванильного тултипа, описывающие содержимое контейнера.
      *
-     * <p>В 1.21.11 {@code ContainerComponent} добавляет две строки:
+     * <p>В 1.21.11 {@code ItemContainerContents} добавляет две строки:
      * {@code item.container.item_count} («3/27») и
      * {@code item.container.more_items} («и ещё N…»). Они и есть надписи о том,
      * что лежит внутри, поэтому отсекаются; содержимое показывает сетка.
      */
     private static boolean isContainerLabel(Component line) {
-        if (!(line.getContent() instanceof net.minecraft.text.TranslatableTextContent content)) {
+        if (!(line.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents content)) {
             return false;
         }
 
@@ -351,33 +351,33 @@ public class Tooltips extends Module {
      * <p>Перенос {@code getMapState2653}: серверное состояние, затем кэш по
      * имени для карт с собственным названием.
      */
-    private static MapState mapStateOf(ItemStack stack, MapIdComponent id) {
+    private static MapItemSavedData mapStateOf(ItemStack stack, MapId id) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.world == null || id == null) return null;
+        if (mc.level == null || id == null) return null;
 
-        MapState state = FilledMapItem.getMapState(id, mc.world);
+        MapItemSavedData state = MapItem.getSavedData(id, mc.level);
         if (id.id() != -1 && state != null) return state;
 
-        if (stack.contains(DataComponentTypes.CUSTOM_NAME)) {
-            return ContainerTooltipComponent.NamedMaps.get(stack.getName().getString());
+        if (stack.has(DataComponents.CUSTOM_NAME)) {
+            return ContainerTooltipComponent.NamedMaps.get(stack.getHoverName().getString());
         }
 
         return null;
     }
 
     /** Координаты цветка: массив из трёх int либо compound с x/y/z. */
-    private static BlockPos flowerPos(NbtCompound nbt) {
+    private static BlockPos flowerPos(CompoundTag nbt) {
         var value = nbt.get("FlowerPos");
         if (value == null) return null;
 
-        if (value instanceof net.minecraft.nbt.NbtIntArray array) {
-            int[] values = array.getIntArray();
+        if (value instanceof net.minecraft.nbt.IntArrayTag array) {
+            int[] values = array.getAsIntArray();
             if (values.length >= 3) return new BlockPos(values[0], values[1], values[2]);
         }
 
-        if (value instanceof net.minecraft.nbt.NbtCompound compound
+        if (value instanceof net.minecraft.nbt.CompoundTag compound
                 && compound.contains("x") && compound.contains("y") && compound.contains("z")) {
-            return new BlockPos(compound.getInt("x", 0), compound.getInt("y", 0), compound.getInt("z", 0));
+            return new BlockPos(compound.getIntOr("x", 0), compound.getIntOr("y", 0), compound.getIntOr("z", 0));
         }
 
         return null;
@@ -389,7 +389,7 @@ public class Tooltips extends Module {
         if (mc.player == null) return null;
 
         try {
-            var ops = RegistryOps.of(NbtOps.INSTANCE, mc.player.getRegistryManager());
+            var ops = mc.player.registryAccess().createSerializationContext(NbtOps.INSTANCE);
             var encoded = ItemStack.CODEC.encodeStart(ops, stack).result().orElse(null);
             if (encoded == null) return null;
 
@@ -417,12 +417,12 @@ public class Tooltips extends Module {
      */
     private static Integer borderColorOf(ItemStack stack) {
         if (!(stack.getItem() instanceof BlockItem blockItem)) return null;
-        if (!(blockItem.getBlock() instanceof net.minecraft.block.ShulkerBoxBlock block)) return null;
+        if (!(blockItem.getBlock() instanceof net.minecraft.world.level.block.ShulkerBoxBlock block)) return null;
 
         if (block.getColor() == null) return null;
 
         MapColor mapColor = block.getColor().getMapColor();
-        return 0xFF000000 | mapColor.color;
+        return 0xFF000000 | mapColor.col;
     }
 
     /** Затемнённая версия цвета для второй половины рамки. */
@@ -436,13 +436,13 @@ public class Tooltips extends Module {
     /** Средняя кнопка мыши открывает содержимое в отдельном окне. */
     private void openPreviewScreenOnMiddleClick(List<ItemStack> slots, ItemStack stack) {
         Minecraft mc = Minecraft.getInstance();
-        if (!(mc.currentScreen instanceof HandledScreen<?>)) return;
+        if (!(mc.gui.screen() instanceof AbstractContainerScreen<?>)) return;
         // уже открыто окно просмотра — повторно не открываем
-        if (mc.currentScreen instanceof ContainerPreviewScreen) return;
-        if (GLFW.glfwGetMouseButton(mc.getWindow().getHandle(), GLFW.GLFW_MOUSE_BUTTON_MIDDLE) != GLFW.GLFW_PRESS) {
+        if (mc.gui.screen() instanceof ContainerPreviewScreen) return;
+        if (GLFW.glfwGetMouseButton(mc.getWindow().handle(), GLFW.GLFW_MOUSE_BUTTON_MIDDLE) != GLFW.GLFW_PRESS) {
             return;
         }
 
-        mc.setScreen(new ContainerPreviewScreen(slots, stack));
+        mc.gui.setScreen(new ContainerPreviewScreen(slots, stack));
     }
 }

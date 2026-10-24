@@ -5,7 +5,7 @@ import me.collective.event.events.PacketEvent;
 import me.collective.font.FontManager;
 import me.collective.render.RenderUtil;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.awt.Color;
 
@@ -34,15 +34,15 @@ public class Lag extends HudModule {
     }
 
     @Override
-    public void render(GuiGraphics context, float delta) {
+    public void render(GuiGraphicsExtractor context, float delta) {
         if (!isToggled()) return;
-        if (mc.player == null || mc.world == null) return;
-        if (mc.isInSingleplayer()) return;
+        if (mc.player == null || mc.level == null) return;
+        if (mc.hasSingleplayerServer()) return;
 
         long diff = System.currentTimeMillis() - lastPacketTime;
         long thresholdMs = (long) (threshold.getValue() * 1000.0);
 
-        boolean inEditor = mc.currentScreen instanceof me.collective.gui.hud.HudEditorScreen;
+        boolean inEditor = mc.gui.screen() instanceof me.collective.gui.hud.HudEditorScreen;
         if (diff < thresholdMs && !inEditor) {
             this.width = 0;
             this.height = 0;

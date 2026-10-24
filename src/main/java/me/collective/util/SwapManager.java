@@ -7,7 +7,13 @@ import me.collective.event.events.TickEvent;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.packet.c2s.play.*;
+import net.minecraft.network.protocol.game.ServerboundInteractPacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemPacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import net.minecraft.network.protocol.game.ServerboundClientTickEndPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
 import net.minecraft.world.InteractionHand;
 
@@ -55,8 +61,8 @@ public class SwapManager {
     }
 
     public boolean hold(Object owner, int slot, int priority, boolean silent, int releaseDelay) {
-        if (mc.player == null || mc.getNetworkHandler() == null) return false;
-        if (!Inventory.isValidHotbarIndex(slot)) return false;
+        if (mc.player == null || mc.getConnection() == null) return false;
+        if (!Inventory.isHotbarSlot(slot)) return false;
 
         checkDrift();
 
@@ -116,8 +122,8 @@ public class SwapManager {
     }
 
     public boolean pulse(Object owner, int slot, int priority, int ticks) {
-        if (mc.player == null || mc.getNetworkHandler() == null) return false;
-        if (!Inventory.isValidHotbarIndex(slot)) return false;
+        if (mc.player == null || mc.getConnection() == null) return false;
+        if (!Inventory.isHotbarSlot(slot)) return false;
 
         checkDrift();
 
@@ -207,21 +213,21 @@ public class SwapManager {
 
         Packet<?> packet = event.packet;
 
-        if (packet instanceof PlayerInteractEntityC2SPacket
-            || packet instanceof PlayerInteractItemC2SPacket
-            || packet instanceof PlayerInteractBlockC2SPacket
-            || packet instanceof ClientCommandC2SPacket) {
+        if (packet instanceof ServerboundInteractPacket
+            || packet instanceof ServerboundUseItemPacket
+            || packet instanceof ServerboundUseItemOnPacket
+            || packet instanceof ServerboundPlayerCommandPacket) {
             this.actionConflict = true;
             return;
         }
 
-        if (packet instanceof PlayerActionC2SPacket action
-            && action.getAction() == PlayerActionC2SPacket.Action.RELEASE_USE_ITEM) {
+        if (packet instanceof ServerboundPlayerActionPacket action
+            && action.getAction() == ServerboundPlayerActionPacket.Action.RELEASE_USE_ITEM) {
             this.actionConflict = true;
             return;
         }
 
-        if (packet instanceof PlayerMoveC2SPacket) {
+        if (packet instanceof ServerboundMovePlayerPacket) {
             if (this.pendingTeleportConfirms > 0) {
                 this.pendingTeleportConfirms--;
                 return;
@@ -233,7 +239,7 @@ public class SwapManager {
             return;
         }
 
-        if (packet instanceof ClientTickEndC2SPacket) {
+        if (packet instanceof ServerboundClientTickEndPacket) {
             if (!this.movedSinceTickEnd) this.actionConflict = false;
 
             this.movedSinceTickEnd = false;
@@ -243,7 +249,7 @@ public class SwapManager {
 
     @EventHandler
     public void onPacketReceive(PacketEvent.Receive event) {
-        if (event.packet instanceof PlayerPositionLookS2CPacket) this.pendingTeleportConfirms++;
+        if (event.packet instanceof ClientboundPlayerPositionPacket) this.pendingTeleportConfirms++;
     }
 
     /** Полный сброс при выходе с сервера. */
@@ -259,7 +265,7 @@ public class SwapManager {
     private boolean usingMainHandItem() {
         return mc.player != null
             && mc.player.isUsingItem()
-            && mc.player.getActiveHand() == InteractionHand.MAIN_HAND;
+            && mc.player.getUsedItemHand() == InteractionHand.MAIN_HAND;
     }
 
     @EventHandler(priority = 200)
@@ -306,12 +312,12 @@ public class SwapManager {
 
             clearResume();
 
-            if (mc.player == null || mc.getNetworkHandler() == null) {
+            if (mc.player == null || mc.getConnection() == null) {
                 clearSession();
                 return;
             }
 
-            if (!Inventory.isValidHotbarIndex(slot)) {
+            if (!Inventory.isHotbarSlot(slot)) {
                 clearSession();
                 return;
             }
@@ -326,9 +332,9 @@ public class SwapManager {
 
         clearSession();
 
-        if (mc.player == null || mc.getNetworkHandler() == null) return;
+        if (mc.player == null || mc.getConnection() == null) return;
 
-        if (visible && Inventory.isValidHotbarIndex(restore)) {
+        if (visible && Inventory.isHotbarSlot(restore)) {
             mc.player.getInventory().setSelectedSlot(restore);
             this.inv.setSlotForced(restore);
         } else {
@@ -362,7 +368,7 @@ public class SwapManager {
     }
 
     private int clientSlot() {
-        return mc.player != null ? mc.player.getInventory().selectedSlot : 0;
+        return mc.player != null ? mc.player.getInventory().getSelectedSlot() : 0;
     }
 
     public static final class Priority {

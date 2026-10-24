@@ -13,11 +13,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(CobwebBlock.class)
+@Mixin(WebBlock.class)
 public class CobwebBlockMixin {
-    @Inject(method = "onEntityCollision", at = @At("HEAD"), cancellable = true)
-    private void collective$onEntityCollision(BlockState state, Level world, BlockPos pos, Entity entity,
-                                              EntityCollisionHandler handler, boolean bl, CallbackInfo ci) {
+    @Inject(method = "entityInside", at = @At("HEAD"), cancellable = true)
+    private void collective$onEntityInside(BlockState state, Level world, BlockPos pos, Entity entity,
+                                           InsideBlockEffectApplier applier, boolean bl, CallbackInfo ci) {
         if (NoWeb.isIgnoreActive() && entity == Minecraft.getInstance().player) {
             ci.cancel();
             NoWeb.onEntityCollideCobweb(pos);

@@ -37,7 +37,7 @@ public class AutoMend extends Module {
 
     @Override
     public void onUpdate() {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
         if (delayTimer > 0) {
             delayTimer--;
             return;
@@ -60,23 +60,23 @@ public class AutoMend extends Module {
         warnedNoXp = false;
 
         if (silentAim.getValue()) {
-            RotationUtils.setServerRotation(mc.player.getYaw(), 90f);
+            RotationUtils.setServerRotation(mc.player.getYRot(), 90f);
         }
         InventoryUtil.swap(xp.slot(), true);
-        mc.interactionManager.interactItem(mc.player, InteractionHand.MAIN_HAND);
-        mc.player.swingHand(InteractionHand.MAIN_HAND);
+        mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
+        me.collective.util.Utils.swingHand(InteractionHand.MAIN_HAND);
         InventoryUtil.swapBack();
         delayTimer = delay.getIntValue();
     }
 
     private boolean needsRepair() {
         double threshold = minDurability.getFloatValue() / 100.0;
-        for (net.minecraft.entity.EquipmentSlot slot : net.minecraft.entity.EquipmentSlot.values()) {
-            if (slot.getType() != net.minecraft.entity.EquipmentSlot.Type.HUMANOID_ARMOR) continue;
-            ItemStack armor = mc.player.getEquippedStack(slot);
+        for (net.minecraft.world.entity.EquipmentSlot slot : net.minecraft.world.entity.EquipmentSlot.values()) {
+            if (slot.getType() != net.minecraft.world.entity.EquipmentSlot.Type.HUMANOID_ARMOR) continue;
+            ItemStack armor = mc.player.getItemBySlot(slot);
             if (armor.isEmpty() || !hasMending(armor)) continue;
-            if (!armor.isDamageable()) continue;
-            double durability = 1.0 - (double) armor.getDamage() / armor.getMaxDamage();
+            if (!armor.isDamageableItem()) continue;
+            double durability = 1.0 - (double) armor.getDamageValue() / armor.getMaxDamage();
             if (durability < threshold) return true;
         }
         return false;
@@ -84,10 +84,9 @@ public class AutoMend extends Module {
 
     private boolean hasMending(ItemStack stack) {
         try {
-            var enchantments = stack.getEnchantments();
-            RegistryEntry<Enchantment> mending = mc.world.getRegistryManager()
-                .getOrThrow(RegistryKeys.ENCHANTMENT).getOrThrow(Enchantments.MENDING);
-            return enchantments.getEnchantments().stream().anyMatch(e -> e.equals(mending));
+            net.minecraft.core.Holder<Enchantment> mending = mc.level.registryAccess()
+                .lookupOrThrow(net.minecraft.core.registries.Registries.ENCHANTMENT).getOrThrow(net.minecraft.world.item.enchantment.Enchantments.MENDING);
+            return net.minecraft.world.item.enchantment.EnchantmentHelper.getItemEnchantmentLevel(mending, stack) > 0;
         } catch (Exception e) {
             return false;
         }

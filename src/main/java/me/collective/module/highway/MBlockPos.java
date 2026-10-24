@@ -51,14 +51,30 @@ public class MBlockPos {
         return offset(dir, 1);
     }
 
-    public MBlockPos offset(net.minecraft.util.math.Direction dir, int amount) {
-        x += dir.getOffsetX() * amount;
-        y += dir.getOffsetY() * amount;
-        z += dir.getOffsetZ() * amount;
+    public MBlockPos offset(net.minecraft.core.Direction dir, int amount) {
+        x += dir.getStepX() * amount;
+        y += dir.getStepY() * amount;
+        z += dir.getStepZ() * amount;
         return this;
     }
 
-    public MBlockPos offset(net.minecraft.util.math.Direction dir) {
+    public MBlockPos offset(net.minecraft.core.Direction dir) {
+        return offset(dir, 1);
+    }
+
+    public MBlockPos relative(HorizontalDirection dir, int amount) {
+        return offset(dir, amount);
+    }
+
+    public MBlockPos relative(HorizontalDirection dir) {
+        return offset(dir, 1);
+    }
+
+    public MBlockPos relative(net.minecraft.core.Direction dir, int amount) {
+        return offset(dir, amount);
+    }
+
+    public MBlockPos relative(net.minecraft.core.Direction dir) {
         return offset(dir, 1);
     }
 
@@ -69,14 +85,18 @@ public class MBlockPos {
         return this;
     }
 
+    public MBlockPos offset(int x, int y, int z) {
+        return add(x, y, z);
+    }
+
     public BlockPos getBlockPos() {
         return new BlockPos(x, y, z);
     }
 
     public BlockState getState() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.world == null) return Blocks.AIR.getDefaultState();
-        return mc.world.getBlockState(getBlockPos());
+        if (mc.level == null) return Blocks.AIR.defaultBlockState();
+        return mc.level.getBlockState(getBlockPos());
     }
 
     @Override

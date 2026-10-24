@@ -12,8 +12,8 @@ public class AutoRespawn extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player != null && (mc.player.isDead() || !mc.player.isAlive())) {
-            mc.player.requestRespawn();
+        if (mc.player != null && (mc.player.isDeadOrDying() || !mc.player.isAlive())) {
+            mc.player.respawn();
         }
     }
 }

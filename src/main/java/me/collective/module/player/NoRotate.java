@@ -19,7 +19,7 @@ public class NoRotate extends Module {
 
     @EventHandler
     public void onPacketReceive(PacketEvent.Receive event) {
-        if (!(event.packet instanceof PlayerPositionLookS2CPacket)) return;
+        if (!(event.packet instanceof ClientboundPlayerPositionPacket)) return;
         // Receive стреляет на нетти-треде: мутить состояние ротаций можно
         // только на игровом, снимаем значения и планируем.
         RotationUtils rot = RotationUtils.getInstance();

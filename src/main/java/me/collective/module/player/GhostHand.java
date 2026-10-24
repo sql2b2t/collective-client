@@ -36,25 +36,25 @@ public class GhostHand extends Module {
 
     @EventHandler
     public void onClick(MouseClickEvent event) {
-        if (event.button != 1 || mc.player == null || mc.world == null || mc.interactionManager == null) return;
-        if (mc.currentScreen != null) return;
+        if (event.button != 1 || mc.player == null || mc.level == null || mc.gameMode == null) return;
+        if (mc.gui.screen() != null) return;
 
-        Vec3 eye = mc.player.getEyePos();
-        Vec3 look = mc.player.getRotationVec(1.0f);
+        Vec3 eye = mc.player.getEyePosition();
+        Vec3 look = mc.player.getViewVector(1.0f);
 
         for (double d = 1.0; d <= range.getFloatValue(); d += 0.25) {
-            BlockPos pos = BlockPos.ofFloored(eye.add(look.multiply(d)));
-            BlockState state = mc.world.getBlockState(pos);
+            BlockPos pos = BlockPos.containing(eye.add(look.scale(d)));
+            BlockState state = mc.level.getBlockState(pos);
             if (state.isAir()) continue;
             if (!isContainer(state)) continue;
             // Ванилла сама достала — дубль не нужен
-            if (mc.crosshairTarget instanceof BlockHitResult bhr && bhr.getBlockPos().equals(pos)) return;
+            if (mc.hitResult instanceof BlockHitResult bhr && bhr.getBlockPos().equals(pos)) return;
 
-            Vec3 hitVec = eye.add(look.multiply(d));
-            Direction side = Direction.getFacing(look.x, look.y, look.z).getOpposite();
+            Vec3 hitVec = eye.add(look.scale(d));
+            Direction side = Direction.getApproximateNearest(look.x, look.y, look.z).getOpposite();
             BlockHitResult hit = new BlockHitResult(hitVec, side, pos, false);
-            mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND, hit);
-            mc.player.swingHand(InteractionHand.MAIN_HAND);
+            mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, hit);
+            me.collective.util.Utils.swingHand(InteractionHand.MAIN_HAND);
             return;
         }
     }
@@ -65,9 +65,9 @@ public class GhostHand extends Module {
             || state.getBlock() instanceof BarrelBlock
             || state.getBlock() instanceof HopperBlock
             || state.getBlock() instanceof FurnaceBlock
-            || state.isOf(net.minecraft.block.Blocks.DISPENSER)
-            || state.isOf(net.minecraft.block.Blocks.DROPPER)
-            || state.isOf(net.minecraft.block.Blocks.CRAFTER)
+            || state.is(net.minecraft.world.level.block.Blocks.DISPENSER)
+            || state.is(net.minecraft.world.level.block.Blocks.DROPPER)
+            || state.is(net.minecraft.world.level.block.Blocks.CRAFTER)
             || (shulkers.getValue() && state.getBlock() instanceof ShulkerBoxBlock);
     }
 }

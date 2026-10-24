@@ -39,9 +39,9 @@ public class Discord extends Module {
                         }
 
                         String state = "In Main Menu";
-                        if (mc.getCurrentServerEntry() != null) {
-                            state = server.getValue() ? ("Playing on " + mc.getCurrentServerEntry().address) : "Playing Multiplayer";
-                        } else if (mc.isInSingleplayer()) {
+                        if (mc.getCurrentServer() != null) {
+                            state = server.getValue() ? ("Playing on " + mc.getCurrentServer().ip) : "Playing Multiplayer";
+                        } else if (mc.hasSingleplayerServer()) {
                             state = "Playing Singleplayer";
                         }
 

@@ -73,7 +73,7 @@ public class Spammer extends Module {
             factsMode = useFacts;
             lastFactAttempt = 0;
         }
-        if (mc.player == null || mc.world == null || mc.getNetworkHandler() == null) {
+        if (mc.player == null || mc.level == null || mc.getConnection() == null) {
             cancelFetch();
             return;
         }
@@ -115,14 +115,14 @@ public class Spammer extends Module {
         if (spamMode.process("Chat")) {
             if (msg.length() > 255) msg = msg.substring(0, 255);
             if (msg.charAt(0) == '/') {
-                mc.getNetworkHandler().sendChatCommand(msg.substring(1));
+                mc.getConnection().sendCommand(msg.substring(1));
             } else {
-                mc.getNetworkHandler().sendChatMessage(global.getValue() ? "!" + msg : msg);
+                mc.getConnection().sendChat(global.getValue() ? "!" + msg : msg);
             }
         } else {
             String prefix = whisperPrefix.compute().trim() + " " + target.getGameProfile().name() + " ";
             if (msg.length() > 256 - prefix.length()) msg = msg.substring(0, 256 - prefix.length());
-            mc.getNetworkHandler().sendChatCommand(prefix + msg);
+            mc.getConnection().sendCommand(prefix + msg);
         }
         if (useFacts) fact = null;
         lastSend = System.currentTimeMillis();
@@ -131,7 +131,7 @@ public class Spammer extends Module {
     private Player nearestPlayer() {
         Player best = null;
         double bestDist = Double.MAX_VALUE;
-        for (Player p : mc.world.getPlayers()) {
+        for (Player p : mc.level.players()) {
             if (p == mc.player || !p.isAlive()) continue;
             double d = mc.player.distanceTo(p);
             if (d < bestDist) {

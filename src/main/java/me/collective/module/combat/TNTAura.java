@@ -64,7 +64,7 @@ public class TNTAura extends Module {
 
     @Override
     public void onUpdate() {
-        if (mc.player == null || mc.world == null || mc.interactionManager == null) return;
+        if (mc.player == null || mc.level == null || mc.gameMode == null) return;
 
         FindItemResult tnt = InventoryUtil.findInHotbar(Items.TNT);
         if (!tnt.found()) {
@@ -110,18 +110,18 @@ public class TNTAura extends Module {
 
         // Динамит над головой + поджог
         if (target != null) {
-            BlockPos head = BlockPos.ofFloored(target.getEntityPos()).up(2);
+            BlockPos head = BlockPos.containing(target.position()).above(2);
             if (PlacementUtils.canPlace(head, false)) {
                 PlacementUtils.placeBlock(head, tnt, silent, true, strict);
             }
             BlockHitResult ignite = getIgniteResult(head);
-            if (mc.world.getBlockState(head).getBlock() instanceof TntBlock && ignite != null) {
+            if (mc.level.getBlockState(head).getBlock() instanceof TntBlock && ignite != null) {
                 InventoryUtil.swap(flint.slot(), true);
-                if (mc.getNetworkHandler() != null) {
-                    mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(
+                if (mc.getConnection() != null) {
+                    mc.getConnection().send(new ServerboundUseItemOnPacket(
                         InteractionHand.MAIN_HAND, ignite, me.collective.util.GrimUtils.nextSequence()));
                 }
-                mc.player.swingHand(InteractionHand.MAIN_HAND);
+                me.collective.util.Utils.swingHand(InteractionHand.MAIN_HAND);
                 InventoryUtil.swapBack();
             }
             renderPoses.put(head, System.currentTimeMillis());
@@ -130,7 +130,7 @@ public class TNTAura extends Module {
 
     private BlockPos getSequentialPos(Player target) {
         for (BlockPos bp : getBlocks(target)) {
-            if (PlacementUtils.canPlace(bp, false) && mc.world.isAir(bp)) return bp;
+            if (PlacementUtils.canPlace(bp, false) && mc.level.isEmptyBlock(bp)) return bp;
         }
         return null;
     }
@@ -138,36 +138,36 @@ public class TNTAura extends Module {
     private List<BlockPos> getBlocks(Player target) {
         List<BlockPos> blocks = new ArrayList<>();
         if (target == null) return blocks;
-        BlockPos base = BlockPos.ofFloored(target.getEntityPos());
+        BlockPos base = BlockPos.containing(target.position());
         BlockPos[] around = {base, base.north(), base.south(), base.east(), base.west(),
             base.north().east(), base.north().west(), base.south().east(), base.south().west()};
         for (BlockPos bp : around) {
             for (Direction dir : Direction.values()) {
                 if (dir == Direction.UP || dir == Direction.DOWN) continue;
-                blocks.add(bp.offset(dir));
-                blocks.add(bp.offset(dir).up(1));
-                AABB up2 = new AABB(bp.offset(dir).up(1));
-                if (!up2.intersects(target.getBoundingBox())) blocks.add(bp.offset(dir).up(2));
-                blocks.add(bp.offset(dir).down(1));
+                blocks.add(bp.relative(dir));
+                blocks.add(bp.relative(dir).above(1));
+                AABB up2 = new AABB(bp.relative(dir).above(1));
+                if (!up2.intersects(target.getBoundingBox())) blocks.add(bp.relative(dir).above(2));
+                blocks.add(bp.relative(dir).below(1));
             }
-            blocks.add(bp.down(1));
-            blocks.add(bp.up(3));
+            blocks.add(bp.below(1));
+            blocks.add(bp.above(3));
         }
-        blocks.sort(Comparator.comparing(b -> -mc.player.squaredDistanceTo(b.toCenterPos())));
+        blocks.sort(Comparator.comparing(b -> -mc.player.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(b))));
         return blocks;
     }
 
     private BlockHitResult getIgniteResult(BlockPos pos) {
         if (mc.player == null) return null;
         double r = range.getFloatValue();
-        if (mc.player.squaredDistanceTo(pos.toCenterPos()) > r * r) return null;
-        return new BlockHitResult(pos.toCenterPos().add(0, -0.5, 0), Direction.DOWN, pos, false);
+        if (mc.player.distanceToSqr(Vec3.atCenterOf(pos)) > r * r) return null;
+        return new BlockHitResult(Vec3.atCenterOf(pos).add(0, -0.5, 0), Direction.DOWN, pos, false);
     }
 
     private Player getTarget() {
         Player best = null;
         double bestDist = range.getFloatValue();
-        for (Player p : mc.world.getPlayers()) {
+        for (Player p : mc.level.players()) {
             if (p == mc.player || !p.isAlive() || p.isSpectator() || p.isCreative()) continue;
             if (FriendManager.getInstance().isFriend(p)) continue;
             double d = mc.player.distanceTo(p);
@@ -198,8 +198,8 @@ public class TNTAura extends Module {
             } else {
                 float scale = 1f - age / 500f;
                 AABB b = new AABB(pos.getX(), pos.getY(), pos.getZ(), pos.getX(), pos.getY(), pos.getZ())
-                    .shrink(scale, scale, scale)
-                    .offset(0.5 + scale * 0.5, 0.5 + scale * 0.5, 0.5 + scale * 0.5);
+                    .deflate(scale, scale, scale)
+                    .move(0.5 + scale * 0.5, 0.5 + scale * 0.5, 0.5 + scale * 0.5);
                 Renderer3D.box(b, fill, lineColor.getValue(), ShapeMode.Both, true);
             }
         }

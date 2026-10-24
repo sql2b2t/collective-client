@@ -95,14 +95,14 @@ public class ChestTrackerDataManager {
     private static String currentServerIdentifier() {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null) return "unknown";
-        if (mc.getCurrentServerEntry() != null) return mc.getCurrentServerEntry().address;
-        return mc.isInSingleplayer() && mc.getServer() != null
-            ? "singleplayer_" + mc.getServer().getSaveProperties().getLevelName()
+        if (mc.getCurrentServer() != null) return mc.getCurrentServer().ip;
+        return mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null
+            ? "singleplayer_" + mc.getSingleplayerServer().getWorldData().getLevelName()
             : "unknown";
     }
 
     /** Куда класть экспорт — рядом с остальными файлами индекса. */
     static File exportTarget(String filename) {
-        return new File(new File(net.minecraft.client.Minecraft.getInstance().runDirectory, "collective/ChestTracker"), filename);
+        return new File(new File(net.minecraft.client.Minecraft.getInstance().gameDirectory, "collective/ChestTracker"), filename);
     }
 }

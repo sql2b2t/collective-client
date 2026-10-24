@@ -13,8 +13,8 @@ public class Freecam extends Module {
 
     public final NumberSetting speed = add(new NumberSetting("Speed", 1.0, 0.1, 5.0, 0.1));
 
-    private net.minecraft.client.world.ClientLevel cameraWorld;
-    private net.minecraft.client.network.LocalPlayer cameraPlayer;
+    private net.minecraft.client.multiplayer.ClientLevel cameraWorld;
+    private net.minecraft.client.player.LocalPlayer cameraPlayer;
     private Vec3 pos = Vec3.ZERO;
     private Vec3 prevPos = Vec3.ZERO;
     private float yaw = 0f;
@@ -40,18 +40,18 @@ public class Freecam extends Module {
     }
 
     private void synchronizeCamera() {
-        if (mc.world != cameraWorld || mc.player != cameraPlayer) {
-            cameraWorld = mc.world;
+        if (mc.level != cameraWorld || mc.player != cameraPlayer) {
+            cameraWorld = mc.level;
             cameraPlayer = mc.player;
         } else {
             return;
         }
-        if (mc.world != null && mc.player != null) {
-            Vec3 eyePos = mc.player.getEyePos();
+        if (mc.level != null && mc.player != null) {
+            Vec3 eyePos = mc.player.getEyePosition();
             pos = eyePos;
             prevPos = eyePos;
-            yaw = mc.player.getYaw();
-            pitch = mc.player.getPitch();
+            yaw = mc.player.getYRot();
+            pitch = mc.player.getXRot();
             prevYaw = yaw;
             prevPitch = pitch;
         }
@@ -68,35 +68,35 @@ public class Freecam extends Module {
     @EventHandler
     private void onTick(TickEvent.Pre event) {
         synchronizeCamera();
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         prevPos = pos;
         prevYaw = yaw;
         prevPitch = pitch;
 
         double s = speed.getValue();
-        Vec3 forward = Vec3.fromPolar(0, yaw).multiply(s);
-        Vec3 strafe = Vec3.fromPolar(0, yaw + 90).multiply(s);
+        Vec3 forward = Vec3.directionFromRotation(0, yaw).scale(s);
+        Vec3 strafe = Vec3.directionFromRotation(0, yaw + 90).scale(s);
 
         Vec3 move = Vec3.ZERO;
-        if (mc.options.forwardKey.isPressed()) move = move.add(forward);
-        if (mc.options.backKey.isPressed()) move = move.subtract(forward);
-        if (mc.options.leftKey.isPressed()) move = move.subtract(strafe);
-        if (mc.options.rightKey.isPressed()) move = move.add(strafe);
-        if (mc.options.jumpKey.isPressed()) move = move.add(0, s, 0);
-        if (mc.options.sneakKey.isPressed()) move = move.subtract(0, s, 0);
+        if (mc.options.keyUp.isDown()) move = move.add(forward);
+        if (mc.options.keyDown.isDown()) move = move.subtract(forward);
+        if (mc.options.keyLeft.isDown()) move = move.subtract(strafe);
+        if (mc.options.keyRight.isDown()) move = move.add(strafe);
+        if (mc.options.keyJump.isDown()) move = move.add(0, s, 0);
+        if (mc.options.keyShift.isDown()) move = move.subtract(0, s, 0);
 
         pos = pos.add(move);
     }
 
     public Vec3 getInterpolatedPos(float tickProgress) {
         synchronizeCamera();
-        if (mc.player == null || mc.world == null) {
-            return mc.player != null ? mc.player.getEyePos() : Vec3.ZERO;
+        if (mc.player == null || mc.level == null) {
+            return mc.player != null ? mc.player.getEyePosition() : Vec3.ZERO;
         }
-        double x = MathHelper.lerp(tickProgress, prevPos.x, pos.x);
-        double y = MathHelper.lerp(tickProgress, prevPos.y, pos.y);
-        double z = MathHelper.lerp(tickProgress, prevPos.z, pos.z);
+        double x = Mth.lerp(tickProgress, prevPos.x, pos.x);
+        double y = Mth.lerp(tickProgress, prevPos.y, pos.y);
+        double z = Mth.lerp(tickProgress, prevPos.z, pos.z);
         return new Vec3(x, y, z);
     }
 
@@ -113,20 +113,20 @@ public class Freecam extends Module {
     /** Поворот от мыши (вызывается из миксина вместо игрока). */
     public void turn(double cursorDeltaX, double cursorDeltaY) {
         synchronizeCamera();
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
         // Знаки как в ванильном Entity.changeLookDirection, иначе оси
         // мыши оказываются инвертированными.
         yaw += (float) cursorDeltaX * 0.15F;
-        pitch = MathHelper.clamp(pitch + (float) cursorDeltaY * 0.15F, -90f, 90f);
+        pitch = Mth.clamp(pitch + (float) cursorDeltaY * 0.15F, -90f, 90f);
     }
 
     public float getInterpolatedYaw(float tickProgress) {
         synchronizeCamera();
-        return prevYaw + MathHelper.wrapDegrees(yaw - prevYaw) * tickProgress;
+        return prevYaw + Mth.wrapDegrees(yaw - prevYaw) * tickProgress;
     }
 
     public float getInterpolatedPitch(float tickProgress) {
         synchronizeCamera();
-        return prevPitch + MathHelper.wrapDegrees(pitch - prevPitch) * tickProgress;
+        return prevPitch + Mth.wrapDegrees(pitch - prevPitch) * tickProgress;
     }
 }

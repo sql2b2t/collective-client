@@ -15,14 +15,8 @@ import net.minecraft.world.phys.Vec3;
  * Симуляция контекста установки блока (порт из BepHax NEW-SRC).
  * Подменяет «взгляд» игрока на симулированный yaw/pitch, чтобы блок ставился
  * с правильной ориентацией без реального поворота камеры.
- *
- * Адаптация под 1.21.11 (Yarn): Mojmap-переопределения BlockPlaceContext
- * отображаются на getPlayerYaw/getHorizontalPlayerFacing (ItemUsageContext) и
- * getPlayerLookDirection/getVerticalPlayerLookDirection/getPlacementDirections
- * (ItemPlacementContext); Direction.fromYRot -> Direction.fromHorizontalDegrees,
- * replacingClickedOnBlock -> canReplaceExisting, getClickedFace -> getSide.
  */
-public class PlacementContextSim extends ItemPlacementContext {
+public class PlacementContextSim extends BlockPlaceContext {
     private final float simYaw;
     private final Vec3 look;
 
@@ -33,7 +27,7 @@ public class PlacementContextSim extends ItemPlacementContext {
     }
 
     private static Vec3 normal(Direction d) {
-        return new Vec3(d.getOffsetX(), d.getOffsetY(), d.getOffsetZ());
+        return new Vec3(d.getStepX(), d.getStepY(), d.getStepZ());
     }
 
     private boolean ready() {
@@ -42,50 +36,50 @@ public class PlacementContextSim extends ItemPlacementContext {
 
     private Direction[] orderedByNearest() {
         if (!this.ready()) {
-            return Direction.getEntityFacingOrder(this.getPlayer());
+            return Direction.orderedByNearest(this.getPlayer());
         }
 
         Direction[] dirs = Direction.values().clone();
-        Arrays.sort(dirs, Comparator.comparingDouble(d -> -this.look.dotProduct(normal(d))));
+        Arrays.sort(dirs, Comparator.comparingDouble(d -> -this.look.dot(normal(d))));
         return dirs;
     }
 
     @Override
-    public float getPlayerYaw() {
-        return this.ready() ? this.simYaw : super.getPlayerYaw();
+    public float getRotation() {
+        return this.ready() ? this.simYaw : super.getRotation();
     }
 
     @Override
-    public Direction getHorizontalPlayerFacing() {
-        return this.ready() ? Direction.fromHorizontalDegrees(this.simYaw) : super.getHorizontalPlayerFacing();
+    public Direction getHorizontalDirection() {
+        return this.ready() ? Direction.fromYRot(this.simYaw) : super.getHorizontalDirection();
     }
 
     @Override
-    public Direction getPlayerLookDirection() {
+    public Direction getNearestLookingDirection() {
         return this.orderedByNearest()[0];
     }
 
     @Override
-    public Direction getVerticalPlayerLookDirection() {
+    public Direction getNearestLookingVerticalDirection() {
         if (!this.ready()) {
-            return super.getVerticalPlayerLookDirection();
+            return super.getNearestLookingVerticalDirection();
         } else {
             return this.look.y > 0.0 ? Direction.UP : Direction.DOWN;
         }
     }
 
     @Override
-    public Direction[] getPlacementDirections() {
+    public Direction[] getNearestLookingDirections() {
         if (!this.ready()) {
-            return super.getPlacementDirections();
+            return super.getNearestLookingDirections();
         }
 
         Direction[] dirs = this.orderedByNearest();
-        if (this.canReplaceExisting()) {
+        if (this.replacingClickedOnBlock()) {
             return dirs;
         }
 
-        Direction opposite = this.getSide().getOpposite();
+        Direction opposite = this.getClickedFace().getOpposite();
         int i = 0;
 
         while (i < dirs.length && dirs[i] != opposite) {

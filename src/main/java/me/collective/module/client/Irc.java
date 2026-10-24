@@ -371,8 +371,8 @@ public class Irc extends Module {
 
     private UUID playerUuidByName(String name) {
         try {
-            if (mc.getNetworkHandler() == null) return null;
-            for (PlayerListEntry entry : mc.getNetworkHandler().getPlayerList()) {
+            if (mc.getConnection() == null) return null;
+            for (PlayerInfo entry : mc.getConnection().getOnlinePlayers()) {
                 if (entry.getProfile() != null && name.equals(entry.getProfile().name())) {
                     return entry.getProfile().id();
                 }
@@ -438,7 +438,7 @@ public class Irc extends Module {
         try {
             Minecraft client = Minecraft.getInstance();
             if (client.getUser() != null) {
-                name = client.getUser().getUsername();
+                name = client.getUser().getName();
             }
         } catch (Throwable ignored) {
         }

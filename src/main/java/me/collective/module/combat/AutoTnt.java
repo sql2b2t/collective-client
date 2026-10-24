@@ -56,15 +56,15 @@ public class AutoTnt extends Module {
 
     @EventHandler
     private void onSendPacket(PacketEvent.Send event) {
-        if (mc.player == null || mc.world == null || igniting) return;
+        if (mc.player == null || mc.level == null || igniting) return;
 
-        if (event.packet instanceof PlayerInteractBlockC2SPacket packet) {
-            BlockHitResult hit = packet.getBlockHitResult();
+        if (event.packet instanceof ServerboundUseItemOnPacket packet) {
+            BlockHitResult hit = packet.hitResult();
             BlockPos clicked = hit.getBlockPos();
-            BlockPos offset = clicked.offset(hit.getSide());
+            BlockPos offset = clicked.relative(hit.getDirection());
 
-            boolean clickedIsTnt = mc.world.getBlockState(clicked).isOf(Blocks.TNT);
-            boolean offsetIsTnt = mc.world.getBlockState(offset).isOf(Blocks.TNT);
+            boolean clickedIsTnt = mc.level.getBlockState(clicked).is(Blocks.TNT);
+            boolean offsetIsTnt = mc.level.getBlockState(offset).is(Blocks.TNT);
 
             if (clickedIsTnt) candidatePositions.add(clicked);
             if (offsetIsTnt) candidatePositions.add(offset);
@@ -74,7 +74,7 @@ public class AutoTnt extends Module {
             Iterator<BlockPos> it = candidatePositions.iterator();
             while (it.hasNext()) {
                 BlockPos pos = it.next();
-                if (mc.world.getBlockState(pos).getBlock() == Blocks.TNT) {
+                if (mc.level.getBlockState(pos).getBlock() == Blocks.TNT) {
                     if (ignitionQueue.stream().anyMatch(task -> task.pos().equals(pos))) {
                         it.remove();
                         continue;
@@ -98,7 +98,7 @@ public class AutoTnt extends Module {
 
         if (ignitePos != null && !igniting && flintSlot == -1) {
             if (originalSlot == -1) {
-                originalSlot = mc.player.getInventory().selectedSlot;
+                originalSlot = mc.player.getInventory().getSelectedSlot();
             }
 
             FindItemResult flint = InventoryUtil.findInHotbarOrOffhand(Items.FLINT_AND_STEEL, Items.FIRE_CHARGE);
@@ -112,10 +112,10 @@ public class AutoTnt extends Module {
 
             if (flint.isOffhand()) {
                 igniting = true;
-                Vec3 hitVec = Vec3.ofCenter(ignitePos);
+                Vec3 hitVec = Vec3.atCenterOf(ignitePos);
                 BlockHitResult hit = new BlockHitResult(hitVec, Direction.UP, ignitePos, false);
-                mc.interactionManager.interactBlock(mc.player, InteractionHand.OFF_HAND, hit);
-                mc.player.swingHand(InteractionHand.OFF_HAND);
+                mc.gameMode.useItemOn(mc.player, InteractionHand.OFF_HAND, hit);
+                me.collective.util.Utils.swingHand(InteractionHand.OFF_HAND);
                 ignitePos = null;
                 flintSlot = -1;
                 originalSlot = -1;
@@ -124,20 +124,20 @@ public class AutoTnt extends Module {
             }
 
             flintSlot = flint.slot();
-            mc.player.getInventory().selectedSlot = flintSlot;
-            if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
+            mc.player.getInventory().setSelectedSlot(flintSlot);
+            me.collective.util.InventoryUtil.syncSelectedSlot();
             return;
         }
 
-        if (ignitePos != null && !igniting && mc.player.getInventory().selectedSlot == flintSlot) {
+        if (ignitePos != null && !igniting && mc.player.getInventory().getSelectedSlot() == flintSlot) {
             igniting = true;
-            Vec3 hitVec = Vec3.ofCenter(ignitePos);
+            Vec3 hitVec = Vec3.atCenterOf(ignitePos);
             BlockHitResult hit = new BlockHitResult(hitVec, Direction.UP, ignitePos, false);
-            mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND, hit);
-            mc.player.swingHand(InteractionHand.MAIN_HAND);
+            mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, hit);
+            me.collective.util.Utils.swingHand(InteractionHand.MAIN_HAND);
 
-            mc.player.getInventory().selectedSlot = originalSlot;
-            if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
+            mc.player.getInventory().setSelectedSlot(originalSlot);
+            me.collective.util.InventoryUtil.syncSelectedSlot();
             ignitePos = null;
             flintSlot = -1;
             originalSlot = -1;
@@ -147,7 +147,7 @@ public class AutoTnt extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
         if (!useTickDelay.getValue()) return;
         if (igniting) return;
         if (ignitionQueue.isEmpty()) return;
@@ -178,31 +178,31 @@ public class AutoTnt extends Module {
     }
 
     private void igniteNow(BlockPos pos, FindItemResult flint) {
-        if (mc.player.getEyePos().distanceTo(Vec3.ofCenter(pos)) > reach.getValue()) return;
+        if (mc.player.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) > reach.getValue()) return;
         igniting = true;
-        Vec3 hitVec = Vec3.ofCenter(pos);
+        Vec3 hitVec = Vec3.atCenterOf(pos);
         BlockHitResult hit = new BlockHitResult(hitVec, Direction.UP, pos, false);
 
         if (flint.isOffhand()) {
-            mc.interactionManager.interactBlock(mc.player, InteractionHand.OFF_HAND, hit);
-            mc.player.swingHand(InteractionHand.OFF_HAND);
+            mc.gameMode.useItemOn(mc.player, InteractionHand.OFF_HAND, hit);
+            me.collective.util.Utils.swingHand(InteractionHand.OFF_HAND);
         } else {
-            int prevSlot = mc.player.getInventory().selectedSlot;
-            mc.player.getInventory().selectedSlot = flint.slot();
-            if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
+            int prevSlot = mc.player.getInventory().getSelectedSlot();
+            mc.player.getInventory().setSelectedSlot(flint.slot());
+            me.collective.util.InventoryUtil.syncSelectedSlot();
 
-            mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND, hit);
-            mc.player.swingHand(InteractionHand.MAIN_HAND);
+            mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, hit);
+            me.collective.util.Utils.swingHand(InteractionHand.MAIN_HAND);
 
-            mc.player.getInventory().selectedSlot = prevSlot;
-            if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
+            mc.player.getInventory().setSelectedSlot(prevSlot);
+            me.collective.util.InventoryUtil.syncSelectedSlot();
         }
         igniting = false;
     }
 
     private void sendClientMessage(String msg) {
         if (mc.player != null) {
-            mc.player.sendMessage(net.minecraft.text.Component.literal("§7[§cAutoTnt§7] §f" + msg), false);
+            mc.player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§7[§cAutoTnt§7] §f" + msg));
         }
     }
 }

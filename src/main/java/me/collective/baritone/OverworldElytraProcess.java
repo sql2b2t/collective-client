@@ -113,7 +113,7 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
         this.fireworkCooldown = 0;
         syncBoundsFromModule();
 
-        if (ctx.player() != null && ctx.player().isGliding()) {
+        if (ctx.player() != null && ctx.player().isFallFlying()) {
             this.state = State.CRUISING_PITCH40;
             ChatHelper.sendMessage("§b[Elytra] §fЦель: " + dest.toShortString() + ". Режим Pitch-40 активен!");
         } else {
@@ -201,8 +201,8 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
             this.fireworkCooldown--;
         }
 
-        Vec3 playerPos = ctx.player().getEntityPos();
-        double distSqToDest = playerPos.squaredDistanceTo(destination.getX() + 0.5, playerPos.y, destination.getZ() + 0.5);
+        Vec3 playerPos = ctx.player().position();
+        double distSqToDest = playerPos.distanceToSqr(destination.getX() + 0.5, playerPos.y, destination.getZ() + 0.5);
 
         // Прибыли в пункт назначения
         if (distSqToDest < 16.0 && Math.abs(playerPos.y - destination.getY()) < 10.0) {
@@ -230,7 +230,7 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
     }
 
     private void tickTakeoff() {
-        if (ctx.player().isGliding()) {
+        if (ctx.player().isFallFlying()) {
             this.takeoffTicks = 0;
             if (ctx.player().getY() < this.cruiseLowerY) {
                 this.state = State.CLIMBING;
@@ -250,13 +250,13 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
         baritone.getInputOverrideHandler().clearAllKeys();
 
         // 1. Прыжок с земли
-        if (ctx.player().isOnGround()) {
+        if (ctx.player().onGround()) {
             baritone.getInputOverrideHandler().setInputForceState(Input.JUMP, true);
         } else if (this.takeoffTicks > 2) {
             // 2. Отправка пакета раскрытия элитр
             Minecraft mc = ctx.minecraft();
-            if (mc.getNetworkHandler() != null) {
-                mc.getNetworkHandler().sendPacket(new ClientCommandC2SPacket(ctx.player(), ClientCommandC2SPacket.Mode.START_FALL_FLYING));
+            if (mc.getConnection() != null) {
+                mc.getConnection().send(new ServerboundPlayerCommandPacket(ctx.player(), ServerboundPlayerCommandPacket.Action.START_FALL_FLYING));
             }
             // 3. Запуск фейерверка вверх для разгона
             if (this.takeoffTicks > 4 && this.fireworkCooldown <= 0) {
@@ -277,7 +277,7 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
     }
 
     private void tickClimbing() {
-        if (!ctx.player().isGliding()) {
+        if (!ctx.player().isFallFlying()) {
             this.state = State.TAKEOFF;
             return;
         }
@@ -300,7 +300,7 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
     }
 
     private void tickPitch40Cruise() {
-        if (!ctx.player().isGliding()) {
+        if (!ctx.player().isFallFlying()) {
             ChatHelper.sendMessage("§e[Elytra] Полёт прерван! Возобновляю взлёт...");
             this.state = State.TAKEOFF;
             return;
@@ -339,14 +339,14 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
             }
         }
 
-        if (ctx.player().age % 40 == 0) {
+        if (ctx.player().tickCount % 40 == 0) {
             recalculateVisualPath();
         }
     }
 
     private void tickLanding() {
-        if (!ctx.player().isGliding()) {
-            if (ctx.player().isOnGround()) {
+        if (!ctx.player().isFallFlying()) {
+            if (ctx.player().onGround()) {
                 ChatHelper.sendMessage("§a[Elytra] Успешная посадка в цель!");
                 onLostControl();
             }
@@ -354,7 +354,7 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
         }
 
         Vec3 destVec = new Vec3(destination.getX() + 0.5, destination.getY() + 1.0, destination.getZ() + 0.5);
-        double distXZ = Math.sqrt(ctx.player().squaredDistanceTo(destVec.x, ctx.player().getY(), destVec.z));
+        double distXZ = Math.sqrt(ctx.player().distanceToSqr(destVec.x, ctx.player().getY(), destVec.z));
 
         if (distXZ > 15.0) {
             lookTowards(destVec, 15.0f);
@@ -367,21 +367,21 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
     }
 
     private void lookTowards(Vec3 target, float targetPitch) {
-        Vec3 from = ctx.playerFeetAsVec().add(0, ctx.player().getStandingEyeHeight(), 0);
+        Vec3 from = ctx.playerFeetAsVec().add(0, ctx.player().getEyeHeight(net.minecraft.world.entity.Pose.STANDING), 0);
         double dx = target.x - from.x;
         double dz = target.z - from.z;
-        float yaw = (float) (MathHelper.atan2(dz, dx) * (180.0 / Math.PI)) - 90.0f;
+        float yaw = (float) (Mth.atan2(dz, dx) * (180.0 / Math.PI)) - 90.0f;
         baritone.getLookBehavior().updateTarget(new Rotation(yaw, targetPitch), true);
     }
 
     private double getSpeedBPS() {
-        Vec3 v = ctx.player().getVelocity();
+        Vec3 v = ctx.player().getDeltaMovement();
         return Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z) * 20.0;
     }
 
     private boolean hasElytraEquipped() {
-        ItemStack chest = ctx.player().getEquippedStack(EquipmentSlot.CHEST);
-        return chest.isOf(Items.ELYTRA) && (chest.getMaxDamage() - chest.getDamage()) > 5;
+        ItemStack chest = ctx.player().getItemBySlot(EquipmentSlot.CHEST);
+        return chest.is(Items.ELYTRA) && (chest.getMaxDamage() - chest.getDamageValue()) > 5;
     }
 
     private boolean useFirework() {
@@ -389,14 +389,14 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
         if (mc.player == null) return false;
 
         int fwSlot = -1;
-        if (isFirework(mc.player.getMainHandStack())) {
-            fwSlot = mc.player.getInventory().selectedSlot;
-        } else if (isFirework(mc.player.getOffHandStack())) {
-            mc.interactionManager.interactItem(mc.player, InteractionHand.OFF_HAND);
+        if (isFirework(mc.player.getMainHandItem())) {
+            fwSlot = mc.player.getInventory().getSelectedSlot();
+        } else if (isFirework(mc.player.getOffhandItem())) {
+            mc.gameMode.useItem(mc.player, InteractionHand.OFF_HAND);
             return true;
         } else {
             for (int i = 0; i < 9; i++) {
-                if (isFirework(mc.player.getInventory().getStack(i))) {
+                if (isFirework(mc.player.getInventory().getItem(i))) {
                     fwSlot = i;
                     break;
                 }
@@ -405,15 +405,15 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
 
         if (fwSlot != -1) {
             InventoryUtil.swap(fwSlot, true);
-            mc.interactionManager.interactItem(mc.player, InteractionHand.MAIN_HAND);
+            mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
             InventoryUtil.swapBack();
             return true;
         }
 
         for (int i = 9; i < 36; i++) {
-            if (isFirework(mc.player.getInventory().getStack(i))) {
+            if (isFirework(mc.player.getInventory().getItem(i))) {
                 InventoryUtil.swap(i, true);
-                mc.interactionManager.interactItem(mc.player, InteractionHand.MAIN_HAND);
+                mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
                 InventoryUtil.swapBack();
                 return true;
             }
@@ -423,8 +423,8 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
     }
 
     private boolean isFirework(ItemStack stack) {
-        if (!stack.isOf(Items.FIREWORK_ROCKET)) return false;
-        FireworksComponent fc = stack.get(DataComponentTypes.FIREWORKS);
+        if (!stack.is(Items.FIREWORK_ROCKET)) return false;
+        Fireworks fc = stack.get(DataComponents.FIREWORKS);
         return fc != null && fc.explosions().isEmpty();
     }
 
@@ -432,7 +432,7 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
         this.visualPath.clear();
         if (destination == null || ctx.player() == null) return;
 
-        Vec3 start = ctx.player().getEntityPos();
+        Vec3 start = ctx.player().position();
         Vec3 end = new Vec3(destination.getX() + 0.5, destination.getY() + 0.5, destination.getZ() + 0.5);
 
         this.visualPath.add(new BetterBlockPos(start.x, start.y, start.z));
@@ -441,8 +441,8 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
         int steps = 15;
         for (int i = 1; i <= steps; i++) {
             double frac = (double) i / steps;
-            double x = MathHelper.lerp(frac, start.x, end.x);
-            double z = MathHelper.lerp(frac, start.z, end.z);
+            double x = Mth.lerp(frac, start.x, end.x);
+            double z = Mth.lerp(frac, start.z, end.z);
             double y = (i == steps) ? end.y : this.cruiseTargetY;
             this.visualPath.add(new BetterBlockPos(x, y, z));
         }

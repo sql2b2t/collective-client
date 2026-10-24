@@ -25,16 +25,16 @@ public final class ItemSignature {
     public static String of(ItemStack s) {
         if (s == null || s.isEmpty()) return "";
 
-        String itemId = Registries.ITEM.getId(s.getItem()).toString();
+        String itemId = BuiltInRegistries.ITEM.getKey(s.getItem()).toString();
         // У зачарованной книги зачарования лежат не на самой книге, а внутри
-        ItemEnchantmentsComponent ench = s.getItem() == Items.ENCHANTED_BOOK
-            ? s.getOrDefault(DataComponentTypes.STORED_ENCHANTMENTS, ItemEnchantmentsComponent.DEFAULT)
+        ItemEnchantments ench = s.getItem() == Items.ENCHANTED_BOOK
+            ? s.getOrDefault(DataComponents.STORED_ENCHANTMENTS, ItemEnchantments.EMPTY)
             : s.getEnchantments();
 
         List<String> parts = new ArrayList<>();
-        for (Object2IntMap.Entry<RegistryEntry<Enchantment>> e : ench.getEnchantmentEntries()) {
-            String id = e.getKey().getIdAsString();
-            if (!id.isEmpty()) parts.add(id + "=" + e.getIntValue());
+        for (Object2IntMap.Entry<Holder<Enchantment>> e : ench.entrySet()) {
+            String id = e.getKey().getRegisteredName();
+            if (id != null && !id.isEmpty()) parts.add(id + "=" + e.getIntValue());
         }
 
         return format(itemId, parts);

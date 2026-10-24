@@ -37,7 +37,7 @@ public class Pitch40 extends Module {
     private double peakY = 0.0;
     private double troughY = 0.0;
     private ElytraRecast elytraRecast = null;
-    private RegistryKey<Level> lastDimension = null;
+    private ResourceKey<Level> lastDimension = null;
     private boolean waitingNoticeShown = false;
 
     public Pitch40() {
@@ -63,7 +63,7 @@ public class Pitch40 extends Module {
     }
 
     private void driveBoost() {
-        if (this.useBoost.getValue() && mc.player != null && mc.player.isGliding()) {
+        if (this.useBoost.getValue() && mc.player != null && mc.player.isFallFlying()) {
             RocketBoost boost = ModuleManager.INSTANCE.getModule(RocketBoost.class);
             if (boost != null && boost.isToggled()) {
                 boost.declareTravelling();
@@ -78,7 +78,7 @@ public class Pitch40 extends Module {
         this.peakY = mc.player != null ? mc.player.getY() : 0.0;
         this.troughY = this.peakY;
         this.elytraRecast = ModuleManager.INSTANCE.getModule(ElytraRecast.class);
-        this.lastDimension = mc.world != null ? mc.world.getRegistryKey() : null;
+        this.lastDimension = mc.level != null ? mc.level.dimension() : null;
         this.waitingNoticeShown = false;
 
         if (this.useBoost.getValue()) {
@@ -102,7 +102,7 @@ public class Pitch40 extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         if (this.useBoost.getValue()) this.enableBoost();
         else this.disableBoost();
@@ -114,7 +114,7 @@ public class Pitch40 extends Module {
             this.recastToggledByUs = true;
         }
         this.driveBoost();
-        RegistryKey<Level> currentDimension = mc.world.getRegistryKey();
+        ResourceKey<Level> currentDimension = mc.level.dimension();
         if (this.lastDimension != null && !this.lastDimension.equals(currentDimension)) {
             sendClientMessage("Измерение сменилось! Обновляю границы Pitch40.");
             this.lastDimension = currentDimension;
@@ -130,13 +130,13 @@ public class Pitch40 extends Module {
             }
             if (this.elytraSwapSlot != -1) {
                 InventoryUtil.swap(this.elytraSwapSlot, true);
-                mc.interactionManager.interactItem(mc.player, InteractionHand.MAIN_HAND);
+                mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
                 InventoryUtil.swapBack();
                 this.elytraSwapSlot = -1;
             }
 
             double playerY = mc.player.getY();
-            double velocityY = mc.player.getVelocity().y;
+            double velocityY = mc.player.getDeltaMovement().y;
             boolean wasGoingUp = this.goingUp;
             this.goingUp = velocityY > 0.0;
             if (wasGoingUp && !this.goingUp) {
@@ -162,14 +162,14 @@ public class Pitch40 extends Module {
     }
 
     private double getSpeedBPS() {
-        Vec3 velocity = mc.player.getVelocity();
+        Vec3 velocity = mc.player.getDeltaMovement();
         double speedPerTick = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z);
         return speedPerTick * 20.0;
     }
 
     private void checkAndUseFirework() {
         if (this.autoFirework.getValue() && this.fireworkCooldown <= 0) {
-            if (mc.player != null && mc.player.isGliding()) {
+            if (mc.player != null && mc.player.isFallFlying()) {
                 if (this.elytraRecast == null || !this.elytraRecast.isToggled() || !this.elytraRecast.isRecovering()) {
                     double currentSpeed = this.getSpeedBPS();
                     double playerY = mc.player.getY();
@@ -194,7 +194,7 @@ public class Pitch40 extends Module {
 
     private void sendClientMessage(String msg) {
         if (mc.player != null) {
-            mc.player.sendMessage(net.minecraft.text.Component.literal("§7[§bPitch40§7] §f" + msg), false);
+            mc.player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§7[§bPitch40§7] §f" + msg));
         }
     }
 }

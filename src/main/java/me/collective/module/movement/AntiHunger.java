@@ -24,16 +24,16 @@ public class AntiHunger extends Module {
 
     @EventHandler
     public void onPacketSend(PacketEvent.Send event) {
-        if (!(event.packet instanceof ClientCommandC2SPacket cmd)) return;
-        if (spoofSprint.getValue() && (cmd.getMode() == ClientCommandC2SPacket.Mode.START_SPRINTING
-            || cmd.getMode() == ClientCommandC2SPacket.Mode.STOP_SPRINTING)) {
-            if (grimSafe.getValue() && mc.player != null && !mc.player.isGliding() && mc.player.getVehicle() == null) {
+        if (!(event.packet instanceof ServerboundPlayerCommandPacket cmd)) return;
+        if (spoofSprint.getValue() && (cmd.getAction() == ServerboundPlayerCommandPacket.Action.START_SPRINTING
+            || cmd.getAction() == ServerboundPlayerCommandPacket.Action.STOP_SPRINTING)) {
+            if (grimSafe.getValue() && mc.player != null && !mc.player.isFallFlying() && mc.player.getVehicle() == null) {
                 return;
             }
             event.cancel();
         }
-        if (spoofJump.getValue() && (cmd.getMode() == ClientCommandC2SPacket.Mode.START_RIDING_JUMP
-            || cmd.getMode() == ClientCommandC2SPacket.Mode.STOP_RIDING_JUMP)) {
+        if (spoofJump.getValue() && (cmd.getAction() == ServerboundPlayerCommandPacket.Action.START_RIDING_JUMP
+            || cmd.getAction() == ServerboundPlayerCommandPacket.Action.STOP_RIDING_JUMP)) {
             event.cancel();
         }
     }

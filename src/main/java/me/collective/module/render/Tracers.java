@@ -39,18 +39,18 @@ public class Tracers extends Module {
 
     @EventHandler
     public void onRender3D(Render3DEvent event) {
-        if (!isToggled() || mc.player == null || mc.world == null) return;
-        Vec3 cam = mc.gameRenderer.getCamera().getCameraPos();
+        if (!isToggled() || mc.player == null || mc.level == null) return;
+        Vec3 cam = mc.gameRenderer.mainCamera().position();
         double rangeSq = this.range.getFloatValue() * this.range.getFloatValue();
 
         // Игроки — через готовый маленький список игроков; полный скан всех
         // сущностей мира стартует только когда включены предметы или мобы.
-        for (Player p : mc.world.getPlayers()) {
+        for (Player p : mc.level.players()) {
             if (p == mc.player || !p.isAlive() || p.isSpectator()) continue;
             boolean friend = FriendManager.getInstance().isFriend(p);
             if (friend && !friends.getValue()) continue;
             if (!friend && !players.getValue()) continue;
-            if (mc.player.squaredDistanceTo(p) > rangeSq) continue;
+            if (mc.player.distanceToSqr(p) > rangeSq) continue;
 
             Vec3 target = p.getBoundingBox().getCenter();
             Renderer3D.line(cam.x, cam.y, cam.z, target.x, target.y, target.z,
@@ -58,9 +58,9 @@ public class Tracers extends Module {
         }
 
         if (items.getValue() || mobs.getValue()) {
-            for (Entity e : mc.world.getEntities()) {
+            for (Entity e : mc.level.entitiesForRendering()) {
                 if (e == mc.player || !e.isAlive() || e instanceof Player) continue;
-                if (mc.player.squaredDistanceTo(e) > rangeSq) continue;
+                if (mc.player.distanceToSqr(e) > rangeSq) continue;
 
                 Color c;
                 if (e instanceof ItemEntity) {

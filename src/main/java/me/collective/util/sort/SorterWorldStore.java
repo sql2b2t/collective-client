@@ -45,7 +45,7 @@ public class SorterWorldStore {
 
     private void initializeFiles() {
         try {
-            File baseFolder = new File(new File(net.minecraft.client.Minecraft.getInstance().runDirectory, "collective"), "StashSorter");
+            File baseFolder = new File(new File(net.minecraft.client.Minecraft.getInstance().gameDirectory, "collective"), "StashSorter");
             if (!baseFolder.exists() && !baseFolder.mkdirs()) LOGGER.error("Не удалось создать папку StashSorter");
 
             File folder = new File(baseFolder, ContainerGeometry.serverId());

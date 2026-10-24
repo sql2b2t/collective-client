@@ -123,7 +123,7 @@ public class ElytraBounce extends Module {
     @Override
     public void onEnable() {
         this.lastUnstuckPos = null;
-        if (mc.player != null && !mc.player.getAbilities().allowFlying) {
+        if (mc.player != null && !mc.player.getAbilities().mayfly) {
             this.startSprinting = mc.player.isSprinting();
             this.jumpKeyDown = false;
             this.tempPath = null;
@@ -145,15 +145,15 @@ public class ElytraBounce extends Module {
                 }
 
                 if (this.highwayObstaclePasser.getValue()) {
-                    this.startPos = mc.player.getBlockPos();
+                    this.startPos = mc.player.blockPosition();
                     this.targetY = mc.player.getBlockY();
                 } else {
                     this.startPos = new BlockPos(0, 0, 0);
                 }
 
                 if (!this.useCustomYaw.getValue()) {
-                    if (!(mc.player.getBlockPos().getSquaredDistance(this.startPos) < 10000.0) && this.highwayObstaclePasser.getValue()) {
-                        BlockPos directionVec = mc.player.getBlockPos().subtract(this.startPos);
+                    if (!(mc.player.blockPosition().distSqr(this.startPos) < 10000.0) && this.highwayObstaclePasser.getValue()) {
+                        BlockPos directionVec = mc.player.blockPosition().subtract(this.startPos);
                         double angle = Math.toDegrees(Math.atan2(-directionVec.getX(), directionVec.getZ()));
                         double angleNormalized = Utils.angleOnAxis(angle);
                         if (!this.awayFromStartPos.getValue()) {
@@ -162,7 +162,7 @@ public class ElytraBounce extends Module {
 
                         this.yaw.setValue(angleNormalized);
                     } else {
-                        double playerAngleNormalized = Utils.angleOnAxis(mc.player.getYaw());
+                        double playerAngleNormalized = Utils.angleOnAxis(mc.player.getYRot());
                         this.yaw.setValue(playerAngleNormalized);
                     }
                 }
@@ -183,7 +183,7 @@ public class ElytraBounce extends Module {
             mc.player.setSprinting(this.startSprinting);
             if (this.toggleElytra.getValue()
                 && !this.fakeFly.getValue()
-                && !mc.player.getEquippedStack(EquipmentSlot.CHEST).getItem().toString().contains("chestplate")) {
+                && !mc.player.getItemBySlot(EquipmentSlot.CHEST).getItem().toString().contains("chestplate")) {
                 ChestSwap cs = ModuleManager.INSTANCE.getModule(ChestSwap.class);
                 if (cs != null) {
                     cs.swap();
@@ -194,7 +194,7 @@ public class ElytraBounce extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player != null && !mc.player.getAbilities().allowFlying) {
+        if (mc.player != null && !mc.player.getAbilities().mayfly) {
             if (this.lastUnstuckPos == null) onEnable();
             if (this.setbackTicks > 0) {
                 this.setbackTicks--;
@@ -206,8 +206,8 @@ public class ElytraBounce extends Module {
             this.scanPendingPortalChunk();
 
             if (this.toggleElytra.getValue() && !this.fakeFly.getValue() && !this.elytraToggled) {
-                ItemStack chest = mc.player.getEquippedStack(EquipmentSlot.CHEST);
-                if (!chest.isOf(Items.ELYTRA) && !chest.contains(DataComponentTypes.GLIDER)) {
+                ItemStack chest = mc.player.getItemBySlot(EquipmentSlot.CHEST);
+                if (!chest.is(Items.ELYTRA) && !chest.has(DataComponents.GLIDER)) {
                     // Не чаще раза в секунду: спам свапами не применяется сервером,
                     // а следующий glide-start палится как BadPacketsJ
                     long now = System.currentTimeMillis();
@@ -228,7 +228,7 @@ public class ElytraBounce extends Module {
             }
 
             if (this.bounce.getValue()) {
-                if (this.tempPath != null && mc.player.getBlockPos().getSquaredDistance(this.tempPath) < 500.0) {
+                if (this.tempPath != null && mc.player.blockPosition().distSqr(this.tempPath) < 500.0) {
                     this.tempPath = null;
                     this.lastNavGoal = null;
                     BaritoneHelper.clearGoal();
@@ -246,7 +246,7 @@ public class ElytraBounce extends Module {
                     return;
                 }
 
-                if (mc.player.squaredDistanceTo(this.lastUnstuckPos) < 25.0) {
+                if (mc.player.distanceToSqr(this.lastUnstuckPos) < 25.0) {
                     this.stuckTimer++;
                 } else {
                     this.stuckTimer = 0;
@@ -260,7 +260,7 @@ public class ElytraBounce extends Module {
                             || mc.player.getY() > this.targetY + 2
                             || mc.player.horizontalCollision
                             || (this.portalTrap != null
-                                && this.portalTrap.getSquaredDistance(mc.player.getBlockPos())
+                                && this.portalTrap.distSqr(mc.player.blockPosition())
                                     < this.portalAvoidDistance.getValue() * this.portalAvoidDistance.getValue())
                             || this.waitingForChunksToLoad
                             || this.stuckTimer > 50
@@ -268,10 +268,10 @@ public class ElytraBounce extends Module {
                     this.waitingForChunksToLoad = false;
                     this.paused = true;
                     RotationUtils.getInstance().clearRotations(this);
-                    BlockPos goal = mc.player.getBlockPos();
+                    BlockPos goal = mc.player.blockPosition();
                     double currDistance = this.distance.getValue();
                     if (this.portalTrap != null) {
-                        currDistance += playerPos().distanceTo(this.portalTrap.toCenterPos());
+                        currDistance += playerPos().distanceTo(Vec3.atCenterOf(portalTrap));
                         this.portalTrap = null;
                         ChatHelper.sendMessage("Путь в обход портала.");
                     }
@@ -287,21 +287,21 @@ public class ElytraBounce extends Module {
                         }
 
                         Vec3 unitYawVec = Utils.yawToDirection(this.yaw.getValue());
-                        Vec3 travelVec = playerPos().subtract(this.startPos.toCenterPos());
-                        double parallelCurrPosDot = travelVec.multiply(new Vec3(1.0, 0.0, 1.0)).dotProduct(unitYawVec);
-                        Vec3 parallelCurrPosComponent = unitYawVec.multiply(parallelCurrPosDot);
-                        Vec3 pos = this.startPos.toCenterPos().add(parallelCurrPosComponent);
+                        Vec3 travelVec = playerPos().subtract(Vec3.atCenterOf(startPos));
+                        double parallelCurrPosDot = travelVec.multiply(new Vec3(1.0, 0.0, 1.0)).dot(unitYawVec);
+                        Vec3 parallelCurrPosComponent = unitYawVec.scale(parallelCurrPosDot);
+                        Vec3 pos = Vec3.atCenterOf(startPos).add(parallelCurrPosComponent);
                         pos = Utils.positionInDirection(pos, this.yaw.getValue(), currDistance);
-                        goal = new BlockPos((int) Math.floor(pos.getX()), this.targetY, (int) Math.floor(pos.getZ()));
+                        goal = new BlockPos((int) Math.floor(pos.x), this.targetY, (int) Math.floor(pos.z));
                         currDistance++;
-                        if (mc.world.getBlockState(goal).getBlock() == Blocks.VOID_AIR) {
+                        if (mc.level.getBlockState(goal).getBlock() == Blocks.VOID_AIR) {
                             this.waitingForChunksToLoad = true;
                             return;
                         }
                     } while (
-                        !mc.world.getBlockState(goal.down()).isSolidBlock(mc.world, goal.down())
-                            || mc.world.getBlockState(goal).getBlock() == Blocks.NETHER_PORTAL
-                            || !mc.world.getBlockState(goal).isAir()
+                        !mc.level.getBlockState(goal.below()).isSolidRender()
+                            || mc.level.getBlockState(goal).getBlock() == Blocks.NETHER_PORTAL
+                            || !mc.level.getBlockState(goal).isAir()
                     );
 
                     if (!goal.equals(this.lastNavGoal)) {
@@ -316,7 +316,7 @@ public class ElytraBounce extends Module {
                     }
 
                     if (this.lockYaw.getValue()) {
-                        mc.player.setYaw(this.yaw.getValue().floatValue());
+                        mc.player.setYRot(this.yaw.getValue().floatValue());
                     }
 
                     RotationUtils rotation = RotationUtils.getInstance();
@@ -324,7 +324,7 @@ public class ElytraBounce extends Module {
                         rotation.setRotationFullInstant(
                             this,
                             ROTATION_PRIORITY,
-                            this.lockYaw.getValue() ? this.yaw.getValue().floatValue() : mc.player.getYaw(),
+                            this.lockYaw.getValue() ? this.yaw.getValue().floatValue() : mc.player.getYRot(),
                             this.effectivePitch()
                         );
                     } else {
@@ -361,12 +361,12 @@ public class ElytraBounce extends Module {
     }
 
     private void updateAutoPitch() {
-        if (this.autoPitch.getValue() && this.bounce.getValue() && this.lockPitch.getValue() && mc.world != null) {
+        if (this.autoPitch.getValue() && this.bounce.getValue() && this.lockPitch.getValue() && mc.level != null) {
             if (this.solveCooldown > 0) {
                 this.solveCooldown--;
-            } else if (mc.player.isOnGround()) {
+            } else if (mc.player.onGround()) {
                 this.solveCooldown = 10;
-                double headroom = BounceSolver.measureHeadroom(mc.player, mc.world);
+                double headroom = BounceSolver.measureHeadroom(mc.player, mc.level);
                 if (!(this.solvedHeadroom >= 0.0) || Math.abs(headroom - this.solvedHeadroom) >= 0.05) {
                     this.solvedHeadroom = headroom;
                     this.solvedPitch = BounceSolver.solvePitch(headroom);
@@ -383,7 +383,7 @@ public class ElytraBounce extends Module {
     @EventHandler
     private void onPacketReceive(PacketEvent.Receive event) {
         if (this.bounce.getValue() && this.setbackPause.getValue().intValue() > 0) {
-            if (event.getPacket() instanceof PlayerPositionLookS2CPacket) {
+            if (event.getPacket() instanceof ClientboundPlayerPositionPacket) {
                 this.setbackTicks = this.setbackPause.getValue().intValue();
             }
         }
@@ -392,8 +392,8 @@ public class ElytraBounce extends Module {
             // Receive стреляет на нетти-треде: чанк ещё не интегрирован в мир
             // (это делает ванилла позже, на основном треде). Запоминаем чанк и
             // сканируем его в тике — иначе getChunk всегда null и детект мёртв.
-            if (event.getPacket() instanceof ChunkDataS2CPacket chunkPacket) {
-                this.pendingPortalScan = new ChunkPos(chunkPacket.getChunkX(), chunkPacket.getChunkZ());
+            if (event.getPacket() instanceof ClientboundLevelChunkWithLightPacket chunkPacket) {
+                this.pendingPortalScan = new ChunkPos(chunkPacket.x(), chunkPacket.z());
             }
         }
     }
@@ -402,36 +402,36 @@ public class ElytraBounce extends Module {
     private void scanPendingPortalChunk() {
         ChunkPos pos = this.pendingPortalScan;
         this.pendingPortalScan = null;
-        if (pos == null || mc.world == null || mc.player == null) return;
+        if (pos == null || mc.level == null || mc.player == null) return;
 
         Vec3 moveDir = Utils.yawToDirection(this.yaw.getValue());
-        if (Utils.distancePointToDirection(Vec3.of(pos.getCenterAtY(this.targetY)), moveDir, playerPos()) > 21.0) {
+        if (Utils.distancePointToDirection(new Vec3(pos.getMiddleBlockX(), this.targetY, pos.getMiddleBlockZ()), moveDir, playerPos()) > 21.0) {
             return;
         }
 
-        WorldChunk chunk = mc.world.getChunk(pos.x, pos.z);
+        LevelChunk chunk = mc.level.getChunk(pos.x(), pos.z());
         if (chunk == null) return;
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 for (int y = this.targetY; y < this.targetY + 3; y++) {
-                    BlockPos position = new BlockPos(pos.getStartX() + x, y, pos.getStartZ() + z);
-                    if ((Utils.distancePointToDirection(Vec3.of(position), moveDir, playerPos())
+                    BlockPos position = new BlockPos(pos.getMinBlockX() + x, y, pos.getMinBlockZ() + z);
+                    if ((Utils.distancePointToDirection(Vec3.atCenterOf(position), moveDir, playerPos())
                             <= this.portalScanWidth.getValue().intValue())
-                        && mc.world.getBlockState(position).getBlock().equals(Blocks.NETHER_PORTAL)) {
+                        && mc.level.getBlockState(position).getBlock().equals(Blocks.NETHER_PORTAL)) {
                         BlockPos posBehind = new BlockPos(
-                            (int) Math.floor(position.getX() + moveDir.getX()),
+                            (int) Math.floor(position.getX() + moveDir.x),
                             position.getY(),
-                            (int) Math.floor(position.getZ() + moveDir.getZ())
+                            (int) Math.floor(position.getZ() + moveDir.z)
                         );
                         if ((
-                                mc.world.getBlockState(posBehind).isSolidBlock(mc.world, posBehind)
-                                    || mc.world.getBlockState(posBehind).getBlock() == Blocks.NETHER_PORTAL
+                                mc.level.getBlockState(posBehind).isSolid()
+                                    || mc.level.getBlockState(posBehind).getBlock() == Blocks.NETHER_PORTAL
                             )
                             && (
                                 this.portalTrap == null
-                                    || this.portalTrap.getSquaredDistance(posBehind) > 100.0
-                                        && mc.player.getBlockPos().getSquaredDistance(posBehind)
-                                            < mc.player.getBlockPos().getSquaredDistance(this.portalTrap)
+                                    || this.portalTrap.distSqr(posBehind) > 100.0
+                                        && mc.player.blockPosition().distSqr(posBehind)
+                                            < mc.player.blockPosition().distSqr(this.portalTrap)
                             )) {
                             this.portalTrap = posBehind;
                         }
@@ -457,8 +457,8 @@ public class ElytraBounce extends Module {
             && this.setbackTicks == 0
             && mc.player != null
             && (this.fakeFly.getValue()
-                || mc.player.getEquippedStack(EquipmentSlot.CHEST).isOf(Items.ELYTRA)
-                || mc.player.getEquippedStack(EquipmentSlot.CHEST).contains(DataComponentTypes.GLIDER));
+                || mc.player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA)
+                || mc.player.getItemBySlot(EquipmentSlot.CHEST).has(DataComponents.GLIDER));
     }
 
     public boolean shouldAutoJump() {
@@ -469,9 +469,9 @@ public class ElytraBounce extends Module {
         boolean prev = this.jumpKeyDown;
         if (!this.enabled() || !this.shouldAutoJump()) {
             this.jumpKeyDown = false;
-        } else if (mc.player.isOnGround()) {
+        } else if (mc.player.onGround()) {
             this.jumpKeyDown = true;
-        } else if (mc.player.isGliding()) {
+        } else if (mc.player.isFallFlying()) {
             this.jumpKeyDown = false;
         } else {
             this.jumpKeyDown = !prev;
@@ -514,11 +514,11 @@ public class ElytraBounce extends Module {
 
         if (advance) {
             // Нормализация шага по времени кадра: на 144+ fps скорость не падает.
-            double dt = MathHelper.clamp((now - this.cameraLastFrameNanos) / 50_000_000.0, 0.25, 3.0);
+            double dt = Mth.clamp((now - this.cameraLastFrameNanos) / 50_000_000.0, 0.25, 3.0);
             this.cameraLastFrameNanos = now;
 
             double gap = realY - this.cameraSmoothY;
-            if (mc.player.isOnGround()) {
+            if (mc.player.onGround()) {
                 // на земле — быстрый плавный прилип к реальной высоте
                 // (≈75% на кадр 20 мс): ступени и смена уровня дороги
                 // склеиваются за 2-3 кадра, без рывка
@@ -540,8 +540,8 @@ public class ElytraBounce extends Module {
     }
 
     private void doGrimEflyStuff() {
-        if (this.bounce.getValue() && mc.player.isOnGround()) {
-            mc.player.jump();
+        if (this.bounce.getValue() && mc.player.onGround()) {
+            mc.player.jumpFromGround();
         }
     }
 
@@ -550,15 +550,11 @@ public class ElytraBounce extends Module {
         if (module == null || !module.isToggled() || !module.fakeFly.getValue()) return false;
 
         for (Identifier id : List.of(
-            Identifier.of("minecraft:item.armor.equip_generic"),
-            Identifier.of("minecraft:item.armor.equip_netherite"),
-            Identifier.of("minecraft:item.armor.equip_elytra"),
-            Identifier.of("minecraft:item.armor.equip_diamond"),
-            Identifier.of("minecraft:item.armor.equip_gold"),
-            Identifier.of("minecraft:item.armor.equip_iron"),
-            Identifier.of("minecraft:item.armor.equip_chain"),
-            Identifier.of("minecraft:item.armor.equip_leather"),
-            Identifier.of("minecraft:item.elytra.flying")
+            Identifier.parse("minecraft:item.armor.equip_generic"), Identifier.parse("minecraft:item.armor.equip_netherite"),
+            Identifier.parse("minecraft:item.armor.equip_elytra"), Identifier.parse("minecraft:item.armor.equip_diamond"),
+            Identifier.parse("minecraft:item.armor.equip_gold"), Identifier.parse("minecraft:item.armor.equip_iron"),
+            Identifier.parse("minecraft:item.armor.equip_chain"), Identifier.parse("minecraft:item.armor.equip_leather"),
+            Identifier.parse("minecraft:item.elytra.flying")
         )) {
             if (id.equals(soundId)) {
                 return true;
@@ -572,6 +568,6 @@ public class ElytraBounce extends Module {
     }
 
     private boolean hasEnoughFood() {
-        return mc.player.getHungerManager().getFoodLevel() >= 20;
+        return mc.player.getFoodData().getFoodLevel() >= 20;
     }
 }

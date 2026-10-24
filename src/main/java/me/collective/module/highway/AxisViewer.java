@@ -46,9 +46,9 @@ public class AxisViewer extends Module {
 
     @EventHandler
     private void onRender3D(Render3DEvent event) {
-        if (!isToggled() || mc.world == null || mc.options.hudHidden) return;
+        if (!isToggled() || mc.level == null || mc.gui.hud.isHidden()) return;
 
-        String dim = mc.world.getRegistryKey().getValue().toString();
+        String dim = mc.level.dimension().identifier().toString();
         AxisType axisType;
         int y;
         Color lineColor;

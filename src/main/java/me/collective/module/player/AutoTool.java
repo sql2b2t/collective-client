@@ -24,12 +24,12 @@ public class AutoTool extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
-        boolean isPressed = mc.options.attackKey.isPressed();
+        boolean isPressed = mc.options.keyAttack.isDown();
 
-        if (isPressed && mc.crosshairTarget instanceof BlockHitResult hit && hit.getType() == HitResult.Type.BLOCK) {
-            BlockState state = mc.world.getBlockState(hit.getBlockPos());
+        if (isPressed && mc.hitResult instanceof BlockHitResult hit && hit.getType() == HitResult.Type.BLOCK) {
+            BlockState state = mc.level.getBlockState(hit.getBlockPos());
             if (!state.isAir()) {
                 int bestSlot = getBestTool(state);
                 if (bestSlot != -1 && bestSlot != mc.player.getInventory().getSelectedSlot()) {
@@ -54,15 +54,15 @@ public class AutoTool extends Module {
         float bestSpeed = 1.0f;
 
         for (int i = 0; i < 9; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
+            ItemStack stack = mc.player.getInventory().getItem(i);
             if (stack.isEmpty()) continue;
 
-            if (saveDurability.getValue() && stack.isDamageable()) {
-                if ((stack.getMaxDamage() - stack.getDamage()) < 15) continue;
+            if (saveDurability.getValue() && stack.isDamageableItem()) {
+                if ((stack.getMaxDamage() - stack.getDamageValue()) < 15) continue;
             }
 
-            float speed = stack.getMiningSpeedMultiplier(state);
-            if (state.isToolRequired() && !stack.isSuitableFor(state)) {
+            float speed = stack.getDestroySpeed(state);
+            if (state.requiresCorrectToolForDrops() && !stack.isCorrectToolForDrops(state)) {
                 continue;
             }
 

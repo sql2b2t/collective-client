@@ -3,7 +3,7 @@ package me.collective.mixin;
 import me.collective.module.render.Tooltips;
 import me.collective.module.tooltips.DominantStacks;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -18,21 +18,21 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * предмет совпадает с записью из накопленного списка, рисует поверх иконку
  * доминирующего предмета с тем же искажением, что в оригинале: сдвиг
  * {@code +3.5 / -4} и масштаб {@code 10 / -10} (отрицательный Y зеркалит
- * иконку). Смещение и масштаб заданы явно через матрицы {@code GuiGraphics},
+ * иконку). Смещение и масштаб заданы явно через матрицы {@code GuiGraphicsExtractor},
  * т.к. в 1.21.11 {@code drawItem} уходит в render-состояния и хуков на
  * {@code translate}/{@code scale} внутри может не оказаться.
  */
-@Mixin(GuiGraphics.class)
+@Mixin(GuiGraphicsExtractor.class)
 public abstract class MixinDrawContextDominant {
 
     /** Модуль кэшируется один раз: drawStackOverlay вызывается на каждый отрисованный предмет. */
     private Tooltips collective$module;
 
     @Inject(
-        method = "drawStackOverlay(Lnet/minecraft/client/font/TextRenderer;"
+        method = "drawStackOverlay(Lnet/minecraft/client/font/Font;"
             + "Lnet/minecraft/item/ItemStack;IILjava/lang/String;)V",
         at = @At("HEAD"))
-    private void collective$majorityItem(TextRenderer font, ItemStack stack, int x, int y,
+    private void collective$majorityItem(Font font, ItemStack stack, int x, int y,
                                    String countLabel, CallbackInfo ci) {
         Tooltips module = this.collective$module;
         if (module == null) {
@@ -53,13 +53,13 @@ public abstract class MixinDrawContextDominant {
      * Отрисовывает доминирующий предмет поверх контейнера (шаposition/мешка).
      */
     private void renderDominantItem(ItemStack dominant, int x, int y, Tooltips.MajorityMode mode, Tooltips.MajorityPosition position) {
-        GuiGraphics context = (GuiGraphics) (Object) this;
+        GuiGraphicsExtractor context = (GuiGraphicsExtractor) (Object) this;
 
         if (mode == Tooltips.MajorityMode.FULL) {
-            context.drawItem(dominant, x, y);
+            context.item(dominant, x, y);
         } else {
             // Миниатюра 10×10 (scale = 10/16 = 0.625)
-            var matrices = context.getMatrices();
+            var matrices = context.pose();
             matrices.pushMatrix();
 
             if (position == Tooltips.MajorityPosition.CENTER) {
@@ -71,7 +71,7 @@ public abstract class MixinDrawContextDominant {
             }
 
             matrices.scale(0.625f, 0.625f);
-            context.drawItem(dominant, 0, 0);
+            context.item(dominant, 0, 0);
             matrices.popMatrix();
         }
     }

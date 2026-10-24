@@ -3,7 +3,7 @@ package me.collective.module.hud;
 import me.collective.gui.GuiGfx;
 import me.collective.module.client.HUD;
 import me.collective.module.client.UI;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.awt.Color;
 
@@ -54,7 +54,7 @@ public final class HudTheme {
     }
 
     /** Плашка с тенью, заливкой и тонкой рамкой. */
-    public static void plate(GuiGraphics context, float x, float y, float w, float h, float r) {
+    public static void plate(GuiGraphicsExtractor context, float x, float y, float w, float h, float r) {
         GuiGfx.shadow(context, (int) x, (int) y, (int) w, (int) h, (int) r);
         GuiGfx.fillRounded(context, x, y, w, h, r, PLATE.getRGB());
         GuiGfx.strokeRounded(context, x, y, w, h, r, 1f, BORDER.getRGB());

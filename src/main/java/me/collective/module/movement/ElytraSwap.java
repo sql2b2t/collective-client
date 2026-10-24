@@ -13,8 +13,8 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
 import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.InteractionHand;
 
 /**
@@ -71,14 +71,14 @@ public class ElytraSwap extends Module {
             processQueue();
             return;
         }
-        if (!mode.process("Bind") || mc.player == null || mc.currentScreen != null) return;
+        if (!mode.process("Bind") || mc.player == null || mc.gui.screen() != null) return;
         long now = System.currentTimeMillis();
         if (switchButton.getValue() != -1 && switchButton.isPressed() && now - lastSwitch >= 500) {
             lastSwitch = now;
             swapChest(false);
         }
         if (fireWorkButton.getValue() != -1 && fireWorkButton.isPressed()
-            && now - lastFirework >= 500 && mc.player.isGliding()) {
+            && now - lastFirework >= 500 && mc.player.isFallFlying()) {
             lastFirework = now;
             useFireWork();
         }
@@ -86,22 +86,22 @@ public class ElytraSwap extends Module {
 
     /** Один клик в тик из очереди (render-тред). */
     private void processQueue() {
-        if (mc.player == null || mc.interactionManager == null) {
+        if (mc.player == null || mc.gameMode == null) {
             clickQueue = null;
             swapping = false;
             return;
         }
-        if (mc.currentScreen != null) {
+        if (mc.gui.screen() != null) {
             clickQueue = null;
             swapping = false;
             info("Свап прерван: открыт инвентарь!");
             if (queueDisable) setToggled(false);
             return;
         }
-        clickSlot(clickQueue[queueIndex++]);
+        handleContainerInput(clickQueue[queueIndex++]);
         if (queueIndex >= clickQueue.length) {
             clickQueue = null;
-            sendClose(mc.player.currentScreenHandler.syncId);
+            sendClose(mc.player.containerMenu.containerId);
             swapping = false;
             if (queueDisable) disable("Свапнул! Отключаю..");
             else info("Свапнул!");
@@ -110,30 +110,30 @@ public class ElytraSwap extends Module {
 
     @EventHandler
     public void onPacketSend(PacketEvent.Send event) {
-        if (!(event.packet instanceof ClientCommandC2SPacket cmd)) return;
-        if (cmd.getMode() != ClientCommandC2SPacket.Mode.START_FALL_FLYING) return;
+        if (!(event.packet instanceof ServerboundPlayerCommandPacket cmd)) return;
+        if (cmd.getAction() != ServerboundPlayerCommandPacket.Action.START_FALL_FLYING) return;
         if (!mode.process("Bind") || !startFireWork.getValue()) return;
         useFireWork();
     }
 
     public void useFireWork() {
-        if (mc.player == null || mc.interactionManager == null) return;
+        if (mc.player == null || mc.gameMode == null) return;
         boolean silent = fireWorkMode.process("Silent");
 
         FindItemResult hotbar = InventoryUtil.findInHotbarOrOffhand(Items.FIREWORK_ROCKET);
         if (hotbar.isOffhand()) {
-            mc.interactionManager.interactItem(mc.player, InteractionHand.OFF_HAND);
+            mc.gameMode.useItem(mc.player, InteractionHand.OFF_HAND);
             return;
         }
         if (hotbar.isHotbar()) {
             if (silent) {
                 InventoryUtil.swap(hotbar.slot(), true);
-                mc.interactionManager.interactItem(mc.player, InteractionHand.MAIN_HAND);
+                mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
                 InventoryUtil.swapBack();
             } else {
-                mc.player.getInventory().selectedSlot = hotbar.slot();
-                mc.interactionManager.syncSelectedSlot();
-                mc.interactionManager.interactItem(mc.player, InteractionHand.MAIN_HAND);
+                mc.player.getInventory().setSelectedSlot(hotbar.slot());
+                me.collective.util.InventoryUtil.syncSelectedSlot();
+                mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
             }
             sendSwing();
             return;
@@ -141,13 +141,13 @@ public class ElytraSwap extends Module {
 
         FindItemResult inv = InventoryUtil.find(Items.FIREWORK_ROCKET);
         if (inv.found() && inv.isMain()) {
-            int syncId = mc.player.currentScreenHandler.syncId;
-            mc.interactionManager.clickSlot(syncId, inv.slot(), mc.player.getInventory().selectedSlot, SlotActionType.SWAP, mc.player);
+            int syncId = mc.player.containerMenu.containerId;
+            mc.gameMode.handleContainerInput(syncId, inv.slot(), mc.player.getInventory().getSelectedSlot(), ContainerInput.SWAP, mc.player);
             sendClose(syncId);
-            mc.interactionManager.interactItem(mc.player, InteractionHand.MAIN_HAND);
+            mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
             sendSwing();
             if (silent) {
-                mc.interactionManager.clickSlot(syncId, inv.slot(), mc.player.getInventory().selectedSlot, SlotActionType.SWAP, mc.player);
+                mc.gameMode.handleContainerInput(syncId, inv.slot(), mc.player.getInventory().getSelectedSlot(), ContainerInput.SWAP, mc.player);
                 sendClose(syncId);
             }
             return;
@@ -167,8 +167,8 @@ public class ElytraSwap extends Module {
     }
 
     private void swapChest(boolean disable) {
-        if (mc.player == null || mc.interactionManager == null) return;
-        if (mc.currentScreen != null) {
+        if (mc.player == null || mc.gameMode == null) return;
+        if (mc.gui.screen() != null) {
             if (disable) disable("Закрой инвентарь и повтори!");
             else info("Закрой инвентарь и повтори!");
             return;
@@ -176,7 +176,7 @@ public class ElytraSwap extends Module {
         if (clickQueue != null) return;
         FindItemResult elytra = InventoryUtil.find(Items.ELYTRA);
 
-        if (mc.player.getInventory().getStack(38).isOf(Items.ELYTRA)) {
+        if (mc.player.getInventory().getItem(38).is(Items.ELYTRA)) {
             int invSlot = getChestPlateSlot();
             if (invSlot == -1) {
                 if (disable) disable("У тебя нет нагрудника!");
@@ -211,10 +211,10 @@ public class ElytraSwap extends Module {
 
     /** Один SWAP-клик: слот брони 6 <-> хотбар. Без курсора и задержек. */
     private void fastSwap(int hotbarSlot) {
-        if (mc.player == null || mc.interactionManager == null) return;
+        if (mc.player == null || mc.gameMode == null) return;
         swapping = true;
-        mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, 6, hotbarSlot, SlotActionType.SWAP, mc.player);
-        sendClose(mc.player.currentScreenHandler.syncId);
+        mc.gameMode.handleContainerInput(mc.player.containerMenu.containerId, 6, hotbarSlot, ContainerInput.SWAP, mc.player);
+        sendClose(mc.player.containerMenu.containerId);
         swapping = false;
     }
 
@@ -222,8 +222,8 @@ public class ElytraSwap extends Module {
     private void startQueue(int[] slots, boolean disable) {
         if (!delay.getValue()) {
             swapping = true;
-            for (int slot : slots) clickSlot(slot);
-            sendClose(mc.player.currentScreenHandler.syncId);
+            for (int slot : slots) handleContainerInput(slot);
+            sendClose(mc.player.containerMenu.containerId);
             swapping = false;
             if (disable) disable("Свапнул! Отключаю..");
             else info("Свапнул!");
@@ -235,20 +235,20 @@ public class ElytraSwap extends Module {
         swapping = true;
     }
 
-    private void clickSlot(int slot) {
-        if (mc.player == null || mc.interactionManager == null) return;
-        mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, slot, 0, SlotActionType.PICKUP, mc.player);
+    private void handleContainerInput(int slot) {
+        if (mc.player == null || mc.gameMode == null) return;
+        mc.gameMode.handleContainerInput(mc.player.containerMenu.containerId, slot, 0, ContainerInput.PICKUP, mc.player);
     }
 
     private void sendClose(int syncId) {
-        if (mc.getNetworkHandler() != null) {
-            mc.getNetworkHandler().sendPacket(new CloseHandledScreenC2SPacket(syncId));
+        if (mc.getConnection() != null) {
+            mc.getConnection().send(new ServerboundContainerClosePacket(syncId));
         }
     }
 
     private void sendSwing() {
-        if (mc.getNetworkHandler() != null) {
-            mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
+        if (mc.getConnection() != null) {
+            mc.getConnection().send(ServerboundPunchPacket.INSTANCE);
         }
     }
 

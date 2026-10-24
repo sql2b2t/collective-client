@@ -20,25 +20,25 @@ public class Parkour extends Module {
 
     @Override
     public void onUpdate() {
-        if (mc.player == null || mc.world == null) return;
-        if (!mc.player.isOnGround()) return;
-        if (mc.player.isSneaking()) return;
-        if (onlyForward.getValue() && !mc.options.forwardKey.isPressed()) return;
+        if (mc.player == null || mc.level == null) return;
+        if (!mc.player.onGround()) return;
+        if (mc.player.isShiftKeyDown()) return;
+        if (onlyForward.getValue() && !mc.options.keyUp.isDown()) return;
 
-        Direction dir = mc.player.getHorizontalFacing();
-        BlockPos ahead = mc.player.getBlockPos().offset(dir);
+        Direction dir = mc.player.getDirection();
+        BlockPos ahead = mc.player.blockPosition().relative(dir);
 
-        boolean gapAhead = mc.world.getBlockState(ahead).isAir()
-            && mc.world.getBlockState(ahead.up(1)).isAir();
+        boolean gapAhead = mc.level.getBlockState(ahead).isAir()
+            && mc.level.getBlockState(ahead.above(1)).isAir();
         if (!gapAhead) return;
 
         boolean landing = false;
         for (int i = 1; i <= 3; i++) {
-            if (!mc.world.getBlockState(ahead.down(i)).isAir()) {
+            if (!mc.level.getBlockState(ahead.below(i)).isAir()) {
                 landing = true;
                 break;
             }
         }
-        if (landing) mc.player.jump();
+        if (landing) mc.player.jumpFromGround();
     }
 }

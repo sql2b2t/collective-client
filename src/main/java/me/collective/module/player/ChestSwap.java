@@ -10,7 +10,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import me.collective.util.InventoryUtil;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerInput;
 
 public class ChestSwap extends Module {
     public enum TargetChest {
@@ -33,8 +33,8 @@ public class ChestSwap extends Module {
     public void swap() {
         if (!InventoryUtil.canUsePlayerInventory()) return;
 
-        ItemStack current = mc.player.getEquippedStack(EquipmentSlot.CHEST);
-        if (current.contains(DataComponentTypes.GLIDER)) {
+        ItemStack current = mc.player.getItemBySlot(EquipmentSlot.CHEST);
+        if (current.has(DataComponents.GLIDER)) {
             equipChestplate();
         } else {
             equipElytra();
@@ -44,8 +44,8 @@ public class ChestSwap extends Module {
     private boolean equipChestplate() {
         int bestSlot = -1;
 
-        for (int i = 0; i < mc.player.getInventory().getMainStacks().size(); i++) {
-            Item item = mc.player.getInventory().getMainStacks().get(i).getItem();
+        for (int i = 0; i < mc.player.getInventory().getNonEquipmentItems().size(); i++) {
+            Item item = mc.player.getInventory().getNonEquipmentItems().get(i).getItem();
 
             if (chestplateMode.getValue() == TargetChest.NETHERITE && item == Items.NETHERITE_CHESTPLATE) {
                 bestSlot = i;
@@ -78,9 +78,9 @@ public class ChestSwap extends Module {
     }
 
     private void equipElytra() {
-        for (int i = 0; i < mc.player.getInventory().getMainStacks().size(); i++) {
-            ItemStack stack = mc.player.getInventory().getMainStacks().get(i);
-            if (stack.contains(DataComponentTypes.GLIDER)) {
+        for (int i = 0; i < mc.player.getInventory().getNonEquipmentItems().size(); i++) {
+            ItemStack stack = mc.player.getInventory().getNonEquipmentItems().get(i);
+            if (stack.has(DataComponents.GLIDER)) {
                 equip(i);
                 break;
             }
@@ -88,12 +88,12 @@ public class ChestSwap extends Module {
     }
 
     private void equip(int slot) {
-        if (!InventoryUtil.canUsePlayerInventory() || mc.currentScreen != null) return;
-        if (!mc.player.playerScreenHandler.getSlot(6).getStack().isEmpty()
-            && !mc.player.playerScreenHandler.getSlot(6).canTakeItems(mc.player)) return;
+        if (!InventoryUtil.canUsePlayerInventory() || mc.gui.screen() != null) return;
+        if (!mc.player.inventoryMenu.getSlot(6).getItem().isEmpty()
+            && !mc.player.inventoryMenu.getSlot(6).mayPickup(mc.player)) return;
         if (slot >= 0 && slot < 9) {
             // Хотбар: один атомарный SWAP вместо трёх PICKUP (меньше флагов)
-            mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, 6, slot, SlotActionType.SWAP, mc.player);
+            mc.gameMode.handleContainerInput(mc.player.containerMenu.containerId, 6, slot, ContainerInput.SWAP, mc.player);
         } else {
             InventoryUtil.move().from(slot).to(38);
         }

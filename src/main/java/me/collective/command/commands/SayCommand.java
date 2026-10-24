@@ -9,8 +9,8 @@ public class SayCommand extends Command {
 
     @Override
     public void execute(String[] args) {
-        if (mc.getNetworkHandler() == null || args.length < 1) return;
+        if (mc.getConnection() == null || args.length < 1) return;
         String msg = String.join(" ", args);
-        mc.getNetworkHandler().sendChatMessage(msg);
+        mc.getConnection().sendChat(msg);
     }
 }

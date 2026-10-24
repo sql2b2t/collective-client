@@ -48,19 +48,19 @@ public class Velocity extends Module {
 
     @EventHandler
     private void onPacketReceive(PacketEvent.Receive event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
-        if (event.getPacket() instanceof EntityVelocityUpdateS2CPacket packet) {
+        if (event.getPacket() instanceof ClientboundSetEntityMotionPacket packet) {
             handleEntityVelocity(event, packet);
-        } else if (event.getPacket() instanceof ExplosionS2CPacket explosion) {
+        } else if (event.getPacket() instanceof ClientboundExplodePacket explosion) {
             handleExplosion(event, explosion);
         }
     }
 
-    private void handleEntityVelocity(PacketEvent.Receive event, EntityVelocityUpdateS2CPacket packet) {
+    private void handleEntityVelocity(PacketEvent.Receive event, ClientboundSetEntityMotionPacket packet) {
         if (!entities.getValue()) return;
-        if (packet.getEntityId() != mc.player.getId()) return;
-        if (ignoreInLiquid.getValue() && (mc.player.isTouchingWater() || mc.player.isInLava())) return;
+        if (packet.id() != mc.player.getId()) return;
+        if (ignoreInLiquid.getValue() && (mc.player.isInWater() || mc.player.isInLava())) return;
         if (onlyWhenMoving.getValue() && !isMoving()) return;
         if (chance.getValue() < 100.0 && (Math.random() * 100.0 > chance.getValue())) return;
 
@@ -68,8 +68,8 @@ public class Velocity extends Module {
             case GRIM -> {
                 if (grimJumpReset.getValue()) {
                     mc.execute(() -> {
-                        if (mc.player != null && mc.player.isOnGround()) {
-                            mc.player.jump();
+                        if (mc.player != null && mc.player.onGround()) {
+                            mc.player.jumpFromGround();
                         }
                     });
                 }
@@ -81,8 +81,8 @@ public class Velocity extends Module {
                 if (h <= 0.0 && v <= 0.0) {
                     event.cancel();
                 } else {
-                    Vec3 vel = packet.getVelocity();
-                    ((EntityVelocityUpdateS2CPacketAccessor) (Object) packet).setVelocity(
+                    Vec3 vel = packet.movement();
+                    ((EntityVelocityUpdateS2CPacketAccessor) (Object) packet).setMovement(
                         new Vec3(vel.x * h, vel.y * v, vel.z * h)
                     );
                 }
@@ -90,9 +90,9 @@ public class Velocity extends Module {
         }
     }
 
-    private void handleExplosion(PacketEvent.Receive event, ExplosionS2CPacket explosion) {
+    private void handleExplosion(PacketEvent.Receive event, ClientboundExplodePacket explosion) {
         if (!explosions.getValue()) return;
-        if (ignoreInLiquid.getValue() && (mc.player.isTouchingWater() || mc.player.isInLava())) return;
+        if (ignoreInLiquid.getValue() && (mc.player.isInWater() || mc.player.isInLava())) return;
         if (onlyWhenMoving.getValue() && !isMoving()) return;
         if (chance.getValue() < 100.0 && (Math.random() * 100.0 > chance.getValue())) return;
 
@@ -100,8 +100,8 @@ public class Velocity extends Module {
             case GRIM -> {
                 if (grimJumpReset.getValue()) {
                     mc.execute(() -> {
-                        if (mc.player != null && mc.player.isOnGround()) {
-                            mc.player.jump();
+                        if (mc.player != null && mc.player.onGround()) {
+                            mc.player.jumpFromGround();
                         }
                     });
                 }
@@ -127,7 +127,7 @@ public class Velocity extends Module {
 
     private boolean isMoving() {
         if (mc.player == null || mc.player.input == null) return false;
-        Vec2f move = mc.player.input.getMovementInput();
+        Vec2 move = mc.player.input.getMoveVector();
         return move.x != 0.0f || move.y != 0.0f;
     }
 }

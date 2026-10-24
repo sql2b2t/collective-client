@@ -28,7 +28,7 @@ public class AutoReconnect extends Module {
     public final NumberSetting backoff = add(new NumberSetting("Backoff", 2, 0, 15, 1));
     public final BooleanSetting skipAfkLogout = add(new BooleanSetting("Skip AfkLogout", true));
 
-    private ServerInfo lastServer;
+    private net.minecraft.client.multiplayer.ServerData lastServer;
     private long nextAttemptAt;
     private int used;
     private boolean countsActive;
@@ -70,16 +70,16 @@ public class AutoReconnect extends Module {
 
         // одобряющее соединение в игре: запоминаем сервер и обнуляем счётчик
         if (client.player != null) {
-            ServerInfo current = client.getCurrentServerEntry();
+            net.minecraft.client.multiplayer.ServerData current = client.getCurrentServer();
             if (current != null) {
                 lastServer = current;
-            } else if (client.getNetworkHandler() != null && client.getNetworkHandler().getConnection() != null) {
-                var address = client.getNetworkHandler().getConnection().getAddress();
+            } else if (client.getConnection() != null && client.getConnection().getConnection() != null) {
+                var address = client.getConnection().getConnection().getRemoteAddress();
                 if (address != null) {
                     String str = address.toString();
                     if (str.startsWith("/")) str = str.substring(1);
-                    if (lastServer == null || !lastServer.address.equals(str)) {
-                        lastServer = new ServerInfo("Direct Server", str, ServerInfo.ServerType.OTHER);
+                    if (lastServer == null || !lastServer.ip.equals(str)) {
+                        lastServer = new net.minecraft.client.multiplayer.ServerData("Direct Server", str, net.minecraft.client.multiplayer.ServerData.Type.OTHER);
                     }
                 }
             }
@@ -89,7 +89,7 @@ public class AutoReconnect extends Module {
         }
 
         if (lastServer == null) return;
-        if (!(client.currentScreen instanceof DisconnectedScreen)) {
+        if (!(client.gui.screen() instanceof DisconnectedScreen)) {
             countsActive = false;
             return;
         }
@@ -119,20 +119,20 @@ public class AutoReconnect extends Module {
 
     @EventHandler
     private void onPacketReceive(PacketEvent.Receive event) {
-        if (event.packet instanceof DisconnectS2CPacket packet) {
+        if (event.packet instanceof ClientboundDisconnectPacket packet) {
             Component reason = packet.reason();
             lastReason = reason == null ? "" : reason.getString();
         }
     }
 
     private void connect(Minecraft client) {
-        ServerInfo info = lastServer;
-        if (info == null || info.address == null || info.address.isBlank()) return;
+        net.minecraft.client.multiplayer.ServerData info = lastServer;
+        if (info == null || info.ip == null || info.ip.isBlank()) return;
         used++;
         long step = Math.round((delay.getFloatValue() + backoff.getFloatValue() * used) * 1000f);
         nextAttemptAt = System.currentTimeMillis() + step;
         SoundUtil.playClick(0.15f, 1.1f);
-        ConnectScreen.connect(client.currentScreen, client,
-                ServerAddress.parse(info.address), info, false, null);
+        ConnectScreen.startConnecting(client.gui.screen(), client,
+                ServerAddress.parseString(info.ip), info, false, null);
     }
 }

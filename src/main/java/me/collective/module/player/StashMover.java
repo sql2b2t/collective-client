@@ -28,7 +28,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.core.BlockPos;
@@ -257,7 +257,7 @@ public class StashMover extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        if (!runRequested || mc.player == null || mc.world == null || mc.interactionManager == null) return;
+        if (!runRequested || mc.player == null || mc.level == null || mc.gameMode == null) return;
         ticks++;
 
         if (!hasValidAreas()) {
@@ -274,7 +274,7 @@ public class StashMover extends Module {
             stateTimer++;
         }
 
-        if (mc.player.isDead()) {
+        if (mc.player.isDeadOrDying()) {
             handleDeath();
             return;
         }
@@ -324,9 +324,9 @@ public class StashMover extends Module {
     /** Блок, на который смотрит игрок, — для команды .перенос. */
     @Nullable
     public BlockPos lookedAtBlock() {
-        if (mc.player == null || mc.crosshairTarget == null) return null;
-        if (mc.crosshairTarget.getType() != net.minecraft.util.hit.HitResult.Type.BLOCK) return null;
-        return ((BlockHitResult) mc.crosshairTarget).getBlockPos();
+        if (mc.player == null || mc.hitResult == null) return null;
+        if (mc.hitResult.getType() != net.minecraft.world.phys.HitResult.Type.BLOCK) return null;
+        return ((BlockHitResult) mc.hitResult).getBlockPos();
     }
 
     public int clearAreas() {
@@ -384,11 +384,11 @@ public class StashMover extends Module {
     }
 
     private boolean nearInput() {
-        return inArea(inputCorner1(), inputCorner2(), mc.player.getBlockPos());
+        return inArea(inputCorner1(), inputCorner2(), mc.player.blockPosition());
     }
 
     private boolean nearOutput() {
-        return inArea(outputCorner1(), outputCorner2(), mc.player.getBlockPos());
+        return inArea(outputCorner1(), outputCorner2(), mc.player.blockPosition());
     }
 
     // ------------------------------------------------------------------
@@ -404,17 +404,17 @@ public class StashMover extends Module {
 
         int minX = Math.min(c1.getX(), c2.getX()) - 20, maxX = Math.max(c1.getX(), c2.getX()) + 20;
         int minZ = Math.min(c1.getZ(), c2.getZ()) - 20, maxZ = Math.max(c1.getZ(), c2.getZ()) + 20;
-        String dim = mc.world.getRegistryKey().getValue().toString();
+        String dim = mc.level.dimension().identifier().toString();
 
         for (int cx = minX >> 4; cx <= maxX >> 4; cx++) {
             for (int cz = minZ >> 4; cz <= maxZ >> 4; cz++) {
-                if (!mc.world.getChunkManager().isChunkLoaded(cx, cz)) continue;
-                var chunk = mc.world.getChunkManager().getChunk(cx, cz, net.minecraft.world.chunk.ChunkStatus.FULL, false);
+                if (!mc.level.hasChunk(cx, cz)) continue;
+                var chunk = mc.level.getChunkSource().getChunk(cx, cz, net.minecraft.world.level.chunk.status.ChunkStatus.FULL, false);
                 if (chunk == null) continue;
 
                 for (var be : chunk.getBlockEntities().values()) {
-                    if (!ContainerGeometry.isContainerBlock(be.getCachedState())) continue;
-                    BlockPos canonical = ContainerGeometry.canonical(mc.world, be.getPos());
+                    if (!ContainerGeometry.isContainerBlock(be.getBlockState())) continue;
+                    BlockPos canonical = ContainerGeometry.canonical(mc.level, be.getBlockPos());
                     if (!flagged.add(canonical)) continue;
                     if (canonical.getX() < minX || canonical.getX() > maxX
                         || canonical.getZ() < minZ || canonical.getZ() > maxZ) continue;
@@ -423,14 +423,14 @@ public class StashMover extends Module {
                     int used = tracked != null ? tracked.getUsedStacks() : 0;
                     String type = tracked != null ? tracked.getContainerType() : containerTypeAt(canonical);
                     target.add(new ContainerInfo(canonical, type,
-                        ContainerGeometry.slotCount(mc.world, canonical, type, used), used, tracked != null && used == 0));
+                        ContainerGeometry.slotCount(mc.level, canonical, type, used), used, tracked != null && used == 0));
                 }
             }
         }
     }
 
     private String containerTypeAt(BlockPos pos) {
-        String block = mc.world.getBlockState(pos).getBlock().getName().getString();
+        String block = mc.level.getBlockState(pos).getBlock().getName().getString();
         if (block.contains("barrel")) return "barrel";
         if (block.contains("trapped")) return "trapped_chest";
         return "chest";
@@ -504,7 +504,7 @@ public class StashMover extends Module {
     private ContainerInfo nearestWithItems(List<ContainerInfo> list) {
         return list.stream()
             .filter(c -> !c.empty && !c.skipped)
-            .min(Comparator.comparingDouble(c -> mc.player.getBlockPos().getSquaredDistance(c.pos)))
+            .min(Comparator.comparingDouble(c -> mc.player.blockPosition().distSqr(c.pos)))
             .orElse(null);
     }
 
@@ -512,7 +512,7 @@ public class StashMover extends Module {
     private ContainerInfo nearestUsableOutput() {
         return outputContainers.stream()
             .filter(c -> !c.skipped && c.usedSlots < c.totalSlots)
-            .min(Comparator.comparingDouble(c -> mc.player.getBlockPos().getSquaredDistance(c.pos)))
+            .min(Comparator.comparingDouble(c -> mc.player.blockPosition().distSqr(c.pos)))
             .orElse(null);
     }
 
@@ -521,7 +521,7 @@ public class StashMover extends Module {
             state = goingToInput ? ProcessState.INPUT_PROCESS : ProcessState.OUTPUT_PROCESS;
             return;
         }
-        if (mc.world.isPosLoaded(currentContainer.pos) && !ContainerGeometry.isContainerBlock(mc.world.getBlockState(currentContainer.pos))) {
+        if (mc.level.isLoaded(currentContainer.pos) && !ContainerGeometry.isContainerBlock(mc.level.getBlockState(currentContainer.pos))) {
             currentContainer.skipped = true;
             currentContainer = null;
             return;
@@ -564,14 +564,14 @@ public class StashMover extends Module {
             alignTicks = 0;
             return;
         }
-        if (!turnTowards(hit.getPos())) {
+        if (!turnTowards(hit.getLocation())) {
             alignTicks = 0;
             return;
         }
         if (alignTicks++ < 1) return;
 
-        mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND, hit);
-        mc.player.swingHand(InteractionHand.MAIN_HAND);
+        mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, hit);
+        me.collective.util.Utils.swingHand(InteractionHand.MAIN_HAND);
         stateTimer = openDelay.get();
         // Экран откроется только через несколько тиков, поэтому проверять его
         // здесь бессмысленно: счётчик неудач растёт в handleTransferring.
@@ -581,7 +581,7 @@ public class StashMover extends Module {
     private void handleTransferring() {
         if (stateTimer < transferDelay.get()) return;
 
-        if (!(mc.currentScreen instanceof HandledScreen)) {
+        if (!(mc.gui.screen() instanceof AbstractContainerScreen)) {
             // экран закрылся сам — пробуем открыть заново
             if (currentContainer != null && !currentContainer.empty && ++openFailures <= OPEN_RETRIES) {
                 state = ProcessState.MOVING_TO_CONTAINER;
@@ -590,19 +590,19 @@ public class StashMover extends Module {
             }
             return;
         }
-        if (!(mc.player.currentScreenHandler instanceof GenericContainerScreenHandler handler)) {
+        if (!(mc.player.containerMenu instanceof ChestMenu handler)) {
             state = ProcessState.CLOSING_CONTAINER;
             return;
         }
 
-        int total = handler.getRows() * 9;
+        int total = handler.getRowCount() * 9;
         if (goingToInput) {
             // забираем груз из сундука в инвентарь
             int moved = 0;
             for (int i = 0; i < total && moved < clicksPerTick.get(); i++) {
-                ItemStack stack = handler.slots.get(i).getStack();
+                ItemStack stack = handler.slots.get(i).getItem();
                 if (stack.isEmpty() || !isCargo(stack)) continue;
-                mc.interactionManager.clickSlot(handler.syncId, i, 0, SlotActionType.QUICK_MOVE, mc.player);
+                mc.gameMode.handleContainerInput(handler.containerId, i, 0, ContainerInput.QUICK_MOVE, mc.player);
                 itemsTransferred++;
                 moved++;
             }
@@ -617,7 +617,7 @@ public class StashMover extends Module {
         } else {
             // выкладываем груз из инвентаря в сундук
             int free = 0;
-            for (int i = 0; i < total; i++) if (handler.slots.get(i).getStack().isEmpty()) free++;
+            for (int i = 0; i < total; i++) if (handler.slots.get(i).getItem().isEmpty()) free++;
 
             if (free == 0) {
                 note("полный получатель", currentContainer == null ? null : currentContainer.pos, "");
@@ -629,9 +629,9 @@ public class StashMover extends Module {
 
             int moved = 0;
             for (int i = 0; i < INVENTORY_SIZE && moved < clicksPerTick.get() && moved < free; i++) {
-                ItemStack stack = mc.player.getInventory().getStack(i);
+                ItemStack stack = mc.player.getInventory().getItem(i);
                 if (stack.isEmpty() || !isCargo(stack)) continue;
-                mc.interactionManager.clickSlot(handler.syncId, invIndexToMenuId(handler, i), 0, SlotActionType.QUICK_MOVE, mc.player);
+                mc.gameMode.handleContainerInput(handler.containerId, invIndexToMenuId(handler, i), 0, ContainerInput.QUICK_MOVE, mc.player);
                 moved++;
             }
 
@@ -664,7 +664,7 @@ public class StashMover extends Module {
             return;
         }
         BlockHitResult hit = nav().openHit(currentContainer.pos);
-        if (hit == null || !turnTowards(hit.getPos())) return;
+        if (hit == null || !turnTowards(hit.getLocation())) return;
 
         if (stateTimer > 40) {
             flagged.add(currentContainer.pos);
@@ -689,7 +689,7 @@ public class StashMover extends Module {
     // ------------------------------------------------------------------
 
     private void handleOpeningEnderChest() {
-        if (!(mc.currentScreen instanceof HandledScreen)) {
+        if (!(mc.gui.screen() instanceof AbstractContainerScreen)) {
             // ищем эндер-сундук рядом, открываем
             BlockPos ec = findEnderChest();
             if (ec == null) {
@@ -698,15 +698,15 @@ public class StashMover extends Module {
                 return;
             }
             BlockHitResult hit = nav().openHit(ec);
-            if (hit == null || !turnTowards(hit.getPos())) return;
-            mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND, hit);
-            mc.player.swingHand(InteractionHand.MAIN_HAND);
+            if (hit == null || !turnTowards(hit.getLocation())) return;
+            mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, hit);
+            me.collective.util.Utils.swingHand(InteractionHand.MAIN_HAND);
             stateTimer = openDelay.get();
             awaitingEnderChest = true;
         }
-        // Эндер-сундук открывается обычным GenericContainerScreenHandler, так что
+        // Эндер-сундук открывается обычным ChestMenu, так что
         // по типу обработчика его не отличить — ориентируемся на флаг клика.
-        if (awaitingEnderChest && mc.currentScreen instanceof HandledScreen && !(mc.currentScreen instanceof InventoryScreen)) {
+        if (awaitingEnderChest && mc.gui.screen() instanceof AbstractContainerScreen && !(mc.gui.screen() instanceof InventoryScreen)) {
             awaitingEnderChest = false;
             state = ProcessState.FILLING_ENDERCHEST;
         } else if (stateTimer > 60) {
@@ -716,16 +716,16 @@ public class StashMover extends Module {
     }
 
     private void handleFillingEnderChest() {
-        if (!(mc.player.currentScreenHandler instanceof GenericContainerScreenHandler handler)) {
+        if (!(mc.player.containerMenu instanceof ChestMenu handler)) {
             state = ProcessState.CLOSING_CONTAINER;
             state = ProcessState.INPUT_PROCESS;
             return;
         }
         int moved = 0;
         for (int i = 0; i < INVENTORY_SIZE && moved < clicksPerTick.get(); i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
+            ItemStack stack = mc.player.getInventory().getItem(i);
             if (stack.isEmpty() || !isCargo(stack)) continue;
-            mc.interactionManager.clickSlot(handler.syncId, invIndexToMenuId(handler, i), 0, SlotActionType.QUICK_MOVE, mc.player);
+            mc.gameMode.handleContainerInput(handler.containerId, invIndexToMenuId(handler, i), 0, ContainerInput.QUICK_MOVE, mc.player);
             moved++;
         }
         if (moved == 0) {
@@ -741,12 +741,12 @@ public class StashMover extends Module {
 
     @Nullable
     private BlockPos findEnderChest() {
-        BlockPos p = mc.player.getBlockPos();
+        BlockPos p = mc.player.blockPosition();
         for (int dx = -4; dx <= 4; dx++) {
             for (int dy = -2; dy <= 2; dy++) {
                 for (int dz = -4; dz <= 4; dz++) {
-                    BlockPos q = p.add(dx, dy, dz);
-                    if (mc.world.getBlockState(q).getBlock() instanceof net.minecraft.block.EnderChestBlock) {
+                    BlockPos q = p.offset(dx, dy, dz);
+                    if (mc.level.getBlockState(q).getBlock() instanceof net.minecraft.world.level.block.EnderChestBlock) {
                         return q;
                     }
                 }
@@ -764,7 +764,7 @@ public class StashMover extends Module {
         currentContainer = null;
         closeContainer();
         nav().stop();
-        positionBeforeTransport = mc.player.getEntityPos();
+        positionBeforeTransport = mc.player.position();
         transportRetries = 0;
         awaitingPearl = false;
         awaitingRespawn = false;
@@ -785,7 +785,7 @@ public class StashMover extends Module {
             awaitingPearl = true;
             lastTransportMessage = System.currentTimeMillis();
         }
-        if (positionBeforeTransport != null && mc.player.getEntityPos().squaredDistanceTo(positionBeforeTransport) > 100.0) {
+        if (positionBeforeTransport != null && mc.player.position().distanceToSqr(positionBeforeTransport) > 100.0) {
             info("Телепорт к зоне выхода удался.");
             onArrived();
             return;
@@ -808,7 +808,7 @@ public class StashMover extends Module {
             awaitingPearl = true;
             lastTransportMessage = System.currentTimeMillis();
         }
-        if (positionBeforeTransport != null && mc.player.getEntityPos().squaredDistanceTo(positionBeforeTransport) > 100.0) {
+        if (positionBeforeTransport != null && mc.player.position().distanceToSqr(positionBeforeTransport) > 100.0) {
             info("Вернулся к зоне входа.");
             onArrived();
             return;
@@ -853,9 +853,9 @@ public class StashMover extends Module {
     }
 
     private void handleKillPositionWalk() {
-        if (mc.player.isDead()) return;
+        if (mc.player.isDeadOrDying()) return;
 
-        var death = mc.player.getLastDeathPos();
+        var death = mc.player.getLastDeathLocation();
         if (death.isEmpty()) {
             // ещё не умирали — шлём команду
             String base = (goingToInput ? goBackKillCommand.get() : forwardKillCommand.get()).trim();
@@ -867,7 +867,7 @@ public class StashMover extends Module {
         }
 
         BlockPos target = death.get().pos();
-        if (mc.player.getBlockPos().getSquaredDistance(target) > 9) {
+        if (mc.player.blockPosition().distSqr(target) > 9) {
             if (stateTimer > 2000) {
                 warning("Не дошёл до места смерти, сдаюсь.");
                 toggle();
@@ -879,7 +879,7 @@ public class StashMover extends Module {
     }
 
     private void handleKillPositionWait() {
-        if (!mc.player.isDead()) {
+        if (!mc.player.isDeadOrDying()) {
             if (stateTimer > 40) {
                 info("Респавн у места смерти, продолжаю.");
                 onArrived();
@@ -909,42 +909,42 @@ public class StashMover extends Module {
     // ------------------------------------------------------------------
 
     private void sendChat(String message) {
-        if (mc.getNetworkHandler() != null && !message.isBlank()) {
-            mc.getNetworkHandler().sendChatMessage(message);
+        if (mc.getConnection() != null && !message.isBlank()) {
+            mc.getConnection().sendChat(message);
         }
     }
 
     private void sendChatCommand(String command) {
-        if (mc.getNetworkHandler() != null && !command.isBlank()) {
-            mc.getNetworkHandler().sendChatCommand(command);
+        if (mc.getConnection() != null && !command.isBlank()) {
+            mc.getConnection().sendCommand(command);
         }
     }
 
     private boolean settled() {
         nav().stop();
-        mc.options.forwardKey.setPressed(false);
-        mc.options.backKey.setPressed(false);
-        mc.options.leftKey.setPressed(false);
-        mc.options.rightKey.setPressed(false);
-        mc.options.jumpKey.setPressed(false);
-        mc.options.sprintKey.setPressed(false);
+        mc.options.keyUp.setDown(false);
+        mc.options.keyDown.setDown(false);
+        mc.options.keyLeft.setDown(false);
+        mc.options.keyRight.setDown(false);
+        mc.options.keyJump.setDown(false);
+        mc.options.keySprint.setDown(false);
         return settleTicks++ >= 2;
     }
 
     private boolean turnTowards(Vec3 point) {
-        Vec3 eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePosition();
         double dx = point.x - eye.x, dy = point.y - eye.y, dz = point.z - eye.z;
         double horizontal = Math.sqrt(dx * dx + dz * dz);
         float targetYaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
         float targetPitch = (float) -Math.toDegrees(Math.atan2(dy, horizontal));
 
-        float dYaw = MathHelper.wrapDegrees(targetYaw - mc.player.getYaw());
-        float dPitch = targetPitch - mc.player.getPitch();
+        float dYaw = Mth.wrapDegrees(targetYaw - mc.player.getYRot());
+        float dPitch = targetPitch - mc.player.getXRot();
         float step = 45.0F;
-        float yaw = mc.player.getYaw() + MathHelper.clamp(dYaw, -step, step);
-        mc.player.setYaw(yaw);
-        mc.player.setHeadYaw(yaw);
-        mc.player.setPitch(MathHelper.clamp(mc.player.getPitch() + MathHelper.clamp(dPitch, -step, step), -90.0F, 90.0F));
+        float yaw = mc.player.getYRot() + Mth.clamp(dYaw, -step, step);
+        mc.player.setYRot(yaw);
+        mc.player.setYHeadRot(yaw);
+        mc.player.setXRot(Mth.clamp(mc.player.getXRot() + Mth.clamp(dPitch, -step, step), -90.0F, 90.0F));
         return Math.abs(dYaw) <= 3.0F && Math.abs(dPitch) <= 3.0F;
     }
 
@@ -960,16 +960,16 @@ public class StashMover extends Module {
     }
 
     @Nullable
-    private GenericContainerScreenHandler openContainer() {
-        if (mc.currentScreen instanceof HandledScreen && !(mc.currentScreen instanceof InventoryScreen)) {
-            return mc.player.currentScreenHandler instanceof GenericContainerScreenHandler h ? h : null;
+    private ChestMenu openContainer() {
+        if (mc.gui.screen() instanceof AbstractContainerScreen && !(mc.gui.screen() instanceof InventoryScreen)) {
+            return mc.player.containerMenu instanceof ChestMenu h ? h : null;
         }
         return null;
     }
 
     private void closeContainer() {
-        if (mc.currentScreen != null && mc.currentScreen instanceof HandledScreen && !(mc.currentScreen instanceof InventoryScreen)) {
-            mc.currentScreen.close();
+        if (mc.gui != null && mc.gui.screen() instanceof AbstractContainerScreen && !(mc.gui.screen() instanceof InventoryScreen)) {
+            mc.gui.screen().onClose();
         }
     }
 
@@ -979,7 +979,7 @@ public class StashMover extends Module {
 
     private boolean hasCargo() {
         for (int i = 0; i < INVENTORY_SIZE; i++) {
-            ItemStack s = mc.player.getInventory().getStack(i);
+            ItemStack s = mc.player.getInventory().getItem(i);
             if (!s.isEmpty() && isCargo(s)) return true;
         }
         return false;
@@ -987,27 +987,27 @@ public class StashMover extends Module {
 
     private boolean inventoryFull() {
         for (int i = 0; i < INVENTORY_SIZE; i++) {
-            if (mc.player.getInventory().getStack(i).isEmpty()) return false;
+            if (mc.player.getInventory().getItem(i).isEmpty()) return false;
         }
         return true;
     }
 
     private void dropNonCargo() {
         for (int i = 0; i < INVENTORY_SIZE; i++) {
-            ItemStack s = mc.player.getInventory().getStack(i);
+            ItemStack s = mc.player.getInventory().getItem(i);
             if (s.isEmpty() || isCargo(s)) continue;
             // Выброс слота без смены хотбара: кладём предмет к игроку вручную,
             // иначе пришлось бы переключать selectedSlot, и сервер увидит
             // несоответствие между хотбаром и инвентарём.
             if (mc.player.canDropItems()) {
-                mc.player.dropItem(s.copy(), false);
-                mc.player.getInventory().setStack(i, ItemStack.EMPTY);
+                int menuSlot = i < 9 ? i + 36 : i;
+                mc.gameMode.handleContainerInput(mc.player.containerMenu.containerId, menuSlot, 1, net.minecraft.world.inventory.ContainerInput.THROW, mc.player);
             }
         }
     }
 
-    private static int invIndexToMenuId(GenericContainerScreenHandler menu, int invIndex) {
-        return menu.getRows() * 9 + (invIndex < 9 ? invIndex + 27 : invIndex - 9);
+    private static int invIndexToMenuId(ChestMenu menu, int invIndex) {
+        return menu.getRowCount() * 9 + (invIndex < 9 ? invIndex + 27 : invIndex - 9);
     }
 
     // ------------------------------------------------------------------
@@ -1038,7 +1038,7 @@ public class StashMover extends Module {
 
     private void drawContainer(Render3DEvent event, ContainerInfo c, SettingColor color) {
         if (color.a <= 5) return;
-        if (c.pos.getSquaredDistance(mc.player.getEntityPos()) > 256) return;
+        if (c.pos.distToCenterSqr(mc.player.position()) > 256) return;
         event.renderer.box(c.pos.getX() + 0.1, c.pos.getY() + 0.1, c.pos.getZ() + 0.1,
             c.pos.getX() + 0.9, c.pos.getY() + 0.9, c.pos.getZ() + 0.9,
             new SettingColor(color.r, color.g, color.b, Math.min(60, color.a)), color, ShapeMode.Both, 0);

@@ -29,7 +29,7 @@ public class Keybind {
 
     public boolean isPressed() {
         if (key < 0 || key == GLFW.GLFW_KEY_UNKNOWN) return false;
-        long window = net.minecraft.client.Minecraft.getInstance().getWindow().getHandle();
+        long window = net.minecraft.client.Minecraft.getInstance().getWindow().handle();
         if (isButton) {
             return GLFW.glfwGetMouseButton(window, key) == GLFW.GLFW_PRESS;
         }

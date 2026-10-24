@@ -30,24 +30,24 @@ public final class ShulkerDataParser {
     public static Map<Item, Integer> parseShulkerContents(ItemStack shulkerStack) {
         Map<Item, Integer> itemCounts = new HashMap<>();
 
-        ContainerComponent container = shulkerStack.get(DataComponentTypes.CONTAINER);
+        ItemContainerContents container = shulkerStack.get(DataComponents.CONTAINER);
         if (container != null) {
-            container.stream().toList().forEach(stack -> {
+            container.itemCopies().toList().forEach(stack -> {
                 if (!stack.isEmpty()) itemCounts.merge(stack.getItem(), stack.getCount(), Integer::sum);
             });
             if (!itemCounts.isEmpty()) return itemCounts;
         }
 
-        NbtComponent customData = shulkerStack.getOrDefault(DataComponentTypes.CUSTOM_DATA, NbtComponent.DEFAULT);
-        NbtCompound nbt = customData.copyNbt();
+        CustomData customData = shulkerStack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
+        CompoundTag nbt = customData.copyTag();
         if (nbt != null && nbt.contains("BlockEntityTag")) {
-            Optional<NbtCompound> optional = nbt.getCompound("BlockEntityTag");
+            Optional<CompoundTag> optional = nbt.getCompound("BlockEntityTag");
             if (optional.isPresent() && optional.get().contains("Items")) {
-                Optional<NbtList> itemsListOpt = optional.get().getList("Items");
+                Optional<ListTag> itemsListOpt = optional.get().getList("Items");
                 if (itemsListOpt.isPresent()) {
-                    NbtList items = itemsListOpt.get();
+                    ListTag items = itemsListOpt.get();
                     for (int i = 0; i < items.size(); i++) {
-                        Optional<NbtCompound> itemOpt = items.getCompound(i);
+                        Optional<CompoundTag> itemOpt = items.getCompound(i);
                         if (itemOpt.isPresent()) {
                             ItemStack parsed = parseItemFromNbt(itemOpt.get());
                             if (!parsed.isEmpty()) itemCounts.merge(parsed.getItem(), parsed.getCount(), Integer::sum);
@@ -64,9 +64,9 @@ public final class ShulkerDataParser {
     public static List<ItemStack> parseShulkerContentsAsList(ItemStack shulkerStack) {
         List<ItemStack> items = new ArrayList<>();
 
-        ContainerComponent container = shulkerStack.get(DataComponentTypes.CONTAINER);
+        ItemContainerContents container = shulkerStack.get(DataComponents.CONTAINER);
         if (container != null) {
-            container.stream().forEach(stack -> {
+            container.itemCopies().forEach(stack -> {
                 if (stack != null && !stack.isEmpty()) items.add(stack.copy());
             });
             if (!items.isEmpty()) return items;
@@ -75,7 +75,7 @@ public final class ShulkerDataParser {
         // Из общего количества собираем обратно полные стопки
         for (Entry<Item, Integer> entry : parseShulkerContents(shulkerStack).entrySet()) {
             int count = entry.getValue();
-            int maxStack = entry.getKey().getDefaultStack().getMaxCount();
+            int maxStack = entry.getKey().getDefaultInstance().getMaxStackSize();
             while (count > 0) {
                 int stackSize = Math.min(count, maxStack);
                 items.add(new ItemStack(entry.getKey(), stackSize));
@@ -86,17 +86,17 @@ public final class ShulkerDataParser {
         return items;
     }
 
-    private static ItemStack parseItemFromNbt(NbtCompound itemTag) {
-        String id = itemTag.getString("id", "");
+    private static ItemStack parseItemFromNbt(CompoundTag itemTag) {
+        String id = itemTag.getStringOr("id", "");
         if (id.isEmpty()) return ItemStack.EMPTY;
 
         int count = 1;
-        if (itemTag.contains("count")) count = itemTag.getInt("count", 1);
-        else if (itemTag.contains("Count")) count = itemTag.getByte("Count", (byte) 1);
+        if (itemTag.contains("count")) count = itemTag.getIntOr("count", 1);
+        else if (itemTag.contains("Count")) count = itemTag.getByteOr("Count", (byte) 1);
 
         Identifier itemId = Identifier.tryParse(id);
-        if (itemId == null || !Registries.ITEM.containsId(itemId)) return ItemStack.EMPTY;
+        if (itemId == null || !BuiltInRegistries.ITEM.containsKey(itemId)) return ItemStack.EMPTY;
 
-        return new ItemStack(Registries.ITEM.get(itemId), count);
+        return new ItemStack(BuiltInRegistries.ITEM.getValue(itemId), count);
     }
 }

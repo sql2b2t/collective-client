@@ -25,7 +25,7 @@ public final class EmoteData {
     private EmoteData(Map<String, BoneTracks> bones, float duration, float loopStart, float loopEnd, boolean easingBefore) {
         this.bones = bones;
         this.duration = Math.max(0.05f, duration);
-        this.loopStart = MathHelper.clamp(loopStart, 0.0f, this.duration);
+        this.loopStart = Mth.clamp(loopStart, 0.0f, this.duration);
         this.loopEnd = Math.max(this.duration, loopEnd);
         this.easingBefore = easingBefore;
     }
@@ -67,8 +67,8 @@ public final class EmoteData {
     }
 
     public static EmoteData load(Emote emote, String animName) {
-        Identifier id = Identifier.of("collective", "player_animation/" + emote.file() + ".json");
-        try (BufferedReader reader = Minecraft.getInstance().getResourceManager().getResource(id).orElseThrow().getReader()) {
+        Identifier id = Identifier.fromNamespaceAndPath("collective", "player_animation/" + emote.file() + ".json");
+        try (BufferedReader reader = Minecraft.getInstance().getResourceManager().getResource(id).orElseThrow().openAsReader()) {
             JsonObject root = JsonParser.parseReader(reader).getAsJsonObject();
             JsonObject allAnims = root.getAsJsonObject("animations");
             JsonObject anim = allAnims.getAsJsonObject(animName);
@@ -110,8 +110,8 @@ public final class EmoteData {
     }
 
     private static JsonObject loadVariant(Emote emote, String animName, String suffix) {
-        Identifier id = Identifier.of("collective", "player_animation/" + emote.file() + suffix + ".json");
-        try (BufferedReader reader = Minecraft.getInstance().getResourceManager().getResource(id).orElseThrow().getReader()) {
+        Identifier id = Identifier.fromNamespaceAndPath("collective", "player_animation/" + emote.file() + suffix + ".json");
+        try (BufferedReader reader = Minecraft.getInstance().getResourceManager().getResource(id).orElseThrow().openAsReader()) {
             JsonObject root = JsonParser.parseReader(reader).getAsJsonObject();
             return root.getAsJsonObject("animations").getAsJsonObject(animName);
         } catch (Exception e) {
@@ -230,7 +230,7 @@ public final class EmoteData {
                 }
                 VecKey prev = this.frames.get(i - 1);
                 float a = (t - prev.time) / Math.max(1.0E-4f, cur.time - prev.time);
-                a = Easing.apply(easingBefore ? cur.easing : prev.easing, MathHelper.clamp(a, 0.0f, 1.0f));
+                a = Easing.apply(easingBefore ? cur.easing : prev.easing, Mth.clamp(a, 0.0f, 1.0f));
                 return new Vector3f(prev.value).lerp(cur.value, a);
             }
             if (loopEnd > this.frames.getLast().time) {
@@ -239,7 +239,7 @@ public final class EmoteData {
                     VecKey last = this.frames.getLast();
                     float wrapped = first.time + loopEnd - loopStart;
                     float a = (t - last.time) / Math.max(1.0E-4f, wrapped - last.time);
-                    a = Easing.apply(easingBefore ? first.easing : last.easing, MathHelper.clamp(a, 0.0f, 1.0f));
+                    a = Easing.apply(easingBefore ? first.easing : last.easing, Mth.clamp(a, 0.0f, 1.0f));
                     return new Vector3f(last.value).lerp(first.value, a);
                 }
             }
@@ -268,8 +268,8 @@ public final class EmoteData {
                 }
                 FloatKey prev = this.frames.get(i - 1);
                 float a = (t - prev.time) / Math.max(1.0E-4f, cur.time - prev.time);
-                a = Easing.apply(easingBefore ? cur.easing : prev.easing, MathHelper.clamp(a, 0.0f, 1.0f));
-                return MathHelper.lerp(a, prev.value, cur.value);
+                a = Easing.apply(easingBefore ? cur.easing : prev.easing, Mth.clamp(a, 0.0f, 1.0f));
+                return Mth.lerp(a, prev.value, cur.value);
             }
             if (loopEnd > this.frames.getLast().time) {
                 FloatKey first = this.frames.stream().filter(k -> k.time >= loopStart).findFirst().orElse(null);
@@ -277,8 +277,8 @@ public final class EmoteData {
                     FloatKey last = this.frames.getLast();
                     float wrapped = first.time + loopEnd - loopStart;
                     float a = (t - last.time) / Math.max(1.0E-4f, wrapped - last.time);
-                    a = Easing.apply(easingBefore ? first.easing : last.easing, MathHelper.clamp(a, 0.0f, 1.0f));
-                    return MathHelper.lerp(a, last.value, first.value);
+                    a = Easing.apply(easingBefore ? first.easing : last.easing, Mth.clamp(a, 0.0f, 1.0f));
+                    return Mth.lerp(a, last.value, first.value);
                 }
             }
             return this.frames.getLast().value;

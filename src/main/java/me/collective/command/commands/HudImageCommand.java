@@ -19,7 +19,7 @@ public class HudImageCommand extends Command {
 
         if (args.length == 0) {
             ChatHelper.sendMessage(Component.literal("Использование: .hudimage <Collective|Komod1|Komod2|Komod3>")
-                .styled(s -> s.withColor(ChatFormatting.GRAY)));
+                .withStyle(s -> s.withColor(ChatFormatting.GRAY)));
             return;
         }
 

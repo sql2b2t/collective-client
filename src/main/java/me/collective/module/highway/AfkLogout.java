@@ -36,19 +36,19 @@ public class AfkLogout extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         if (xCoordsMatch() && zCoordsMatch() && dimensionMatches()) {
             if (autoToggle.getValue()) setToggled(false);
             AutoReconnect.markAfkLogout();
-            if (mc.getNetworkHandler() != null && mc.getNetworkHandler().getConnection() != null) {
-                mc.getNetworkHandler().getConnection().disconnect(Component.literal("[AfkLogout] Arrived at destination."));
+            if (mc.getConnection() != null && mc.getConnection().getConnection() != null) {
+                mc.getConnection().getConnection().disconnect(Component.literal("[AfkLogout] Arrived at destination."));
             }
         }
     }
 
     private boolean dimensionMatches() {
-        String dim = mc.world == null ? "" : mc.world.getRegistryKey().getValue().toString();
+        String dim = mc.level == null ? "" : mc.level.dimension().identifier().toString();
         return switch (dimension.getValue()) {
             case Nether -> dim.endsWith("the_nether");
             case End -> dim.endsWith("the_end");

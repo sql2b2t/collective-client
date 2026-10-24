@@ -2,7 +2,7 @@ package me.collective.font;
 
 import me.collective.module.client.Fonts;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.awt.Color;
 import java.awt.Font;
@@ -67,24 +67,24 @@ public class FontManager {
         }
     }
 
-    public void drawString(GuiGraphics context, String text, float x, float y, Color color) {
+    public void drawString(GuiGraphicsExtractor context, String text, float x, float y, Color color) {
         drawString(context, text, x, y, color.getRGB());
     }
 
-    public void drawString(GuiGraphics context, String text, float x, float y, int color) {
+    public void drawString(GuiGraphicsExtractor context, String text, float x, float y, int color) {
         if (text == null || text.isEmpty()) return;
         if (Fonts.INSTANCE != null && Fonts.INSTANCE.isToggled() && currentFont != null) {
             currentFont.drawString(context, text, x, y, color);
         } else {
-            context.drawText(mc.textRenderer, text, (int) Math.round(x), (int) Math.round(y), color, false);
+            context.text(mc.font, text, (int) Math.round(x), (int) Math.round(y), color, false);
         }
     }
 
-    public void drawStringWithShadow(GuiGraphics context, String text, float x, float y, Color color) {
+    public void drawStringWithShadow(GuiGraphicsExtractor context, String text, float x, float y, Color color) {
         drawStringWithShadow(context, text, x, y, color.getRGB());
     }
 
-    public void drawStringWithShadow(GuiGraphics context, String text, float x, float y, int color) {
+    public void drawStringWithShadow(GuiGraphicsExtractor context, String text, float x, float y, int color) {
         if (text == null || text.isEmpty()) return;
         if (Fonts.INSTANCE != null && Fonts.INSTANCE.isToggled() && currentFont != null) {
             if (Fonts.INSTANCE.shadow.getValue()) {
@@ -93,7 +93,7 @@ public class FontManager {
                 currentFont.drawString(context, text, x, y, color);
             }
         } else {
-            context.drawTextWithShadow(mc.textRenderer, text, (int) Math.round(x), (int) Math.round(y), color);
+            context.text(mc.font, text, (int) Math.round(x), (int) Math.round(y), color);
         }
     }
 
@@ -102,14 +102,14 @@ public class FontManager {
         if (Fonts.INSTANCE != null && Fonts.INSTANCE.isToggled() && currentFont != null) {
             return currentFont.getStringWidth(text);
         }
-        return mc.textRenderer.getWidth(text);
+        return mc.font.width(text);
     }
 
     public int getFontHeight() {
         if (Fonts.INSTANCE != null && Fonts.INSTANCE.isToggled() && currentFont != null) {
             return currentFont.getFontHeight();
         }
-        return mc.textRenderer.fontHeight;
+        return mc.font.lineHeight;
     }
 
     // ------------------------------------------------------------- Масштабируемый текст
@@ -129,39 +129,39 @@ public class FontManager {
         if (Fonts.INSTANCE != null && Fonts.INSTANCE.isToggled() && currentFont != null) {
             return currentFont.getStringWidth(text, scale);
         }
-        return mc.textRenderer.getWidth(text) * scale;
+        return mc.font.width(text) * scale;
     }
 
     public int getFontHeightScaled(float scale) {
         if (Fonts.INSTANCE != null && Fonts.INSTANCE.isToggled() && currentFont != null) {
             return currentFont.getFontHeight(scale);
         }
-        return (int) Math.ceil(mc.textRenderer.fontHeight * scale);
+        return (int) Math.ceil(mc.font.lineHeight * scale);
     }
 
-    public void drawStringScaled(GuiGraphics context, String text, float x, float y, Color color, float scale) {
+    public void drawStringScaled(GuiGraphicsExtractor context, String text, float x, float y, Color color, float scale) {
         drawStringScaled(context, text, x, y, color.getRGB(), scale);
     }
 
-    public void drawStringScaled(GuiGraphics context, String text, float x, float y, int color, float scale) {
+    public void drawStringScaled(GuiGraphicsExtractor context, String text, float x, float y, int color, float scale) {
         if (text == null || text.isEmpty()) return;
         if (Fonts.INSTANCE != null && Fonts.INSTANCE.isToggled() && currentFont != null) {
             currentFont.drawString(context, text, x, y, color, scale);
         } else if (scale == 1.0f) {
-            context.drawText(mc.textRenderer, text, (int) Math.round(x), (int) Math.round(y), color, false);
+            context.text(mc.font, text, (int) Math.round(x), (int) Math.round(y), color, false);
         } else {
-            context.getMatrices().pushMatrix();
-            context.getMatrices().scale(scale, scale);
-            context.drawText(mc.textRenderer, text, (int) Math.round(x / scale), (int) Math.round(y / scale), color, false);
-            context.getMatrices().popMatrix();
+            context.pose().pushMatrix();
+            context.pose().scale(scale, scale);
+            context.text(mc.font, text, (int) Math.round(x / scale), (int) Math.round(y / scale), color, false);
+            context.pose().popMatrix();
         }
     }
 
-    public void drawStringWithShadowScaled(GuiGraphics context, String text, float x, float y, Color color, float scale) {
+    public void drawStringWithShadowScaled(GuiGraphicsExtractor context, String text, float x, float y, Color color, float scale) {
         drawStringWithShadowScaled(context, text, x, y, color.getRGB(), scale);
     }
 
-    public void drawStringWithShadowScaled(GuiGraphics context, String text, float x, float y, int color, float scale) {
+    public void drawStringWithShadowScaled(GuiGraphicsExtractor context, String text, float x, float y, int color, float scale) {
         if (text == null || text.isEmpty()) return;
         if (Fonts.INSTANCE != null && Fonts.INSTANCE.isToggled() && currentFont != null) {
             if (Fonts.INSTANCE.shadow.getValue()) {
@@ -170,40 +170,40 @@ public class FontManager {
                 currentFont.drawString(context, text, x, y, color, scale);
             }
         } else if (scale == 1.0f) {
-            context.drawTextWithShadow(mc.textRenderer, text, (int) Math.round(x), (int) Math.round(y), color);
+            context.text(mc.font, text, (int) Math.round(x), (int) Math.round(y), color);
         } else {
-            context.getMatrices().pushMatrix();
-            context.getMatrices().scale(scale, scale);
-            context.drawTextWithShadow(mc.textRenderer, text, (int) Math.round(x / scale), (int) Math.round(y / scale), color);
-            context.getMatrices().popMatrix();
+            context.pose().pushMatrix();
+            context.pose().scale(scale, scale);
+            context.text(mc.font, text, (int) Math.round(x / scale), (int) Math.round(y / scale), color);
+            context.pose().popMatrix();
         }
     }
 
-    public void drawCustomString(GuiGraphics context, String text, float x, float y, Color color) {
+    public void drawCustomString(GuiGraphicsExtractor context, String text, float x, float y, Color color) {
         drawCustomString(context, text, x, y, color.getRGB());
     }
 
-    public void drawCustomString(GuiGraphics context, String text, float x, float y, int color) {
+    public void drawCustomString(GuiGraphicsExtractor context, String text, float x, float y, int color) {
         if (text == null || text.isEmpty()) return;
         if (currentFont == null) reloadFont();
         if (currentFont != null) {
             currentFont.drawString(context, text, x, y, color);
         } else {
-            context.drawText(mc.textRenderer, text, (int) Math.round(x), (int) Math.round(y), color, false);
+            context.text(mc.font, text, (int) Math.round(x), (int) Math.round(y), color, false);
         }
     }
 
-    public void drawCustomStringWithShadow(GuiGraphics context, String text, float x, float y, Color color) {
+    public void drawCustomStringWithShadow(GuiGraphicsExtractor context, String text, float x, float y, Color color) {
         drawCustomStringWithShadow(context, text, x, y, color.getRGB());
     }
 
-    public void drawCustomStringWithShadow(GuiGraphics context, String text, float x, float y, int color) {
+    public void drawCustomStringWithShadow(GuiGraphicsExtractor context, String text, float x, float y, int color) {
         if (text == null || text.isEmpty()) return;
         if (currentFont == null) reloadFont();
         if (currentFont != null) {
             currentFont.drawStringWithShadow(context, text, x, y, color);
         } else {
-            context.drawTextWithShadow(mc.textRenderer, text, (int) Math.round(x), (int) Math.round(y), color);
+            context.text(mc.font, text, (int) Math.round(x), (int) Math.round(y), color);
         }
     }
 
@@ -213,6 +213,6 @@ public class FontManager {
         if (currentFont != null) {
             return currentFont.getStringWidth(text);
         }
-        return mc.textRenderer.getWidth(text);
+        return mc.font.width(text);
     }
 }

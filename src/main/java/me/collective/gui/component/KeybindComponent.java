@@ -7,7 +7,7 @@ import me.collective.render.SoundUtil;
 import me.collective.setting.Keybind;
 import me.collective.setting.KeybindSetting;
 import me.collective.setting.Setting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -51,7 +51,7 @@ public class KeybindComponent extends Component {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         if (!setting.isVisible()) return;
 
         boolean hov = isHovered(mouseX, mouseY);

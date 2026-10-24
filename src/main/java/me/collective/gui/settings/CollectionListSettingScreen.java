@@ -12,7 +12,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
@@ -245,7 +245,7 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
     // ------------------------------------------------------------- Рендер
 
     @Override
-    public void renderBackground(GuiGraphics ctx, int mx, int my, float delta) {
+    public void extractBackground(GuiGraphicsExtractor ctx, int mx, int my, float delta) {
         if (Blur.INSTANCE != null && Blur.INSTANCE.isToggled() && Blur.INSTANCE.clickGui.getValue()) {
             List<float[]> regions = List.of(new float[]{bx(), by(), bx() + winW, by() + winH});
             BlurEngine.INSTANCE.renderBlur(ctx, regions, Blur.INSTANCE.radius.getFloatValue());
@@ -254,7 +254,7 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics ctx, int mx, int my, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor ctx, int mx, int my, float delta) {
         FontManager fm = FontManager.INSTANCE;
         long now = System.currentTimeMillis();
 
@@ -349,14 +349,14 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
             RenderUtil.drawOutline(ctx, wx - 1, wy - 1, winW + 2, winH + 2, 1, accent().getRGB());
         }
 
-        super.render(ctx, mx, my, delta);
+        super.extractRenderState(ctx, mx, my, delta);
     }
 
     private static Color DELETE_IDLE_TEXT() {
         return new Color(255, 255, 255, 200);
     }
 
-    private void renderColumn(GuiGraphics ctx, int mx, int my, List<T> items, float cx, float scroll, boolean selectedCol) {
+    private void renderColumn(GuiGraphicsExtractor ctx, int mx, int my, List<T> items, float cx, float scroll, boolean selectedCol) {
         FontManager fm = FontManager.INSTANCE;
         float colW = colWidth();
         float top = listTop();
@@ -382,7 +382,7 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
                 // Иконка предмета
                 ItemStack icon = iconFor(value);
                 if (icon != null && !icon.isEmpty()) {
-                    ctx.drawItem(icon, (int) cx + 2, Math.round(rowY + (ROW_H - ICON) / 2f));
+                    ctx.item(icon, (int) cx + 2, Math.round(rowY + (ROW_H - ICON) / 2f));
                 }
 
                 // Название
@@ -418,7 +418,7 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
         }
     }
 
-    private void renderEmptyHints(FontManager fm, GuiGraphics ctx) {
+    private void renderEmptyHints(FontManager fm, GuiGraphicsExtractor ctx) {
         float top = listTop();
         float bottom = listBottom();
         float centerY = (top + bottom) / 2f - fm.getFontHeight() / 2f;
@@ -508,7 +508,7 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
     // ------------------------------------------------------------- Ввод
 
     @Override
-    public boolean mouseClicked(Click click, boolean doubled) {
+    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent click, boolean doubled) {
         if (click.button() != 0) return super.mouseClicked(click, doubled);
 
         double mx = click.x();
@@ -519,7 +519,7 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
         // Закрыть
         if (inBounds(mx, my, wx + winW - HEADER_H, wy, HEADER_H, HEADER_H)) {
             if (sounds()) SoundUtil.playClick(1.0f, 1.2f);
-            close();
+            onClose();
             return true;
         }
 
@@ -566,15 +566,15 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
     }
 
     @Override
-    public boolean keyPressed(KeyInput input) {
+    public boolean keyPressed(net.minecraft.client.input.KeyEvent input) {
         int key = input.key();
 
         if (key == GLFW.GLFW_KEY_ESCAPE) {
-            close();
+            onClose();
             return true;
         }
 
-        long win = Minecraft.getInstance().getWindow().getHandle();
+        long win = Minecraft.getInstance().getWindow().handle();
         boolean ctrl = GLFW.glfwGetKey(win, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS
                 || GLFW.glfwGetKey(win, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
 
@@ -600,9 +600,9 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
     }
 
     @Override
-    public boolean charTyped(CharInput input) {
-        if (input.isValidChar() && query.length() < 48) {
-            query += input.asString();
+    public boolean charTyped(net.minecraft.client.input.CharacterEvent input) {
+        if (input.isAllowedChatCharacter() && query.length() < 48) {
+            query += input.codepointAsString();
             listDirty = true;
             return true;
         }
@@ -610,12 +610,12 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
     }
 
     @Override
-    public void close() {
-        Minecraft.getInstance().setScreen(parent);
+    public void onClose() {
+        Minecraft.getInstance().gui.setScreen(parent);
     }
 
     @Override
-    public boolean shouldPause() {
+    public boolean isPauseScreen() {
         return false;
     }
 
