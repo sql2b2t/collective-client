@@ -14,7 +14,7 @@ public class MixinMouse {
     @Inject(method = "onButton", at = @At("HEAD"))
     private void onMouseButtonHook(long window, MouseButtonInfo input, int action, CallbackInfo ci) {
         if (action == 1) { // GLFW.GLFW_PRESS
-            EventBus.INSTANCE.post(new MouseClickEvent(input.button()));
+            EventBus.INSTANCE.post(new MouseClickEvent(me.collective.util.KeyHelper.toStandardMouseButton(input.button())));
         }
     }
 

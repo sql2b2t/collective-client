@@ -7,7 +7,8 @@ import me.collective.render.RenderUtil;
 import me.collective.render.SoundUtil;
 import me.collective.setting.IntegerSetting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
+import me.collective.util.KeyHelper;
 
 /**
  * Modern IntegerComponent matching ClickGUI 2 slider design.
@@ -172,8 +173,8 @@ public class IntegerComponent extends Component {
         if (!editing) return false;
         cursor = Math.max(0, Math.min(cursor, buffer.length()));
 
-        if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER || key == GLFW.GLFW_KEY_ESCAPE) {
-            if (key != GLFW.GLFW_KEY_ESCAPE) {
+        if (KeyHelper.isEnter(key) || KeyHelper.isEscape(key)) {
+            if (!KeyHelper.isEscape(key)) {
                 commit();
                 if (UI.INSTANCE.sounds.getValue()) {
                     SoundUtil.playClick(1.0f, 0.8f);
@@ -182,32 +183,49 @@ public class IntegerComponent extends Component {
             editing = false;
             return true;
         }
-        if (key == GLFW.GLFW_KEY_LEFT) {
+        if (KeyHelper.isLeft(key)) {
             if (cursor > 0) cursor--;
             return true;
         }
-        if (key == GLFW.GLFW_KEY_RIGHT) {
+        if (KeyHelper.isRight(key)) {
             if (cursor < buffer.length()) cursor++;
             return true;
         }
-        if (key == GLFW.GLFW_KEY_HOME) {
+        if (KeyHelper.isHome(key)) {
             cursor = 0;
             return true;
         }
-        if (key == GLFW.GLFW_KEY_END) {
+        if (KeyHelper.isEnd(key)) {
             cursor = buffer.length();
             return true;
         }
-        if (key == GLFW.GLFW_KEY_BACKSPACE) {
+        if (KeyHelper.isBackspace(key)) {
             if (cursor > 0) {
                 buffer = buffer.substring(0, cursor - 1) + buffer.substring(cursor);
                 cursor--;
             }
             return true;
         }
-        if (key == GLFW.GLFW_KEY_DELETE) {
+        if (KeyHelper.isDelete(key)) {
             if (cursor < buffer.length()) {
                 buffer = buffer.substring(0, cursor) + buffer.substring(cursor + 1);
+            }
+            return true;
+        }
+        if ((KeyHelper.to263Key(key) == InputConstants.KEY_V || KeyHelper.to263Key(key) == 86) && KeyHelper.isControlDown()) {
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc != null && mc.keyboardHandler != null) {
+                String clip = mc.keyboardHandler.getClipboard();
+                if (clip != null && !clip.isEmpty()) {
+                    StringBuilder sb = new StringBuilder();
+                    for (char c : clip.toCharArray()) {
+                        if (Character.isDigit(c)) sb.append(c);
+                    }
+                    if (sb.length() > 0 && buffer.length() + sb.length() <= 9) {
+                        buffer = buffer.substring(0, cursor) + sb + buffer.substring(cursor);
+                        cursor += sb.length();
+                    }
+                }
             }
             return true;
         }

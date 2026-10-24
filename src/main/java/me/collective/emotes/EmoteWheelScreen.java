@@ -139,8 +139,9 @@ public class EmoteWheelScreen extends Screen {
     @Override
     public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent click, boolean doubled) {
         clampSelection();
-        int count = Emote.ALL.isEmpty() ? 0 : Math.min(PAGE_SIZE, Emote.ALL.size() - page * PAGE_SIZE);
-        if (click.button() == 0) {
+        int button = me.collective.util.KeyHelper.toStandardMouseButton(click.button());
+        if (button == 0) {
+            int count = Math.min(PAGE_SIZE, Math.max(0, Emote.ALL.size() - page * PAGE_SIZE));
             int row = rowAt(click.x(), click.y(), count);
             if (row >= 0) {
                 selected = row;
@@ -149,7 +150,7 @@ public class EmoteWheelScreen extends Screen {
             }
             return true;
         }
-        if (click.button() == 1) {
+        if (button == 1) {
             finish(false);
             return true;
         }

@@ -12,9 +12,8 @@ import me.collective.render.RenderUtil;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
+import me.collective.util.KeyHelper;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -225,7 +224,7 @@ public class HudEditorScreen extends Screen {
 
     @Override
     public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent click, boolean bl) {
-        int button = click.button();
+        int button = me.collective.util.KeyHelper.toStandardMouseButton(click.button());
         double mouseX = click.x();
         double mouseY = click.y();
 
@@ -265,7 +264,8 @@ public class HudEditorScreen extends Screen {
 
     @Override
     public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent click) {
-        hudPanel.mouseReleased(click.x(), click.y(), click.button());
+        int button = me.collective.util.KeyHelper.toStandardMouseButton(click.button());
+        hudPanel.mouseReleased(click.x(), click.y(), button);
         if (draggingModule != null) {
             draggingModule = null;
         }
@@ -276,7 +276,7 @@ public class HudEditorScreen extends Screen {
     public boolean keyPressed(net.minecraft.client.input.KeyEvent input) {
         int key = input.key();
 
-        if (key == GLFW.GLFW_KEY_ESCAPE) {
+        if (input.isEscape() || KeyHelper.isEscape(key)) {
             onClose();
             return true;
         }
@@ -289,19 +289,19 @@ public class HudEditorScreen extends Screen {
         // Keyboard arrow nudging (Collective style: 1 pixel adjustment)
         HudModule target = draggingModule != null ? draggingModule : (selectedModule != null ? selectedModule : hoveredModule);
         if (target != null) {
-            if (key == GLFW.GLFW_KEY_LEFT) {
+            if (input.isLeft() || KeyHelper.isLeft(key)) {
                 target.setX(Math.max(2, target.getX() - 1));
                 return true;
-            } else if (key == GLFW.GLFW_KEY_RIGHT) {
+            } else if (input.isRight() || KeyHelper.isRight(key)) {
                 target.setX(Math.min(width - target.getWidth() - 2, target.getX() + 1));
                 return true;
-            } else if (key == GLFW.GLFW_KEY_UP) {
+            } else if (input.isUp() || KeyHelper.isUp(key)) {
                 target.setY(Math.max(2, target.getY() - 1));
                 return true;
-            } else if (key == GLFW.GLFW_KEY_DOWN) {
+            } else if (input.isDown() || KeyHelper.isDown(key)) {
                 target.setY(Math.min(height - target.getHeight() - 2, target.getY() + 1));
                 return true;
-            } else if (key == GLFW.GLFW_KEY_DELETE || key == GLFW.GLFW_KEY_BACKSPACE) {
+            } else if (KeyHelper.isDelete(key) || KeyHelper.isBackspace(key)) {
                 target.setToggled(false);
                 selectedModule = null;
                 return true;

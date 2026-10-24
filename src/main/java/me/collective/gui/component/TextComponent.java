@@ -8,7 +8,8 @@ import me.collective.render.SoundUtil;
 import me.collective.setting.StringSetting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
+import me.collective.util.KeyHelper;
 
 /**
  * Modern TextComponent with cursor navigation, arrow keys, Home/End, Delete, and clipboard support.
@@ -108,27 +109,27 @@ public class TextComponent extends Component {
         String val = setting.getValue() == null ? "" : setting.getValue();
         cursor = Math.max(0, Math.min(cursor, val.length()));
 
-        if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER || key == GLFW.GLFW_KEY_ESCAPE) {
+        if (KeyHelper.isEnter(key) || KeyHelper.isEscape(key)) {
             editing = false;
             return true;
         }
-        if (key == GLFW.GLFW_KEY_LEFT) {
+        if (KeyHelper.isLeft(key)) {
             if (cursor > 0) cursor--;
             return true;
         }
-        if (key == GLFW.GLFW_KEY_RIGHT) {
+        if (KeyHelper.isRight(key)) {
             if (cursor < val.length()) cursor++;
             return true;
         }
-        if (key == GLFW.GLFW_KEY_HOME) {
+        if (KeyHelper.isHome(key)) {
             cursor = 0;
             return true;
         }
-        if (key == GLFW.GLFW_KEY_END) {
+        if (KeyHelper.isEnd(key)) {
             cursor = val.length();
             return true;
         }
-        if (key == GLFW.GLFW_KEY_BACKSPACE) {
+        if (KeyHelper.isBackspace(key)) {
             if (cursor > 0) {
                 String next = val.substring(0, cursor - 1) + val.substring(cursor);
                 setting.setValue(next);
@@ -136,7 +137,7 @@ public class TextComponent extends Component {
             }
             return true;
         }
-        if (key == GLFW.GLFW_KEY_DELETE) {
+        if (KeyHelper.isDelete(key)) {
             if (cursor < val.length()) {
                 String next = val.substring(0, cursor) + val.substring(cursor + 1);
                 setting.setValue(next);
@@ -144,7 +145,7 @@ public class TextComponent extends Component {
             return true;
         }
         // Paste support: Ctrl+V
-        if (key == GLFW.GLFW_KEY_V && isCtrlDown()) {
+        if ((KeyHelper.to263Key(key) == InputConstants.KEY_V || KeyHelper.to263Key(key) == 86) && KeyHelper.isControlDown()) {
             Minecraft mc = Minecraft.getInstance();
             if (mc != null && mc.keyboardHandler != null) {
                 String clip = mc.keyboardHandler.getClipboard();
@@ -160,7 +161,7 @@ public class TextComponent extends Component {
             return true;
         }
         // Copy support: Ctrl+C
-        if (key == GLFW.GLFW_KEY_C && isCtrlDown()) {
+        if ((KeyHelper.to263Key(key) == InputConstants.KEY_C || KeyHelper.to263Key(key) == 67) && KeyHelper.isControlDown()) {
             Minecraft mc = Minecraft.getInstance();
             if (mc != null && mc.keyboardHandler != null) {
                 mc.keyboardHandler.setClipboard(val);
@@ -168,14 +169,6 @@ public class TextComponent extends Component {
             return true;
         }
         return false;
-    }
-
-    private boolean isCtrlDown() {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc == null || mc.getWindow() == null) return false;
-        long h = mc.getWindow().handle();
-        return GLFW.glfwGetKey(h, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS
-                || GLFW.glfwGetKey(h, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
     }
 
     @Override

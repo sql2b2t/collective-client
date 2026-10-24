@@ -18,7 +18,8 @@ import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
+import me.collective.util.KeyHelper;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -509,7 +510,8 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
 
     @Override
     public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent click, boolean doubled) {
-        if (click.button() != 0) return super.mouseClicked(click, doubled);
+        int button = me.collective.util.KeyHelper.toStandardMouseButton(click.button());
+        if (button != 0) return super.mouseClicked(click, doubled);
 
         double mx = click.x();
         double my = click.y();
@@ -569,17 +571,15 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
     public boolean keyPressed(net.minecraft.client.input.KeyEvent input) {
         int key = input.key();
 
-        if (key == GLFW.GLFW_KEY_ESCAPE) {
+        if (input.isEscape() || KeyHelper.isEscape(key)) {
             onClose();
             return true;
         }
 
-        long win = Minecraft.getInstance().getWindow().handle();
-        boolean ctrl = GLFW.glfwGetKey(win, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS
-                || GLFW.glfwGetKey(win, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
+        boolean ctrl = input.hasControlDown() || KeyHelper.isControlDown();
 
-        if (ctrl && key == GLFW.GLFW_KEY_V) {
-            String clipboard = GLFW.glfwGetClipboardString(win);
+        if (ctrl && (input.isPaste() || KeyHelper.to263Key(key) == InputConstants.KEY_V || KeyHelper.to263Key(key) == 86)) {
+            String clipboard = Minecraft.getInstance().keyboardHandler.getClipboard();
             if (clipboard != null) {
                 for (char c : clipboard.toCharArray()) {
                     if (query.length() >= 48) break;
@@ -590,7 +590,7 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
             return true;
         }
 
-        if (key == GLFW.GLFW_KEY_BACKSPACE && !query.isEmpty()) {
+        if (KeyHelper.isBackspace(key) && !query.isEmpty()) {
             query = query.substring(0, query.length() - 1);
             listDirty = true;
             return true;

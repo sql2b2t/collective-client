@@ -16,7 +16,6 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -184,6 +183,8 @@ public class ClickGuiScreen extends Screen {
             panel.clearFocusFromTextInputs();
         }
 
+        int button = me.collective.util.KeyHelper.toStandardMouseButton(click.button());
+
         if (searchActive) {
             float boxW = 180;
             float boxH = 18;
@@ -197,7 +198,7 @@ public class ClickGuiScreen extends Screen {
         String query = searchActive ? searchQuery : "";
         for (int i = panels.size() - 1; i >= 0; i--) {
             Panel panel = panels.get(i);
-            if (panel.mouseClicked(click.x(), click.y(), click.button(), query)) {
+            if (panel.mouseClicked(click.x(), click.y(), button, query)) {
                 return true;
             }
         }
@@ -206,8 +207,9 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent click) {
+        int button = me.collective.util.KeyHelper.toStandardMouseButton(click.button());
         for (Panel panel : panels) {
-            panel.mouseReleased(click.x(), click.y(), click.button());
+            panel.mouseReleased(click.x(), click.y(), button);
         }
         return super.mouseReleased(click);
     }
@@ -235,7 +237,8 @@ public class ClickGuiScreen extends Screen {
     public boolean keyPressed(net.minecraft.client.input.KeyEvent input) {
         int key = input.key();
 
-        if (input.hasControlDown() && (key == com.mojang.blaze3d.platform.InputConstants.KEY_F || key == 70)) {
+        if ((input.hasControlDown() || me.collective.util.KeyHelper.isControlDown())
+                && (key == com.mojang.blaze3d.platform.InputConstants.KEY_F || key == 70 || me.collective.util.KeyHelper.to263Key(key) == com.mojang.blaze3d.platform.InputConstants.KEY_F)) {
             searchActive = !searchActive;
             if (!searchActive) {
                 searchQuery = "";
@@ -248,41 +251,41 @@ public class ClickGuiScreen extends Screen {
 
         if (searchActive) {
             searchCursor = Math.max(0, Math.min(searchCursor, searchQuery.length()));
-            if (input.isEscape() || key == com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE || key == 256) {
+            if (input.isEscape() || me.collective.util.KeyHelper.isEscape(key)) {
                 searchActive = false;
                 searchQuery = "";
                 searchCursor = 0;
                 return true;
-            } else if (key == com.mojang.blaze3d.platform.InputConstants.KEY_LEFT || key == 263) {
+            } else if (input.isLeft() || me.collective.util.KeyHelper.isLeft(key)) {
                 if (searchCursor > 0) searchCursor--;
                 return true;
-            } else if (key == com.mojang.blaze3d.platform.InputConstants.KEY_RIGHT || key == 262) {
+            } else if (input.isRight() || me.collective.util.KeyHelper.isRight(key)) {
                 if (searchCursor < searchQuery.length()) searchCursor++;
                 return true;
-            } else if (key == com.mojang.blaze3d.platform.InputConstants.KEY_HOME || key == 268) {
+            } else if (me.collective.util.KeyHelper.isHome(key)) {
                 searchCursor = 0;
                 return true;
-            } else if (key == com.mojang.blaze3d.platform.InputConstants.KEY_END || key == 269) {
+            } else if (me.collective.util.KeyHelper.isEnd(key)) {
                 searchCursor = searchQuery.length();
                 return true;
-            } else if (key == com.mojang.blaze3d.platform.InputConstants.KEY_BACKSPACE || key == 259) {
+            } else if (me.collective.util.KeyHelper.isBackspace(key)) {
                 if (searchCursor > 0 && !searchQuery.isEmpty()) {
                     searchQuery = searchQuery.substring(0, searchCursor - 1) + searchQuery.substring(searchCursor);
                     searchCursor--;
                 }
                 return true;
-            } else if (key == com.mojang.blaze3d.platform.InputConstants.KEY_DELETE || key == 261) {
+            } else if (me.collective.util.KeyHelper.isDelete(key)) {
                 if (searchCursor < searchQuery.length()) {
                     searchQuery = searchQuery.substring(0, searchCursor) + searchQuery.substring(searchCursor + 1);
                 }
                 return true;
-            } else if (key == com.mojang.blaze3d.platform.InputConstants.KEY_RETURN || key == 257) {
+            } else if (input.isConfirmation() || me.collective.util.KeyHelper.isEnter(key)) {
                 searchActive = false;
                 return true;
             }
         }
 
-        if (input.isEscape() || key == com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE || key == 256
+        if (input.isEscape() || me.collective.util.KeyHelper.isEscape(key)
                 || me.collective.util.KeyHelper.isRightShift(key)
                 || (UI.INSTANCE != null && me.collective.util.KeyHelper.isMatch(UI.INSTANCE.getKeybind().getValue(), key))) {
             onClose();

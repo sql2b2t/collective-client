@@ -21,7 +21,8 @@ import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.world.entity.player.PlayerSkin;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
+import me.collective.util.KeyHelper;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -705,6 +706,9 @@ public class AltManagerScreen extends Screen {
 
     @Override
     public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent click, boolean doubled) {
+        int button = KeyHelper.toStandardMouseButton(click.button());
+        if (button != 0) return super.mouseClicked(click, doubled);
+
         double mx = click.x();
         double my = click.y();
         float px = getPanelX();
@@ -1087,16 +1091,16 @@ public class AltManagerScreen extends Screen {
         float ph = getPanelHeight();
 
         if (modal != ModalType.NONE) {
-            if (key == GLFW.GLFW_KEY_ESCAPE) {
+            if (input.isEscape() || KeyHelper.isEscape(key)) {
                 if (modal == ModalType.MS_DEVICE_POLLING) MicrosoftAuth.cancel();
                 modal = ModalType.NONE;
                 return true;
             }
-            if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
+            if (input.isConfirmation() || KeyHelper.isEnter(key)) {
                 submitModal();
                 return true;
             }
-            if (key == GLFW.GLFW_KEY_BACKSPACE && !modalInput.isEmpty()) {
+            if (KeyHelper.isBackspace(key) && !modalInput.isEmpty()) {
                 modalInput = modalInput.substring(0, modalInput.length() - 1);
                 return true;
             }
@@ -1105,11 +1109,11 @@ public class AltManagerScreen extends Screen {
         }
 
         if (searchActive) {
-            if (key == GLFW.GLFW_KEY_ESCAPE || key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
+            if (input.isEscape() || KeyHelper.isEscape(key) || input.isConfirmation() || KeyHelper.isEnter(key)) {
                 searchActive = false;
                 return true;
             }
-            if (key == GLFW.GLFW_KEY_BACKSPACE && !searchQuery.isEmpty()) {
+            if (KeyHelper.isBackspace(key) && !searchQuery.isEmpty()) {
                 searchQuery = searchQuery.substring(0, searchQuery.length() - 1);
                 return true;
             }
@@ -1118,27 +1122,27 @@ public class AltManagerScreen extends Screen {
         }
 
         List<AltEntry> filtered = getFilteredAlts();
-        if (key == GLFW.GLFW_KEY_UP) {
+        if (input.isUp() || KeyHelper.isUp(key)) {
             if (selectedIndex > 0) {
                 selectedIndex--;
                 ensureCardVisible(selectedIndex, py, ph);
             }
             return true;
         }
-        if (key == GLFW.GLFW_KEY_DOWN) {
+        if (input.isDown() || KeyHelper.isDown(key)) {
             if (selectedIndex < filtered.size() - 1) {
                 selectedIndex++;
                 ensureCardVisible(selectedIndex, py, ph);
             }
             return true;
         }
-        if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
+        if (input.isConfirmation() || KeyHelper.isEnter(key)) {
             if (selectedIndex >= 0 && selectedIndex < filtered.size()) {
                 loginAlt(filtered.get(selectedIndex));
             }
             return true;
         }
-        if (key == GLFW.GLFW_KEY_DELETE) {
+        if (KeyHelper.isDelete(key)) {
             if (selectedIndex >= 0 && selectedIndex < filtered.size()) {
                 AltEntry rem = filtered.get(selectedIndex);
                 alts.remove(rem);
@@ -1151,7 +1155,7 @@ public class AltManagerScreen extends Screen {
             return true;
         }
 
-        if (key == GLFW.GLFW_KEY_ESCAPE) {
+        if (input.isEscape() || KeyHelper.isEscape(key)) {
             minecraft.gui.setScreen(parent);
             return true;
         }
@@ -1160,12 +1164,10 @@ public class AltManagerScreen extends Screen {
     }
 
     private void handleClipboard(int key, boolean isModal) {
-        long win = minecraft.getWindow().handle();
-        boolean ctrl = GLFW.glfwGetKey(win, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS
-                || GLFW.glfwGetKey(win, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
+        boolean ctrl = KeyHelper.isControlDown();
 
-        if (ctrl && key == GLFW.GLFW_KEY_V) {
-            String cb = GLFW.glfwGetClipboardString(win);
+        if (ctrl && (KeyHelper.to263Key(key) == InputConstants.KEY_V || KeyHelper.to263Key(key) == 86)) {
+            String cb = minecraft.keyboardHandler.getClipboard();
             if (cb != null) {
                 for (char c : cb.toCharArray()) {
                     if (isModal) {

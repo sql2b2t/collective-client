@@ -8,7 +8,6 @@ import me.collective.setting.Keybind;
 import me.collective.setting.KeybindSetting;
 import me.collective.setting.Setting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import org.lwjgl.glfw.GLFW;
 
 /**
  * Modern KeybindComponent matching ClickGUI 2 pill badge styling.
@@ -125,5 +124,10 @@ public class KeybindComponent extends Component {
             return true;
         }
         return false;
+    }
+
+    @Override
+    public void clearFocus() {
+        this.binding = false;
     }
 }

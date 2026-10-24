@@ -9,7 +9,6 @@ import me.collective.render.RenderUtil;
 import me.collective.render.SoundUtil;
 import me.collective.setting.*;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import org.lwjgl.glfw.GLFW;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -114,7 +113,7 @@ public class ModuleButton extends Component {
         FontManager.INSTANCE.drawStringWithShadow(context, module.getName(), x + pad, y + (height - FontManager.INSTANCE.getFontHeight()) / 2f + 0.5f, textCol);
 
         // Keybind indicator [KEY]
-        if (UI.INSTANCE.binds.getValue() && module.getKeybind().getValue() != GLFW.GLFW_KEY_UNKNOWN) {
+        if (UI.INSTANCE.binds.getValue() && !module.getKeybind().isNone()) {
             String bindText = "[" + module.getKeybind().getKeyName().toUpperCase() + "]";
             float nameW = FontManager.INSTANCE.getStringWidth(module.getName());
             FontManager.INSTANCE.drawStringWithShadow(context, bindText, x + pad + nameW + 3, y + (height - FontManager.INSTANCE.getFontHeight()) / 2f + 1f, new Color(170, 170, 170));

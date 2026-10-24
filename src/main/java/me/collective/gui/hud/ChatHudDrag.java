@@ -4,7 +4,6 @@ import me.collective.module.hud.HudModule;
 import me.collective.module.ModuleManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.input.MouseButtonEvent;
-import org.lwjgl.glfw.GLFW;
 
 /**
  * Перетаскивание HUD-модулей прямо поверх открытого чата.
@@ -29,7 +28,8 @@ public final class ChatHudDrag {
 
     /** Пытается захватить HUD-модуль под курсором. Возвращает true, если захватила. */
     public static boolean tryBeginDrag(net.minecraft.client.input.MouseButtonEvent click) {
-        if (click.button() != 0) return false;
+        int button = me.collective.util.KeyHelper.toStandardMouseButton(click.button());
+        if (button != 0) return false;
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return false;
@@ -37,8 +37,8 @@ public final class ChatHudDrag {
         double mx = click.x();
         double my = click.y();
 
-        // Зона чата (история + поле ввода) остаётся чату
-        if (my >= mc.getWindow().getGuiScaledHeight() - CHAT_PROTECTED_ZONE) return false;
+        // Поле ввода текста в самом низу оставляем чату
+        if (my >= mc.getWindow().getGuiScaledHeight() - 16) return false;
 
         HudModule target = findUnderCursor(mx, my);
         if (target == null) return false;
@@ -54,8 +54,8 @@ public final class ChatHudDrag {
     public static void update(double mouseX, double mouseY) {
         if (dragging == null) return;
 
-        long window = Minecraft.getInstance().getWindow().handle();
-        if (GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) != GLFW.GLFW_PRESS) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.mouseHandler == null || !mc.mouseHandler.isLeftPressed()) {
             endDrag();
             return;
         }

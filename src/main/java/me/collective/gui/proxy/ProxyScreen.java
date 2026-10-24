@@ -13,6 +13,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.EditBox;
+import me.collective.util.KeyHelper;
 
 @Environment(EnvType.CLIENT)
 public class ProxyScreen extends Screen {
@@ -231,6 +232,7 @@ public class ProxyScreen extends Screen {
    }
 
    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent click, boolean doubled) {
+      int button = KeyHelper.toStandardMouseButton(click.button());
       double mx = click.x();
       double my = click.y();
       int w = this.width;
@@ -238,7 +240,7 @@ public class ProxyScreen extends Screen {
       int x = (w - 300) / 2;
       int y = (h - 340) / 2;
       int btnY = y + 100;
-      if (click.button() == 0) {
+      if (button == 0) {
          if (mx >= x + 8 && mx <= x + 146 && my >= btnY && my <= btnY + 16) {
             this.type = this.type == ProxyEntry.ProxyType.SOCKS5
                ? ProxyEntry.ProxyType.HTTP : ProxyEntry.ProxyType.SOCKS5;
@@ -252,25 +254,27 @@ public class ProxyScreen extends Screen {
       int listStartY = btnY + 26;
       List<ProxyEntry> list = ProxyManager.INSTANCE.getProxies();
 
-      for (int i = 0; i < list.size(); i++) {
-         int ay = listStartY + i * 24;
-         if (ay + 20 > y + 340 - 46) {
-            break;
-         }
+      if (button == 0) {
+         for (int i = 0; i < list.size(); i++) {
+            int ay = listStartY + i * 24;
+            if (ay + 20 > y + 340 - 46) {
+               break;
+            }
 
-         int cardX = x + 8;
-         int cardW = 284;
-         int delW = 18;
-         int rowW = cardW - delW - 4;
-         int delX = cardX + rowW + 4;
-         if (mx >= delX && mx <= delX + delW && my >= ay && my <= ay + 18) {
-            ProxyManager.INSTANCE.remove(i);
-            return true;
-         }
+            int cardX = x + 8;
+            int cardW = 284;
+            int delW = 18;
+            int rowW = cardW - delW - 4;
+            int delX = cardX + rowW + 4;
+            if (mx >= delX && mx <= delX + delW && my >= ay && my <= ay + 18) {
+               ProxyManager.INSTANCE.remove(i);
+               return true;
+            }
 
-         if (mx >= cardX && mx <= cardX + rowW && my >= ay && my <= ay + 18) {
-            ProxyManager.INSTANCE.setActive(i);
-            return true;
+            if (mx >= cardX && mx <= cardX + rowW && my >= ay && my <= ay + 18) {
+               ProxyManager.INSTANCE.setActive(i);
+               return true;
+            }
          }
       }
 
@@ -281,26 +285,27 @@ public class ProxyScreen extends Screen {
       int directBtnW = 92;
       int backBtnX = x + 208;
       int backBtnW = 84;
-      if (mx >= toggleBtnX && mx <= toggleBtnX + toggleBtnW && my >= backY && my <= backY + 14) {
-         ProxyManager.INSTANCE.toggle();
-         return true;
-      } else if (mx >= directBtnX && mx <= directBtnX + directBtnW && my >= backY && my <= backY + 14) {
-         ProxyManager.INSTANCE.setDirect();
-         return true;
-      } else if (mx >= backBtnX && mx <= backBtnX + backBtnW && my >= backY && my <= backY + 14) {
-         Minecraft.getInstance().gui.setScreen(this.parent);
-         return true;
-      } else {
-         return super.mouseClicked(click, doubled);
+      if (button == 0) {
+         if (mx >= toggleBtnX && mx <= toggleBtnX + toggleBtnW && my >= backY && my <= backY + 14) {
+            ProxyManager.INSTANCE.toggle();
+            return true;
+         } else if (mx >= directBtnX && mx <= directBtnX + directBtnW && my >= backY && my <= backY + 14) {
+            ProxyManager.INSTANCE.setDirect();
+            return true;
+         } else if (mx >= backBtnX && mx <= backBtnX + backBtnW && my >= backY && my <= backY + 14) {
+            Minecraft.getInstance().gui.setScreen(this.parent);
+            return true;
+         }
       }
+      return super.mouseClicked(click, doubled);
    }
 
    public boolean keyPressed(net.minecraft.client.input.KeyEvent input) {
-      if (input.key() == 256) {
+      if (input.isEscape() || KeyHelper.isEscape(input.key())) {
          Minecraft.getInstance().gui.setScreen(this.parent);
          return true;
       }
-      if (input.key() == 257) {
+      if (input.isConfirmation() || KeyHelper.isEnter(input.key())) {
          this.doAdd();
          return true;
       }

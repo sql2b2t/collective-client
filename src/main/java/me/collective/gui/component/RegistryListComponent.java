@@ -6,7 +6,7 @@ import me.collective.render.RenderUtil;
 import me.collective.setting.Setting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.resources.Identifier;
-import org.lwjgl.glfw.GLFW;
+import me.collective.util.KeyHelper;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -212,23 +212,23 @@ public abstract class RegistryListComponent<T> extends Component {
     public boolean keyPressed(int key) {
         if (!open) return false;
         cursor = Math.max(0, Math.min(cursor, query.length()));
-        if (key == GLFW.GLFW_KEY_LEFT) {
+        if (KeyHelper.isLeft(key)) {
             if (cursor > 0) cursor--;
             return true;
         }
-        if (key == GLFW.GLFW_KEY_RIGHT) {
+        if (KeyHelper.isRight(key)) {
             if (cursor < query.length()) cursor++;
             return true;
         }
-        if (key == GLFW.GLFW_KEY_HOME) {
+        if (KeyHelper.isHome(key)) {
             cursor = 0;
             return true;
         }
-        if (key == GLFW.GLFW_KEY_END) {
+        if (KeyHelper.isEnd(key)) {
             cursor = query.length();
             return true;
         }
-        if (key == GLFW.GLFW_KEY_BACKSPACE) {
+        if (KeyHelper.isBackspace(key)) {
             if (cursor > 0 && !query.isEmpty()) {
                 query = query.substring(0, cursor - 1) + query.substring(cursor);
                 cursor--;
@@ -236,14 +236,14 @@ public abstract class RegistryListComponent<T> extends Component {
             }
             return true;
         }
-        if (key == GLFW.GLFW_KEY_DELETE) {
+        if (KeyHelper.isDelete(key)) {
             if (cursor < query.length()) {
                 query = query.substring(0, cursor) + query.substring(cursor + 1);
                 scroll = 0;
             }
             return true;
         }
-        if (key == GLFW.GLFW_KEY_ESCAPE) {
+        if (KeyHelper.isEscape(key)) {
             open = false;
             query = "";
             return true;

@@ -91,4 +91,76 @@ public final class KeyHelper {
         int target = to263Key(key);
         return InputConstants.isKeyDown(target);
     }
+
+    /**
+     * Преобразует SDL кнопку мыши (1=Left, 3=Right, 2=Middle) в стандартную нумерацию GLFW (0=Left, 1=Right, 2=Middle).
+     */
+    public static int toStandardMouseButton(int button) {
+        if (button == 1) return 0; // SDL Left Click -> standard 0
+        if (button == 3) return 1; // SDL Right Click -> standard 1
+        if (button == 2) return 2; // SDL Middle Click -> standard 2
+        return button;
+    }
+
+    public static boolean isEnter(int key) {
+        int k = to263Key(key);
+        return k == InputConstants.KEY_RETURN || k == InputConstants.KEY_NUMPADENTER || k == 257 || key == InputConstants.KEYCODE_RETURN || key == InputConstants.KEYCODE_NUMPADENTER;
+    }
+
+    public static boolean isEscape(int key) {
+        int k = to263Key(key);
+        return k == InputConstants.KEY_ESCAPE || k == 256;
+    }
+
+    public static boolean isBackspace(int key) {
+        int k = to263Key(key);
+        return k == InputConstants.KEY_BACKSPACE || k == 259 || key == InputConstants.KEYCODE_BACKSPACE;
+    }
+
+    public static boolean isDelete(int key) {
+        int k = to263Key(key);
+        return k == InputConstants.KEY_DELETE || k == 261 || key == InputConstants.KEYCODE_DELETE;
+    }
+
+    public static boolean isLeft(int key) {
+        int k = to263Key(key);
+        return k == InputConstants.KEY_LEFT || k == 263 || key == InputConstants.KEYCODE_LEFT;
+    }
+
+    public static boolean isRight(int key) {
+        int k = to263Key(key);
+        return k == InputConstants.KEY_RIGHT || k == 262 || key == InputConstants.KEYCODE_RIGHT;
+    }
+
+    public static boolean isUp(int key) {
+        int k = to263Key(key);
+        return k == InputConstants.KEY_UP || k == 265 || key == InputConstants.KEYCODE_UP;
+    }
+
+    public static boolean isDown(int key) {
+        int k = to263Key(key);
+        return k == InputConstants.KEY_DOWN || k == 264 || key == InputConstants.KEYCODE_DOWN;
+    }
+
+    public static boolean isHome(int key) {
+        int k = to263Key(key);
+        return k == InputConstants.KEY_HOME || k == 268 || key == InputConstants.KEYCODE_HOME;
+    }
+
+    public static boolean isEnd(int key) {
+        int k = to263Key(key);
+        return k == InputConstants.KEY_END || k == 269 || key == InputConstants.KEYCODE_END;
+    }
+
+    public static boolean isControlDown() {
+        return InputConstants.isKeyDown(InputConstants.KEY_LCONTROL) || InputConstants.isKeyDown(InputConstants.KEY_RCONTROL);
+    }
+
+    public static boolean isShiftDown() {
+        return InputConstants.isKeyDown(InputConstants.KEY_LSHIFT) || InputConstants.isKeyDown(InputConstants.KEY_RSHIFT);
+    }
+
+    public static boolean isAltDown() {
+        return InputConstants.isKeyDown(InputConstants.KEY_LALT) || InputConstants.isKeyDown(InputConstants.KEY_RALT);
+    }
 }

@@ -7,7 +7,8 @@ import me.collective.render.RenderUtil;
 import me.collective.render.SoundUtil;
 import me.collective.setting.NumberSetting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
+import me.collective.util.KeyHelper;
 
 /**
  * Modern SliderComponent matching ClickGUI 2 slider styling with rounded track and draggable knob.
@@ -140,39 +141,39 @@ public class SliderComponent extends Component {
     public boolean keyPressed(int key) {
         if (textEditing) {
             cursor = Math.max(0, Math.min(cursor, textInput.length()));
-            if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
+            if (KeyHelper.isEnter(key)) {
                 try {
                     setting.setValue(Double.parseDouble(textInput));
                 } catch (Exception ignored) {}
                 textEditing = false;
                 return true;
-            } else if (key == GLFW.GLFW_KEY_LEFT) {
+            } else if (KeyHelper.isLeft(key)) {
                 if (cursor > 0) cursor--;
                 return true;
-            } else if (key == GLFW.GLFW_KEY_RIGHT) {
+            } else if (KeyHelper.isRight(key)) {
                 if (cursor < textInput.length()) cursor++;
                 return true;
-            } else if (key == GLFW.GLFW_KEY_HOME) {
+            } else if (KeyHelper.isHome(key)) {
                 cursor = 0;
                 return true;
-            } else if (key == GLFW.GLFW_KEY_END) {
+            } else if (KeyHelper.isEnd(key)) {
                 cursor = textInput.length();
                 return true;
-            } else if (key == GLFW.GLFW_KEY_BACKSPACE) {
+            } else if (KeyHelper.isBackspace(key)) {
                 if (cursor > 0 && !textInput.isEmpty()) {
                     textInput = textInput.substring(0, cursor - 1) + textInput.substring(cursor);
                     cursor--;
                 }
                 return true;
-            } else if (key == GLFW.GLFW_KEY_DELETE) {
+            } else if (KeyHelper.isDelete(key)) {
                 if (cursor < textInput.length()) {
                     textInput = textInput.substring(0, cursor) + textInput.substring(cursor + 1);
                 }
                 return true;
-            } else if (key == GLFW.GLFW_KEY_ESCAPE) {
+            } else if (KeyHelper.isEscape(key)) {
                 textEditing = false;
                 return true;
-            } else if (key == GLFW.GLFW_KEY_V && (GLFW.glfwGetKey(mc.getWindow().handle(), GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS || GLFW.glfwGetKey(mc.getWindow().handle(), GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS)) {
+            } else if ((KeyHelper.to263Key(key) == InputConstants.KEY_V || KeyHelper.to263Key(key) == 86) && KeyHelper.isControlDown()) {
                 String clip = mc.keyboardHandler.getClipboard();
                 if (clip != null && !clip.isEmpty()) {
                     StringBuilder sb = new StringBuilder();

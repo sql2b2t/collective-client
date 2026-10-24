@@ -63,7 +63,7 @@ public class ItemScroller extends Module {
         }
 
         // Для перемещения предметов обрабатываем только левую кнопку мыши (button 0)
-        if (click.button() != 0) return false;
+        if (me.collective.util.KeyHelper.toStandardMouseButton(click.button()) != 0) return false;
 
         // Если на курсоре уже зажат предмет, не выполняем автоматическое перемещение
         if (!handler.getCarried().isEmpty()) return false;
@@ -97,7 +97,7 @@ public class ItemScroller extends Module {
         AbstractContainerMenu handler = screen.getMenu();
         if (handler != mc.player.containerMenu) return false;
 
-        if (click.button() == 0 && ctrlShiftAll.getValue() && isShiftDown() && isCtrlDown()) {
+        if (me.collective.util.KeyHelper.toStandardMouseButton(click.button()) == 0 && ctrlShiftAll.getValue() && isShiftDown() && isCtrlDown()) {
             if (!hovered.mayPickup(mc.player)) return false;
             lastDraggedSlotId = hovered.index;
             boolean playerSide = hovered.container instanceof Inventory;

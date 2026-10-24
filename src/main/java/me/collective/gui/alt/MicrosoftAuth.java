@@ -3,8 +3,8 @@ package me.collective.gui.alt;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import net.minecraft.client.Minecraft;
 import net.minecraft.util.Util;
-import org.lwjgl.glfw.GLFW;
 
 import java.net.URI;
 import java.net.URLEncoder;
@@ -102,7 +102,10 @@ public final class MicrosoftAuth {
 
                 // Copy code to user's clipboard automatically
                 try {
-                    GLFW.glfwSetClipboardString(0, userCode);
+                    Minecraft mc = Minecraft.getInstance();
+                    if (mc != null && mc.keyboardHandler != null) {
+                        mc.keyboardHandler.setClipboard(userCode);
+                    }
                 } catch (Exception ignored) {}
 
                 // Open browser
