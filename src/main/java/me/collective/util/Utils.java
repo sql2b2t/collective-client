@@ -141,8 +141,7 @@ public final class Utils {
         }
     }
 
-    public static boolean isPressed(int glfwKey) {
-        return org.lwjgl.glfw.GLFW.glfwGetKey(
-            net.minecraft.client.Minecraft.getInstance().getWindow().handle(), glfwKey) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
+    public static boolean isPressed(int key) {
+        return KeyHelper.isKeyDown(key);
     }
 }

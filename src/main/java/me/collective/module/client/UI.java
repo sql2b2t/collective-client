@@ -72,7 +72,7 @@ public class UI extends Module {
     public final ColorSetting gradientColor = add(new ColorSetting("GradientColor", new Color(194, 162, 252, 34)));
 
     public UI() {
-        super("UI", "Настройки меню чита: блюр, звуки, цвета и оформление интерфейса.", Category.CLIENT, GLFW.GLFW_KEY_RIGHT_SHIFT);
+        super("UI", "Настройки меню чита: блюр, звуки, цвета и оформление интерфейса.", Category.CLIENT, com.mojang.blaze3d.platform.InputConstants.KEY_RSHIFT);
         INSTANCE = this;
     }
 

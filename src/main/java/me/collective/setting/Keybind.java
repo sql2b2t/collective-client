@@ -28,20 +28,25 @@ public class Keybind {
     }
 
     public boolean isPressed() {
-        if (key < 0 || key == GLFW.GLFW_KEY_UNKNOWN) return false;
-        long window = net.minecraft.client.Minecraft.getInstance().getWindow().handle();
+        if (key <= 0) return false;
         if (isButton) {
-            return GLFW.glfwGetMouseButton(window, key) == GLFW.GLFW_PRESS;
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc != null && mc.mouseHandler != null) {
+                if (key == 0) return mc.mouseHandler.isLeftPressed();
+                if (key == 1) return mc.mouseHandler.isRightPressed();
+                if (key == 2) return mc.mouseHandler.isMiddlePressed();
+            }
+            return false;
         }
-        return GLFW.glfwGetKey(window, key) == GLFW.GLFW_PRESS;
+        return me.collective.util.KeyHelper.isKeyDown(key);
     }
 
     public boolean isNone() {
-        return key <= 0 || key == GLFW.GLFW_KEY_UNKNOWN;
+        return key <= 0;
     }
 
     public static Keybind none() {
-        return new Keybind(GLFW.GLFW_KEY_UNKNOWN, false);
+        return new Keybind(-1, false);
     }
 
     public static Keybind fromKey(int key) {

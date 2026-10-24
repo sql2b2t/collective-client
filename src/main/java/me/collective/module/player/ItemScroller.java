@@ -247,21 +247,16 @@ public class ItemScroller extends Module {
     }
 
     private boolean isShiftDown() {
-        if (mc == null || mc.getWindow() == null) return false;
-        long h = mc.getWindow().handle();
-        return GLFW.glfwGetKey(h, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS
-                || GLFW.glfwGetKey(h, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS;
+        return me.collective.util.KeyHelper.isKeyDown(com.mojang.blaze3d.platform.InputConstants.KEY_LSHIFT)
+                || me.collective.util.KeyHelper.isKeyDown(com.mojang.blaze3d.platform.InputConstants.KEY_RSHIFT);
     }
 
     private boolean isCtrlDown() {
-        if (mc == null || mc.getWindow() == null) return false;
-        long h = mc.getWindow().handle();
-        return GLFW.glfwGetKey(h, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS
-                || GLFW.glfwGetKey(h, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
+        return me.collective.util.KeyHelper.isKeyDown(com.mojang.blaze3d.platform.InputConstants.KEY_LCONTROL)
+                || me.collective.util.KeyHelper.isKeyDown(com.mojang.blaze3d.platform.InputConstants.KEY_RCONTROL);
     }
 
     private boolean isKeyDown(int key) {
-        if (mc == null || mc.getWindow() == null) return false;
-        return GLFW.glfwGetKey(mc.getWindow().handle(), key) == GLFW.GLFW_PRESS;
+        return me.collective.util.KeyHelper.isKeyDown(key);
     }
 }

@@ -27,7 +27,7 @@ public class MiddleClickExtra extends Module {
     private void onTick(TickEvent.Pre event) {
         if (mc.player == null || mc.gui.screen() != null) return;
 
-        boolean isPressed = GLFW.glfwGetMouseButton(mc.getWindow().handle(), GLFW.GLFW_MOUSE_BUTTON_MIDDLE) == GLFW.GLFW_PRESS;
+        boolean isPressed = mc.mouseHandler != null && mc.mouseHandler.isMiddlePressed();
 
         if (isPressed && !wasPressed) {
             if (friend.getValue() && mc.hitResult instanceof net.minecraft.world.phys.EntityHitResult hit && hit.getEntity() instanceof net.minecraft.world.entity.player.Player player) {

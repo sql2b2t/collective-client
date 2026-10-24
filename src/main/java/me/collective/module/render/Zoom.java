@@ -34,7 +34,7 @@ public class Zoom extends Module {
     private long lastTime = System.currentTimeMillis();
 
     public Zoom() {
-        super("Zoom", "Плавный зум камеры с регулировкой колесиком мыши и кинематографическим режимом.", Category.RENDER, GLFW.GLFW_KEY_C);
+        super("Zoom", "Плавный зум камеры с регулировкой колесиком мыши и кинематографическим режимом.", Category.RENDER, com.mojang.blaze3d.platform.InputConstants.KEY_C);
         INSTANCE = this;
     }
 
@@ -55,8 +55,8 @@ public class Zoom extends Module {
         }
 
         int key = getKeybind().getValue();
-        if (key != GLFW.GLFW_KEY_UNKNOWN && mc.getWindow() != null) {
-            return com.mojang.blaze3d.platform.InputConstants.isKeyDown(key);
+        if (key > 0) {
+            return me.collective.util.KeyHelper.isKeyDown(key);
         }
 
         return isToggled();

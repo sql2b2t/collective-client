@@ -439,7 +439,7 @@ public class Tooltips extends Module {
         if (!(mc.gui.screen() instanceof AbstractContainerScreen<?>)) return;
         // уже открыто окно просмотра — повторно не открываем
         if (mc.gui.screen() instanceof ContainerPreviewScreen) return;
-        if (GLFW.glfwGetMouseButton(mc.getWindow().handle(), GLFW.GLFW_MOUSE_BUTTON_MIDDLE) != GLFW.GLFW_PRESS) {
+        if (mc.mouseHandler == null || !mc.mouseHandler.isMiddlePressed()) {
             return;
         }
 

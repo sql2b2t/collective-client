@@ -261,7 +261,7 @@ public class ModuleManager {
 
     public void onKeyPressed(int key) {
         for (Module m : modules) {
-            if (m.getKeybind().getValue() == key) {
+            if (me.collective.util.KeyHelper.isMatch(m.getKeybind().getValue(), key)) {
                 m.toggle();
             }
         }

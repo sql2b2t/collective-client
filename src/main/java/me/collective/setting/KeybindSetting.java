@@ -42,53 +42,33 @@ public class KeybindSetting extends Setting<Integer> {
     }
 
     public static String getKeyName(int key) {
-        if (key == GLFW.GLFW_KEY_UNKNOWN || key <= 0) return "None";
+        if (key <= 0 || key == -1) return "None";
         if (key == -100) return "LMB";
         if (key == -101) return "RMB";
         if (key == -102) return "MMB";
         if (key < -100) return "Mouse " + (-key - 100);
 
-        switch (key) {
-            case GLFW.GLFW_KEY_RIGHT_SHIFT -> { return "RShift"; }
-            case GLFW.GLFW_KEY_LEFT_SHIFT -> { return "LShift"; }
-            case GLFW.GLFW_KEY_RIGHT_CONTROL -> { return "RCtrl"; }
-            case GLFW.GLFW_KEY_LEFT_CONTROL -> { return "LCtrl"; }
-            case GLFW.GLFW_KEY_RIGHT_ALT -> { return "RAlt"; }
-            case GLFW.GLFW_KEY_LEFT_ALT -> { return "LAlt"; }
-            case GLFW.GLFW_KEY_RIGHT_SUPER -> { return "RWin"; }
-            case GLFW.GLFW_KEY_LEFT_SUPER -> { return "LWin"; }
-            case GLFW.GLFW_KEY_MENU -> { return "Menu"; }
-            case GLFW.GLFW_KEY_ESCAPE -> { return "Esc"; }
-            case GLFW.GLFW_KEY_ENTER -> { return "Enter"; }
-            case GLFW.GLFW_KEY_KP_ENTER -> { return "NumEnter"; }
-            case GLFW.GLFW_KEY_TAB -> { return "Tab"; }
-            case GLFW.GLFW_KEY_BACKSPACE -> { return "Backspace"; }
-            case GLFW.GLFW_KEY_INSERT -> { return "Insert"; }
-            case GLFW.GLFW_KEY_DELETE -> { return "Delete"; }
-            case GLFW.GLFW_KEY_PAGE_UP -> { return "PageUp"; }
-            case GLFW.GLFW_KEY_PAGE_DOWN -> { return "PageDown"; }
-            case GLFW.GLFW_KEY_HOME -> { return "Home"; }
-            case GLFW.GLFW_KEY_END -> { return "End"; }
-            case GLFW.GLFW_KEY_CAPS_LOCK -> { return "Caps"; }
-            case GLFW.GLFW_KEY_SCROLL_LOCK -> { return "Scroll"; }
-            case GLFW.GLFW_KEY_NUM_LOCK -> { return "NumLock"; }
-            case GLFW.GLFW_KEY_PRINT_SCREEN -> { return "PrtScn"; }
-            case GLFW.GLFW_KEY_PAUSE -> { return "Pause"; }
-            case GLFW.GLFW_KEY_UP -> { return "Up"; }
-            case GLFW.GLFW_KEY_DOWN -> { return "Down"; }
-            case GLFW.GLFW_KEY_LEFT -> { return "Left"; }
-            case GLFW.GLFW_KEY_RIGHT -> { return "Right"; }
-            case GLFW.GLFW_KEY_SPACE -> { return "Space"; }
-        }
-
-        if (key >= GLFW.GLFW_KEY_F1 && key <= GLFW.GLFW_KEY_F25) {
-            return "F" + (key - GLFW.GLFW_KEY_F1 + 1);
-        }
+        int k263 = me.collective.util.KeyHelper.to263Key(key);
+        if (me.collective.util.KeyHelper.isRightShift(key)) return "RShift";
+        if (k263 == com.mojang.blaze3d.platform.InputConstants.KEY_LSHIFT) return "LShift";
+        if (k263 == com.mojang.blaze3d.platform.InputConstants.KEY_RCONTROL) return "RCtrl";
+        if (k263 == com.mojang.blaze3d.platform.InputConstants.KEY_LCONTROL) return "LCtrl";
+        if (k263 == com.mojang.blaze3d.platform.InputConstants.KEY_RALT) return "RAlt";
+        if (k263 == com.mojang.blaze3d.platform.InputConstants.KEY_LALT) return "LAlt";
+        if (k263 == com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE) return "Esc";
+        if (k263 == com.mojang.blaze3d.platform.InputConstants.KEY_RETURN) return "Enter";
+        if (k263 == com.mojang.blaze3d.platform.InputConstants.KEY_TAB) return "Tab";
+        if (k263 == com.mojang.blaze3d.platform.InputConstants.KEY_BACKSPACE) return "Backspace";
+        if (k263 == com.mojang.blaze3d.platform.InputConstants.KEY_DELETE) return "Delete";
+        if (k263 == com.mojang.blaze3d.platform.InputConstants.KEY_SPACE) return "Space";
 
         try {
-            String name = GLFW.glfwGetKeyName(key, 0);
-            if (name != null && !name.trim().isEmpty()) {
-                return name.toUpperCase();
+            com.mojang.blaze3d.platform.InputConstants.Key k = com.mojang.blaze3d.platform.InputConstants.Type.KEYBOARD.getOrCreate(k263);
+            if (k != null && k.getDisplayName() != null) {
+                String str = k.getDisplayName().getString();
+                if (str != null && !str.trim().isEmpty()) {
+                    return str;
+                }
             }
         } catch (Throwable ignored) {}
 
@@ -96,14 +76,19 @@ public class KeybindSetting extends Setting<Integer> {
     }
 
     public boolean isPressed() {
-        int key = getValue();
-        if (key == GLFW.GLFW_KEY_UNKNOWN || key == -1) return false;
-        long window = net.minecraft.client.Minecraft.getInstance().getWindow().handle();
+        int key = getValue() != null ? getValue() : -1;
+        if (key <= 0 || key == -1) return false;
         if (key <= -100) {
             int button = -key - 100;
-            return GLFW.glfwGetMouseButton(window, button) == GLFW.GLFW_PRESS;
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc != null && mc.mouseHandler != null) {
+                if (button == 0) return mc.mouseHandler.isLeftPressed();
+                if (button == 1) return mc.mouseHandler.isRightPressed();
+                if (button == 2) return mc.mouseHandler.isMiddlePressed();
+            }
+            return false;
         }
-        return GLFW.glfwGetKey(window, key) == GLFW.GLFW_PRESS;
+        return me.collective.util.KeyHelper.isKeyDown(key);
     }
 
     public boolean isDown() {
@@ -111,7 +96,7 @@ public class KeybindSetting extends Setting<Integer> {
     }
 
     public boolean isNone() {
-        return getValue() == null || getValue() <= 0 || getValue() == GLFW.GLFW_KEY_UNKNOWN;
+        return getValue() == null || getValue() <= 0 || getValue() == -1;
     }
 
     public int compute() {

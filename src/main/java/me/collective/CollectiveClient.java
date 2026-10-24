@@ -168,16 +168,31 @@ public class CollectiveClient implements ClientModInitializer {
             System.err.println("[Collective] Error loading config: " + t.getMessage());
         }
 
+        // Ensure non-daemon mod worker threads (such as Baritone) do not trigger post-main shutdown watchdog
+        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+            Thread cleanExit = new Thread(() -> {
+                try {
+                    Thread.sleep(1200);
+                } catch (InterruptedException ignored) {}
+                System.exit(0);
+            }, "Collective-Clean-Exit");
+            cleanExit.setDaemon(true);
+            cleanExit.start();
+        });
+
         System.out.println("[" + MOD_NAME + "] Initialized successfully!");
     }
 
     public static void onKeyPressed(int key) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.gui.screen() == null) {
-            if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT_SHIFT && me.collective.module.client.UI.INSTANCE != null) {
-                me.collective.module.client.UI.INSTANCE.getKeybind().setValue(org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT_SHIFT);
-                me.collective.module.client.UI.INSTANCE.toggle();
-                return;
+            if (me.collective.util.KeyHelper.isRightShift(key)
+                    || (me.collective.module.client.UI.INSTANCE != null
+                        && me.collective.util.KeyHelper.isMatch(me.collective.module.client.UI.INSTANCE.getKeybind().getValue(), key))) {
+                if (me.collective.module.client.UI.INSTANCE != null) {
+                    me.collective.module.client.UI.INSTANCE.toggle();
+                    return;
+                }
             }
             ModuleManager.INSTANCE.onKeyPressed(key);
         }

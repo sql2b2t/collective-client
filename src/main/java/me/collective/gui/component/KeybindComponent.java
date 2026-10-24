@@ -88,7 +88,7 @@ public class KeybindComponent extends Component {
                     }
                     return true;
                 } else if (button == 1) { // Right click clears bind
-                    setKey(GLFW.GLFW_KEY_UNKNOWN, false);
+                    setKey(-1, false);
                     this.binding = false;
                     if (UI.INSTANCE.sounds.getValue()) {
                         SoundUtil.playClick(1.0f, 0.8f);
@@ -110,10 +110,13 @@ public class KeybindComponent extends Component {
     @Override
     public boolean keyPressed(int key) {
         if (binding) {
-            if (key == GLFW.GLFW_KEY_ESCAPE || key == GLFW.GLFW_KEY_DELETE || key == GLFW.GLFW_KEY_BACKSPACE) {
-                setKey(GLFW.GLFW_KEY_UNKNOWN, false);
+            int k263 = me.collective.util.KeyHelper.to263Key(key);
+            if (k263 == com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE
+                    || k263 == com.mojang.blaze3d.platform.InputConstants.KEY_DELETE
+                    || k263 == com.mojang.blaze3d.platform.InputConstants.KEY_BACKSPACE) {
+                setKey(-1, false);
             } else {
-                setKey(key, false);
+                setKey(k263, false);
             }
             this.binding = false;
             if (UI.INSTANCE.sounds.getValue()) {

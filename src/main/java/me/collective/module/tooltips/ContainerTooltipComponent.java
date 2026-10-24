@@ -154,7 +154,7 @@ public class ContainerTooltipComponent implements ClientTooltipComponent {
     }
 
     private static boolean isAltPressed(Minecraft mc) {
-        return org.lwjgl.glfw.GLFW.glfwGetKey(mc.getWindow().handle(), org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_ALT) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
+        return me.collective.util.KeyHelper.isKeyDown(com.mojang.blaze3d.platform.InputConstants.KEY_LALT);
     }
 
     /**
