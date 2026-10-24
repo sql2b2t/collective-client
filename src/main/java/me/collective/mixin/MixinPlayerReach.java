@@ -25,7 +25,7 @@ public abstract class MixinPlayerReach {
         return mod;
     }
 
-    @Inject(method = "getBlockInteractionRange", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "blockInteractionRange", at = @At("HEAD"), cancellable = true)
     private void reach$blocks(CallbackInfoReturnable<Double> cir) {
         if ((Object) this != Minecraft.getInstance().player) return;
 
@@ -36,7 +36,7 @@ public abstract class MixinPlayerReach {
             : (double) mod.blocksRange.compute());
     }
 
-    @Inject(method = "getEntityInteractionRange", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "entityInteractionRange", at = @At("HEAD"), cancellable = true)
     private void reach$entities(CallbackInfoReturnable<Double> cir) {
         if ((Object) this != Minecraft.getInstance().player) return;
 

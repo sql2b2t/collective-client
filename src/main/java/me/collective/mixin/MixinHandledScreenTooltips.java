@@ -27,7 +27,7 @@ public abstract class MixinHandledScreenTooltips {
     private static final int PADDING = 3;
 
     @Shadow
-    protected Slot focusedSlot;
+    protected Slot hoveredSlot;
 
     @Redirect(
         method = "extractTooltip",
@@ -43,7 +43,7 @@ public abstract class MixinHandledScreenTooltips {
             return;
         }
 
-        ItemStack stack = focusedSlot != null ? focusedSlot.getItem() : ItemStack.EMPTY;
+        ItemStack stack = hoveredSlot != null ? hoveredSlot.getItem() : ItemStack.EMPTY;
 
         List<ClientTooltipComponent> components =
             module.buildComponents(lines, data.orElse(null), stack, mouseX, mouseY);

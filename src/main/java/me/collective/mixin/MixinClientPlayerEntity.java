@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(LocalPlayer.class)
 public abstract class MixinClientPlayerEntity {
 
-    @ModifyExpressionValue(method = "sendMovementPackets", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/LocalPlayer;getYaw()F"))
+    @ModifyExpressionValue(method = "sendPosition", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;getYRot()F"))
     private float collective$modifyGetYaw(float original) {
         RotationUtils rotUtils = RotationUtils.getInstance();
         if (rotUtils.isRotating() || rotUtils.isWireFresh()) {
@@ -24,13 +24,13 @@ public abstract class MixinClientPlayerEntity {
         return original;
     }
 
-    @ModifyExpressionValue(method = "sendMovementPackets", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/LocalPlayer;getPitch()F"))
+    @ModifyExpressionValue(method = "sendPosition", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;getXRot()F"))
     private float collective$modifyGetPitch(float original) {
         RotationUtils rotUtils = RotationUtils.getInstance();
         return !rotUtils.isRotating() && !rotUtils.isWireFresh() ? original : rotUtils.getSentPitch();
     }
 
-    @ModifyExpressionValue(method = "tick", at = @At(value = "FIELD", target = "Lnet/minecraft/client/player/ClientInput;keyPresses:Lnet/minecraft/world/entity/player/Input;"))
+    @ModifyExpressionValue(method = "sendChanges", at = @At(value = "FIELD", target = "Lnet/minecraft/client/player/ClientInput;keyPresses:Lnet/minecraft/world/entity/player/Input;"))
     private Input collective$modifyDeclaredInput(Input original) {
         if (me.collective.module.render.Freecam.INSTANCE != null && me.collective.module.render.Freecam.INSTANCE.isToggled()) {
             // Пока баритон ведёт игрока (PlayerMovementInput), его принудительные
@@ -60,14 +60,14 @@ public abstract class MixinClientPlayerEntity {
         return in;
     }
 
-    @Inject(method = "shouldStopSprinting", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "shouldStopRunSprinting", at = @At("HEAD"), cancellable = true)
     private void collective$onShouldStopSprinting(CallbackInfoReturnable<Boolean> cir) {
         if (RotationUtils.getInstance().isSprintBlocked()) {
             cir.setReturnValue(true);
         }
     }
 
-    @ModifyExpressionValue(method = "tickMovementInput", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/input/Input;getMovementInput()Lnet/minecraft/util/math/Vec2;"))
+    @ModifyExpressionValue(method = "applyInput", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/ClientInput;getMoveVector()Lnet/minecraft/world/phys/Vec2;"))
     private net.minecraft.world.phys.Vec2 collective$modifyMovementInput(net.minecraft.world.phys.Vec2 original) {
         RotationUtils rotUtils = RotationUtils.getInstance();
         if (rotUtils.isRotating() && !rotUtils.isSyncMovement()) {

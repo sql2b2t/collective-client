@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 @Mixin(Entity.class)
 public abstract class MixinEntity {
 
-    @ModifyExpressionValue(method = "updateVelocity", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/Entity;getYaw()F"))
+    @ModifyExpressionValue(method = "moveRelative", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;getYRot()F"))
     private float collective$modifyUpdateVelocityYaw(float original) {
         if ((Object) this == Minecraft.getInstance().player) {
             RotationUtils rotUtils = RotationUtils.getInstance();
@@ -23,7 +23,7 @@ public abstract class MixinEntity {
         return original;
     }
 
-    @ModifyVariable(method = "updateVelocity", at = @At("HEAD"), argsOnly = true, ordinal = 0)
+    @ModifyVariable(method = "moveRelative", at = @At("HEAD"), argsOnly = true, ordinal = 0)
     private float collective$modifyUpdateVelocitySpeed(float speed) {
         if ((Object) this == Minecraft.getInstance().player) {
             RotationUtils rotUtils = RotationUtils.getInstance();

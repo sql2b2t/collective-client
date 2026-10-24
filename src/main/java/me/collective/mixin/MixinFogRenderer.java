@@ -12,7 +12,7 @@ import java.nio.ByteBuffer;
 
 @Mixin(FogRenderer.class)
 public class MixinFogRenderer {
-    @Inject(method = "applyFog(Ljava/nio/ByteBuffer;ILorg/joml/Vector4f;FFFFFF)V", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "updateBuffer(Ljava/nio/ByteBuffer;ILorg/joml/Vector4f;FFFFFF)V", at = @At("HEAD"), cancellable = true)
     private void collective$onApplyFog(ByteBuffer buffer, int offset, Vector4f color, float envStart, float envEnd, float rdStart, float rdEnd, float skyEnd, float cloudEnd, CallbackInfo ci) {
         Ambience ambience = Ambience.INSTANCE;
         if (ambience != null && ambience.isToggled()) {

@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Level.class)
 public class MixinWorld {
-    @Inject(method = "getTimeOfDay", at = @At("RETURN"), cancellable = true)
+    @Inject(method = {"getDefaultClockTime", "getOverworldClockTime"}, at = @At("RETURN"), cancellable = true)
     private void collective$onGetTimeOfDay(CallbackInfoReturnable<Long> cir) {
         if (!((Level) (Object) this).isClientSide()) return;
 
@@ -22,7 +22,7 @@ public class MixinWorld {
         }
     }
 
-    @Inject(method = "getRainGradient", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "getRainLevel", at = @At("HEAD"), cancellable = true)
     private void collective$onGetRainGradient(float delta, CallbackInfoReturnable<Float> cir) {
         if (!((Level) (Object) this).isClientSide()) return;
 
@@ -35,7 +35,7 @@ public class MixinWorld {
         }
     }
 
-    @Inject(method = "getThunderGradient", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "getThunderLevel", at = @At("HEAD"), cancellable = true)
     private void collective$onGetThunderGradient(float delta, CallbackInfoReturnable<Float> cir) {
         if (!((Level) (Object) this).isClientSide()) return;
 

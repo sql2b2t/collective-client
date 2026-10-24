@@ -25,7 +25,7 @@ public class MixinChatScreenHudDrag {
         }
     }
 
-    @Inject(method = "close", at = @At("HEAD"))
+    @Inject(method = "onClose", at = @At("HEAD"))
     private void collective$chatHudDragClose(CallbackInfo ci) {
         ChatHudDrag.endDrag();
     }

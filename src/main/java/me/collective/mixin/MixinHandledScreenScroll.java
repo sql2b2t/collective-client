@@ -21,16 +21,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class MixinHandledScreenScroll {
 
     @Shadow
-    protected int x;
+    protected int leftPos;
 
     @Shadow
-    protected int y;
+    protected int topPos;
 
     private Slot getSlotUnderMouse(AbstractContainerScreen<?> screen, double mouseX, double mouseY) {
         if (screen == null || screen.getMenu() == null) return null;
         for (Slot slot : screen.getMenu().slots) {
-            double slotX = this.x + slot.x;
-            double slotY = this.y + slot.y;
+            double slotX = this.leftPos + slot.x;
+            double slotY = this.topPos + slot.y;
             if (mouseX >= slotX && mouseX < slotX + 16.0 && mouseY >= slotY && mouseY < slotY + 16.0) {
                 return slot;
             }

@@ -6,7 +6,6 @@ import me.collective.util.RotationUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Avatar;
 import net.minecraft.world.entity.player.Player;
@@ -17,7 +16,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(AvatarRenderer.class)
 public abstract class MixinPlayerEntityRenderer {
@@ -59,9 +57,9 @@ public abstract class MixinPlayerEntityRenderer {
     }
 
     // HideVanillaLabel: при включённом NameTags ванильный неймтег не рисуется
-    @Inject(method = "getNameTag", at = @At("HEAD"), cancellable = true)
-    private void collective$hideVanillaLabel(CallbackInfoReturnable<Component> cir) {
+    @Inject(method = "submitNameDisplay(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V", at = @At("HEAD"), cancellable = true)
+    private void collective$hideVanillaLabel(CallbackInfo ci) {
         NameTags nametags = NameTags.INSTANCE;
-        if (nametags != null && nametags.isToggled()) cir.setReturnValue(null);
+        if (nametags != null && nametags.isToggled()) ci.cancel();
     }
 }

@@ -29,7 +29,7 @@ public abstract class MixinEntityHitbox {
     public abstract EntityDimensions getDimensions(Pose pose);
 
     @Shadow
-    public abstract Vec3 getEntityPos();
+    public abstract Vec3 position();
 
     /** Модуль кэшируется один раз: getBoundingBox вызывается тысячи раз за кадр. */
     private HitBox collective$module;
@@ -52,7 +52,7 @@ public abstract class MixinEntityHitbox {
         float y = mod.yExpand.compute();
         if (xz <= 0 && y <= 0) return;
 
-        AABB base = getDimensions(getPose()).makeBoundingBox(getEntityPos());
+        AABB base = getDimensions(getPose()).makeBoundingBox(position());
         cir.setReturnValue(base.inflate(xz, y, xz));
     }
 }

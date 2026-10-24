@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(AvatarRenderer.class)
 public abstract class MixinEmoteBody {
-    @Inject(method = "setupTransforms(Lnet/minecraft/client/render/entity/state/AvatarRenderState;Lnet/minecraft/client/util/math/PoseStack;FF)V", at = @At("TAIL"))
+    @Inject(method = "setupRotations", at = @At("TAIL"))
     private void collective$emoteBodyTransform(AvatarRenderState state, PoseStack matrices, float f, float tickDelta, CallbackInfo ci) {
         EmoteEngine.applyBodyTransform(state, matrices);
     }

@@ -8,6 +8,6 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 /** Доступ к табличке экрана редактирования (для AutoSign). */
 @Mixin(AbstractSignEditScreen.class)
 public interface AbstractSignEditScreenAccessor {
-    @Accessor("blockEntity")
-    SignBlockEntity collective$getBlockEntity();
+    @Accessor("sign")
+    SignBlockEntity collective$getSign();
 }

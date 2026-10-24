@@ -29,8 +29,8 @@ public abstract class MixinDrawContextDominant {
     private Tooltips collective$module;
 
     @Inject(
-        method = "drawStackOverlay(Lnet/minecraft/client/font/Font;"
-            + "Lnet/minecraft/item/ItemStack;IILjava/lang/String;)V",
+        method = "itemDecorations(Lnet/minecraft/client/gui/Font;"
+            + "Lnet/minecraft/world/item/ItemStack;IILjava/lang/String;)V",
         at = @At("HEAD"))
     private void collective$majorityItem(Font font, ItemStack stack, int x, int y,
                                    String countLabel, CallbackInfo ci) {

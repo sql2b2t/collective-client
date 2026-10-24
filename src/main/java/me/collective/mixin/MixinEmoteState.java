@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(AvatarRenderer.class)
 public abstract class MixinEmoteState {
-    @Inject(method = "updateRenderState(Lnet/minecraft/entity/Avatar;Lnet/minecraft/client/render/entity/state/AvatarRenderState;F)V", at = @At("TAIL"))
+    @Inject(method = "extractRenderState(Lnet/minecraft/world/entity/Avatar;Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;F)V", at = @At("TAIL"))
     private void collective$mapEmoteState(Avatar entity, AvatarRenderState state, float tickDelta, CallbackInfo ci) {
         if (entity == null) return;
         // Мапим ВСЕХ: локальный игрок нужен для своих эмоутов, чужие — для

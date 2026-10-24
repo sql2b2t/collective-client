@@ -1,5 +1,6 @@
 package me.collective.mixin;
 
+import me.collective.font.ChatFontUtil;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.util.FormattedCharSequence;
 import org.spongepowered.asm.mixin.Final;
@@ -10,25 +11,21 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Тот же кастомный шрифт для второго бэкенда чата.
- *
- * <p>Когда чат открыт (фокус/наведение для кликабельных ссылок), строки
- * рисует {@code ChatHud$Interactable}, а не {@code ChatHud$Hud} — без этого
- * хука шрифт слетал на ванильный при открытии чата.
+ * Тот же кастомный шрифт для второго бэкенда чата (открытый чат).
  */
-@Mixin(targets = "net.minecraft.client.gui.hud.ChatHud$Interactable")
+@Mixin(targets = "net.minecraft.client.gui.components.ChatComponent$DrawingFocusedGraphicsAccess")
 public abstract class MixinChatHudInteractable {
 
     @Shadow
     @Final
-    private GuiGraphicsExtractor context;
+    private GuiGraphicsExtractor graphics;
 
     @Inject(
-        method = "text(IFLnet/minecraft/text/FormattedCharSequence;)Z",
+        method = "handleMessage(IFLnet/minecraft/util/FormattedCharSequence;)Z",
         at = @At("HEAD"),
         cancellable = true
     )
     private void drawCustomChatFont(int y, float opacity, FormattedCharSequence text, CallbackInfoReturnable<Boolean> cir) {
-        if (me.collective.font.ChatFontUtil.drawCustomChat(context, y, opacity, text)) cir.setReturnValue(true);
+        if (ChatFontUtil.drawCustomChat(graphics, y, opacity, text)) cir.setReturnValue(true);
     }
 }

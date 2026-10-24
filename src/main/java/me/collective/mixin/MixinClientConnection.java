@@ -30,12 +30,12 @@ import java.net.InetSocketAddress;
  * <p>Перехватывает финальный connect: вместо сервера цепляемся к прокси,
  * а целевой адрес отдаём в рукопожатии (без локального DNS-резолва).
  */
-@Mixin(targets = "net.minecraft.network.ClientConnection")
+@Mixin(net.minecraft.network.Connection.class)
 public abstract class MixinClientConnection {
 
     private static final String CONNECT_METHOD = "connect(Ljava/net/InetSocketAddress;"
-        + "Lnet/minecraft/network/NetworkingBackend;"
-        + "Lnet/minecraft/network/ClientConnection;)Lio/netty/channel/ChannelFuture;";
+        + "Lnet/minecraft/server/network/EventLoopGroupHolder;"
+        + "Lnet/minecraft/network/Connection;)Lio/netty/channel/ChannelFuture;";
 
     /** Ванильный хендлер пайплайна — читаем рефлексией, второго инжекта не надо. */
     @Unique
@@ -89,7 +89,7 @@ public abstract class MixinClientConnection {
     }
 
     /** Исходящие пакеты в шину (HEAD, отмена глушит отправку). */
-    @Inject(method = "send(Lnet/minecraft/network/packet/Packet;)V", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "send(Lnet/minecraft/network/protocol/Packet;)V", at = @At("HEAD"), cancellable = true)
     private void collective$onSend(Packet<?> packet, CallbackInfo ci) {
         PacketEvent.Send event = new PacketEvent.Send(packet);
         EventBus.INSTANCE.post(event);
@@ -98,7 +98,7 @@ public abstract class MixinClientConnection {
 
     /** Входящие пакеты в шину (HEAD, отмена глушит обработку). */
     @Inject(
-        method = "channelRead0(Lio/netty/channel/ChannelHandlerContext;Lnet/minecraft/network/packet/Packet;)V",
+        method = "channelRead0(Lio/netty/channel/ChannelHandlerContext;Lnet/minecraft/network/protocol/Packet;)V",
         at = @At("HEAD"), cancellable = true
     )
     private void collective$onReceive(ChannelHandlerContext context, Packet<?> packet, CallbackInfo ci) {

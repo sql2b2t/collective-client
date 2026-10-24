@@ -13,10 +13,9 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 @Mixin(PlayerTabOverlay.class)
 public abstract class MixinPlayerListHud {
 
-    @Redirect(method = {"render", "renderScoreboardObjective", "renderHearts"},
+    @Redirect(method = {"extractRenderState", "extractTablistScore"},
         at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;drawTextWithShadow"
-                + "(Lnet/minecraft/client/font/Font;Lnet/minecraft/text/Component;III)V"))
+            target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;text(Lnet/minecraft/client/gui/Font;Lnet/minecraft/network/chat/Component;III)V"))
     private void drawCustomTabText(GuiGraphicsExtractor context, Font renderer,
                                    Component text, int x, int y, int color) {
         if (FontScopes.tab()) {

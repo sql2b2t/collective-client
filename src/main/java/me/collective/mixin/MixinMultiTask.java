@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 /**
  * Часть порта MultiTask из Meteor Client.
  *
- * <p>{@code Minecraft.handleBlockBreaking} не даёт копать во время
+ * <p>{@code Minecraft.continueAttack} не даёт копать во время
  * использования предмета (еды). Подменяем проверку — можно есть и копать
  * одновременно.
  */
@@ -19,9 +19,9 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 public abstract class MixinMultiTask {
 
     @Redirect(
-        method = "handleBlockBreaking",
+        method = "continueAttack",
         at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/network/LocalPlayer;isUsingItem()Z")
+            target = "Lnet/minecraft/client/player/LocalPlayer;isUsingItem()Z")
     )
     private boolean allowBreakingWhileUsing(LocalPlayer player) {
         MultiTask mod = ModuleManager.INSTANCE.getModule(MultiTask.class);

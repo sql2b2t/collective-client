@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ChatScreen.class)
 public class MixinChatScreen {
 
-    @org.spongepowered.asm.mixin.injection.ModifyVariable(method = "sendMessage(Ljava/lang/String;Z)V", at = @At("HEAD"), argsOnly = true, ordinal = 0)
+    @org.spongepowered.asm.mixin.injection.ModifyVariable(method = "handleChatInput(Ljava/lang/String;Z)V", at = @At("HEAD"), argsOnly = true, ordinal = 0)
     private String modifyChatMessage(String chatText) {
         if (chatText == null) return null;
         if (chatText.startsWith(CommandManager.INSTANCE.getPrefix())) {
@@ -28,7 +28,7 @@ public class MixinChatScreen {
         return event.message != null ? event.message : chatText;
     }
 
-    @Inject(method = "sendMessage(Ljava/lang/String;Z)V", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "handleChatInput(Ljava/lang/String;Z)V", at = @At("HEAD"), cancellable = true)
     private void onSendMessage(String chatText, boolean addToHistory, CallbackInfo ci) {
         if (chatText != null && chatText.startsWith(CommandManager.INSTANCE.getPrefix())) {
             boolean handled = CommandManager.INSTANCE.execute(chatText);

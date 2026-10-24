@@ -11,21 +11,21 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Замена шрифта чата на шрифт модуля Fonts (закрытый чат, бэкенд Hud).
+ * Замена шрифта чата на шрифт модуля Fonts (закрытый чат, бэкенд DrawingBackgroundGraphicsAccess).
  */
-@Mixin(targets = "net.minecraft.client.gui.hud.ChatHud$Hud")
+@Mixin(targets = "net.minecraft.client.gui.components.ChatComponent$DrawingBackgroundGraphicsAccess")
 public abstract class MixinChatHud {
 
     @Shadow
     @Final
-    private GuiGraphicsExtractor context;
+    private GuiGraphicsExtractor graphics;
 
     @Inject(
-        method = "text(IFLnet/minecraft/text/FormattedCharSequence;)Z",
+        method = "handleMessage(IFLnet/minecraft/util/FormattedCharSequence;)Z",
         at = @At("HEAD"),
         cancellable = true
     )
     private void drawCustomChatFont(int y, float opacity, FormattedCharSequence text, CallbackInfoReturnable<Boolean> cir) {
-        if (ChatFontUtil.drawCustomChat(context, y, opacity, text)) cir.setReturnValue(true);
+        if (ChatFontUtil.drawCustomChat(graphics, y, opacity, text)) cir.setReturnValue(true);
     }
 }

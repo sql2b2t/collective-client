@@ -18,9 +18,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityMixin {
     @Shadow
-    private int jumpingCooldown;
+    private int noJumpDelay;
 
-    @Inject(at = @At("HEAD"), method = "tickMovement")
+    @Inject(at = @At("HEAD"), method = "aiStep")
     private void collective$tickMovement(CallbackInfo ci) {
         LivingEntity self = (LivingEntity) (Object) this;
         Minecraft mc = Minecraft.getInstance();
@@ -28,12 +28,12 @@ public abstract class LivingEntityMixin {
             ElytraBounce efly = ElytraBounce.INSTANCE;
             NoJumpDelay njd = NoJumpDelay.INSTANCE;
             if ((efly != null && efly.enabled()) || (njd != null && njd.isToggled())) {
-                this.jumpingCooldown = 0;
+                this.noJumpDelay = 0;
             }
         }
     }
 
-    @WrapOperation(method = "calcGlidingVelocity", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;getPitch()F"))
+    @WrapOperation(method = "updateFallFlyingMovement", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;getXRot()F"))
     private float collective$wrapGlidingPitch(LivingEntity entity, Operation<Float> original) {
         Float pitch = RotationUtils.getInstance().getMovementPitch();
         Minecraft mc = Minecraft.getInstance();
@@ -43,7 +43,7 @@ public abstract class LivingEntityMixin {
         return pitch;
     }
 
-    @WrapOperation(method = "travelGliding", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;calcGlidingVelocity(Lnet/minecraft/util/math/Vec3;)Lnet/minecraft/util/math/Vec3;"))
+    @WrapOperation(method = "travelFallFlying", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;updateFallFlyingMovement(Lnet/minecraft/world/phys/Vec3;)Lnet/minecraft/world/phys/Vec3;"))
     private Vec3 collective$rocketBoost(LivingEntity entity, Vec3 oldVelocity, Operation<Vec3> original) {
         RocketBoost boost = RocketBoost.INSTANCE;
         Minecraft mc = Minecraft.getInstance();
@@ -55,7 +55,7 @@ public abstract class LivingEntityMixin {
         return boosted != null ? boosted : vanilla;
     }
 
-    @WrapOperation(method = "jump", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;getYaw()F"))
+    @WrapOperation(method = "jumpFromGround", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;getYRot()F"))
     private float collective$wrapSprintJumpYaw(LivingEntity entity, Operation<Float> original) {
         RotationUtils rm = RotationUtils.getInstance();
         Minecraft mc = Minecraft.getInstance();

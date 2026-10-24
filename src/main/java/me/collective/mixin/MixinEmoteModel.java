@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(HumanoidModel.class)
 public abstract class MixinEmoteModel {
 
-    @Inject(method = "setAngles(Lnet/minecraft/client/render/entity/state/HumanoidRenderState;)V", at = @At("TAIL"))
+    @Inject(method = "setupAnim", at = @At("TAIL"))
     private void collective$applyEmotePose(HumanoidRenderState state, CallbackInfo ci) {
         EmoteEngine.applyToModel((HumanoidModel) (Object) this, state);
     }

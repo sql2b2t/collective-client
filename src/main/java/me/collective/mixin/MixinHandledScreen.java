@@ -13,10 +13,9 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 @Mixin(AbstractContainerScreen.class)
 public abstract class MixinHandledScreen {
 
-    @Redirect(method = "drawForeground",
+    @Redirect(method = "extractLabels",
         at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;drawText"
-                + "(Lnet/minecraft/client/font/Font;Lnet/minecraft/text/Component;IIIZ)V"))
+            target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;text(Lnet/minecraft/client/gui/Font;Lnet/minecraft/network/chat/Component;IIIZ)V"))
     private void drawCustomScreenTitle(GuiGraphicsExtractor context, Font renderer,
                                        Component text, int x, int y, int color, boolean shadow) {
         if (FontScopes.inventory()) {
