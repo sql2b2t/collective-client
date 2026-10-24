@@ -63,10 +63,33 @@ public class BindCommand extends Command {
 
         try {
             int code = -1;
-            try {
-                InputUtil.Key key = InputUtil.fromTranslationKey("key.keyboard." + keyStr.toLowerCase());
-                code = key.getCode();
-            } catch (Exception ignored) {}
+            String clean = keyStr.toLowerCase().replace("_", "").replace("-", "");
+            if (clean.equals("rshift") || clean.equals("rightshift")) {
+                code = GLFW.GLFW_KEY_RIGHT_SHIFT;
+            } else if (clean.equals("lshift") || clean.equals("leftshift") || clean.equals("shift")) {
+                code = GLFW.GLFW_KEY_LEFT_SHIFT;
+            } else if (clean.equals("rctrl") || clean.equals("rightctrl") || clean.equals("rightcontrol")) {
+                code = GLFW.GLFW_KEY_RIGHT_CONTROL;
+            } else if (clean.equals("lctrl") || clean.equals("leftctrl") || clean.equals("leftcontrol") || clean.equals("ctrl")) {
+                code = GLFW.GLFW_KEY_LEFT_CONTROL;
+            } else if (clean.equals("ralt") || clean.equals("rightalt")) {
+                code = GLFW.GLFW_KEY_RIGHT_ALT;
+            } else if (clean.equals("lalt") || clean.equals("leftalt") || clean.equals("alt")) {
+                code = GLFW.GLFW_KEY_LEFT_ALT;
+            } else if (clean.equals("esc") || clean.equals("escape")) {
+                code = GLFW.GLFW_KEY_ESCAPE;
+            } else if (clean.equals("space") || clean.equals("spacebar")) {
+                code = GLFW.GLFW_KEY_SPACE;
+            } else if (clean.equals("tab")) {
+                code = GLFW.GLFW_KEY_TAB;
+            }
+
+            if (code == -1) {
+                try {
+                    InputUtil.Key key = InputUtil.fromTranslationKey("key.keyboard." + keyStr.toLowerCase());
+                    code = key.getCode();
+                } catch (Exception ignored) {}
+            }
 
             if (code == -1) {
                 code = GLFW.class.getField("GLFW_KEY_" + keyStr.toUpperCase()).getInt(null);
@@ -76,7 +99,7 @@ public class BindCommand extends Command {
             ChatHelper.sendMessage(Text.literal("Bind for ").styled(s -> s.withColor(Formatting.GRAY))
                 .append(Text.literal(mod.getName()).styled(s -> s.withColor(ChatHelper.getPrimaryTextColor())))
                 .append(Text.literal(" has been set to ").styled(s -> s.withColor(Formatting.GRAY)))
-                .append(Text.literal(keyStr.toUpperCase()).styled(s -> s.withColor(Formatting.GREEN))));
+                .append(Text.literal(mod.getKeybind().getKeyName().toUpperCase()).styled(s -> s.withColor(Formatting.GREEN))));
         } catch (Exception e) {
             ChatHelper.sendMessage(Text.literal("Invalid key: " + keyStr).styled(s -> s.withColor(Formatting.RED)));
         }

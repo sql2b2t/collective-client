@@ -6,7 +6,7 @@ import net.minecraft.util.math.BlockPos;
 
 public class AxisBorer extends BorerModule {
     public AxisBorer() {
-        super("AxisBorer", "Digs axis highways and ring roads.", 4, 4, 0, 0);
+        super("AxisBorer", "Автоматически копает осевые хайвеи и кольцевые дороги.", 4, 4, 0, 0);
     }
 
     @Override

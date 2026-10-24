@@ -67,7 +67,7 @@ public class RocketBoost extends Module {
     private boolean syncedToBaritone = false;
 
     public RocketBoost() {
-        super("RocketBoost", "Boosts Elytra glide speed up to the maximum GrimAC fireworks limits.", Category.MOVEMENT);
+        super("RocketBoost", "Увеличивает скорость планирования на элитрах до максимальных лимитов фейерверков GrimAC.", Category.MOVEMENT);
         INSTANCE = this;
     }
 

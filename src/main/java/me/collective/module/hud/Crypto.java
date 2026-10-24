@@ -8,7 +8,7 @@ import java.awt.Color;
 
 public class Crypto extends HudModule {
     public Crypto() {
-        super("Crypto", "Displays crypto exchange prices.", 4, 380);
+        super("Crypto", "Отображает актуальные биржевые курсы криптовалют на экране.", 4, 380);
     }
 
     @Override

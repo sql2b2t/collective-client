@@ -4,24 +4,35 @@ import me.collective.category.Category;
 import me.collective.event.EventHandler;
 import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
+import me.collective.setting.BooleanSetting;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
-import me.collective.util.HighwayUtils;
+import me.collective.util.GrimUtils;
 import me.collective.util.PacketUtil;
+import me.collective.util.RotationUtils;
+import net.minecraft.block.BlockState;
+import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
+import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
+import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.IntStream;
 
-import static me.collective.util.HighwayUtils.backward;
 import static me.collective.util.HighwayUtils.forward;
 import static me.collective.util.HighwayUtils.left;
 import static me.collective.util.HighwayUtils.right;
 
 /**
- * Порт BorerModule: пакетный майнер тоннелей (START+STOP пакеты).
- * Конкретные направления — в наследниках.
+ * Базовый модуль автоматического бурения хайвеев и тоннелей.
+ * Поддерживает безопасный обход проверок GrimAC (дистанция, углы обзора, последовательности тиков).
  */
 public abstract class BorerModule extends Module {
     public enum Shape {
@@ -30,6 +41,9 @@ public abstract class BorerModule extends Module {
     }
 
     public final EnumSetting<Shape> mode = add(new EnumSetting<>("Shape", Shape.HIGHWAY));
+    public final BooleanSetting grimBypass = add(new BooleanSetting("GrimBypass", true));
+    public final BooleanSetting rotate = add(new BooleanSetting("Rotate", true));
+    public final NumberSetting maxPerTick = add(new NumberSetting("MaxPerTick", 1, 1, 3, 1));
 
     public final NumberSetting extForward;
     public final NumberSetting extBackward;
@@ -42,6 +56,10 @@ public abstract class BorerModule extends Module {
     protected long lastUpdateTime = 0;
     protected BlockPos playerPos = BlockPos.ORIGIN;
 
+    private final Set<BlockPos> pendingBlocks = new LinkedHashSet<>();
+    private BlockPos currentMiningPos = null;
+    private float currentMiningDamage = 0.0f;
+
     protected BorerModule(String name, String description, int extForwards, int extBackwards, int xOff, int zOff) {
         super(name, description, Category.HIGHWAY);
 
@@ -51,8 +69,24 @@ public abstract class BorerModule extends Module {
         this.zOffset = add(new NumberSetting("ZOffset", zOff, -2, 2, 1));
     }
 
+    @Override
+    public void onDisable() {
+        pendingBlocks.clear();
+        currentMiningPos = null;
+        currentMiningDamage = 0.0f;
+    }
+
     @EventHandler
     public abstract void onTick(TickEvent.Pre event);
+
+    @EventHandler
+    public void onPostTick(TickEvent.Post event) {
+        if (mc.player == null || mc.world == null || !isToggled()) return;
+
+        if (grimBypass.getValue()) {
+            processGrimQueue();
+        }
+    }
 
     protected void do2x3(BlockPos playerPos) {
         IntStream.rangeClosed(-extBackward.getIntValue(), extForward.getIntValue()).forEach(i -> {
@@ -99,18 +133,146 @@ public abstract class BorerModule extends Module {
 
     protected void breakBlock(BlockPos blockPos) {
         if (mc.player == null || mc.world == null) return;
+        if (mc.world.getBlockState(blockPos).isReplaceable()) return;
 
-        if (packets >= 130 || mc.world.getBlockState(blockPos).isReplaceable()) {
+        if (grimBypass.getValue()) {
+            pendingBlocks.add(blockPos.toImmutable());
             return;
         }
 
+        if (packets >= 130) return;
+
+        Direction dir = getInteractDirection(blockPos);
         PacketUtil.sendSilently(new PlayerActionC2SPacket(
-            PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, blockPos, Direction.UP));
+            PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, blockPos, dir));
         PacketUtil.sendSilently(new PlayerActionC2SPacket(
-            PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK, blockPos, Direction.UP));
+            PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK, blockPos, dir));
         packets += 2;
 
         mc.player.getInventory().updateItems();
+    }
+
+    private void processGrimQueue() {
+        if (mc.player == null || mc.world == null || mc.interactionManager == null) return;
+
+        // Если сейчас копается прочный блок (базальт, руда и т.д.)
+        if (currentMiningPos != null) {
+            BlockState state = mc.world.getBlockState(currentMiningPos);
+            double distSq = GrimUtils.closestEyeDistanceSqTo(mc.player, currentMiningPos);
+            if (state.isReplaceable() || distSq > 18.0) {
+                currentMiningPos = null;
+                currentMiningDamage = 0.0f;
+            } else {
+                if (rotate.getValue()) {
+                    rotateTo(currentMiningPos);
+                }
+                currentMiningDamage += state.calcBlockBreakingDelta(mc.player, mc.world, currentMiningPos);
+                if (mc.getNetworkHandler() != null) {
+                    mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+                }
+
+                if (currentMiningDamage >= 1.0f) {
+                    Direction dir = getInteractDirection(currentMiningPos);
+                    int seq = GrimUtils.nextSequence();
+                    if (mc.getNetworkHandler() != null) {
+                        mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
+                            PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK, currentMiningPos, dir, seq));
+                    }
+                    mc.interactionManager.breakBlock(currentMiningPos);
+                    pendingBlocks.remove(currentMiningPos);
+                    currentMiningPos = null;
+                    currentMiningDamage = 0.0f;
+                }
+                return;
+            }
+        }
+
+        if (pendingBlocks.isEmpty()) return;
+
+        // Удаляем из очереди воздух и блоки за пределами досягаемости
+        pendingBlocks.removeIf(bp -> mc.world.getBlockState(bp).isReplaceable()
+            || GrimUtils.closestEyeDistanceSqTo(mc.player, bp) > 18.0);
+
+        if (pendingBlocks.isEmpty()) return;
+
+        List<BlockPos> sorted = new ArrayList<>(pendingBlocks);
+        sorted.sort(Comparator.comparingDouble(bp -> GrimUtils.closestEyeDistanceSqTo(mc.player, bp)));
+
+        int budget = maxPerTick.getIntValue();
+        int done = 0;
+
+        for (BlockPos bp : sorted) {
+            if (done >= budget) break;
+
+            BlockState state = mc.world.getBlockState(bp);
+            if (state.isReplaceable()) {
+                pendingBlocks.remove(bp);
+                continue;
+            }
+
+            float delta = state.calcBlockBreakingDelta(mc.player, mc.world, bp);
+            if (rotate.getValue()) {
+                rotateTo(bp);
+            }
+
+            Direction dir = getInteractDirection(bp);
+            int seq = GrimUtils.nextSequence();
+
+            if (delta >= 1.0f) {
+                // Мгновенный майнинг (незерак при хорошей кирке)
+                if (mc.getNetworkHandler() != null) {
+                    mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
+                        PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, bp, dir, seq));
+                    mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+                    mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
+                        PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK, bp, dir, seq));
+                }
+                mc.interactionManager.breakBlock(bp);
+                pendingBlocks.remove(bp);
+                done++;
+            } else {
+                // Блок требует нескольких тиков копания
+                currentMiningPos = bp;
+                currentMiningDamage = delta;
+                if (mc.getNetworkHandler() != null) {
+                    mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
+                        PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, bp, dir, seq));
+                    mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+                }
+                break;
+            }
+        }
+    }
+
+    protected Direction getInteractDirection(BlockPos pos) {
+        if (mc.player == null) return Direction.UP;
+        Vec3d eyePos = mc.player.getEyePos();
+        Vec3d posVec = Vec3d.ofCenter(pos);
+        Direction bestDir = Direction.UP;
+        double bestDot = -Double.MAX_VALUE;
+
+        for (Direction dir : Direction.values()) {
+            Vec3d dirVec = Vec3d.of(dir.getVector());
+            double dot = eyePos.subtract(posVec).normalize().dotProduct(dirVec);
+            if (dot > bestDot) {
+                bestDot = dot;
+                bestDir = dir;
+            }
+        }
+        return bestDir;
+    }
+
+    protected void rotateTo(BlockPos bp) {
+        if (mc.player == null) return;
+        Vec3d eye = mc.player.getEyePos();
+        Vec3d target = Vec3d.ofCenter(bp);
+        double dx = target.x - eye.x;
+        double dy = target.y - eye.y;
+        double dz = target.z - eye.z;
+        double distXZ = Math.sqrt(dx * dx + dz * dz);
+        float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+        float pitch = (float) -Math.toDegrees(Math.atan2(dy, distXZ));
+        RotationUtils.getInstance().setRotationSilentInstant(this, 50, yaw, pitch);
     }
 
     protected BlockPos flooredPlayerPos() {

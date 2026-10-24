@@ -6,6 +6,7 @@ import net.minecraft.entity.EntityPose;
 import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.PlayerInput;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 
@@ -48,6 +49,10 @@ public final class GrimUtils {
         }
 
         return new double[]{standing, sneaking, swimming};
+    }
+
+    public static double closestEyeDistanceSqTo(PlayerEntity player, BlockPos pos) {
+        return closestEyeDistanceSqTo(player, Vec3d.ofCenter(pos));
     }
 
     public static double closestEyeDistanceSqTo(PlayerEntity player, Vec3d target) {

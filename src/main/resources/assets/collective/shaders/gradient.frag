@@ -53,7 +53,7 @@ void main() {
     vec4 overlay = texture(u_Overlay, v_TexCoord * vec2(1.0, -1.0));
 
     if (center.a != 0.0) {
-        if (u_ShapeMode == 0 || overlay.a == 0.0) discard;
+        if (u_ShapeMode == 0 || (u_Image && overlay.a == 0.0)) discard;
         vec4 fill = gradient(u_FillColor, u_FillColor2, u_Step * 300., u_Time);
         if (decorator(fill)) {
             center = vec4(fill.rgb, u_DotsAlpha);
@@ -99,9 +99,9 @@ void main() {
 
         float minDist = u_Width * u_Width;
 
-        if (dist > minDist)
-            center.a = 0.0;
-        else {
+        if (dist > minDist) {
+            discard;
+        } else {
             vec4 outline = gradient(u_OutlineColor, u_OutlineColor2, u_Step * 300., u_Time);
             center.rgb = outline.rgb;
             center.a = min((1.0 - (dist / minDist)) * u_GlowMultiplier, 1.0) * outline.a;
@@ -110,5 +110,6 @@ void main() {
         }
     }
 
+    if (center.a == 0.0) discard;
     color = center;
 }

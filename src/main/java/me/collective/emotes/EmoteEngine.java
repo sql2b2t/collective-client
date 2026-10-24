@@ -89,7 +89,7 @@ public final class EmoteEngine {
         if (state != null && uuid != null) STATE_UUID.put(state, uuid);
     }
 
-    private static boolean isLocal(Object state) {
+    public static boolean isLocal(Object state) {
         if (mc.player == null) return false;
         UUID uuid = STATE_UUID.get(state);
         return uuid != null && uuid.equals(mc.player.getUuid());

@@ -14,7 +14,7 @@ public class TextRadar extends HudModule {
     public final NumberSetting range = add(new NumberSetting("Range", 50, 10, 150, 5));
 
     public TextRadar() {
-        super("TextRadar", "Displays nearby players and their distance.", 4, 180);
+        super("TextRadar", "Отображает текстовый список ближайших игроков и расстояние до них.", 4, 180);
     }
 
     /** Строка радара: текст, ширина и здоровье посчитаны на пересборке (раз в 50 мс). */

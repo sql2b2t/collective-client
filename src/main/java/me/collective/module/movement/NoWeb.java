@@ -36,7 +36,7 @@ public class NoWeb extends Module {
     private boolean sprintBlocked;
 
     public NoWeb() {
-        super("NoWeb", "Removes or customizes slowdown inside cobwebs.", Category.MOVEMENT);
+        super("NoWeb", "Убирает или настраивает замедление при перемещении в паутине.", Category.MOVEMENT);
         INSTANCE = this;
     }
 

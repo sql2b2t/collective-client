@@ -46,8 +46,8 @@ public class HoleFiller extends Module {
         }
 
         FindItemResult mat = fillWith.process("Web")
-            ? InventoryUtil.findInHotbar(Items.COBWEB)
-            : InventoryUtil.findInHotbar(Items.OBSIDIAN, Items.CRYING_OBSIDIAN, Items.NETHERITE_BLOCK);
+            ? InventoryUtil.findInHotbarOrOffhand(Items.COBWEB)
+            : InventoryUtil.findInHotbarOrOffhand(Items.OBSIDIAN, Items.CRYING_OBSIDIAN, Items.NETHERITE_BLOCK);
         if (!mat.found()) return;
 
         BlockPos self = mc.player.getBlockPos();

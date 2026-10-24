@@ -38,7 +38,7 @@ public class AutoReconnect extends Module {
     private static volatile boolean afkMarked;
 
     public AutoReconnect() {
-        super("AutoReconnect", "Reconnects to the last server after a disconnect.", Category.MISC);
+        super("AutoReconnect", "Автоматически переподключается к серверу после разрыва соединения.", Category.MISC);
     }
 
     /** Вызов при выходе по достижении места, чтобы не переподключаться. */
@@ -73,6 +73,15 @@ public class AutoReconnect extends Module {
             ServerInfo current = client.getCurrentServerEntry();
             if (current != null) {
                 lastServer = current;
+            } else if (client.getNetworkHandler() != null && client.getNetworkHandler().getConnection() != null) {
+                var address = client.getNetworkHandler().getConnection().getAddress();
+                if (address != null) {
+                    String str = address.toString();
+                    if (str.startsWith("/")) str = str.substring(1);
+                    if (lastServer == null || !lastServer.address.equals(str)) {
+                        lastServer = new ServerInfo("Direct Server", str, ServerInfo.ServerType.OTHER);
+                    }
+                }
             }
             resetState();
             afkMarked = false;

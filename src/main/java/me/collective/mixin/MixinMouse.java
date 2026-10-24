@@ -17,4 +17,16 @@ public class MixinMouse {
             EventBus.INSTANCE.post(new MouseClickEvent(input.button()));
         }
     }
+
+    @Inject(method = "onMouseScroll", at = @At("HEAD"), cancellable = true)
+    private void onMouseScrollHook(long window, double horizontal, double vertical, CallbackInfo ci) {
+        if (vertical != 0) {
+            me.collective.event.events.MouseScrollEvent event = new me.collective.event.events.MouseScrollEvent(vertical);
+            EventBus.INSTANCE.post(event);
+            if (event.isCancelled()) {
+                ci.cancel();
+            }
+        }
+    }
 }
+

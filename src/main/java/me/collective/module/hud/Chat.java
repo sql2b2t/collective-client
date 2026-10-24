@@ -7,7 +7,7 @@ public class Chat extends HudModule {
     public final BooleanSetting clearBackground = add(new BooleanSetting("ClearBackground", false));
 
     public Chat() {
-        super("Chat", "Customizes chat appearance.", 4, 250);
+        super("Chat", "Кастомизация внешнего вида чата: анимация, прозрачность и шрифт.", 4, 250);
         this.width = 0;
         this.height = 0;
     }

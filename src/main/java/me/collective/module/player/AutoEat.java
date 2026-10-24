@@ -26,13 +26,14 @@ public class AutoEat extends Module {
 
     private boolean eating = false;
     private int prevSlot = -1;
+    private int waitTicks = 0;
 
     public boolean isEating() {
         return isToggled() && eating;
     }
 
     public AutoEat() {
-        super("AutoEat", "Automatically eats food when hunger or health is low.", Category.PLAYER);
+        super("AutoEat", "Автоматически ест еду из хотбара при голоде или потере здоровья.", Category.PLAYER);
     }
 
     @Override
@@ -53,19 +54,55 @@ public class AutoEat extends Module {
         }
 
         if (eating) {
-            if (!mc.player.isUsingItem()) {
+            waitTicks++;
+            if (waitTicks > 3 && !mc.player.isUsingItem()) {
                 stopEating();
             }
             return;
         }
 
-        FindItemResult food = findFood(lowHealth && gapples.getValue());
+        boolean preferGapple = lowHealth && gapples.getValue();
+
+        // 1. Check offhand first
+        if (isFood(mc.player.getOffHandStack(), preferGapple)) {
+            prevSlot = -1;
+            mc.options.useKey.setPressed(true);
+            eating = true;
+            waitTicks = 0;
+            return;
+        }
+
+        // 2. Check hotbar
+        FindItemResult food = findFood(preferGapple);
         if (food.found()) {
             prevSlot = mc.player.getInventory().getSelectedSlot();
             InventoryUtil.swap(food.slot());
             mc.options.useKey.setPressed(true);
             eating = true;
+            waitTicks = 0;
+            return;
         }
+
+        // 3. Check inventory fallback
+        FindItemResult invFood = findFoodInInventory(preferGapple);
+        if (invFood.found() && InventoryUtil.canUsePlayerInventory()) {
+            int currentHotbar = mc.player.getInventory().getSelectedSlot();
+            InventoryUtil.move().from(invFood.slot()).to(currentHotbar);
+            prevSlot = currentHotbar;
+            mc.options.useKey.setPressed(true);
+            eating = true;
+            waitTicks = 0;
+        }
+    }
+
+    private boolean isFood(ItemStack stack, boolean preferGapple) {
+        if (stack.isEmpty()) return false;
+        Item item = stack.getItem();
+        if (BAD_FOOD.contains(item)) return false;
+        if (preferGapple) {
+            return item == Items.ENCHANTED_GOLDEN_APPLE || item == Items.GOLDEN_APPLE;
+        }
+        return stack.contains(DataComponentTypes.FOOD);
     }
 
     private FindItemResult findFood(boolean preferGapple) {
@@ -74,12 +111,16 @@ public class AutoEat extends Module {
             if (gapple.found()) return gapple;
         }
 
-        return InventoryUtil.findInHotbar(stack -> {
-            if (stack.isEmpty()) return false;
-            Item item = stack.getItem();
-            if (BAD_FOOD.contains(item)) return false;
-            return stack.contains(DataComponentTypes.FOOD);
-        });
+        return InventoryUtil.findInHotbar(stack -> isFood(stack, false));
+    }
+
+    private FindItemResult findFoodInInventory(boolean preferGapple) {
+        if (preferGapple) {
+            FindItemResult gapple = InventoryUtil.find(Items.ENCHANTED_GOLDEN_APPLE, Items.GOLDEN_APPLE);
+            if (gapple.found()) return gapple;
+        }
+
+        return InventoryUtil.find(stack -> isFood(stack, false));
     }
 
     private void stopEating() {
@@ -90,6 +131,7 @@ public class AutoEat extends Module {
                 prevSlot = -1;
             }
             eating = false;
+            waitTicks = 0;
         }
     }
 }

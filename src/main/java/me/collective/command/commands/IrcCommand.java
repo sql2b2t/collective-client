@@ -7,7 +7,7 @@ import me.collective.module.client.Irc;
 /** .irc <message> — чат; .irc — статус; .irc nick <ник> — смена ника. */
 public class IrcCommand extends Command {
     public IrcCommand() {
-        super("irc", "Message to the shared IRC channel of Collective users.", ".irc <message>");
+        super("irc", "Message to the shared IRC channel of Collective users.", ".irc <message> | .irc nick <name>");
     }
 
     @Override
@@ -25,6 +25,16 @@ public class IrcCommand extends Command {
 
         if (args[0].equalsIgnoreCase("nick")) {
             handleNickname(irc, args);
+            return;
+        }
+
+        if (args[0].equalsIgnoreCase("server") || args[0].equalsIgnoreCase("host")) {
+            handleServer(irc, args);
+            return;
+        }
+
+        if (args[0].equalsIgnoreCase("token") || args[0].equalsIgnoreCase("key")) {
+            handleToken(irc, args);
             return;
         }
 
@@ -56,5 +66,39 @@ public class IrcCommand extends Command {
         irc.nickname.setValue(normalized);
         sendMessage("Ник IRC теперь: §b" + (normalized.isEmpty() ? "<авто — ник акка>" : normalized)
             + "§f. Смена применится при пересоединении.");
+    }
+
+    private void handleServer(Irc irc, String[] args) {
+        if (args.length < 2) {
+            sendMessage("Сервер IRC: §b" + irc.server + "§7:§b" + irc.port
+                + "§f. Менять: §7.irc server <host/ip> [port]§f.");
+            return;
+        }
+        String host = args[1].trim();
+        int port = irc.port;
+        if (host.contains(":")) {
+            String[] parts = host.split(":", 2);
+            host = parts[0];
+            try {
+                port = Integer.parseInt(parts[1]);
+            } catch (Exception ignored) {}
+        }
+        if (args.length >= 3) {
+            try {
+                port = Integer.parseInt(args[2]);
+            } catch (Exception ignored) {}
+        }
+        irc.setServer(host, port);
+        sendMessage("Сервер IRC изменён на §b" + irc.server + "§7:§b" + irc.port
+            + "§f. Переподключение...");
+    }
+
+    private void handleToken(Irc irc, String[] args) {
+        if (args.length < 2) {
+            sendMessage("Ключ IRC (Token): §b" + irc.token + "§f. Менять: §7.irc token <ключ>§f.");
+            return;
+        }
+        irc.setToken(args[1].trim());
+        sendMessage("Ключ IRC изменён на §b" + irc.token + "§f. Переподключение...");
     }
 }

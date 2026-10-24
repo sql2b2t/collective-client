@@ -15,11 +15,11 @@ public class MixinItemRenderer {
 
     @WrapOperation(method = "getItemGlintConsumer", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/VertexConsumerProvider;getBuffer(Lnet/minecraft/client/render/RenderLayer;)Lnet/minecraft/client/render/VertexConsumer;"))
     private static VertexConsumer collective$shadeItemQuads(VertexConsumerProvider consumers, RenderLayer layer, Operation<VertexConsumer> original) {
-        return HandsShader.decorate(original.call(consumers, layer));
+        return HandsShader.decorateItem(original.call(consumers, layer));
     }
 
     @WrapOperation(method = "getSpecialItemGlintConsumer", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/VertexConsumerProvider;getBuffer(Lnet/minecraft/client/render/RenderLayer;)Lnet/minecraft/client/render/VertexConsumer;"))
     private static VertexConsumer collective$shadeSpecialItemQuads(VertexConsumerProvider consumers, RenderLayer layer, Operation<VertexConsumer> original) {
-        return HandsShader.decorate(original.call(consumers, layer));
+        return HandsShader.decorateItem(original.call(consumers, layer));
     }
 }

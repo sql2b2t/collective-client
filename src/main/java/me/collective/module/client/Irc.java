@@ -5,6 +5,7 @@ import me.collective.command.ChatHelper;
 import me.collective.emotes.EmoteEngine;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
+import me.collective.setting.IntegerSetting;
 import me.collective.setting.StringSetting;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.PlayerListEntry;
@@ -45,6 +46,14 @@ public class Irc extends Module {
     public final BooleanSetting shareEmotes = add(new BooleanSetting("Emotes", true));
     public final BooleanSetting showActivity = add(new BooleanSetting("Joins Quits", true));
 
+    public static final String DEFAULT_RELAY_HOST = "bore.pub";
+    public static final int DEFAULT_RELAY_PORT = 29900;
+    public static final String DEFAULT_RELAY_TOKEN = "collective";
+
+    public String server = DEFAULT_RELAY_HOST;
+    public int port = DEFAULT_RELAY_PORT;
+    public String token = DEFAULT_RELAY_TOKEN;
+
     private static final int CONNECT_TIMEOUT_MS = 6_000;
     private static final int LOGIN_TIMEOUT_MS = 8_000;
     private static final int READ_TIMEOUT_MS = 15_000;
@@ -53,14 +62,6 @@ public class Irc extends Module {
     private static final int MAX_LINE = 2040;
     private static final int BACKOFF_STEP_MS = 5_000;
     private static final int BACKOFF_MAX_MS = 30_000;
-
-    /**
-     * Релей вшит в клиент: адрес, порт и ключ не настраиваются — юзер задаёт
-     * только ник (Nickname). Ключ ниже держит рандомных зрителей подальше.
-     */
-    public static final String RELAY_HOST = "31.77.19.160";
-    public static final int RELAY_PORT = 29900;
-    public static final String RELAY_TOKEN = "collective";
 
     // ── Состояние сети ──
     private Thread thread;
@@ -73,16 +74,25 @@ public class Irc extends Module {
     private final Set<String> users = ConcurrentHashMap.newKeySet();
 
     public Irc() {
-        super("IRC", "Общий чат и эмоуты пользователей чита через релей на VPS. "
+        super("IRC", "Общий чат и эмоуты пользователей чита. "
             + "Ник задаётся в Nickname (пусто = имя аккаунта).", Category.CLIENT);
         INSTANCE = this;
-        // Смена ника на лету: рвём соединение, run() сам перелогинится
-        // (backoff сброшен, т.к. прошлые сессии были успешными).
         this.nickname.setChangeListener(v -> {
             if (this.connected) {
                 closeQuietly();
             }
         });
+    }
+
+    public void setServer(String host, int port) {
+        this.server = host;
+        this.port = port;
+        if (this.connected) closeQuietly();
+    }
+
+    public void setToken(String token) {
+        this.token = token;
+        if (this.connected) closeQuietly();
     }
 
     @Override
@@ -183,8 +193,9 @@ public class Irc extends Module {
     private boolean session() {
         Socket sock = null;
         try {
-            String host = RELAY_HOST;
-            int port = RELAY_PORT;
+            String host = this.server != null && !this.server.trim().isEmpty() ? this.server.trim() : DEFAULT_RELAY_HOST;
+            int port = this.port > 0 ? this.port : DEFAULT_RELAY_PORT;
+            String authToken = this.token != null && !this.token.trim().isEmpty() ? this.token.trim() : DEFAULT_RELAY_TOKEN;
 
             sock = new Socket();
             this.socket = sock;
@@ -196,7 +207,7 @@ public class Irc extends Module {
             this.writer = out;
 
             String name = currentName();
-            String greeting = "LOGIN " + name + " " + RELAY_TOKEN;
+            String greeting = "LOGIN " + name + " " + authToken;
             synchronized (this.sendLock) {
                 out.write(greeting);
                 out.write('\n');
@@ -478,9 +489,12 @@ public class Irc extends Module {
 
     private String hideAddress(String text) {
         String result = IPV4_PATTERN.matcher(text).replaceAll("*.*.*.*");
-        String hostValue = RELAY_HOST;
+        String hostValue = this.server != null ? this.server.trim() : "";
         if (!hostValue.isEmpty()) {
             result = result.replace(hostValue, "***");
+        }
+        if (!DEFAULT_RELAY_HOST.isEmpty()) {
+            result = result.replace(DEFAULT_RELAY_HOST, "***");
         }
         return result;
     }

@@ -16,6 +16,9 @@ import net.minecraft.block.entity.ChestBlockEntity;
 import net.minecraft.block.entity.EnderChestBlockEntity;
 import net.minecraft.block.entity.ShulkerBoxBlockEntity;
 import net.minecraft.block.entity.BarrelBlockEntity;
+import net.minecraft.block.entity.HopperBlockEntity;
+import net.minecraft.block.entity.DispenserBlockEntity;
+import net.minecraft.block.entity.DropperBlockEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
@@ -39,11 +42,15 @@ public class StorageESP extends Module {
     public static final Color SHULKER_TINT = new Color(178, 132, 255);
     public static final Color ENDER_TINT = new Color(88, 221, 178);
     public static final Color BARREL_TINT = new Color(226, 172, 104);
+    public static final Color HOPPER_TINT = new Color(140, 140, 150);
+    public static final Color DISPENSER_TINT = new Color(120, 120, 120);
 
     public final BooleanSetting chests = add(new BooleanSetting("Chests", true));
     public final BooleanSetting shulkers = add(new BooleanSetting("Shulkers", true));
     public final BooleanSetting enderChests = add(new BooleanSetting("EnderChests", true));
     public final BooleanSetting barrels = add(new BooleanSetting("Barrels", true));
+    public final BooleanSetting hoppers = add(new BooleanSetting("Hoppers", true));
+    public final BooleanSetting dispensers = add(new BooleanSetting("Dispensers", true));
     public final BooleanSetting chatAlert = add(new BooleanSetting("ChatAlert", true));
     public final BooleanSetting highlight = add(new BooleanSetting("Highlight", true));
     public final NumberSetting range = add(new NumberSetting("Радиус", 24.0, 8.0, 48.0, 1.0, (v) -> highlight.getValue()));
@@ -86,6 +93,8 @@ public class StorageESP extends Module {
                 else if (shulkers.getValue() && be instanceof ShulkerBoxBlockEntity) tint = SHULKER_TINT;
                 else if (enderChests.getValue() && be instanceof EnderChestBlockEntity) tint = ENDER_TINT;
                 else if (barrels.getValue() && be instanceof BarrelBlockEntity) tint = BARREL_TINT;
+                else if (hoppers.getValue() && be instanceof HopperBlockEntity) tint = HOPPER_TINT;
+                else if (dispensers.getValue() && (be instanceof DispenserBlockEntity || be instanceof DropperBlockEntity)) tint = DISPENSER_TINT;
 
                 if (tint != null) toRender.add(new PosBox(pos, tint));
             }
@@ -94,6 +103,10 @@ public class StorageESP extends Module {
         tickTimer++;
         if (tickTimer < 20) return; // состояния чата один раз в секунду
         tickTimer = 0;
+
+        if (alertedPositions.size() > 1000) {
+            alertedPositions.clear();
+        }
 
         if (chatAlert.getValue()) {
             for (BlockEntity be : mc.world.getBlockEntities()) {
@@ -105,6 +118,9 @@ public class StorageESP extends Module {
                 else if (shulkers.getValue() && be instanceof ShulkerBoxBlockEntity) type = "Shulker Box";
                 else if (enderChests.getValue() && be instanceof EnderChestBlockEntity) type = "Ender Chest";
                 else if (barrels.getValue() && be instanceof BarrelBlockEntity) type = "Barrel";
+                else if (hoppers.getValue() && be instanceof HopperBlockEntity) type = "Hopper";
+                else if (dispensers.getValue() && be instanceof DispenserBlockEntity) type = "Dispenser";
+                else if (dispensers.getValue() && be instanceof DropperBlockEntity) type = "Dropper";
 
                 if (type != null) {
                     alertedPositions.add(pos);

@@ -19,11 +19,13 @@ import me.collective.setting.ColorSetting;
 import me.collective.setting.DynamicActionSetting;
 import me.collective.setting.EntityListSetting;
 import me.collective.setting.EnumSetting;
+import me.collective.setting.IntegerSetting;
 import me.collective.setting.Keybind;
 import me.collective.setting.KeybindSetting;
 import me.collective.setting.ModeSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.setting.Setting;
+import me.collective.setting.SettingColorSetting;
 import me.collective.setting.StringSetting;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.text.Text;
@@ -61,6 +63,11 @@ public class ConfigManager {
             Files.createDirectories(configsFolder);
         } catch (Exception ignored) {
         }
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (dirty) {
+                save(DEFAULT_NAME);
+            }
+        }, "Collective-Config-Shutdown"));
     }
 
     public static ConfigManager getInstance() {
@@ -74,6 +81,12 @@ public class ConfigManager {
     /** Помечает конфиг изменённым (вызывается из настроек и модулей). */
     public void markDirty() {
         dirty = true;
+    }
+
+    /** Принудительно запрашивает сохранение текущей конфигурации. */
+    public void requestSave() {
+        markDirty();
+        save(DEFAULT_NAME);
     }
 
     /** Вызывается каждый клиентский тик: автосейв default при изменениях. */
@@ -127,7 +140,8 @@ public class ConfigManager {
             JsonObject modules = new JsonObject();
             for (Module m : ModuleManager.INSTANCE.getModules()) {
                 JsonObject mj = new JsonObject();
-                mj.addProperty("toggled", m.isToggled());
+                boolean isUi = (m instanceof me.collective.module.client.UI);
+                mj.addProperty("toggled", isUi ? false : m.isToggled());
                 if (m instanceof HudModule hud) {
                     mj.addProperty("x", hud.getX());
                     mj.addProperty("y", hud.getY());
@@ -176,9 +190,6 @@ public class ConfigManager {
                 for (Module m : ModuleManager.INSTANCE.getModules()) {
                     if (!modules.has(m.getName())) continue;
                     JsonObject mj = modules.getAsJsonObject(m.getName());
-                    if (mj.has("toggled")) {
-                        m.setToggled(mj.get("toggled").getAsBoolean());
-                    }
                     if (m instanceof HudModule hud && mj.has("x") && mj.has("y")) {
                         hud.setX(mj.get("x").getAsFloat());
                         hud.setY(mj.get("y").getAsFloat());
@@ -193,6 +204,18 @@ public class ConfigManager {
                             }
                         }
                     }
+                    if (mj.has("toggled")) {
+                        if (m instanceof me.collective.module.client.UI) {
+                            m.setToggled(false);
+                        } else {
+                            m.setToggled(mj.get("toggled").getAsBoolean());
+                        }
+                    }
+                }
+                if (me.collective.module.client.UI.INSTANCE != null
+                        && (me.collective.module.client.UI.INSTANCE.getKeybind().getValue() <= 0
+                        || me.collective.module.client.UI.INSTANCE.getKeybind().getValue() == org.lwjgl.glfw.GLFW.GLFW_KEY_UNKNOWN)) {
+                    me.collective.module.client.UI.INSTANCE.getKeybind().setValue(org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT_SHIFT);
                 }
             }
 
@@ -214,6 +237,13 @@ public class ConfigManager {
     private static JsonElement serializeSetting(Setting<?> s) {
         // Кнопки без состояния (ActionSetting/DynamicActionSetting) в конфиг не пишутся
         if (s instanceof ActionSetting || s instanceof DynamicActionSetting) return null;
+        if (s instanceof SettingColorSetting scs) {
+            me.collective.util.SettingColor sc = scs.getValue();
+            if (sc == null) return null;
+            JsonObject co = new JsonObject();
+            co.addProperty("color", sc.toAwt().getRGB());
+            return co;
+        }
         // ChoiceSetting: строка + вложенные тумблеры опций
         if (s instanceof ChoiceSetting cs) {
             JsonObject o = new JsonObject();
@@ -264,9 +294,11 @@ public class ConfigManager {
         Object v = s.getValue();
         if (v instanceof Keybind k) return new JsonPrimitive(k.getKey());
         if (v instanceof Boolean b) return new JsonPrimitive(b);
+        if (v instanceof Integer i) return new JsonPrimitive(i);
         if (v instanceof Number n) return new JsonPrimitive(n.doubleValue());
         if (v instanceof String str) return new JsonPrimitive(str);
         if (v instanceof Color c) return new JsonPrimitive(c.getRGB());
+        if (v instanceof me.collective.util.SettingColor sc) return new JsonPrimitive(sc.toAwt().getRGB());
         // ActionSetting и прочие кнопки без состояния — не храним
         return null;
     }
@@ -274,6 +306,14 @@ public class ConfigManager {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static void applySetting(Setting<?> s, JsonElement el) {
         if (s instanceof ActionSetting || s instanceof DynamicActionSetting) return;
+        if (s instanceof SettingColorSetting scs) {
+            if (el.isJsonObject() && el.getAsJsonObject().has("color")) {
+                scs.setValue(new me.collective.util.SettingColor(new Color(el.getAsJsonObject().get("color").getAsInt(), true)));
+            } else if (el.isJsonPrimitive()) {
+                scs.setValue(new me.collective.util.SettingColor(new Color(el.getAsInt(), true)));
+            }
+            return;
+        }
         if (s instanceof ChoiceSetting cs && el.isJsonObject()) {
             JsonObject o = el.getAsJsonObject();
             if (o.has("value")) ((Setting) s).setValue(o.get("value").getAsString());
@@ -345,6 +385,10 @@ public class ConfigManager {
             ((Setting) s).setValue(el.getAsInt());
             return;
         }
+        if (s instanceof IntegerSetting is) {
+            is.setValue(el.getAsInt());
+            return;
+        }
         if (s instanceof NumberSetting) {
             ((Setting) s).setValue(el.getAsDouble());
             return;
@@ -358,12 +402,16 @@ public class ConfigManager {
             ((Setting) s).setValue(new Keybind(el.getAsInt()));
         } else if (cur instanceof Boolean) {
             ((Setting) s).setValue(el.getAsBoolean());
+        } else if (cur instanceof Integer) {
+            ((Setting) s).setValue(el.getAsInt());
         } else if (cur instanceof Number) {
             ((Setting) s).setValue(el.getAsDouble());
         } else if (cur instanceof String) {
             ((Setting) s).setValue(el.getAsString());
         } else if (cur instanceof Color) {
             ((Setting) s).setValue(new Color(el.getAsInt(), true));
+        } else if (cur instanceof me.collective.util.SettingColor) {
+            ((Setting) s).setValue(new me.collective.util.SettingColor(new Color(el.getAsInt(), true)));
         }
     }
 }

@@ -21,7 +21,7 @@ public class HUD extends Module {
     public final NumberSetting padding = add(new NumberSetting("Padding", 2, 0, 10, 1));
 
     public HUD() {
-        super("HUD", "Draws useful HUD elements on screen.", Category.CLIENT);
+        super("HUD", "Отображение наэкранных информационных элементов и виджетов.", Category.CLIENT);
         INSTANCE = this;
         setToggled(true);
 

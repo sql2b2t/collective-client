@@ -16,9 +16,10 @@ public class AutoGap extends Module {
 
     private boolean eating = false;
     private int prevSlot = -1;
+    private int waitTicks = 0;
 
     public AutoGap() {
-        super("AutoGap", "Automatically eats Golden Apples when health is below threshold.", Category.COMBAT);
+        super("AutoGap", "Автоматически ест золотые яблоки при низком уровне здоровья.", Category.COMBAT);
     }
 
     @Override
@@ -38,18 +39,31 @@ public class AutoGap extends Module {
         }
 
         if (eating) {
-            if (!mc.player.isUsingItem()) {
+            waitTicks++;
+            if (waitTicks > 3 && !mc.player.isUsingItem()) {
                 stopEating();
             }
             return;
         }
 
+        // 1. Offhand check
+        var offhand = mc.player.getOffHandStack();
+        if (offhand.isOf(Items.ENCHANTED_GOLDEN_APPLE) || (!preferEnchanted.getValue() && offhand.isOf(Items.GOLDEN_APPLE))) {
+            prevSlot = -1;
+            mc.options.useKey.setPressed(true);
+            eating = true;
+            waitTicks = 0;
+            return;
+        }
+
+        // 2. Hotbar check
         FindItemResult gap = findGap();
         if (gap.found()) {
             prevSlot = mc.player.getInventory().getSelectedSlot();
             InventoryUtil.swap(gap.slot());
             mc.options.useKey.setPressed(true);
             eating = true;
+            waitTicks = 0;
         }
     }
 
@@ -69,6 +83,7 @@ public class AutoGap extends Module {
                 prevSlot = -1;
             }
             eating = false;
+            waitTicks = 0;
         }
     }
 }

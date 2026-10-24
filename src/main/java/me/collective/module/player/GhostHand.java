@@ -65,6 +65,9 @@ public class GhostHand extends Module {
             || state.getBlock() instanceof BarrelBlock
             || state.getBlock() instanceof HopperBlock
             || state.getBlock() instanceof FurnaceBlock
+            || state.isOf(net.minecraft.block.Blocks.DISPENSER)
+            || state.isOf(net.minecraft.block.Blocks.DROPPER)
+            || state.isOf(net.minecraft.block.Blocks.CRAFTER)
             || (shulkers.getValue() && state.getBlock() instanceof ShulkerBoxBlock);
     }
 }

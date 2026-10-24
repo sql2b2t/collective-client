@@ -39,6 +39,7 @@ public class ModuleManager {
         // Combat Modules
         register(new GrimAnchorAura());
         register(new CrystalAura());
+        register(new CrystalOptimizer());
         register(new Criticals());
         register(new Offhand());
         register(new Surround());
@@ -58,6 +59,7 @@ public class ModuleManager {
         register(new HitBox());
         register(new Reach());
         register(new TNTAura());
+        register(new Velocity());
 
         // Movement Modules
         register(new AirPlaceScaffold());
@@ -160,6 +162,14 @@ public class ModuleManager {
         register(new BlockESP());
         register(new ItemESP());
         register(new Tracers());
+        register(new Chams());
+        register(new Trajectories());
+        register(new BreakProgress());
+        register(new VoidESP());
+        register(new Breadcrumbs());
+        register(new Zoom());
+        register(new Ambience());
+        register(new CrystalModifier());
 
         // Misc Modules
         register(new AntiBot());
@@ -184,7 +194,6 @@ public class ModuleManager {
         register(new TextRadar());
         register(new Welcomer());
         register(new Lag());
-        register(new Graph());
         register(new Chat());
         register(new Music());
         register(new Crypto());

@@ -13,7 +13,7 @@ public class Position extends HudModule {
     public final BooleanSetting angles = add(new BooleanSetting("Angles", true));
 
     public Position() {
-        super("Position", "Displays current coordinates.", 4, 300);
+        super("Position", "Отображает текущие координаты игрока (включая Незер/Обычный мир).", 4, 300);
     }
 
     @Override
@@ -26,15 +26,19 @@ public class Position extends HudModule {
 
         String coords = String.format("XYZ: §f%.1f, %.1f, %.1f", posX, posY, posZ);
 
-        if (nether.getValue()) {
-            boolean isNether = mc.world != null && mc.world.getRegistryKey().getValue().getPath().contains("the_nether");
-            double nX = isNether ? posX * 8.0 : posX / 8.0;
-            double nZ = isNether ? posZ * 8.0 : posZ / 8.0;
-            coords += String.format(" §7[§f%.1f, %.1f§7]", nX, nZ);
+        if (nether.getValue() && mc.world != null) {
+            boolean isNether = mc.world.getRegistryKey() == net.minecraft.world.World.NETHER;
+            boolean isOverworld = mc.world.getRegistryKey() == net.minecraft.world.World.OVERWORLD;
+            if (isNether || isOverworld) {
+                double nX = isNether ? posX * 8.0 : posX / 8.0;
+                double nZ = isNether ? posZ * 8.0 : posZ / 8.0;
+                coords += String.format(" §7[§f%.1f, %.1f§7]", nX, nZ);
+            }
         }
 
         if (angles.getValue()) {
             float yaw = mc.player.getYaw() % 360;
+            if (yaw < 0) yaw += 360;
             float pitch = mc.player.getPitch();
             coords += String.format(" §7(§f%.1f§7, §f%.1f§7)", yaw, pitch);
         }

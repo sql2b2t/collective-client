@@ -10,7 +10,7 @@ import java.awt.Color;
 
 public class Direction extends HudModule {
     public Direction() {
-        super("Direction", "Displays player facing direction.", 4, 320);
+        super("Direction", "Показывает сторону света и ось направления взгляда игрока.", 4, 320);
     }
 
     @Override

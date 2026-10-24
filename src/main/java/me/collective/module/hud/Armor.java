@@ -16,7 +16,7 @@ public class Armor extends HudModule {
     public final BooleanSetting showHands = add(new BooleanSetting("ShowHands", true));
 
     public Armor() {
-        super("Armor", "Displays armor status and durability.", 200, 200);
+        super("Armor", "Отображает надетое снаряжение и прочность каждого элемента брони.", 200, 200);
     }
 
     @Override

@@ -77,8 +77,8 @@ public class BedAura extends Module {
         PlayerEntity target = getTarget(range.getFloatValue());
         if (target == null) return;
 
-        FindItemResult bed = InventoryUtil.findInHotbar(stack -> stack.getItem() instanceof BedItem);
-        if (!bed.found() || !bed.isHotbar()) return;
+        FindItemResult bed = InventoryUtil.findInHotbarOrOffhand(stack -> stack.getItem() instanceof BedItem);
+        if (!bed.found()) return;
 
         BlockPos feet = target.getBlockPos();
         BlockPos place = null;

@@ -15,7 +15,7 @@ public class Metrics extends HudModule {
     public final BooleanSetting server = add(new BooleanSetting("Server", true));
 
     public Metrics() {
-        super("Metrics", "Displays FPS, Ping, and Server.", 4, 340);
+        super("Metrics", "Отображает FPS, пинг до сервера и адрес текущего сервера.", 4, 340);
     }
 
     @Override

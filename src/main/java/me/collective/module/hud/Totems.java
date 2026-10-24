@@ -12,7 +12,7 @@ public class Totems extends HudModule {
     private static final ItemStack TOTEM_STACK = new ItemStack(Items.TOTEM_OF_UNDYING);
 
     public Totems() {
-        super("Totems", "Displays the number of totems in inventory.", 120, 4);
+        super("Totems", "Отображает общее количество тотемов бессмертия в инвентаре.", 120, 4);
         this.width = 36;
         this.height = 18;
     }
@@ -34,6 +34,7 @@ public class Totems extends HudModule {
         }
 
         context.drawItem(TOTEM_STACK, (int) x + 1, (int) y + 1);
-        FontManager.INSTANCE.drawStringWithShadow(context, String.valueOf(count), x + 20, y + 5, Color.WHITE);
+        Color numColor = count == 0 ? new Color(255, 70, 70) : count <= 2 ? new Color(255, 200, 50) : Color.WHITE;
+        FontManager.INSTANCE.drawStringWithShadow(context, String.valueOf(count), x + 20, y + 5, numColor);
     }
 }

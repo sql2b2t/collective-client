@@ -186,10 +186,33 @@ public class PlacementUtils {
 
             Direction side = dir.getOpposite();
             Vec3d normal = Vec3d.of(side.getVector());
-            Vec3d hitVec = Vec3d.ofCenter(neighbor).add(normal.multiply(0.5));
 
-            if (eye.subtract(hitVec).dotProduct(normal) <= 0.0) continue;
+            boolean visible = eye.subtract(Vec3d.ofCenter(neighbor)).dotProduct(normal) > -0.05
+                || (side.getAxis().isHorizontal() && eye.y >= neighbor.getY() + 0.85);
 
+            if (!visible) continue;
+
+            double minX = neighbor.getX();
+            double minY = neighbor.getY();
+            double minZ = neighbor.getZ();
+            double maxX = minX + 1.0;
+            double maxY = minY + 1.0;
+            double maxZ = minZ + 1.0;
+
+            double px = clamp(eye.x, minX + 0.1, maxX - 0.1);
+            double py = clamp(eye.y, minY + 0.1, maxY - 0.1);
+            double pz = clamp(eye.z, minZ + 0.1, maxZ - 0.1);
+
+            switch (side) {
+                case DOWN -> py = minY;
+                case UP -> py = maxY;
+                case NORTH -> pz = minZ;
+                case SOUTH -> pz = maxZ;
+                case WEST -> px = minX;
+                case EAST -> px = maxX;
+            }
+
+            Vec3d hitVec = new Vec3d(px, py, pz);
             double dist = eye.squaredDistanceTo(hitVec);
             if (dist > reach * reach || dist >= bestDist) continue;
 
@@ -199,6 +222,7 @@ public class PlacementUtils {
 
         return best;
     }
+
 
     public static boolean canPlace(BlockPos pos, boolean strictDirection) {
         if (mc.world == null) return false;

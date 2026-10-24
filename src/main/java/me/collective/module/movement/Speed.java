@@ -12,10 +12,10 @@ public class Speed extends Module {
     public static Speed INSTANCE;
 
     public enum Mode {
-        NCP, STRICT_STRAFE, VANILLA, MATRIX_DAMAGE
+        GRIM_BHOP, NCP, STRICT_STRAFE, VANILLA, MATRIX_DAMAGE
     }
 
-    public final EnumSetting<Mode> mode = add(new EnumSetting<>("Режим", Mode.NCP));
+    public final EnumSetting<Mode> mode = add(new EnumSetting<>("Режим", Mode.GRIM_BHOP));
     public final NumberSetting speedMultiplier = add(new NumberSetting("Множитель", 1.25, 1.0, 3.0, 0.05));
     public final BooleanSetting autoJump = add(new BooleanSetting("Авто прыжок", true));
     public final BooleanSetting pauseInWater = add(new BooleanSetting("Пауза в воде", true));
@@ -41,6 +41,12 @@ public class Speed extends Module {
         }
 
         switch (mode.getValue()) {
+            case GRIM_BHOP -> {
+                mc.player.setSprinting(true);
+                if (mc.player.isOnGround()) {
+                    mc.player.jump();
+                }
+            }
             case VANILLA -> {
                 double speed = 0.2873 * speedMultiplier.getValue();
                 strafe(speed);

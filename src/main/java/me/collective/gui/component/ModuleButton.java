@@ -1,6 +1,8 @@
 package me.collective.gui.component;
 
 import me.collective.font.FontManager;
+import me.collective.gui.alt.SmoothGfx;
+import me.collective.gui.ClickGuiTheme;
 import me.collective.module.Module;
 import me.collective.module.client.UI;
 import me.collective.render.RenderUtil;
@@ -26,7 +28,7 @@ public class ModuleButton extends Component {
         this.module = module;
         this.toggleProgress = module.isToggled() ? 1.0f : 0.0f;
 
-        float settingH = 11;
+        float settingH = 16f;
         float curY = y + height;
 
         for (Setting<?> setting : module.getSettings()) {
@@ -34,7 +36,7 @@ public class ModuleButton extends Component {
             if (c == null) continue; // тип не поддерживается — строк без дыр
             components.add(c);
             settings.add(setting);
-            curY += settingH;
+            curY += c.getHeight();
         }
     }
 
@@ -63,8 +65,11 @@ public class ModuleButton extends Component {
         if (setting instanceof ColorSetting) {
             return new ColorComponent((ColorSetting) setting, x, y, width, height);
         }
-        if (setting instanceof KeybindSetting) {
-            return new KeybindComponent((KeybindSetting) setting, x, y, width, height);
+        if (setting instanceof SettingColorSetting) {
+            return new SettingColorComponent((SettingColorSetting) setting, x, y, width, height);
+        }
+        if (setting instanceof KeybindSetting || (setting.getValue() instanceof Keybind)) {
+            return new KeybindComponent(setting, x, y, width, height);
         }
         if (setting instanceof ActionSetting) {
             return new ActionComponent((ActionSetting) setting, x, y, width, height);
@@ -124,53 +129,35 @@ public class ModuleButton extends Component {
 
         // Render sub-settings when open
         if (open && !components.isEmpty()) {
-            // Высота строки тянется за высотой шрифта настроек: захардкоженные
-            // 11 не вмещали крупный SettingsFontSize/кастомные шрифты — текст
-            // соседних строк наезжал друг на друга.
-            float rowH = adaptiveRowHeight();
             float curY = y + height;
-            float sH = getSettingsHeight(rowH);
+            float sH = getSettingsHeight();
 
-            // Distinct settings container background (frosted glass backing)
-            RenderUtil.drawRect(context, x, curY, x + width, curY + sH, new Color(14, 14, 18, 180));
-            // Left accent line
-            RenderUtil.drawRect(context, x, curY, x + 2.0f, curY + sH, UI.INSTANCE.color.getValue());
+            // Distinct settings container background (frosted glass backing with smooth corners)
+            SmoothGfx.fillRounded(context, x, curY, width, sH, 3.0f, 0x500A0E18);
+            // Left accent line synchronized with Colors
+            SmoothGfx.fillRounded(context, x, curY, 2.0f, sH, 1.0f, ClickGuiTheme.getAccentColor());
 
             for (int i = 0; i < components.size(); i++) {
                 Setting<?> setting = settings.get(i);
                 if (!setting.isVisible()) continue; // невидимка не занимает строку
                 Component c = components.get(i);
+                float itemH = c.getHeight();
                 c.setX(x);
                 c.setY(curY);
                 c.setWidth(width);
-                c.setHeight(rowH);
+                c.setHeight(itemH);
                 c.render(context, mouseX, mouseY, delta);
-                // Раскрытый дропдаун режимов занимает больше строки — сдвигаем
-                // последующие настройки на его реальную высоту, иначе список
-                // рисуется поверх них и клики попадают не в него.
-                curY += Math.max(rowH, c.getHeight());
+                curY += itemH;
             }
         }
     }
 
-    /** Строка настроек: минимум 11 px, или высота шрифта настроек + отступ. */
-    private float adaptiveRowHeight() {
-        float textH = FontManager.INSTANCE.getFontHeightScaled(FontManager.settingsScale());
-        return Math.max(11f, textH + 4f);
-    }
-
     public float getSettingsHeight() {
-        return getSettingsHeight(adaptiveRowHeight());
-    }
-
-    private float getSettingsHeight(float rowH) {
         if (!open) return 0;
         float h = 0;
         for (int i = 0; i < components.size(); i++) {
             if (!settings.get(i).isVisible()) continue;
-            // Раскрытый дропдаун режимов выше обычной строки — контейнер и
-            // общая высота панели должны учитывать его реальную высоту.
-            h += Math.max(rowH, components.get(i).getHeight());
+            h += components.get(i).getHeight();
         }
         return h;
     }

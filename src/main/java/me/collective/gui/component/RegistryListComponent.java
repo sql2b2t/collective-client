@@ -6,6 +6,7 @@ import me.collective.render.RenderUtil;
 import me.collective.setting.Setting;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.util.Identifier;
+import org.lwjgl.glfw.GLFW;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -28,6 +29,7 @@ public abstract class RegistryListComponent<T> extends Component {
 
     private boolean open;
     private String query = "";
+    private int cursor;
     private float scroll;
     private String lastName = "";
 
@@ -99,8 +101,14 @@ public abstract class RegistryListComponent<T> extends Component {
         RenderUtil.drawRect(context, lx, ly, lx + lw, ly + 1, bg);
 
         // Строка поиска
-        String searchText = "Поиск: " + query + "_";
-        FontManager.INSTANCE.drawStringWithShadowScaled(context, searchText, lx + 3, ly + 1, text, fs);
+        String prefix = "Поиск: ";
+        cursor = Math.max(0, Math.min(cursor, query.length()));
+        FontManager.INSTANCE.drawStringWithShadowScaled(context, prefix + query, lx + 3, ly + 1, text, fs);
+        boolean caret = (System.currentTimeMillis() / 450) % 2 == 0;
+        if (caret) {
+            float caretX = lx + 3 + FontManager.INSTANCE.getStringWidthScaled(prefix + query.substring(0, cursor), fs);
+            RenderUtil.drawRect(context, caretX, ly + 1f, caretX + 1f, ly + 9f, accent);
+        }
 
         // Скролл-клип
         List<T> filtered = filtered();
@@ -155,7 +163,12 @@ public abstract class RegistryListComponent<T> extends Component {
 
         if (mouseY < y + HEADER_H) {
             open = !open;
-            if (!open) query = "";
+            if (!open) {
+                query = "";
+                cursor = 0;
+            } else {
+                cursor = query.length();
+            }
             if (UI.INSTANCE.sounds.getValue()) {
                 me.collective.render.SoundUtil.playClick(1.0f, open ? 1.2f : 1.0f);
             }
@@ -198,14 +211,39 @@ public abstract class RegistryListComponent<T> extends Component {
     @Override
     public boolean keyPressed(int key) {
         if (!open) return false;
-        if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_BACKSPACE) {
-            if (!query.isEmpty()) {
-                query = query.substring(0, query.length() - 1);
+        cursor = Math.max(0, Math.min(cursor, query.length()));
+        if (key == GLFW.GLFW_KEY_LEFT) {
+            if (cursor > 0) cursor--;
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_RIGHT) {
+            if (cursor < query.length()) cursor++;
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_HOME) {
+            cursor = 0;
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_END) {
+            cursor = query.length();
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_BACKSPACE) {
+            if (cursor > 0 && !query.isEmpty()) {
+                query = query.substring(0, cursor - 1) + query.substring(cursor);
+                cursor--;
                 scroll = 0;
             }
             return true;
         }
-        if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+        if (key == GLFW.GLFW_KEY_DELETE) {
+            if (cursor < query.length()) {
+                query = query.substring(0, cursor) + query.substring(cursor + 1);
+                scroll = 0;
+            }
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_ESCAPE) {
             open = false;
             query = "";
             return true;
@@ -217,7 +255,9 @@ public abstract class RegistryListComponent<T> extends Component {
     public boolean charTyped(char chr) {
         if (!open) return false;
         if (chr >= 32 && chr != 127) {
-            query = query + chr;
+            cursor = Math.max(0, Math.min(cursor, query.length()));
+            query = query.substring(0, cursor) + chr + query.substring(cursor);
+            cursor++;
             scroll = 0;
             return true;
         }

@@ -19,7 +19,7 @@ public class Lag extends HudModule {
     }
 
     public Lag() {
-        super("Lag", "Shows server lag duration.", 350, 40);
+        super("Lag", "Показывает время задержки ответа сервера (лаг тиков).", 350, 40);
     }
 
     @Override
@@ -42,13 +42,16 @@ public class Lag extends HudModule {
         long diff = System.currentTimeMillis() - lastPacketTime;
         long thresholdMs = (long) (threshold.getValue() * 1000.0);
 
-        if (diff < thresholdMs) {
+        boolean inEditor = mc.currentScreen instanceof me.collective.gui.hud.HudEditorScreen;
+        if (diff < thresholdMs && !inEditor) {
             this.width = 0;
             this.height = 0;
             return;
         }
 
-        String lagText = String.format("Server not responding: §c%.1fs", diff / 1000.0f);
+        String lagText = (inEditor && diff < thresholdMs)
+            ? "Server not responding: §c2.5s"
+            : String.format("Server not responding: §c%.1fs", diff / 1000.0f);
         this.width = FontManager.INSTANCE.getStringWidth(lagText) + 6;
         this.height = FontManager.INSTANCE.getFontHeight() + 4;
 

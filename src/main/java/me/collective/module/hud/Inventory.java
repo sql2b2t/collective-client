@@ -8,7 +8,7 @@ import java.awt.Color;
 
 public class Inventory extends HudModule {
     public Inventory() {
-        super("Inventory", "Draws an inventory preview.", 250, 250);
+        super("Inventory", "Отображает превью содержимого инвентаря на экране.", 250, 250);
         this.width = 9 * 18 + 4;
         this.height = 3 * 18 + 4;
     }

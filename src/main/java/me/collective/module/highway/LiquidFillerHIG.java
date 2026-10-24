@@ -10,6 +10,7 @@ import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.setting.StringSetting;
 import me.collective.util.FindItemResult;
+import me.collective.util.GrimUtils;
 import me.collective.util.InventoryUtil;
 import me.collective.util.RotationUtils;
 import net.minecraft.block.Block;
@@ -17,6 +18,7 @@ import net.minecraft.fluid.Fluid;
 import net.minecraft.fluid.Fluids;
 import net.minecraft.item.BlockItem;
 import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
+import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
@@ -74,7 +76,7 @@ public class LiquidFillerHIG extends Module {
     private int timer;
 
     public LiquidFillerHIG() {
-        super("LiquidFillerHIG", "Places blocks inside of liquid source blocks within range of you.", Category.HIGHWAY);
+        super("LiquidFillerHIG", "Заливает источники лавы и воды блоками в радиусе действия.", Category.HIGHWAY);
     }
 
     @Override
@@ -101,10 +103,10 @@ public class LiquidFillerHIG extends Module {
         FindItemResult item;
         Set<Block> filter = parseBlocks();
         if (listMode.getValue() == ListMode.Whitelist) {
-            item = InventoryUtil.findInHotbar(stack ->
+            item = InventoryUtil.findInHotbarOrOffhand(stack ->
                 stack.getItem() instanceof BlockItem && filter.contains(Block.getBlockFromItem(stack.getItem())));
         } else {
-            item = InventoryUtil.findInHotbar(stack ->
+            item = InventoryUtil.findInHotbarOrOffhand(stack ->
                 stack.getItem() instanceof BlockItem && !filter.contains(Block.getBlockFromItem(stack.getItem())));
         }
         if (!item.found()) return;
@@ -151,13 +153,13 @@ public class LiquidFillerHIG extends Module {
         int count = 0;
         for (BlockPos pos : targets) {
             if (count >= maxBlocksPerTick.getIntValue()) break;
-            if (place(pos, item.slot())) count++;
+            if (place(pos, item)) count++;
         }
         targets.clear();
     }
 
     /** Ставит блок с опорой на соседний цельный блок. False если опереться не на что. */
-    private boolean place(BlockPos pos, int hotbarSlot) {
+    private boolean place(BlockPos pos, FindItemResult item) {
         Direction[] order = {Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
         for (Direction dir : order) {
             BlockPos neighbor = pos.offset(dir);
@@ -165,9 +167,15 @@ public class LiquidFillerHIG extends Module {
                 && mc.world.getBlockState(neighbor).isSolidBlock(mc.world, neighbor)) {
                 Direction side = dir.getOpposite();
                 Vec3d hitVec = Vec3d.ofCenter(neighbor).add(
-                    side.getOffsetX() * 0.5, side.getOffsetY() * 0.5, side.getOffsetZ() * 0.5);
+                    side.getOffsetX() * 0.45, side.getOffsetY() * 0.45, side.getOffsetZ() * 0.45);
 
-                InventoryUtil.swap(hotbarSlot, true);
+                if (GrimUtils.closestEyeDistanceSqTo(mc.player, hitVec) > 18.0) continue;
+
+                Hand hand = item.getHand();
+                if (!item.isOffhand()) {
+                    InventoryUtil.swap(item.slot(), true);
+                }
+
                 if (rotate.getValue()) {
                     Vec3d eyes = mc.player.getEyePos();
                     double dx = hitVec.x - eyes.x;
@@ -178,12 +186,14 @@ public class LiquidFillerHIG extends Module {
                     float pitch = (float) -Math.toDegrees(Math.atan2(dy, distXZ));
                     RotationUtils.getInstance().setRotationSilentInstant(this, 40, yaw, pitch);
                 }
-                mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND,
+                mc.interactionManager.interactBlock(mc.player, hand,
                     new BlockHitResult(hitVec, side, neighbor, false));
                 if (mc.getNetworkHandler() != null) {
-                    mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+                    mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
                 }
-                InventoryUtil.swapBack();
+                if (!item.isOffhand()) {
+                    InventoryUtil.swapBack();
+                }
                 return true;
             }
         }

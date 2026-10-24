@@ -335,9 +335,11 @@ public class VillagerRoller extends Module {
         if (mc.world.getBlockState(rollingBlockPos).isAir()) {
             currentState = State.ROLLING_WAITING_FOR_PROFESSION_CLEAR;
         }
-        else if (!instantRebreak.get() && !mc.interactionManager.attackBlock(rollingBlockPos, Direction.UP)) {
-            error("Не удаётся сломать этот блок");
-            toggle();
+        else if (!instantRebreak.get()) {
+            if (!mc.interactionManager.updateBlockBreakingProgress(rollingBlockPos, Direction.UP)) {
+                mc.interactionManager.attackBlock(rollingBlockPos, Direction.UP);
+            }
+            mc.player.swingHand(net.minecraft.util.Hand.MAIN_HAND);
         }
     }
 

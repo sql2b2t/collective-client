@@ -57,4 +57,18 @@ public class ModeSetting extends Setting<String> {
         int next = (index + 1) % modes.size();
         setValue(modes.get(next));
     }
+
+    public void cycleReverse() {
+        int index = -1;
+        for (int i = 0; i < modes.size(); i++) {
+            if (modes.get(i).trim().equalsIgnoreCase(getValue().trim())) {
+                index = i;
+                break;
+            }
+        }
+        if (index == -1) index = 0;
+        int prev = (index - 1 + modes.size()) % modes.size();
+        setValue(modes.get(prev));
+    }
 }
+

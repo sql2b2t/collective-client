@@ -40,6 +40,7 @@ public class CommandManager {
         register(new McpCommand());
         register(new HudImageCommand());
         register(new ConfigCommand());
+        register(new FriendCommand());
     }
 
     public void register(Command command) {

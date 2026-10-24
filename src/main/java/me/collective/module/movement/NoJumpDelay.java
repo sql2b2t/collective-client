@@ -7,7 +7,7 @@ public class NoJumpDelay extends Module {
     public static NoJumpDelay INSTANCE;
 
     public NoJumpDelay() {
-        super("NoJumpDelay", "Removes the delay between consecutive jumps.", Category.MOVEMENT);
+        super("NoJumpDelay", "Убирает задержку между последовательными прыжками.", Category.MOVEMENT);
         INSTANCE = this;
     }
 }

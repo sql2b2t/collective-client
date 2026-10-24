@@ -61,33 +61,36 @@ public class Panel {
         return HEADER_HEIGHT + getContentHeight(searchQuery) * openProgress;
     }
 
-    public void collectBlurRegions(List<float[]> regions, boolean includeCategories, boolean includeSettings, String searchQuery) {
+    public void collectCategoryRegions(List<float[]> regions, String searchQuery) {
         float animHeight = getContentHeight(searchQuery) * openProgress;
         float totalH = HEADER_HEIGHT + animHeight;
+        regions.add(new float[]{ x, y, x + width, y + totalH });
+    }
 
-        if (includeCategories) {
-            regions.add(new float[]{ x, y, x + width, y + totalH });
-        }
-
-        if (includeSettings && openProgress > 0.4f) {
-            float btnH = UI.INSTANCE.buttonHeight.getIntValue();
-            float curY = y + HEADER_HEIGHT;
-            for (ModuleButton btn : buttons) {
-                if (searchQuery != null && !searchQuery.isEmpty()) {
-                    if (!btn.getModule().getName().toLowerCase().contains(searchQuery.toLowerCase())) {
-                        continue;
-                    }
+    public void collectSettingsRegions(List<float[]> regions, String searchQuery) {
+        if (openProgress <= 0.4f) return;
+        float btnH = UI.INSTANCE.buttonHeight.getIntValue();
+        float curY = y + HEADER_HEIGHT - scrollOffset;
+        for (ModuleButton btn : buttons) {
+            if (searchQuery != null && !searchQuery.isEmpty()) {
+                if (!btn.getModule().getName().toLowerCase().contains(searchQuery.toLowerCase())) {
+                    continue;
                 }
-                if (btn.isOpen()) {
-                    float sH = btn.getSettingsHeight();
-                    if (sH > 0) {
-                        float sY = curY + btnH;
-                        regions.add(new float[]{ x + 1, sY, x + width - 1, sY + sH });
-                    }
-                }
-                curY += btn.getTotalHeight();
             }
+            if (btn.isOpen()) {
+                float sH = btn.getSettingsHeight();
+                if (sH > 0) {
+                    float sY = curY + btnH;
+                    regions.add(new float[]{ x + 1, sY, x + width - 1, sY + sH });
+                }
+            }
+            curY += btn.getTotalHeight();
         }
+    }
+
+    public void collectBlurRegions(List<float[]> regions, boolean includeCategories, boolean includeSettings, String searchQuery) {
+        if (includeCategories) collectCategoryRegions(regions, searchQuery);
+        if (includeSettings) collectSettingsRegions(regions, searchQuery);
     }
 
     private float scrollOffset = 0;
@@ -128,8 +131,10 @@ public class Panel {
             scrollOffset = Math.max(0, Math.min(maxScroll, scrollOffset));
 
             if (contentHeight > 0) {
-                // Background behind modules
-                RenderUtil.drawRect(context, x, y + HEADER_HEIGHT, x + width, y + HEADER_HEIGHT + visibleH, UI.INSTANCE.bgColor.getValue());
+                // Background behind modules (balanced translucent glass)
+                Color bg = UI.INSTANCE.bgColor.getValue();
+                int glassAlpha = Math.min(85, bg.getAlpha());
+                RenderUtil.drawRect(context, x, y + HEADER_HEIGHT, x + width, y + HEADER_HEIGHT + visibleH, new Color(bg.getRed(), bg.getGreen(), bg.getBlue(), glassAlpha));
 
                 // Enable scissor during unfolding animation and scrolling
                 context.enableScissor((int) x, (int) (y + HEADER_HEIGHT), (int) (x + width), (int) Math.ceil(y + HEADER_HEIGHT + visibleH));
@@ -178,6 +183,10 @@ public class Panel {
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        return mouseClicked(mouseX, mouseY, button, "");
+    }
+
+    public boolean mouseClicked(double mouseX, double mouseY, int button, String searchQuery) {
         if (isHeaderHovered(mouseX, mouseY)) {
             if (button == 0) {
                 this.dragging = true;
@@ -196,9 +205,14 @@ public class Panel {
         if (open) {
             int screenH = net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaledHeight();
             float availableH = Math.max(80, screenH - y - HEADER_HEIGHT - 12);
-            float visibleH = Math.min(getContentHeight(""), availableH) * openProgress;
+            float visibleH = Math.min(getContentHeight(searchQuery), availableH) * openProgress;
             if (mouseY >= y + HEADER_HEIGHT && mouseY <= y + HEADER_HEIGHT + visibleH) {
                 for (ModuleButton btn : buttons) {
+                    if (searchQuery != null && !searchQuery.isEmpty()) {
+                        if (!btn.getModule().getName().toLowerCase().contains(searchQuery.toLowerCase())) {
+                            continue;
+                        }
+                    }
                     if (btn.mouseClicked(mouseX, mouseY, button)) {
                         return true;
                     }
@@ -228,17 +242,26 @@ public class Panel {
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        return mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount, "");
+    }
+
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount, String searchQuery) {
         if (verticalAmount == 0) return false;
-        if (!isHovered(mouseX, mouseY)) return false;
+        if (!isHovered(mouseX, mouseY, searchQuery)) return false;
 
         if (open) {
             for (ModuleButton btn : buttons) {
+                if (searchQuery != null && !searchQuery.isEmpty()) {
+                    if (!btn.getModule().getName().toLowerCase().contains(searchQuery.toLowerCase())) {
+                        continue;
+                    }
+                }
                 if (btn.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount)) {
                     return true;
                 }
             }
 
-            float contentHeight = getContentHeight("");
+            float contentHeight = getContentHeight(searchQuery);
             int screenH = net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaledHeight();
             float availableH = Math.max(80, screenH - y - HEADER_HEIGHT - 12);
             float maxScroll = Math.max(0, contentHeight - availableH);
@@ -279,11 +302,15 @@ public class Panel {
     }
 
     public boolean isHovered(double mouseX, double mouseY) {
+        return isHovered(mouseX, mouseY, "");
+    }
+
+    public boolean isHovered(double mouseX, double mouseY, String searchQuery) {
         float h = HEADER_HEIGHT;
         if (open) {
             int screenH = net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaledHeight();
             float availableH = Math.max(80, screenH - y - HEADER_HEIGHT - 12);
-            h += Math.min(getContentHeight(""), availableH) * openProgress;
+            h += Math.min(getContentHeight(searchQuery), availableH) * openProgress;
         }
         return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + h;
     }

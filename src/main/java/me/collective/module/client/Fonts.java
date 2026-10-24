@@ -35,7 +35,7 @@ public class Fonts extends Module {
     public final BooleanSetting inventory = add(new BooleanSetting("Инвентарь", true));
 
     public Fonts() {
-        super("Fonts", "Manages the client's custom font renderer.", Category.CLIENT);
+        super("Fonts", "Управление кастомными шрифтами и сглаживанием текста.", Category.CLIENT);
         INSTANCE = this;
         setToggled(true);
 

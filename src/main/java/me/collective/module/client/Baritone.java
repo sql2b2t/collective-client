@@ -21,7 +21,7 @@ public class Baritone extends Module {
     public final ColorSetting colorGoal = add(new ColorSetting("ColorGoal", new Color(255, 85, 255, 255)));
 
     public Baritone() {
-        super("Baritone", "Manages baritone settings and path colors.", Category.CLIENT);
+        super("Baritone", "Настройки интеграции с Baritone и цвета отображения путей.", Category.CLIENT);
         INSTANCE = this;
     }
 

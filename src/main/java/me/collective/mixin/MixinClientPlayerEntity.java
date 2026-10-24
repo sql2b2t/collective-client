@@ -67,6 +67,24 @@ public abstract class MixinClientPlayerEntity {
         }
     }
 
+    @ModifyExpressionValue(method = "tickMovementInput", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/input/Input;getMovementInput()Lnet/minecraft/util/math/Vec2f;"))
+    private net.minecraft.util.math.Vec2f collective$modifyMovementInput(net.minecraft.util.math.Vec2f original) {
+        RotationUtils rotUtils = RotationUtils.getInstance();
+        if (rotUtils.isRotating() && !rotUtils.isSyncMovement()) {
+            ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
+            if (player.input != null && player.input.playerInput != null) {
+                PlayerInput in = player.input.playerInput;
+                float s = (in.left() ? 1f : 0f) - (in.right() ? 1f : 0f);
+                float f = (in.forward() ? 1f : 0f) - (in.backward() ? 1f : 0f);
+                if (s != 0f || f != 0f) {
+                    return new net.minecraft.util.math.Vec2f(s, f).normalize();
+                }
+                return net.minecraft.util.math.Vec2f.ZERO;
+            }
+        }
+        return original;
+    }
+
     @org.spongepowered.asm.mixin.injection.ModifyVariable(method = "move", at = @At("HEAD"), argsOnly = true)
     private Vec3d collective$onMove(Vec3d movement, net.minecraft.entity.MovementType type) {
         if (me.collective.module.render.Freecam.INSTANCE != null && me.collective.module.render.Freecam.INSTANCE.isToggled()) {

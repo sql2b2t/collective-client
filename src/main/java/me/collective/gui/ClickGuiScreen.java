@@ -2,6 +2,7 @@ package me.collective.gui;
 
 import me.collective.category.Category;
 import me.collective.font.FontManager;
+import me.collective.gui.alt.SmoothGfx;
 import me.collective.gui.component.ModuleButton;
 import me.collective.gui.component.Panel;
 import me.collective.module.Module;
@@ -35,6 +36,7 @@ public class ClickGuiScreen extends Screen {
     private final List<Panel> panels = new ArrayList<>();
     private boolean searchActive;
     private String searchQuery = "";
+    private int searchCursor;
     private Module hoveredModule;
 
     // Snow particles
@@ -75,48 +77,54 @@ public class ClickGuiScreen extends Screen {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         // Detect hovered module first
         hoveredModule = null;
+        String query = searchActive ? searchQuery : "";
         for (Panel panel : panels) {
             for (ModuleButton btn : panel.getButtons()) {
+                if (!query.isEmpty() && !btn.getModule().getName().toLowerCase().contains(query.toLowerCase())) {
+                    continue;
+                }
                 if (btn.isHovered(mouseX, mouseY)) {
                     hoveredModule = btn.getModule();
                 }
             }
         }
 
-        // 1. Shaded / Frosted Blur behind categories and module settings
-        if (Blur.INSTANCE != null && Blur.INSTANCE.isToggled() && Blur.INSTANCE.clickGui.getValue()) {
-            List<float[]> blurRegions = new ArrayList<>();
-            boolean incCat = Blur.INSTANCE.categories.getValue();
-            boolean incSet = Blur.INSTANCE.settings.getValue();
-
-            for (Panel panel : panels) {
-                panel.collectBlurRegions(blurRegions, incCat, incSet, searchActive ? searchQuery : "");
+        // Multi-level granular blur for different parts of ClickGUI
+        if (Blur.INSTANCE != null && Blur.INSTANCE.isToggled()) {
+            // 1. Background Blur (весь экран / мир игры на заднем плане)
+            if (Blur.INSTANCE.clickGui.getValue()) {
+                float rad = Blur.INSTANCE.radius.getFloatValue();
+                float op = Blur.INSTANCE.opacity != null ? Blur.INSTANCE.opacity.getFloatValue() : 0.65f;
+                BlurEngine.INSTANCE.renderBlur(context, rad, op);
             }
 
-            if (searchActive) {
-                float boxW = 180;
-                float boxH = 18;
-                float boxX = width / 2f - boxW / 2f;
-                float boxY = 8;
-                blurRegions.add(new float[]{ boxX, boxY, boxX + boxW, boxY + boxH });
-            }
-
-            if (Blur.INSTANCE.tooltips.getValue() && hoveredModule != null && hoveredModule.getDescription() != null && !hoveredModule.getDescription().isEmpty()) {
-                String desc = hoveredModule.getDescription();
-                float dw = FontManager.INSTANCE.getStringWidth(desc);
-                float dx = mouseX + 8;
-                float dy = mouseY + 8;
-                if (dx + dw + 10 > width) {
-                    dx = width - dw - 12;
+            // 2. Category Panels Blur (шапки и контейнеры панелей)
+            if (Blur.INSTANCE.categories.getValue()) {
+                List<float[]> catRegions = new ArrayList<>();
+                for (Panel panel : panels) {
+                    panel.collectCategoryRegions(catRegions, searchActive ? searchQuery : "");
                 }
-                blurRegions.add(new float[]{ dx - 3, dy - 2, dx + dw + 5, dy + 12 });
+                float catRad = Blur.INSTANCE.catRadius.getFloatValue();
+                float catOp = Blur.INSTANCE.catOpacity.getFloatValue();
+                BlurEngine.INSTANCE.renderBlur(context, catRegions, catRad, catOp);
             }
 
-            BlurEngine.INSTANCE.renderBlur(context, blurRegions, Blur.INSTANCE.radius.getFloatValue());
+            // 3. Expanded Module Settings Blur (раскрытые списки настроек)
+            if (Blur.INSTANCE.settings.getValue()) {
+                List<float[]> setRegions = new ArrayList<>();
+                for (Panel panel : panels) {
+                    panel.collectSettingsRegions(setRegions, searchActive ? searchQuery : "");
+                }
+                if (!setRegions.isEmpty()) {
+                    float setRad = Blur.INSTANCE.setRadius.getFloatValue();
+                    float setOp = Blur.INSTANCE.setOpacity.getFloatValue();
+                    BlurEngine.INSTANCE.renderBlur(context, setRegions, setRad, setOp);
+                }
+            }
         }
 
         // 2. Snow effect
-        if (UI.INSTANCE.snow.getValue()) {
+        if (UI.INSTANCE != null && UI.INSTANCE.snow.getValue()) {
             for (Snowflake s : snowflakes) {
                 s.y += s.speed;
                 if (s.y > height) {
@@ -139,31 +147,30 @@ public class ClickGuiScreen extends Screen {
             float boxX = width / 2f - boxW / 2f;
             float boxY = 8;
 
+            int outlineCol = UI.INSTANCE != null ? UI.INSTANCE.color.getValue().getRGB() : new Color(189, 153, 255).getRGB();
             RenderUtil.drawRect(context, boxX, boxY, boxX + boxW, boxY + boxH, new Color(15, 15, 18, 230));
-            RenderUtil.drawOutline(context, boxX, boxY, boxW, boxH, 1, UI.INSTANCE.color.getValue().getRGB());
+            RenderUtil.drawOutline(context, boxX, boxY, boxW, boxH, 1, outlineCol);
 
-            String displayText = searchQuery.isEmpty() ? "Search..." : searchQuery + "_";
-            FontManager.INSTANCE.drawStringWithShadow(context, displayText, boxX + 6, boxY + 5, Color.WHITE);
+            if (searchQuery.isEmpty()) {
+                FontManager.INSTANCE.drawStringWithShadow(context, "Поиск...", boxX + 6, boxY + 5, new Color(150, 150, 150));
+            } else {
+                FontManager.INSTANCE.drawStringWithShadow(context, searchQuery, boxX + 6, boxY + 5, Color.WHITE);
+            }
+            boolean caret = (System.currentTimeMillis() / 450) % 2 == 0;
+            if (caret) {
+                searchCursor = Math.max(0, Math.min(searchCursor, searchQuery.length()));
+                float caretX = boxX + 6 + FontManager.INSTANCE.getStringWidth(searchQuery.substring(0, searchCursor));
+                RenderUtil.drawRect(context, caretX, boxY + 4f, caretX + 1f, boxY + 14f, outlineCol);
+            }
         } else {
-            String hint = "Ctrl + F to activate search.";
+            String hint = "Ctrl + F — открыть поиск";
             float hw = FontManager.INSTANCE.getStringWidth(hint);
             FontManager.INSTANCE.drawStringWithShadow(context, hint, width - hw - 6, height - 12, new Color(140, 140, 140));
         }
 
         // 5. Module Description Tooltip
         if (hoveredModule != null && hoveredModule.getDescription() != null && !hoveredModule.getDescription().isEmpty()) {
-            String desc = hoveredModule.getDescription();
-            float dw = FontManager.INSTANCE.getStringWidth(desc);
-            float dx = mouseX + 8;
-            float dy = mouseY + 8;
-
-            if (dx + dw + 10 > width) {
-                dx = width - dw - 12;
-            }
-
-            RenderUtil.drawRect(context, dx - 3, dy - 2, dx + dw + 5, dy + 12, new Color(10, 10, 10, 200));
-            RenderUtil.drawOutline(context, dx - 3, dy - 2, dw + 8, 14, 1, new Color(189, 153, 255, 200).getRGB());
-            FontManager.INSTANCE.drawStringWithShadow(context, desc, dx, dy + 1, Color.WHITE);
+            renderModuleTooltip(context, hoveredModule, mouseX, mouseY);
         }
 
         super.render(context, mouseX, mouseY, delta);
@@ -176,9 +183,21 @@ public class ClickGuiScreen extends Screen {
         for (Panel panel : panels) {
             panel.clearFocusFromTextInputs();
         }
+
+        if (searchActive) {
+            float boxW = 180;
+            float boxH = 18;
+            float boxX = width / 2f - boxW / 2f;
+            float boxY = 8;
+            if (click.x() >= boxX && click.x() <= boxX + boxW && click.y() >= boxY && click.y() <= boxY + boxH) {
+                return true;
+            }
+        }
+
+        String query = searchActive ? searchQuery : "";
         for (int i = panels.size() - 1; i >= 0; i--) {
             Panel panel = panels.get(i);
-            if (panel.mouseClicked(click.x(), click.y(), click.button())) {
+            if (panel.mouseClicked(click.x(), click.y(), click.button(), query)) {
                 return true;
             }
         }
@@ -196,8 +215,9 @@ public class ClickGuiScreen extends Screen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         if (verticalAmount != 0) {
+            String query = searchActive ? searchQuery : "";
             for (Panel panel : panels) {
-                if (panel.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount)) {
+                if (panel.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount, query)) {
                     return true;
                 }
             }
@@ -217,18 +237,43 @@ public class ClickGuiScreen extends Screen {
 
         if (input.hasCtrl() && key == GLFW.GLFW_KEY_F) {
             searchActive = !searchActive;
-            if (!searchActive) searchQuery = "";
+            if (!searchActive) {
+                searchQuery = "";
+                searchCursor = 0;
+            } else {
+                searchCursor = searchQuery.length();
+            }
             return true;
         }
 
         if (searchActive) {
+            searchCursor = Math.max(0, Math.min(searchCursor, searchQuery.length()));
             if (key == GLFW.GLFW_KEY_ESCAPE) {
                 searchActive = false;
                 searchQuery = "";
+                searchCursor = 0;
+                return true;
+            } else if (key == GLFW.GLFW_KEY_LEFT) {
+                if (searchCursor > 0) searchCursor--;
+                return true;
+            } else if (key == GLFW.GLFW_KEY_RIGHT) {
+                if (searchCursor < searchQuery.length()) searchCursor++;
+                return true;
+            } else if (key == GLFW.GLFW_KEY_HOME) {
+                searchCursor = 0;
+                return true;
+            } else if (key == GLFW.GLFW_KEY_END) {
+                searchCursor = searchQuery.length();
                 return true;
             } else if (key == GLFW.GLFW_KEY_BACKSPACE) {
-                if (!searchQuery.isEmpty()) {
-                    searchQuery = searchQuery.substring(0, searchQuery.length() - 1);
+                if (searchCursor > 0 && !searchQuery.isEmpty()) {
+                    searchQuery = searchQuery.substring(0, searchCursor - 1) + searchQuery.substring(searchCursor);
+                    searchCursor--;
+                }
+                return true;
+            } else if (key == GLFW.GLFW_KEY_DELETE) {
+                if (searchCursor < searchQuery.length()) {
+                    searchQuery = searchQuery.substring(0, searchCursor) + searchQuery.substring(searchCursor + 1);
                 }
                 return true;
             } else if (key == GLFW.GLFW_KEY_ENTER) {
@@ -237,7 +282,7 @@ public class ClickGuiScreen extends Screen {
             }
         }
 
-        if (key == GLFW.GLFW_KEY_ESCAPE) {
+        if (key == GLFW.GLFW_KEY_ESCAPE || (UI.INSTANCE != null && key == UI.INSTANCE.getKeybind().getValue())) {
             close();
             return true;
         }
@@ -252,7 +297,10 @@ public class ClickGuiScreen extends Screen {
     @Override
     public boolean charTyped(CharInput input) {
         if (searchActive && input.isValidChar()) {
-            searchQuery += input.asString();
+            searchCursor = Math.max(0, Math.min(searchCursor, searchQuery.length()));
+            String str = input.asString();
+            searchQuery = searchQuery.substring(0, searchCursor) + str + searchQuery.substring(searchCursor);
+            searchCursor += str.length();
             return true;
         }
         if (input.isValidChar()) {
@@ -264,12 +312,121 @@ public class ClickGuiScreen extends Screen {
         return super.charTyped(input);
     }
 
+    private List<String> wrapTooltipText(String text, float maxWidth) {
+        List<String> lines = new ArrayList<>();
+        if (text == null || text.trim().isEmpty()) return lines;
+
+        String[] words = text.split("\\s+");
+        StringBuilder current = new StringBuilder();
+
+        for (String word : words) {
+            String candidate = current.length() == 0 ? word : current + " " + word;
+            if (FontManager.INSTANCE.getStringWidth(candidate) <= maxWidth) {
+                current = new StringBuilder(candidate);
+            } else {
+                if (current.length() > 0) {
+                    lines.add(current.toString());
+                }
+                current = new StringBuilder(word);
+            }
+        }
+        if (current.length() > 0) {
+            lines.add(current.toString());
+        }
+        return lines;
+    }
+
+    private float[] getTooltipBounds(Module module, float mouseX, float mouseY) {
+        String desc = module.getDescription();
+        if (desc == null || desc.trim().isEmpty()) {
+            return new float[]{ mouseX, mouseY, 0, 0 };
+        }
+
+        float maxTextW = 160f;
+        List<String> descLines = wrapTooltipText(desc, maxTextW);
+        if (descLines.isEmpty()) {
+            return new float[]{ mouseX, mouseY, 0, 0 };
+        }
+
+        float textW = 0;
+        for (String line : descLines) {
+            textW = Math.max(textW, FontManager.INSTANCE.getStringWidth(line));
+        }
+
+        float padX = 6f;
+        float padY = 3.5f;
+        float lineH = 10.0f;
+
+        float cardW = textW + padX * 2f;
+        float cardH = descLines.size() * lineH + padY * 2f - 1.5f;
+
+        float cardX = mouseX + 8f;
+        float cardY = mouseY + 8f;
+
+        if (cardX + cardW > width - 6f) {
+            cardX = mouseX - cardW - 6f;
+        }
+        if (cardX < 6f) cardX = 6f;
+
+        if (cardY + cardH > height - 6f) {
+            cardY = mouseY - cardH - 6f;
+        }
+        if (cardY < 6f) cardY = 6f;
+
+        return new float[]{ cardX, cardY, cardW, cardH };
+    }
+
+    private void renderModuleTooltip(DrawContext context, Module module, float mouseX, float mouseY) {
+        float[] b = getTooltipBounds(module, mouseX, mouseY);
+        if (b[2] <= 0 || b[3] <= 0) return;
+
+        float x = b[0], y = b[1], w = b[2], h = b[3];
+        int accent = ClickGuiTheme.getAccentColor();
+
+        // 1. Tooltips Blur: dynamically blur the background/panels under the tooltip
+        boolean hasBlur = Blur.INSTANCE != null && Blur.INSTANCE.isToggled() && Blur.INSTANCE.tooltips.getValue();
+        if (hasBlur) {
+            List<float[]> tipRegions = new ArrayList<>();
+            tipRegions.add(new float[]{ x, y, x + w, y + h });
+            float tipRad = Blur.INSTANCE.tipRadius.getFloatValue();
+            float tipOp = Blur.INSTANCE.tipOpacity.getFloatValue();
+            BlurEngine.INSTANCE.renderBlur(context, tipRegions, tipRad, tipOp);
+        }
+
+        SmoothGfx.ensureInitialized();
+
+        // 2. Minimal soft drop shadow
+        SmoothGfx.softGlow(context, x, y, w, h, 3.0f, 0x33000000, 2.5f, 1.0f);
+
+        // 3. Frosted translucent obsidian surface with delicate accent outline
+        int fillColor = hasBlur ? 0x750B0F19 : 0xDC0B0F19;
+        int borderColor = (accent & 0x00FFFFFF) | 0x2E000000;
+        SmoothGfx.fillAndStroke(context, x, y, w, h, 3.0f, fillColor, borderColor, 0.8f);
+
+        // 4. Crisp description text
+        List<String> descLines = wrapTooltipText(module.getDescription(), 160f);
+        float curY = y + 3.5f;
+        for (String line : descLines) {
+            FontManager.INSTANCE.drawStringWithShadow(context, line, x + 6f, curY, new Color(241, 245, 249));
+            curY += 10.0f;
+        }
+    }
+
+
     @Override
     public void close() {
         if (UI.INSTANCE != null) {
             UI.INSTANCE.setToggled(false);
         }
         super.close();
+    }
+
+    @Override
+    public void removed() {
+        if (UI.INSTANCE != null && UI.INSTANCE.isToggled()) {
+            UI.INSTANCE.setToggled(false);
+        }
+        super.removed();
     }
 
     @Override

@@ -6,7 +6,7 @@ import net.minecraft.util.math.BlockPos;
 
 public class PosPosBorer extends BorerModule {
     public PosPosBorer() {
-        super("PosPosBorer", "Digs +X +Z highway.", 1, 2, 2, 2);
+        super("PosPosBorer", "Копает диагональный хайвей в направлении +X +Z.", 1, 2, 2, 2);
     }
 
     @Override

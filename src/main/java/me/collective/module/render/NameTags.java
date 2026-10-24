@@ -199,6 +199,7 @@ public class NameTags extends Module {
                     GuiGfx.fillRounded(context, ix, iy, slot, slot, 3, SLOT_BG.getRGB());
                     GuiGfx.outlineRounded(context, ix, iy, slot, slot, 3, BORDER.getRGB());
                     context.drawItem(equipment[i], (int) ix + 1, (int) iy + 1);
+                    context.drawStackOverlay(mc.textRenderer, equipment[i], (int) ix + 1, (int) iy + 1);
                     ix += slot;
                 }
             }

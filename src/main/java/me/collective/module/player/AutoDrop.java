@@ -46,7 +46,8 @@ public class AutoDrop extends Module {
         for (int i = 9; i < 36; i++) {
             ItemStack s = mc.player.getInventory().getStack(i);
             if (s.isEmpty() || s.contains(DataComponentTypes.CUSTOM_NAME)
-                || s.contains(DataComponentTypes.CUSTOM_DATA)) continue;
+                || s.contains(DataComponentTypes.CUSTOM_DATA)
+                || s.hasEnchantments()) continue;
             if (isTrash(s.getItem())) {
                 mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, i, 1, SlotActionType.THROW, mc.player);
                 delayTimer = delay.getIntValue();

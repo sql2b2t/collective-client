@@ -15,11 +15,12 @@ import org.lwjgl.glfw.GLFW;
 
 public class MiddleClickExtra extends Module {
     public final BooleanSetting pearl = add(new BooleanSetting("Pearl", true));
+    public final BooleanSetting friend = add(new BooleanSetting("Friend", true));
 
     private boolean wasPressed = false;
 
     public MiddleClickExtra() {
-        super("MiddleClickExtra", "Middle-click to instantly throw an Ender Pearl from your hotbar.", Category.PLAYER);
+        super("MiddleClickExtra", "Бросает жемчуг Края или добавляет игрока в друзья по клику колёсика мыши.", Category.PLAYER);
     }
 
     @EventHandler
@@ -29,7 +30,16 @@ public class MiddleClickExtra extends Module {
         boolean isPressed = GLFW.glfwGetMouseButton(mc.getWindow().getHandle(), GLFW.GLFW_MOUSE_BUTTON_MIDDLE) == GLFW.GLFW_PRESS;
 
         if (isPressed && !wasPressed) {
-            if (pearl.getValue()) {
+            if (friend.getValue() && mc.crosshairTarget instanceof net.minecraft.util.hit.EntityHitResult hit && hit.getEntity() instanceof net.minecraft.entity.player.PlayerEntity player) {
+                String name = player.getName().getString();
+                if (me.collective.manager.FriendManager.getInstance().isFriend(name)) {
+                    me.collective.manager.FriendManager.getInstance().removeFriend(name);
+                    me.collective.command.ChatHelper.sendMessage("Игрок §c" + name + " §fудалён из друзей.");
+                } else {
+                    me.collective.manager.FriendManager.getInstance().addFriend(name);
+                    me.collective.command.ChatHelper.sendMessage("Игрок §a" + name + " §fдобавлен в друзья.");
+                }
+            } else if (pearl.getValue()) {
                 throwPearl();
             }
         }
@@ -49,7 +59,7 @@ public class MiddleClickExtra extends Module {
         }
 
         if (mc.getNetworkHandler() != null) {
-            mc.getNetworkHandler().sendPacket(new PlayerInteractItemC2SPacket(hand, 0, mc.player.getYaw(), mc.player.getPitch()));
+            mc.getNetworkHandler().sendPacket(new PlayerInteractItemC2SPacket(hand, me.collective.util.GrimUtils.nextSequence(), mc.player.getYaw(), mc.player.getPitch()));
             mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
         }
 

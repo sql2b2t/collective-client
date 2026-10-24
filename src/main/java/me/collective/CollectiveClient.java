@@ -39,39 +39,38 @@ public class CollectiveClient implements ClientModInitializer {
             MinecraftClient mc = MinecraftClient.getInstance();
 
             // Do not render normal HUD when in ClickGUI or HudEditor
-            if (mc.currentScreen instanceof ClickGuiScreen || mc.currentScreen instanceof HudEditorScreen) {
+            if (mc.currentScreen instanceof ClickGuiScreen
+                    || mc.currentScreen instanceof HudEditorScreen) {
                 return;
-            }
-
-            if (HUD.INSTANCE == null || !HUD.INSTANCE.isToggled()) {
-                return;
-            }
-
-            // Live drag поверх чата: обновляем позицию перетаскиваемого
-            // HUD-модуля по текущему курсору и рисуем его рамку-подсветку.
-            if (mc.currentScreen instanceof net.minecraft.client.gui.screen.ChatScreen) {
-                double mx = mc.mouse.getX() * mc.getWindow().getScaledWidth()
-                    / mc.getWindow().getWidth();
-                double my = mc.mouse.getY() * mc.getWindow().getScaledHeight()
-                    / mc.getWindow().getHeight();
-                me.collective.gui.hud.ChatHudDrag.update(mx, my);
-
-                me.collective.module.hud.HudModule dragged =
-                    me.collective.gui.hud.ChatHudDrag.draggingModule();
-                if (dragged != null) {
-                    me.collective.render.RenderUtil.drawOutline(drawContext,
-                        dragged.getX() - 2, dragged.getY() - 2,
-                        Math.max(20, dragged.getWidth()) + 4,
-                        Math.max(10, dragged.getHeight()) + 4,
-                        1, new java.awt.Color(120, 180, 255, 255).getRGB());
-                }
             }
 
             float delta = renderTickCounter != null ? renderTickCounter.getTickProgress(false) : 1.0f;
 
-            for (HudModule module : ModuleManager.INSTANCE.getHudModules()) {
-                if (module.isToggled()) {
-                    module.render(drawContext, delta);
+            if (HUD.INSTANCE != null && HUD.INSTANCE.isToggled()) {
+                // Live drag поверх чата: обновляем позицию перетаскиваемого
+                // HUD-модуля по текущему курсору и рисуем его рамку-подсветку.
+                if (mc.currentScreen instanceof net.minecraft.client.gui.screen.ChatScreen) {
+                    double mx = mc.mouse.getX() * mc.getWindow().getScaledWidth()
+                        / mc.getWindow().getWidth();
+                    double my = mc.mouse.getY() * mc.getWindow().getScaledHeight()
+                        / mc.getWindow().getHeight();
+                    me.collective.gui.hud.ChatHudDrag.update(mx, my);
+
+                    me.collective.module.hud.HudModule dragged =
+                        me.collective.gui.hud.ChatHudDrag.draggingModule();
+                    if (dragged != null) {
+                        me.collective.render.RenderUtil.drawOutline(drawContext,
+                            dragged.getX() - 2, dragged.getY() - 2,
+                            Math.max(20, dragged.getWidth()) + 4,
+                            Math.max(10, dragged.getHeight()) + 4,
+                            1, new java.awt.Color(120, 180, 255, 255).getRGB());
+                    }
+                }
+
+                for (HudModule module : ModuleManager.INSTANCE.getHudModules()) {
+                    if (module.isToggled()) {
+                        module.render(drawContext, delta);
+                    }
                 }
             }
 
@@ -84,6 +83,7 @@ public class CollectiveClient implements ClientModInitializer {
 
         // Register Client Tick Callbacks for Modules and EventBus
         net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.START_CLIENT_TICK.register(client -> {
+            me.collective.util.TickPacer.onTick();
             if (client.player != null && client.world != null) {
                 // Кэш расчёта урона от взрывов живёт ровно один тик: ключ содержит
                 // блок и id сущности, но НЕ позицию — она меняется каждый тик.
@@ -99,6 +99,13 @@ public class CollectiveClient implements ClientModInitializer {
                 me.collective.event.EventBus.INSTANCE.post(new me.collective.event.events.TickEvent.Post());
                 ModuleManager.INSTANCE.onUpdate();
             }
+            me.collective.module.misc.AutoReconnect autoReconnect = ModuleManager.INSTANCE.getModule(me.collective.module.misc.AutoReconnect.class);
+            if (autoReconnect != null) {
+                autoReconnect.onClientTick();
+            }
+            if (me.collective.module.client.UI.INSTANCE != null) {
+                me.collective.module.client.UI.INSTANCE.onClientTick();
+            }
             try {
                 me.collective.config.ConfigManager.getInstance().tick();
             } catch (Throwable ignored) {
@@ -112,6 +119,7 @@ public class CollectiveClient implements ClientModInitializer {
                 me.collective.util.RotationUtils.getInstance().onDisconnect();
                 me.collective.util.InventoryManager.getInstance().onDisconnect();
                 me.collective.util.SwapManager.getInstance().onDisconnect();
+                me.collective.util.ExplosionDamageUtil.clearCache();
             });
 
         // Register World 3D Render Callback for Modules
@@ -165,6 +173,11 @@ public class CollectiveClient implements ClientModInitializer {
     public static void onKeyPressed(int key) {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.currentScreen == null) {
+            if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT_SHIFT && me.collective.module.client.UI.INSTANCE != null) {
+                me.collective.module.client.UI.INSTANCE.getKeybind().setValue(org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT_SHIFT);
+                me.collective.module.client.UI.INSTANCE.toggle();
+                return;
+            }
             ModuleManager.INSTANCE.onKeyPressed(key);
         }
     }

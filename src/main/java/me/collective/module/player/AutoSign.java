@@ -33,7 +33,7 @@ public class AutoSign extends Module {
     private int timer;
 
     public AutoSign() {
-        super("AutoSign", "Automatically writes signs. The first sign's text will be used.", Category.PLAYER);
+        super("AutoSign", "Автоматически заполняет текст табличек текстом с первой написанной таблички.", Category.PLAYER);
         INSTANCE = this;
     }
 

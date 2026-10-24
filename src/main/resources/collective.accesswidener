@@ -23,3 +23,5 @@ accessible field net/minecraft/client/gui/screen/ChatInputSuggestor x I
 accessible field net/minecraft/client/gui/screen/ChatInputSuggestor width I
 accessible class net/minecraft/world/chunk/PalettedContainer$Data
 accessible field net/minecraft/world/chunk/PalettedContainer data Lnet/minecraft/world/chunk/PalettedContainer$Data;
+accessible field net/minecraft/client/render/WorldRenderer blockBreakingInfos Lit/unimi/dsi/fastutil/ints/Int2ObjectMap;
+

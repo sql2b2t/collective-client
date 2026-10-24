@@ -7,7 +7,7 @@ public class NoHurtCam extends Module {
     public static NoHurtCam INSTANCE;
 
     public NoHurtCam() {
-        super("NoHurtCam", "Disables camera shake when taking damage.", Category.RENDER);
+        super("NoHurtCam", "Отключает тряску камеры при получении урона.", Category.RENDER);
         INSTANCE = this;
     }
 }

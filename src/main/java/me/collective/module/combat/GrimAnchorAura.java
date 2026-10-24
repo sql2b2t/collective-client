@@ -63,13 +63,24 @@ public class GrimAnchorAura extends Module {
         PLACE, CHARGE, EXPLODE
     }
 
+    public enum Preset {
+        CUSTOM,
+        GRIM_2B2T,
+        GRIM_SAFE,
+        VANILLA_FAST
+    }
+
+    // ── Пресеты и удобство настройки ─────────────────────────────────
+    public final EnumSetting<Preset> preset                   = add(new EnumSetting<>("Preset", Preset.GRIM_2B2T));
+    public final BooleanSetting pauseOnEat                   = add(new BooleanSetting("PauseOnEat", true));
+    public final BooleanSetting pauseOnMine                  = add(new BooleanSetting("PauseOnMine", false));
+    public final BooleanSetting antiSuicide                  = add(new BooleanSetting("AntiSuicide", true));
+
     public final EnumSetting<RotationMode> rotationMode     = add(new EnumSetting<>("Rotation", RotationMode.SILENT));
     // Коррекция движения при тихой ротации.
-    //   true  — клиент считает вектор движения по ОТПРАВЛЕННОМУ серверу углу,
-    //           ввод W/A/S/D не трогаем. Совпадение с серверным предиктом точное.
-    //   false — старое поведение: ввод перемапливается на шаги по 45° и скорость
-    //           подравнивается. Ошибка до ±22.5°, GrimAC ловит как Strafe.
-    public final BooleanSetting syncMovement                  = add(new BooleanSetting("SyncMovement", true));
+    //   false — плавная коррекция под камеру (MovementFix) без флагов GrimAC.
+    //   true  — движение строго по серверному углу (без коррекции).
+    public final BooleanSetting syncMovement                  = add(new BooleanSetting("SyncMovement", false));
     public final NumberSetting targetRange                   = add(new NumberSetting("TargetRange", 10.0, 1.0, 15.0, 0.5));
     public final NumberSetting placeReach                    = add(new NumberSetting("Reach", 4.2, 1.0, 4.5, 0.1));
     public final NumberSetting turnSpeed                     = add(new NumberSetting("TurnSpeed", 65.0, 15.0, 180.0, 5.0));
@@ -82,11 +93,12 @@ public class GrimAnchorAura extends Module {
     public final NumberSetting placeDelay                    = add(new NumberSetting("PlaceDelay", 1.0, 0.0, 5.0, 1.0));
     public final NumberSetting chargeDelay                   = add(new NumberSetting("ChargeDelay", 1.0, 0.0, 5.0, 1.0));
     public final NumberSetting breakDelay                    = add(new NumberSetting("BreakDelay", 1.0, 0.0, 5.0, 1.0));
+    public final BooleanSetting fastCycle                    = add(new BooleanSetting("FastCycle", true));
 
     // Тики ожидания подтверждения с сервера после действия.
     // GrimAC обрабатывает блоки не мгновенно — нужно дождаться
     // хотя бы 1-2 тика прежде чем считывать состояние мира.
-    public final NumberSetting serverConfirmTicks            = add(new NumberSetting("ServerConfirm", 2.0, 1.0, 6.0, 1.0));
+    public final NumberSetting serverConfirmTicks            = add(new NumberSetting("ServerConfirm", 1.0, 0.0, 6.0, 1.0));
 
     public final BooleanSetting checkDimension               = add(new BooleanSetting("CheckDimension", true));
     public final BooleanSetting selfDamageSafety             = add(new BooleanSetting("Safety", false));
@@ -155,7 +167,7 @@ public class GrimAnchorAura extends Module {
     private int explodedWaitTimer;
 
     public GrimAnchorAura() {
-        super("GrimAnchorAura", "Automated Respawn Anchor placement, charging, and exploding for GrimAC.", Category.COMBAT);
+        super("GrimAnchorAura", "Автоматическая установка, зарядка светокамнем и взрыв якорей возрождения под GrimAC.", Category.COMBAT);
     }
 
     @Override
@@ -206,7 +218,82 @@ public class GrimAnchorAura extends Module {
         if (!this.aiming) RotationUtils.getInstance().release(this);
     }
 
+    private Preset lastAppliedPreset = null;
+
+    private void applyPreset() {
+        Preset current = preset.getValue();
+        if (current == Preset.CUSTOM || current == lastAppliedPreset) return;
+        lastAppliedPreset = current;
+
+        switch (current) {
+            case GRIM_2B2T -> {
+                placeDelay.setValue(0.0);
+                chargeDelay.setValue(0.0);
+                breakDelay.setValue(0.0);
+                fastCycle.setValue(true);
+                serverConfirmTicks.setValue(0.0);
+                predict.setValue(true);
+                rotationMode.setValue(RotationMode.SILENT);
+                syncMovement.setValue(false);
+                turnSpeed.setValue(180.0);
+                smoothness.setValue(0.0);
+                placeReach.setValue(4.2);
+                minTargetDamage.setValue(4.0);
+                maxSelfDamage.setValue(8.0);
+            }
+            case GRIM_SAFE -> {
+                placeDelay.setValue(1.0);
+                chargeDelay.setValue(1.0);
+                breakDelay.setValue(1.0);
+                fastCycle.setValue(false);
+                serverConfirmTicks.setValue(1.0);
+                predict.setValue(false);
+                rotationMode.setValue(RotationMode.SILENT);
+                syncMovement.setValue(false);
+                turnSpeed.setValue(75.0);
+                smoothness.setValue(0.50);
+                placeReach.setValue(4.0);
+                minTargetDamage.setValue(5.0);
+                maxSelfDamage.setValue(6.0);
+            }
+            case VANILLA_FAST -> {
+                placeDelay.setValue(0.0);
+                chargeDelay.setValue(0.0);
+                breakDelay.setValue(0.0);
+                fastCycle.setValue(true);
+                serverConfirmTicks.setValue(0.0);
+                predict.setValue(true);
+                syncMovement.setValue(false);
+                turnSpeed.setValue(180.0);
+                smoothness.setValue(0.0);
+                placeReach.setValue(4.5);
+                minTargetDamage.setValue(2.0);
+                maxSelfDamage.setValue(10.0);
+            }
+            case CUSTOM -> {}
+        }
+    }
+
+    @Override
+    public String getInfoString() {
+        return preset.getValue() != Preset.CUSTOM ? preset.getValue().name() : "CUSTOM";
+    }
+
     private void tickAura() {
+        applyPreset();
+
+        if (this.pauseOnEat.getValue() && mc.player.isUsingItem()) {
+            cancelPending();
+            RotationUtils.getInstance().release(this);
+            return;
+        }
+
+        if (this.pauseOnMine.getValue() && mc.interactionManager != null && mc.interactionManager.isBreakingBlock()) {
+            cancelPending();
+            RotationUtils.getInstance().release(this);
+            return;
+        }
+
         // Якорь взрыва работает только вне Незера
         if (this.checkDimension.getValue() && mc.world.getRegistryKey() == World.NETHER) {
             cancelPending();
@@ -249,12 +336,18 @@ public class GrimAnchorAura extends Module {
         // углов ломает проверки прицела друг друга. Слот берём только когда
         // есть цель: простаивающий якорь не съедает тики кристалла.
         // Отказ слота наведение не отменяет — доворот доживёт до своего тика.
+        double reach = this.placeReach.getValue();
+        BlockPos existingAnchor = findExistingAnchor(this.currentTarget, reach);
+        if (existingAnchor == null && !findAnchor().found()) {
+            cancelPending();
+            this.currentAnchorPos = null;
+            RotationUtils.getInstance().release(this);
+            return;
+        }
+
         this.aiming = true;
         if (!AuraCoordination.claim(this, mc.world.getTime())) return;
 
-        double reach = this.placeReach.getValue();
-
-        BlockPos existingAnchor = findExistingAnchor(this.currentTarget, reach);
         if (existingAnchor != null) {
             this.currentAnchorPos = existingAnchor;
             this.lastPlacedAnchorPos = null;
@@ -329,8 +422,12 @@ public class GrimAnchorAura extends Module {
             applyAim(faceCenter(hit));
 
             if (isAimedViaSentRot(hit, reach)) {
-                if (!SwapManager.getInstance().isActionConflictTick()) {
+                if (glowstone.isOffhand() || !SwapManager.getInstance().isActionConflictTick()) {
                     executeCharge(anchorPos);
+
+                    if (this.fastCycle.getValue() && this.actionTimer == 0) {
+                        tryFastExplode(anchorPos, hit);
+                    }
                 }
             }
 
@@ -346,7 +443,51 @@ public class GrimAnchorAura extends Module {
                 return;
             }
 
-            if (this.selfDamageSafety.getValue() && isUnsafeToExplode(anchorPos)) {
+            if (this.selfDamageSafety.getValue()) {
+                if (isUnsafeToExplode(anchorPos)) {
+                    cancelPending();
+                    return;
+                }
+
+                // ── Проверка урона перед взрывом ─────────────────────
+                // Считаем сколько реально нанесём цели и себе
+                if (this.currentTarget instanceof LivingEntity livingTarget) {
+                    boolean elevated = isTargetElevated(livingTarget);
+                    float targetDmg = ExplosionDamageUtil.getDamage(mc.world, anchorPos, livingTarget);
+                    float selfDmg   = ExplosionDamageUtil.getDamage(mc.world, anchorPos, mc.player);
+
+                    float minDmg  = effectiveMinTargetDamage(livingTarget);
+                    double ratio  = effectiveDamageRatio(livingTarget);
+
+                    // Общий порог: цель должна что-то получить
+                    if (targetDmg < minDmg) {
+                        cancelPending();
+                        return;
+                    }
+
+                    if (elevated) {
+                        if (!selfDamageSurvivable(selfDmg)) {
+                            cancelPending();
+                            return;
+                        }
+
+                        if (selfDmg > 0.5f && targetDmg / selfDmg < ratio) {
+                            cancelPending();
+                            return;
+                        }
+                    } else {
+                        if (selfDmg > this.maxSelfDamage.getValue().floatValue()) {
+                            cancelPending();
+                            return;
+                        }
+
+                        if (selfDmg > 0.5f && targetDmg / selfDmg < ratio) {
+                            cancelPending();
+                            return;
+                        }
+                    }
+                }
+            } else if (this.antiSuicide.getValue() && isUnsafeToExplode(anchorPos)) {
                 cancelPending();
                 return;
             }
@@ -355,52 +496,6 @@ public class GrimAnchorAura extends Module {
             if (isFriendDamaged(anchorPos)) {
                 cancelPending();
                 return;
-            }
-
-            // ── Проверка урона перед взрывом ─────────────────────
-            // Считаем сколько реально нанесём цели и себе
-            if (this.currentTarget instanceof LivingEntity livingTarget) {
-                boolean elevated = isTargetElevated(livingTarget);
-                float targetDmg = ExplosionDamageUtil.getDamage(mc.world, anchorPos, livingTarget);
-                float selfDmg   = ExplosionDamageUtil.getDamage(mc.world, anchorPos, mc.player);
-
-                float minDmg  = effectiveMinTargetDamage(livingTarget);
-                double ratio  = effectiveDamageRatio(livingTarget);
-
-                // Общий порог: цель должна что-то получить
-                if (targetDmg < minDmg) {
-                    cancelPending();
-                    return;
-                }
-
-                if (elevated) {
-                    // Противник выше нас больше чем на полблока: якорь уже стоит
-                    // вплотную, радиус взрыва (10) шире reach (4.2), поэтому
-                    // самоурон почти неизбежен. Отменяем только если он летальный.
-                    if (!selfDamageSurvivable(selfDmg)) {
-                        cancelPending();
-                        return;
-                    }
-
-                    // Соотношение здесь почти всегда ~1:1, поэтому гейт мягкий
-                    if (selfDmg > 0.5f && targetDmg / selfDmg < ratio) {
-                        cancelPending();
-                        return;
-                    }
-                } else {
-                    // Не взрываем если себе слишком много урона
-                    if (selfDmg > this.maxSelfDamage.getValue().floatValue()) {
-                        cancelPending();
-                        return;
-                    }
-
-                    // Не взрываем если урон по цели не превышает наш урон в нужное кол-во раз
-                    // selfDmg == 0 → всегда хорошо, не делим на ноль
-                    if (selfDmg > 0.5f && targetDmg / selfDmg < ratio) {
-                        cancelPending();
-                        return;
-                    }
-                }
             }
 
             FindItemResult breakItem = findBreakItem();
@@ -420,10 +515,45 @@ public class GrimAnchorAura extends Module {
             applyAim(faceCenter(hit));
 
             if (isAimedViaSentRot(hit, reach)) {
-                if (!SwapManager.getInstance().isActionConflictTick()) {
+                if (breakItem.isOffhand() || !SwapManager.getInstance().isActionConflictTick()) {
                     executeExplode(anchorPos);
                 }
             }
+        }
+    }
+
+    private void tryFastExplode(BlockPos anchorPos, BlockHitResult hit) {
+        if (this.selfDamageSafety.getValue()) {
+            if (isUnsafeToExplode(anchorPos)) return;
+            if (this.currentTarget instanceof LivingEntity livingTarget) {
+                boolean elevated = isTargetElevated(livingTarget);
+                float targetDmg = ExplosionDamageUtil.getDamage(mc.world, anchorPos, livingTarget);
+                float selfDmg   = ExplosionDamageUtil.getDamage(mc.world, anchorPos, mc.player);
+                float minDmg  = effectiveMinTargetDamage(livingTarget);
+                double ratio  = effectiveDamageRatio(livingTarget);
+
+                if (targetDmg < minDmg) return;
+                if (elevated) {
+                    if (!selfDamageSurvivable(selfDmg)) return;
+                    if (selfDmg > 0.5f && targetDmg / selfDmg < ratio) return;
+                } else {
+                    if (selfDmg > this.maxSelfDamage.getValue().floatValue()) return;
+                    if (selfDmg > 0.5f && targetDmg / selfDmg < ratio) return;
+                }
+            }
+        } else if (this.antiSuicide.getValue() && isUnsafeToExplode(anchorPos)) {
+            return;
+        }
+
+        if (isFriendDamaged(anchorPos)) return;
+
+        FindItemResult breakItem = findBreakItem();
+        if (!breakItem.found()) return;
+
+        if (breakItem.isOffhand() || SwapManager.getInstance().getServerSlot() == breakItem.slot()) {
+            this.pendingAction = ActionType.EXPLODE;
+            this.pendingHit = hit;
+            executeExplode(anchorPos);
         }
     }
 
@@ -458,7 +588,7 @@ public class GrimAnchorAura extends Module {
         applyAim(faceCenter(hit));
 
         if (isAimedViaSentRot(hit, reach)) {
-            if (!SwapManager.getInstance().isActionConflictTick()) {
+            if (anchor.isOffhand() || !SwapManager.getInstance().isActionConflictTick()) {
                 executePlace(placePos);
             }
         }
@@ -575,18 +705,11 @@ public class GrimAnchorAura extends Module {
                 // setRotationFullInstant сам ставит syncMovement = true.
                 rotUtils.setRotationFullInstant(this, ROTATION_PRIORITY,
                     mc.player.getYaw(), mc.player.getPitch());
+            } else if (maxSpeed >= 180.0 && smooth <= 0.0) {
+                rotUtils.setRotationInstant(this, ROTATION_PRIORITY,
+                    rot[0], rot[1], this.syncMovement.getValue());
             } else {
                 // SILENT — плавный серверный поворот, камера не двигается.
-                //
-                // syncMovement решает, как клиент посчитает вектор движения
-                // относительно угла, который ушёл серверу:
-                //   true  — MixinEntity подставляет в movementInputToVelocity
-                //            серверный yaw, а MixinClientPlayerEntity не трогает
-                //            ввод. Вектор совпадает с серверным до миллиметра.
-                //   false — MixinEntity подставляет serverYaw + k*45, и ввод
-                //            дополнительно перемапливается на k шагов. Две
-                //            коррекции складываются и дают уход до 45°,
-                //            именно это GrimAC и называет Strafe.
                 rotUtils.setRotationSmooth(this, ROTATION_PRIORITY,
                     rot[0], rot[1], maxSpeed, this.syncMovement.getValue());
             }
@@ -613,23 +736,25 @@ public class GrimAnchorAura extends Module {
         FindItemResult anchor = findAnchor();
         if (!anchor.found()) { cancelPending(); return; }
 
-        if (!SwapManager.getInstance().hold(this, anchor.slot(), SwapManager.Priority.PLACE, 2)) return;
+        if (!anchor.isOffhand()) {
+            if (!SwapManager.getInstance().hold(this, anchor.slot(), SwapManager.Priority.PLACE, 2)) return;
+        }
 
         // Рандомизируем курсор на грани блока: GrimAC детектит
         // всегда один и тот же offset (0.5,0.5,0.5) как бот
         BlockHitResult finalHit = randomizeCursor(hit);
 
+        Hand hand = anchor.getHand();
         int seq = GrimUtils.nextSequence();
-        mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, finalHit, seq));
-        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+        mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(hand, finalHit, seq));
+        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
 
         if (this.predict.getValue()) {
             mc.world.setBlockState(placePos, Blocks.RESPAWN_ANCHOR.getDefaultState());
         }
 
         this.lastPlacedAnchorPos = placePos;
-        // Ждём serverConfirmTicks — даём GrimAC время обработать размещение
-        this.placedWaitTimer = this.serverConfirmTicks.getValue().intValue() + 1;
+        this.placedWaitTimer = this.serverConfirmTicks.getValue().intValue();
         this.actionTimer     = this.placeDelay.getValue().intValue();
         cancelPending();
     }
@@ -646,13 +771,16 @@ public class GrimAnchorAura extends Module {
         FindItemResult glowstone = findGlowstone();
         if (!glowstone.found()) { cancelPending(); return; }
 
-        if (!SwapManager.getInstance().hold(this, glowstone.slot(), SwapManager.Priority.PLACE, 2)) return;
+        if (!glowstone.isOffhand()) {
+            if (!SwapManager.getInstance().hold(this, glowstone.slot(), SwapManager.Priority.PLACE, 2)) return;
+        }
 
         BlockHitResult finalHit = randomizeCursor(hit);
 
+        Hand hand = glowstone.getHand();
         int seq = GrimUtils.nextSequence();
-        mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, finalHit, seq));
-        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+        mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(hand, finalHit, seq));
+        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
 
         if (this.predict.getValue()) {
             mc.world.setBlockState(anchorPos,
@@ -660,7 +788,7 @@ public class GrimAnchorAura extends Module {
         }
 
         this.lastChargedAnchorPos = anchorPos;
-        this.chargedWaitTimer     = this.serverConfirmTicks.getValue().intValue() + 1;
+        this.chargedWaitTimer     = this.serverConfirmTicks.getValue().intValue();
         this.actionTimer          = this.chargeDelay.getValue().intValue();
         cancelPending();
     }
@@ -677,23 +805,24 @@ public class GrimAnchorAura extends Module {
         FindItemResult breakItem = findBreakItem();
         if (!breakItem.found()) { cancelPending(); return; }
 
-        if (!SwapManager.getInstance().hold(this, breakItem.slot(), SwapManager.Priority.PLACE, 2)) return;
+        if (!breakItem.isOffhand()) {
+            if (!SwapManager.getInstance().hold(this, breakItem.slot(), SwapManager.Priority.PLACE, 2)) return;
+        }
 
         BlockHitResult finalHit = randomizeCursor(hit);
 
+        Hand hand = breakItem.getHand();
         int seq = GrimUtils.nextSequence();
-        mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, finalHit, seq));
-        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+        mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(hand, finalHit, seq));
+        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
 
         if (this.predict.getValue()) {
             mc.world.setBlockState(anchorPos, Blocks.AIR.getDefaultState());
         }
 
         this.lastExplodedAnchorPos = anchorPos;
-        this.explodedWaitTimer     = this.serverConfirmTicks.getValue().intValue() + 1;
+        this.explodedWaitTimer     = this.serverConfirmTicks.getValue().intValue();
         this.lastPlacedAnchorPos   = null;
-        // Якоря на позиции больше нет — следующий надо ставить заново,
-        // иначе keepSticky будет вечно упираться в заблокированный блок.
         this.stickyPos = null;
         this.placedWaitTimer       = 0;
         this.currentAnchorPos      = null;
@@ -916,10 +1045,20 @@ public class GrimAnchorAura extends Module {
     // ─────────────────────────────────────────────────────────────
 
     private boolean isUnsafeToExplode(BlockPos anchorPos) {
-        if (this.testAlone.getValue() || !this.selfDamageSafety.getValue()) return false;
+        if (this.testAlone.getValue()) return false;
+
+        if (mc.player == null || mc.world == null) return true;
 
         boolean hasTotem = mc.player.getMainHandStack().isOf(Items.TOTEM_OF_UNDYING)
                 || mc.player.getOffHandStack().isOf(Items.TOTEM_OF_UNDYING);
+
+        if (this.antiSuicide.getValue() && !hasTotem) {
+            float totalHp = mc.player.getHealth() + mc.player.getAbsorptionAmount();
+            float selfDmg = ExplosionDamageUtil.getDamageRaw(mc.world, anchorPos, mc.player);
+            if (selfDmg >= totalHp - 0.5f) return true;
+        }
+
+        if (!this.selfDamageSafety.getValue()) return false;
 
         Vec3d center     = anchorPos.toCenterPos();
         double playerDist = mc.player.getEyePos().distanceTo(center);
@@ -1164,7 +1303,12 @@ public class GrimAnchorAura extends Module {
                 BlockPos bestPos = null;
                 float bestTarget = Float.NEGATIVE_INFINITY;
                 for (BlockPos p : pool) {
-                    float targetDmg = ExplosionDamageUtil.getDamageRaw(mc.world, p, livingTarget);
+                    if (this.antiSuicide.getValue()) {
+                        float selfDmg = ExplosionDamageUtil.getDamage(mc.world, p, mc.player);
+                        float totalHp = mc.player.getHealth() + mc.player.getAbsorptionAmount();
+                        if (selfDmg >= totalHp - 0.5f) continue;
+                    }
+                    float targetDmg = ExplosionDamageUtil.getDamage(mc.world, p, livingTarget);
                     if (targetDmg > bestTarget) {
                         bestTarget = targetDmg;
                         bestPos = p;
@@ -1182,12 +1326,16 @@ public class GrimAnchorAura extends Module {
             float bestScore = Float.NEGATIVE_INFINITY;
 
             for (BlockPos p : pool) {
-                float targetDmg = ExplosionDamageUtil.getDamageRaw(mc.world, p, livingTarget);
-                float selfDmg   = ExplosionDamageUtil.getDamageRaw(mc.world, p, mc.player);
+                float targetDmg = ExplosionDamageUtil.getDamage(mc.world, p, livingTarget);
+                float selfDmg   = ExplosionDamageUtil.getDamage(mc.world, p, mc.player);
 
                 // Отбрасываем позиции где нам плохо
                 if (targetDmg < minDmg) continue;
                 if (selfDmg > maxSelf) continue;
+                if (this.antiSuicide.getValue()) {
+                    float totalHp = mc.player.getHealth() + mc.player.getAbsorptionAmount();
+                    if (selfDmg >= totalHp - 0.5f) continue;
+                }
                 if (selfDmg > 0.5f && targetDmg / selfDmg < ratio) continue;
 
                 // Оценка: разница "урон цели - урон себе"
@@ -1210,10 +1358,10 @@ public class GrimAnchorAura extends Module {
             BlockPos fallback = null;
             float bestTarget  = Float.NEGATIVE_INFINITY;
             for (BlockPos p : pool) {
-                float selfDmg = ExplosionDamageUtil.getDamageRaw(mc.world, p, mc.player);
+                float selfDmg = ExplosionDamageUtil.getDamage(mc.world, p, mc.player);
                 if (!selfDamageSurvivable(selfDmg)) continue;
 
-                float targetDmg = ExplosionDamageUtil.getDamageRaw(mc.world, p, livingTarget);
+                float targetDmg = ExplosionDamageUtil.getDamage(mc.world, p, livingTarget);
                 if (targetDmg > bestTarget) {
                     bestTarget = targetDmg;
                     fallback = p;
@@ -1325,7 +1473,7 @@ public class GrimAnchorAura extends Module {
     // ─────────────────────────────────────────────────────────────
 
     private FindItemResult findAnchor() {
-        FindItemResult hotbar = InventoryUtil.findInHotbar(Items.RESPAWN_ANCHOR);
+        FindItemResult hotbar = InventoryUtil.findInHotbarOrOffhand(Items.RESPAWN_ANCHOR);
         if (hotbar.found()) return hotbar;
 
         if (this.replenish.getValue() && GrimUtils.inventoryClickClean()) {
@@ -1340,7 +1488,7 @@ public class GrimAnchorAura extends Module {
     }
 
     private FindItemResult findGlowstone() {
-        FindItemResult hotbar = InventoryUtil.findInHotbar(Items.GLOWSTONE);
+        FindItemResult hotbar = InventoryUtil.findInHotbarOrOffhand(Items.GLOWSTONE);
         if (hotbar.found()) return hotbar;
 
         if (this.replenish.getValue() && GrimUtils.inventoryClickClean()) {
@@ -1361,6 +1509,11 @@ public class GrimAnchorAura extends Module {
     private FindItemResult findBreakItem() {
         if (mc.player == null) return new FindItemResult(-1, 0);
 
+        ItemStack offhand = mc.player.getOffHandStack();
+        if (!offhand.isEmpty() && !offhand.isOf(Items.GLOWSTONE)) {
+            return new FindItemResult(40, offhand.getCount());
+        }
+
         int current       = mc.player.getInventory().getSelectedSlot();
         ItemStack curStack = mc.player.getInventory().getStack(current);
         if (!curStack.isOf(Items.GLOWSTONE)) {
@@ -1376,7 +1529,8 @@ public class GrimAnchorAura extends Module {
                 if (stack.isEmpty()
                         || stack.isIn(ItemTags.SWORDS)
                         || stack.isIn(ItemTags.AXES)
-                        || stack.isOf(Items.TOTEM_OF_UNDYING)) {
+                        || stack.isOf(Items.TOTEM_OF_UNDYING)
+                        || stack.isOf(Items.RESPAWN_ANCHOR)) {
                     preferredSlot = i;
                     break;
                 }

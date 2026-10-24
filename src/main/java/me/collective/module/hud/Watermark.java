@@ -14,7 +14,7 @@ public class Watermark extends HudModule {
     public final BooleanSetting version = add(new BooleanSetting("Version", true));
 
     public Watermark() {
-        super("Watermark", "Displays the client watermark.", 4, 4);
+        super("Watermark", "Отображает ватермарку с названием и версией клиента.", 4, 4);
     }
 
     @Override

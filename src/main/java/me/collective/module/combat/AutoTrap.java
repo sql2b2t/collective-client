@@ -52,7 +52,7 @@ public class AutoTrap extends Module {
         PlayerEntity target = getTarget();
         if (target == null) return;
 
-        FindItemResult obby = InventoryUtil.findInHotbar(Items.OBSIDIAN, Items.CRYING_OBSIDIAN, Items.NETHERITE_BLOCK);
+        FindItemResult obby = InventoryUtil.findInHotbarOrOffhand(Items.OBSIDIAN, Items.CRYING_OBSIDIAN, Items.NETHERITE_BLOCK);
         if (!obby.found()) return;
 
         List<BlockPos> blocks = getBlocks(target);

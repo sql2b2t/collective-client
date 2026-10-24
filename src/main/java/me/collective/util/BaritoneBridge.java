@@ -36,7 +36,9 @@ public final class BaritoneBridge {
     /** Неблокирующая выдача цели (расчёт пути в пуле Baritone). */
     public static void setGoalAsync(BlockPos pos) {
         try {
-            BaritoneAPI.getProvider().getPrimaryBaritone().getCustomGoalProcess().setGoal(new GoalBlock(pos));
+            var process = BaritoneAPI.getProvider().getPrimaryBaritone().getCustomGoalProcess();
+            process.setGoal(new GoalBlock(pos));
+            process.path();
         } catch (Throwable ignored) {
         }
     }

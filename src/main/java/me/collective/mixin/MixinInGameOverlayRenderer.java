@@ -31,6 +31,12 @@ public abstract class MixinInGameOverlayRenderer {
         if (mod != null && mod.isToggled()) {
             mod.showFloatingItem(floatingItem);
         }
+        if (floatingItem != null && floatingItem.isOf(net.minecraft.item.Items.TOTEM_OF_UNDYING)) {
+            me.collective.module.combat.Offhand offhand = me.collective.module.combat.Offhand.INSTANCE;
+            if (offhand != null) {
+                offhand.onTotemPop();
+            }
+        }
     }
 
     @Inject(method = "renderFloatingItem", at = @At("HEAD"), cancellable = true)

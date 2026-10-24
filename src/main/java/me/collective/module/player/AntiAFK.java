@@ -13,7 +13,7 @@ public class AntiAFK extends Module {
     private int jumpTimer = 0;
 
     public AntiAFK() {
-        super("AntiAFK", "Prevents getting disconnected from 2b2t due to inactivity/AFK timer.", Category.PLAYER);
+        super("AntiAFK", "Предотвращает кик с сервера за бездействие и AFK-таймер.", Category.PLAYER);
     }
 
     @EventHandler

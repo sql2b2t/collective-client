@@ -13,12 +13,13 @@ import net.minecraft.util.hit.HitResult;
 
 public class AutoTool extends Module {
     public final BooleanSetting switchBack = add(new BooleanSetting("SwitchBack", true));
+    public final BooleanSetting saveDurability = add(new BooleanSetting("SaveDurability", true));
 
     private boolean wasPressed = false;
     private int prevSlot = -1;
 
     public AutoTool() {
-        super("AutoTool", "Automatically switches to the fastest tool when mining blocks.", Category.PLAYER);
+        super("AutoTool", "Автоматически выбирает наиболее эффективный инструмент при копании блоков.", Category.PLAYER);
     }
 
     @EventHandler
@@ -54,7 +55,17 @@ public class AutoTool extends Module {
 
         for (int i = 0; i < 9; i++) {
             ItemStack stack = mc.player.getInventory().getStack(i);
+            if (stack.isEmpty()) continue;
+
+            if (saveDurability.getValue() && stack.isDamageable()) {
+                if ((stack.getMaxDamage() - stack.getDamage()) < 15) continue;
+            }
+
             float speed = stack.getMiningSpeedMultiplier(state);
+            if (state.isToolRequired() && !stack.isSuitableFor(state)) {
+                continue;
+            }
+
             if (speed > bestSpeed) {
                 bestSpeed = speed;
                 bestSlot = i;

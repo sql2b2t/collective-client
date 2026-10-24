@@ -51,7 +51,7 @@ public class OffhandManager extends Module {
     private boolean swapped;
 
     public OffhandManager() {
-        super("OffhandManager", "Automatically manages your offhand (optimized for highway work).", Category.HIGHWAY);
+        super("OffhandManager", "Управляет предметами во второй руке для непрерывного строительства дорог.", Category.HIGHWAY);
     }
 
     @Override
@@ -79,12 +79,6 @@ public class OffhandManager extends Module {
     public void onPreTick(TickEvent.Pre event) {
         if (mc.player == null || mc.world == null || !isToggled()) return;
 
-        // Anti cursor stack
-        if (moved) {
-            dropCursor();
-            moved = false;
-        }
-
         AirPlaceScaffold scaffold = ModuleManager.INSTANCE.getModule(AirPlaceScaffold.class);
         boolean scaffolding = scaffold != null && scaffold.isBusy();
         if (scaffolding) return;
@@ -100,6 +94,11 @@ public class OffhandManager extends Module {
         if (!mc.player.getOffHandStack().isOf(currentItem.item) && !swapped) {
             FindItemResult item = InventoryUtil.find(stack -> stack.isOf(currentItem.item),
                 hotbar.getValue() ? 0 : 9, 35);
+
+            if (!item.found() && currentItem == Item.EGap) {
+                item = InventoryUtil.find(stack -> stack.isOf(Items.GOLDEN_APPLE),
+                    hotbar.getValue() ? 0 : 9, 35);
+            }
 
             if (!item.found()) {
                 if (!sentMsg) {

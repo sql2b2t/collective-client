@@ -10,7 +10,7 @@ import net.minecraft.util.math.Vec3d;
 /** Clips horizontal walking at unsupported edges without forging sneak packets. */
 public class SafeWalk extends Module {
     public SafeWalk() {
-        super("SafeWalk", "Prevents you from walking off the edge of blocks.", Category.MOVEMENT);
+        super("SafeWalk", "Предотвращает падение с краёв блоков (как при зажатом Shift).", Category.MOVEMENT);
     }
 
     @EventHandler

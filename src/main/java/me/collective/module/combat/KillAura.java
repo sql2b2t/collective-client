@@ -87,11 +87,10 @@ public class KillAura extends Module {
     // ── Булава ──
     public static BooleanSetting profileInvoke = new BooleanSetting("Булава", false);
     public static NumberSetting scaleSave = new NumberSetting("Высота булавы", 2.0F, 0.5F, 6.0F, 0.1F);
+    public static BooleanSetting autoWeapon = new BooleanSetting("Авто-оружие", true);
+    public static NumberSetting cooldownGate = new NumberSetting("Кулдаун удара", 0.92F, 0.80F, 1.0F, 0.02F);
 
     public static BooleanSetting debugOutput = new BooleanSetting("Отладка", false);
-
-    /** Порог кулдауна: ниже 0.90 сервер режет урон, ниже не опускаемся. */
-    private static final float COOLDOWN_GATE = 0.92f;
 
     /**
      * Допустимое расхождение серверного угла с углом на цель перед ударом.
@@ -122,6 +121,8 @@ public class KillAura extends Module {
         add(sprintReset);
         add(followTarget);
         add(nearestTarget);
+        add(autoWeapon);
+        add(cooldownGate);
         add(profileInvoke);
         add(scaleSave);
         add(debugOutput);
@@ -406,17 +407,21 @@ public class KillAura extends Module {
         RotationUtils rotUtils = RotationUtils.getInstance();
         float dyaw = Math.abs(MathHelper.wrapDegrees(targetYaw - rotUtils.getSentYaw()));
         float dpitch = Math.abs(targetPitch - rotUtils.getSentPitch());
-        return dyaw <= AIM_EPSILON && dpitch <= AIM_EPSILON;
+        if (dyaw <= AIM_EPSILON && dpitch <= AIM_EPSILON) return true;
+        // Если луч по отправленным углам уже попадает в хитбокс цели — наведение готово
+        return !isRayBlocked();
     }
 
     private boolean shouldSkipAttack() {
         if (mc.player == null) return true;
 
-        // Кулаками не кликаем: удары пустой рукой выглядят как голый
-        // аутокликер и не дают урона.
+        // Если включено авто-оружие, пустая рука или не-оружие не блокируют удар —
+        // модуль сам сделает быстрый pulse-свап на меч перед атакой.
         if (mc.player.getMainHandStack().isEmpty()) {
-            report("в руке пусто — не бью");
-            return true;
+            if (!autoWeapon.getValue() || findBestWeaponInHotbar() == -1) {
+                report("в руке пусто — не бью");
+                return true;
+            }
         }
 
         if (colorMeasure.process("Не бить если кушаешь") && mc.player.isUsingItem() && !(mc.player.getActiveItem().getItem() instanceof ShieldItem)) {
@@ -430,7 +435,11 @@ public class KillAura extends Module {
         if (colorMeasure.process("Бить только оружием")) {
             ItemStack main = mc.player.getMainHandStack();
             boolean isWeapon = main.isIn(ItemTags.SWORDS) || main.isIn(ItemTags.AXES) || main.getItem() == Items.MACE;
-            if (!isWeapon) return true;
+            if (!isWeapon) {
+                if (!autoWeapon.getValue() || findBestWeaponInHotbar() == -1) {
+                    return true;
+                }
+            }
         }
 
         return false;
@@ -488,10 +497,10 @@ public class KillAura extends Module {
         return false;
     }
 
-    /** Фиксированный порог кулдауна с лёгким человеческим дрожанием момента. */
+    /** Порог кулдауна с лёгким человеческим дрожанием момента. */
     private boolean isAttackReady() {
         float progress = mc.player.getAttackCooldownProgress(0.5f);
-        float gate = COOLDOWN_GATE - ThreadLocalRandom.current().nextFloat() * 0.02f;
+        float gate = cooldownGate.compute() - ThreadLocalRandom.current().nextFloat() * 0.02f;
         return progress >= gate;
     }
 
@@ -522,18 +531,32 @@ public class KillAura extends Module {
         // Свапы через SwapManager: слот уходит на сервер немедленно, в этом же
         // батче до удара — бонус булавы и разбивание щита засчитываются
         // по-настоящему. Автовозврат тоже на нём.
+        boolean swapped = false;
         if (profileInvoke.compute() && mc.player.fallDistance > 0
                 && (mc.player.getY() - textureRun.getY()) >= scaleSave.compute()) {
             int maceSlot = findItemInHotbar(Items.MACE);
             if (maceSlot != -1) {
                 SwapManager.getInstance().pulse(this, maceSlot, SwapManager.Priority.WEAPON, 2);
+                swapped = true;
             }
         }
 
-        if (colorMeasure.process("Ломать щит") && textureRun.isBlocking()) {
+        if (!swapped && colorMeasure.process("Ломать щит") && textureRun.isBlocking()) {
             int axeSlot = findAxeInHotbar();
             if (axeSlot != -1) {
                 SwapManager.getInstance().pulse(this, axeSlot, SwapManager.Priority.WEAPON, 2);
+                swapped = true;
+            }
+        }
+
+        if (!swapped && autoWeapon.getValue()) {
+            ItemStack main = mc.player.getMainHandStack();
+            boolean isWeapon = main.isIn(ItemTags.SWORDS) || main.isIn(ItemTags.AXES) || main.isOf(Items.MACE);
+            if (!isWeapon) {
+                int bestWeapon = findBestWeaponInHotbar();
+                if (bestWeapon != -1) {
+                    SwapManager.getInstance().pulse(this, bestWeapon, SwapManager.Priority.WEAPON, 2);
+                }
             }
         }
 
@@ -544,24 +567,13 @@ public class KillAura extends Module {
             wasUsingShield = true;
         }
 
-        // Сброс спринта на тик удара: чистая механика W-tap, без левела.
-        boolean wasSprinting = mc.player.isSprinting();
-        if (sprintReset.getValue()) {
+        // Сброс спринта на тик удара: чистая механика W-tap.
+        if (sprintReset.getValue() && mc.player.isSprinting()) {
             mc.player.setSprinting(false);
         }
 
-        // Порядок «угол → удар»: угол уже доведён и уходил в прошлой батче,
-        // досылаем его же ещё раз, чтобы сервер гарантированно оценил удар
-        // по нашему взгляду.
-        RotationUtils.getInstance().flushServerRotation();
-
         mc.interactionManager.attackEntity(mc.player, textureRun);
         mc.player.swingHand(Hand.MAIN_HAND);
-
-        // Возвращаем спринт тем же состоянием.
-        if (wasSprinting && sprintReset.getValue()) {
-            mc.player.setSprinting(true);
-        }
 
         // Отжим восстанавливаем тем же слотом предмета.
         if (wasUsingShield) {
@@ -597,6 +609,33 @@ public class KillAura extends Module {
             }
         }
         return -1;
+    }
+
+    private int findBestWeaponInHotbar() {
+        if (mc.player == null) return -1;
+        int bestSlot = -1;
+        float bestDamage = -1.0f;
+
+        for (int i = 0; i < 9; i++) {
+            ItemStack stack = mc.player.getInventory().getStack(i);
+            if (stack.isEmpty()) continue;
+            boolean isSword = stack.isIn(ItemTags.SWORDS);
+            boolean isAxe = stack.isIn(ItemTags.AXES);
+            if (isSword || isAxe) {
+                float dmg = 4.0f;
+                if (stack.isOf(Items.NETHERITE_SWORD)) dmg = 8.0f;
+                else if (stack.isOf(Items.DIAMOND_SWORD)) dmg = 7.0f;
+                else if (stack.isOf(Items.NETHERITE_AXE)) dmg = 7.5f;
+                else if (stack.isOf(Items.DIAMOND_AXE)) dmg = 6.5f;
+                else if (stack.isOf(Items.IRON_SWORD)) dmg = 6.0f;
+                else if (stack.isOf(Items.IRON_AXE)) dmg = 5.5f;
+                if (dmg > bestDamage) {
+                    bestDamage = dmg;
+                    bestSlot = i;
+                }
+            }
+        }
+        return bestSlot;
     }
 
     public Entity getTarget() {
