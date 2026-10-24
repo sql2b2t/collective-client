@@ -101,8 +101,7 @@ public class UI extends Module {
 
     @Override
     public void onDisable() {
-        if (mc != null && (mc.gui.screen() instanceof ClickGuiScreen
-                || mc.gui.screen() instanceof me.collective.gui.hud.HudEditorScreen)) {
+        if (mc != null && mc.gui.screen() instanceof ClickGuiScreen) {
             mc.execute(() -> mc.gui.setScreen(null));
         }
     }

@@ -17,6 +17,13 @@ public class HUD extends Module {
     public final ColorSetting color = add(new ColorSetting("Color", new Color(189, 153, 255, 255)));
     public final ColorSetting secondColor = add(new ColorSetting("SecondColor", new Color(105, 86, 143, 255)));
     public final BooleanSetting rainbow = add(new BooleanSetting("Rainbow", false));
+    public final me.collective.setting.ActionSetting openEditor = add(new me.collective.setting.ActionSetting("Редактор HUD", 0)
+        .process("Открыть")
+        .handle(() -> {
+            if (mc != null) {
+                mc.execute(() -> mc.gui.setScreen(HudEditorScreen.getInstance()));
+            }
+        }));
     public final NumberSetting rainbowSpeed = add(new NumberSetting("RainbowSpeed", 1.0, 0.1, 5.0, 0.1));
     public final NumberSetting padding = add(new NumberSetting("Padding", 2, 0, 10, 1));
 
@@ -27,8 +34,10 @@ public class HUD extends Module {
 
         hudEditor.setChangeListener(val -> {
             if (val) {
-                hudEditor.setValue(false);
-                mc.gui.setScreen(HudEditorScreen.getInstance());
+                hudEditor.setValueQuietly(false);
+                if (mc != null) {
+                    mc.execute(() -> mc.gui.setScreen(HudEditorScreen.getInstance()));
+                }
             }
         });
     }

@@ -312,6 +312,14 @@ public class HudEditorScreen extends Screen {
     }
 
     @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (hudPanel.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount, "")) {
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    @Override
     public void onClose() {
         if (draggingModule != null) {
             draggingModule = null;

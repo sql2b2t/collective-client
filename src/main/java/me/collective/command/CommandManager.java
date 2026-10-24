@@ -41,6 +41,7 @@ public class CommandManager {
         register(new HudImageCommand());
         register(new ConfigCommand());
         register(new FriendCommand());
+        register(new HudCommand());
     }
 
     public void register(Command command) {

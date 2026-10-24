@@ -85,6 +85,10 @@ public final class ChatHudDrag {
         return dragging;
     }
 
+    public static boolean isDragging() {
+        return dragging != null;
+    }
+
     /** Вызывается при закрытии чата: снимаем захват. */
     public static void endDrag() {
         dragging = null;

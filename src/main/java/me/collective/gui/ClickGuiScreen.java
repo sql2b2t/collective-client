@@ -162,10 +162,21 @@ public class ClickGuiScreen extends Screen {
                 RenderUtil.drawRect(context, caretX, boxY + 4f, caretX + 1f, boxY + 14f, outlineCol);
             }
         } else {
-            String hint = "Ctrl + F — открыть поиск";
+            String hint = "Ctrl + F — поиск  |  Ctrl + H — редактор HUD";
             float hw = FontManager.INSTANCE.getStringWidth(hint);
             FontManager.INSTANCE.drawStringWithShadow(context, hint, width - hw - 6, height - 12, new Color(140, 140, 140));
         }
+
+        // Кнопка быстрого перехода в редактор HUD
+        float hudBtnX = 8;
+        float hudBtnY = height - 20;
+        float hudBtnW = 95;
+        float hudBtnH = 14;
+        boolean hudHovered = mouseX >= hudBtnX && mouseX <= hudBtnX + hudBtnW && mouseY >= hudBtnY && mouseY <= hudBtnY + hudBtnH;
+        int accent = UI.INSTANCE != null ? UI.INSTANCE.color.getValue().getRGB() : new Color(189, 153, 255).getRGB();
+        RenderUtil.drawRect(context, hudBtnX, hudBtnY, hudBtnX + hudBtnW, hudBtnY + hudBtnH, hudHovered ? new Color(28, 28, 36, 230) : new Color(15, 15, 20, 200));
+        RenderUtil.drawOutline(context, hudBtnX, hudBtnY, hudBtnW, hudBtnH, 1, hudHovered ? accent : new Color(60, 60, 75, 180).getRGB());
+        FontManager.INSTANCE.drawStringWithShadow(context, "Редактор HUD", hudBtnX + 11, hudBtnY + 3.5f, hudHovered ? Color.WHITE : new Color(200, 200, 200));
 
         // 5. Module Description Tooltip
         if (hoveredModule != null && hoveredModule.getDescription() != null && !hoveredModule.getDescription().isEmpty()) {
@@ -184,6 +195,17 @@ public class ClickGuiScreen extends Screen {
         }
 
         int button = me.collective.util.KeyHelper.toStandardMouseButton(click.button());
+
+        float hudBtnX = 8;
+        float hudBtnY = height - 20;
+        float hudBtnW = 95;
+        float hudBtnH = 14;
+        if (button == 0 && click.x() >= hudBtnX && click.x() <= hudBtnX + hudBtnW && click.y() >= hudBtnY && click.y() <= hudBtnY + hudBtnH) {
+            if (minecraft != null) {
+                minecraft.execute(() -> minecraft.gui.setScreen(me.collective.gui.hud.HudEditorScreen.getInstance()));
+            }
+            return true;
+        }
 
         if (searchActive) {
             float boxW = 180;
@@ -245,6 +267,14 @@ public class ClickGuiScreen extends Screen {
                 searchCursor = 0;
             } else {
                 searchCursor = searchQuery.length();
+            }
+            return true;
+        }
+
+        if ((input.hasControlDown() || me.collective.util.KeyHelper.isControlDown())
+                && (key == com.mojang.blaze3d.platform.InputConstants.KEY_H || key == 72 || me.collective.util.KeyHelper.to263Key(key) == com.mojang.blaze3d.platform.InputConstants.KEY_H)) {
+            if (minecraft != null) {
+                minecraft.execute(() -> minecraft.gui.setScreen(me.collective.gui.hud.HudEditorScreen.getInstance()));
             }
             return true;
         }
