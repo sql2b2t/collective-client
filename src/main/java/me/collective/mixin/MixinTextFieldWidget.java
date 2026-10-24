@@ -21,17 +21,9 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 @Mixin(EditBox.class)
 public abstract class MixinTextFieldWidget {
 
-    private static long lastLog = 0L;
-
     private static boolean useCustomFont() {
         Fonts fonts = ModuleManager.INSTANCE.getModule(Fonts.class);
-        boolean on = fonts != null && fonts.isToggled() && fonts.chat.getValue();
-        long now = System.currentTimeMillis();
-        if (now - lastLog > 5000) {
-            lastLog = now;
-            System.out.println("[TextField-Debug] useCustom=" + on);
-        }
-        return on;
+        return fonts != null && fonts.isToggled() && fonts.chat.getValue();
     }
 
     @Redirect(
