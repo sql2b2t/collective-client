@@ -4,9 +4,9 @@ import me.collective.command.commands.*;
 import me.collective.module.Module;
 import me.collective.module.ModuleManager;
 import me.collective.setting.*;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -91,12 +91,12 @@ public class CommandManager {
             } catch (Throwable t) {
                 // Команда обязана никогда не ронять клиент: сваливаем в чат.
                 t.printStackTrace();
-                ChatHelper.sendMessage(Text.literal("Ошибка команды: " + t).styled(s -> s.withColor(Formatting.RED)));
+                ChatHelper.sendMessage(Component.literal("Ошибка команды: " + t).styled(s -> s.withColor(ChatFormatting.RED)));
             }
             return true;
         }
 
-        ChatHelper.sendMessage(Text.literal("Unknown command. Type " + prefix + "help for a list of commands.").styled(s -> s.withColor(Formatting.RED)));
+        ChatHelper.sendMessage(Component.literal("Unknown command. Type " + prefix + "help for a list of commands.").styled(s -> s.withColor(ChatFormatting.RED)));
         return true;
     }
 }

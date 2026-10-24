@@ -20,21 +20,21 @@ import me.collective.module.Module;
 import me.collective.category.Category;
 import me.collective.util.SettingColor;
 import me.collective.event.EventHandler;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.client.gui.screen.ingame.InventoryScreen;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.GenericContainerScreenHandler;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.screen.slot.SlotActionType;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -189,7 +189,7 @@ public class StashMover extends Module {
     private boolean goingToInput;
     private int transportRetries;
     private long lastTransportMessage;
-    private Vec3d positionBeforeTransport;
+    private Vec3 positionBeforeTransport;
     private int openFailures;
     private int itemsTransferred;
     private boolean awaitingRespawn;
@@ -570,8 +570,8 @@ public class StashMover extends Module {
         }
         if (alignTicks++ < 1) return;
 
-        mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
-        mc.player.swingHand(Hand.MAIN_HAND);
+        mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND, hit);
+        mc.player.swingHand(InteractionHand.MAIN_HAND);
         stateTimer = openDelay.get();
         // Экран откроется только через несколько тиков, поэтому проверять его
         // здесь бессмысленно: счётчик неудач растёт в handleTransferring.
@@ -699,8 +699,8 @@ public class StashMover extends Module {
             }
             BlockHitResult hit = nav().openHit(ec);
             if (hit == null || !turnTowards(hit.getPos())) return;
-            mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
-            mc.player.swingHand(Hand.MAIN_HAND);
+            mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND, hit);
+            mc.player.swingHand(InteractionHand.MAIN_HAND);
             stateTimer = openDelay.get();
             awaitingEnderChest = true;
         }
@@ -931,8 +931,8 @@ public class StashMover extends Module {
         return settleTicks++ >= 2;
     }
 
-    private boolean turnTowards(Vec3d point) {
-        Vec3d eye = mc.player.getEyePos();
+    private boolean turnTowards(Vec3 point) {
+        Vec3 eye = mc.player.getEyePos();
         double dx = point.x - eye.x, dy = point.y - eye.y, dz = point.z - eye.z;
         double horizontal = Math.sqrt(dx * dx + dz * dz);
         float targetYaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
@@ -1030,7 +1030,7 @@ public class StashMover extends Module {
         if (color.a <= 5) return;
         int minY = Math.min(a.getY(), b.getY());
         int maxY = Math.max(a.getY(), b.getY());
-        Box box = new Box(Math.min(a.getX(), b.getX()) - 20.0, minY, Math.min(a.getZ(), b.getZ()) - 20.0,
+        AABB box = new AABB(Math.min(a.getX(), b.getX()) - 20.0, minY, Math.min(a.getZ(), b.getZ()) - 20.0,
             Math.max(a.getX(), b.getX()) + 21.0, maxY, Math.max(a.getZ(), b.getZ()) + 21.0);
         event.renderer.box(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ,
             new SettingColor(color.r, color.g, color.b, 0), color, ShapeMode.Lines, 0);

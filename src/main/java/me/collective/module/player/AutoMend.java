@@ -7,13 +7,13 @@ import me.collective.setting.NumberSetting;
 import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
 import me.collective.util.RotationUtils;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.Enchantments;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.util.Hand;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.core.Holder;
+import net.minecraft.world.InteractionHand;
 
 /**
  * Порт AutoMend из Meteor Client.
@@ -63,8 +63,8 @@ public class AutoMend extends Module {
             RotationUtils.setServerRotation(mc.player.getYaw(), 90f);
         }
         InventoryUtil.swap(xp.slot(), true);
-        mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
-        mc.player.swingHand(Hand.MAIN_HAND);
+        mc.interactionManager.interactItem(mc.player, InteractionHand.MAIN_HAND);
+        mc.player.swingHand(InteractionHand.MAIN_HAND);
         InventoryUtil.swapBack();
         delayTimer = delay.getIntValue();
     }

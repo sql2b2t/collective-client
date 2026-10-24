@@ -2,8 +2,8 @@ package me.collective.gui.hud;
 
 import me.collective.module.hud.HudModule;
 import me.collective.module.ModuleManager;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.Click;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.input.MouseButtonEvent;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -31,7 +31,7 @@ public final class ChatHudDrag {
     public static boolean tryBeginDrag(Click click) {
         if (click.button() != 0) return false;
 
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.world == null) return false;
 
         double mx = click.x();
@@ -54,7 +54,7 @@ public final class ChatHudDrag {
     public static void update(double mouseX, double mouseY) {
         if (dragging == null) return;
 
-        long window = MinecraftClient.getInstance().getWindow().getHandle();
+        long window = Minecraft.getInstance().getWindow().getHandle();
         if (GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) != GLFW.GLFW_PRESS) {
             endDrag();
             return;
@@ -62,8 +62,8 @@ public final class ChatHudDrag {
 
         float mw = Math.max(20, dragging.getWidth());
         float mh = Math.max(10, dragging.getHeight());
-        float screenW = MinecraftClient.getInstance().getWindow().getScaledWidth();
-        float screenH = MinecraftClient.getInstance().getWindow().getScaledHeight();
+        float screenW = Minecraft.getInstance().getWindow().getScaledWidth();
+        float screenH = Minecraft.getInstance().getWindow().getScaledHeight();
 
         float nx = Math.max(2, Math.min(screenW - mw - 2, (float) mouseX - offsetX));
         float ny = Math.max(2, Math.min(screenH - mh - 2, (float) mouseY - offsetY));

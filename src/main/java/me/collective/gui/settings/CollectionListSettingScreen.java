@@ -10,14 +10,14 @@ import me.collective.setting.Setting;
 import me.collective.util.SearchUtils;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.input.CharInput;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
 import java.awt.Color;
@@ -84,7 +84,7 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
     private final List<float[]> snow = new ArrayList<>();
 
     protected CollectionListSettingScreen(Screen parent, Setting<List<T>> setting, String title) {
-        super(Text.literal(title));
+        super(Component.literal(title));
         this.parent = parent;
         this.setting = setting;
         this.titleText = title;
@@ -245,7 +245,7 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
     // ------------------------------------------------------------- Рендер
 
     @Override
-    public void renderBackground(DrawContext ctx, int mx, int my, float delta) {
+    public void renderBackground(GuiGraphics ctx, int mx, int my, float delta) {
         if (Blur.INSTANCE != null && Blur.INSTANCE.isToggled() && Blur.INSTANCE.clickGui.getValue()) {
             List<float[]> regions = List.of(new float[]{bx(), by(), bx() + winW, by() + winH});
             BlurEngine.INSTANCE.renderBlur(ctx, regions, Blur.INSTANCE.radius.getFloatValue());
@@ -254,7 +254,7 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
     }
 
     @Override
-    public void render(DrawContext ctx, int mx, int my, float delta) {
+    public void render(GuiGraphics ctx, int mx, int my, float delta) {
         FontManager fm = FontManager.INSTANCE;
         long now = System.currentTimeMillis();
 
@@ -356,7 +356,7 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
         return new Color(255, 255, 255, 200);
     }
 
-    private void renderColumn(DrawContext ctx, int mx, int my, List<T> items, float cx, float scroll, boolean selectedCol) {
+    private void renderColumn(GuiGraphics ctx, int mx, int my, List<T> items, float cx, float scroll, boolean selectedCol) {
         FontManager fm = FontManager.INSTANCE;
         float colW = colWidth();
         float top = listTop();
@@ -418,7 +418,7 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
         }
     }
 
-    private void renderEmptyHints(FontManager fm, DrawContext ctx) {
+    private void renderEmptyHints(FontManager fm, GuiGraphics ctx) {
         float top = listTop();
         float bottom = listBottom();
         float centerY = (top + bottom) / 2f - fm.getFontHeight() / 2f;
@@ -574,7 +574,7 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
             return true;
         }
 
-        long win = MinecraftClient.getInstance().getWindow().getHandle();
+        long win = Minecraft.getInstance().getWindow().getHandle();
         boolean ctrl = GLFW.glfwGetKey(win, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS
                 || GLFW.glfwGetKey(win, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
 
@@ -611,7 +611,7 @@ public abstract class CollectionListSettingScreen<T> extends Screen {
 
     @Override
     public void close() {
-        MinecraftClient.getInstance().setScreen(parent);
+        Minecraft.getInstance().setScreen(parent);
     }
 
     @Override

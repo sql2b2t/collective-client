@@ -8,7 +8,7 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.ModeSetting;
 import me.collective.setting.NumberSetting;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.world.entity.player.Player;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -79,7 +79,7 @@ public class Spammer extends Module {
         }
         if (System.currentTimeMillis() - lastSend < delay.getFloatValue() * 1000) return;
         // No recipient means no request and no consumption of an already fetched fact.
-        PlayerEntity target = spamMode.process("Whisper") ? nearestPlayer() : null;
+        Player target = spamMode.process("Whisper") ? nearestPlayer() : null;
         if (spamMode.process("Whisper") && target == null) {
             cancelFetch();
             return;
@@ -128,10 +128,10 @@ public class Spammer extends Module {
         lastSend = System.currentTimeMillis();
     }
 
-    private PlayerEntity nearestPlayer() {
-        PlayerEntity best = null;
+    private Player nearestPlayer() {
+        Player best = null;
         double bestDist = Double.MAX_VALUE;
-        for (PlayerEntity p : mc.world.getPlayers()) {
+        for (Player p : mc.world.getPlayers()) {
             if (p == mc.player || !p.isAlive()) continue;
             double d = mc.player.distanceTo(p);
             if (d < bestDist) {

@@ -2,14 +2,14 @@ package me.collective.gui.alt;
 
 import com.mojang.authlib.GameProfile;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.PlayerSkinDrawer;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.client.util.DefaultSkinHelper;
-import net.minecraft.entity.player.SkinTextures;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.PlayerFaceRenderer;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.client.resources.DefaultPlayerSkin;
+import net.minecraft.world.entity.player.PlayerSkin;
+import net.minecraft.resources.Identifier;
 
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -49,7 +49,7 @@ public final class AltSkinHelper {
     /**
      * Отрисовка головы игрока с поддержкой реальных скинов и слоя шапки.
      */
-    public static void drawSkinHead(DrawContext ctx, String username, UUID uuid, int x, int y, int size) {
+    public static void drawSkinHead(GuiGraphics ctx, String username, UUID uuid, int x, int y, int size) {
         if (username == null || username.isBlank()) {
             PlayerSkinDrawer.draw(ctx, DefaultSkinHelper.getSkinTextures(uuid != null ? uuid : UUID.randomUUID()), x, y, size);
             return;
@@ -114,7 +114,7 @@ public final class AltSkinHelper {
                 // 2. Резервный поиск официального Mojang UUID
                 UUID realMojangUuid = resolveMojangUuid(username);
                 if (realMojangUuid != null) {
-                    MinecraftClient mc = MinecraftClient.getInstance();
+                    Minecraft mc = Minecraft.getInstance();
                     if (mc != null && mc.getSkinProvider() != null) {
                         Supplier<SkinTextures> sup = mc.getSkinProvider()
                                 .supplySkinTextures(new GameProfile(realMojangUuid, username), false);
@@ -153,7 +153,7 @@ public final class AltSkinHelper {
     }
 
     private static void registerNativeSkin(String key, NativeImage img) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc == null) return;
         mc.execute(() -> {
             try {

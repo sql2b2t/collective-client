@@ -5,14 +5,14 @@ import me.collective.proxy.ProxyEntry;
 import me.collective.proxy.ProxyManager;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.client.gui.Click;
-import net.minecraft.text.Text;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.EditBox;
 
 @Environment(EnvType.CLIENT)
 public class ProxyScreen extends Screen {
@@ -48,16 +48,16 @@ public class ProxyScreen extends Screen {
    private static final int COL_ACT_BRD = -12965888;
 
    public ProxyScreen(Screen parent) {
-      super(Text.literal("Proxy"));
+      super(Component.literal("Proxy"));
       this.parent = parent;
    }
 
    private TextRenderer tr() {
-      return MinecraftClient.getInstance().textRenderer;
+      return Minecraft.getInstance().textRenderer;
    }
 
    @Override
-   public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+   public void renderBackground(GuiGraphics context, int mouseX, int mouseY, float delta) {
       // Фон рисуем сами в render(): тёмная заливка + панель.
       // Виджеты (поля ввода) дорисовывает super.render() поверх.
    }
@@ -65,25 +65,25 @@ public class ProxyScreen extends Screen {
    protected void init() {
       int x = (this.width - 300) / 2;
       int y = (this.height - 340) / 2;
-      this.hostField = new TextFieldWidget(this.textRenderer, x + 8, y + 52, 184, 16, Text.literal("IP"));
+      this.hostField = new TextFieldWidget(this.textRenderer, x + 8, y + 52, 184, 16, Component.literal("IP"));
       this.hostField.setMaxLength(64);
-      this.hostField.setPlaceholder(Text.literal("IP / хост"));
+      this.hostField.setPlaceholder(Component.literal("IP / хост"));
       this.addDrawableChild(this.hostField);
 
-      this.portField = new TextFieldWidget(this.textRenderer, x + 200, y + 52, 92, 16, Text.literal("Port"));
+      this.portField = new TextFieldWidget(this.textRenderer, x + 200, y + 52, 92, 16, Component.literal("Port"));
       this.portField.setMaxLength(5);
       this.portField.setTextPredicate(s -> s.matches("\\d*"));
-      this.portField.setPlaceholder(Text.literal("Порт"));
+      this.portField.setPlaceholder(Component.literal("Порт"));
       this.addDrawableChild(this.portField);
 
-      this.userField = new TextFieldWidget(this.textRenderer, x + 8, y + 76, 138, 16, Text.literal("Login"));
+      this.userField = new TextFieldWidget(this.textRenderer, x + 8, y + 76, 138, 16, Component.literal("Login"));
       this.userField.setMaxLength(64);
-      this.userField.setPlaceholder(Text.literal("Логин (необязательно)"));
+      this.userField.setPlaceholder(Component.literal("Логин (необязательно)"));
       this.addDrawableChild(this.userField);
 
-      this.passField = new TextFieldWidget(this.textRenderer, x + 154, y + 76, 138, 16, Text.literal("Pass"));
+      this.passField = new TextFieldWidget(this.textRenderer, x + 154, y + 76, 138, 16, Component.literal("Pass"));
       this.passField.setMaxLength(64);
-      this.passField.setPlaceholder(Text.literal("Пароль (необязательно)"));
+      this.passField.setPlaceholder(Component.literal("Пароль (необязательно)"));
       this.addDrawableChild(this.passField);
 
       this.setInitialFocus(this.hostField);
@@ -108,7 +108,7 @@ public class ProxyScreen extends Screen {
       this.setInitialFocus(this.hostField);
    }
 
-   public void render(DrawContext ctx, int mx, int my, float delta) {
+   public void render(GuiGraphics ctx, int mx, int my, float delta) {
       int w = this.width;
       int h = this.height;
       int x = (w - 300) / 2;
@@ -287,7 +287,7 @@ public class ProxyScreen extends Screen {
          ProxyManager.INSTANCE.setDirect();
          return true;
       } else if (mx >= backBtnX && mx <= backBtnX + backBtnW && my >= backY && my <= backY + 14) {
-         MinecraftClient.getInstance().setScreen(this.parent);
+         Minecraft.getInstance().setScreen(this.parent);
          return true;
       } else {
          return super.mouseClicked(click, doubled);
@@ -296,7 +296,7 @@ public class ProxyScreen extends Screen {
 
    public boolean keyPressed(KeyInput input) {
       if (input.key() == 256) {
-         MinecraftClient.getInstance().setScreen(this.parent);
+         Minecraft.getInstance().setScreen(this.parent);
          return true;
       }
       if (input.key() == 257) {
@@ -310,7 +310,7 @@ public class ProxyScreen extends Screen {
       return false;
    }
 
-   private void rect(DrawContext ctx, int x, int y, int w, int h, int c) {
+   private void rect(GuiGraphics ctx, int x, int y, int w, int h, int c) {
       ctx.fill(x, y, x + w, y + 1, c);
       ctx.fill(x, y + h - 1, x + w, y + h, c);
       ctx.fill(x, y, x + 1, y + h, c);

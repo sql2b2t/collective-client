@@ -2,8 +2,8 @@ package me.collective.module.hud;
 
 import me.collective.font.FontManager;
 import me.collective.render.RenderUtil;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.entity.effect.StatusEffectInstance;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.world.effect.MobEffectInstance;
 
 import java.awt.Color;
 import java.util.Collection;
@@ -14,7 +14,7 @@ public class Effects extends HudModule {
     }
 
     @Override
-    public void render(DrawContext context, float delta) {
+    public void render(GuiGraphics context, float delta) {
         if (!isToggled() || mc.player == null) return;
 
         Collection<StatusEffectInstance> effects = mc.player.getStatusEffects();

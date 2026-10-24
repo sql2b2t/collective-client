@@ -1,20 +1,20 @@
 package me.collective.event.events;
 
-import net.minecraft.client.network.AbstractClientPlayerEntity;
-import net.minecraft.client.render.command.OrderedRenderCommandQueue;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.Hand;
+import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.InteractionHand;
 
 public class RenderHeldItemEvent {
     private final AbstractClientPlayerEntity player;
-    private final Hand hand;
+    private final InteractionHand hand;
     private final ItemStack item;
-    private final MatrixStack matrices;
+    private final PoseStack matrices;
     private final OrderedRenderCommandQueue renderCommands;
     private final int light;
 
-    public RenderHeldItemEvent(AbstractClientPlayerEntity player, Hand hand, ItemStack item, MatrixStack matrices, OrderedRenderCommandQueue renderCommands, int light) {
+    public RenderHeldItemEvent(AbstractClientPlayerEntity player, InteractionHand hand, ItemStack item, PoseStack matrices, OrderedRenderCommandQueue renderCommands, int light) {
         this.player = player;
         this.hand = hand;
         this.item = item;
@@ -27,7 +27,7 @@ public class RenderHeldItemEvent {
         return player;
     }
 
-    public Hand getHand() {
+    public InteractionHand getHand() {
         return hand;
     }
 
@@ -35,7 +35,7 @@ public class RenderHeldItemEvent {
         return item;
     }
 
-    public MatrixStack getMatrices() {
+    public PoseStack getMatrices() {
         return matrices;
     }
 

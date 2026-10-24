@@ -1,10 +1,10 @@
 package me.collective.module.highway;
 
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.Entity;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.core.BlockPos;
 
 /**
  * Изменяемая позиция блока (порт Meteor MBlockPos).
@@ -74,7 +74,7 @@ public class MBlockPos {
     }
 
     public BlockState getState() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.world == null) return Blocks.AIR.getDefaultState();
         return mc.world.getBlockState(getBlockPos());
     }

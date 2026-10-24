@@ -30,16 +30,16 @@ import me.collective.setting.Setting;
 import me.collective.setting.StringSetting;
 import me.collective.util.BaritoneBridge;
 import me.collective.util.RotationUtils;
-import net.minecraft.block.Block;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.ItemEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.BlockPos;
 
 import java.awt.Color;
 import java.io.File;
@@ -181,7 +181,7 @@ public class McpServer {
 
     /** Выполняет действие в основном (игровом) потоке и ждёт результат. */
     private static <T> T callSync(ThrowingSupplier<T> supplier) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc == null || mc.isOnThread()) {
             try {
                 return supplier.get();
@@ -234,7 +234,7 @@ public class McpServer {
                     exchange.getResponseHeaders().set("Access-Control-Allow-Origin", origin);
                     exchange.getResponseHeaders().set("Vary", "Origin");
                     exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-                    exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Mcp-Session-Id, Authorization");
+                    exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Mcp-User-Id, Authorization");
                 }
                 if ("OPTIONS".equalsIgnoreCase(method)) {
                     exchange.sendResponseHeaders(204, -1);
@@ -707,7 +707,7 @@ public class McpServer {
     // --- Игрок и мир ---
 
     private static String playerStateJson() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         JsonObject state = new JsonObject();
 
         if (mc.player == null) {
@@ -746,7 +746,7 @@ public class McpServer {
     }
 
     private static String worldInfoJson() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         JsonObject o = new JsonObject();
 
         if (mc.world == null || mc.player == null) {
@@ -769,7 +769,7 @@ public class McpServer {
     }
 
     private static String entitiesJson(JsonObject args) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         double radius = args.has("radius") ? args.get("radius").getAsDouble() : 32.0;
         JsonArray arr = new JsonArray();
 
@@ -786,7 +786,7 @@ public class McpServer {
                 o.addProperty("x", e.getX());
                 o.addProperty("y", e.getY());
                 o.addProperty("z", e.getZ());
-                if (e instanceof PlayerEntity pe) {
+                if (e instanceof Player pe) {
                     o.addProperty("health", pe.getHealth());
                 }
                 if (e instanceof ItemEntity ie) {
@@ -998,7 +998,7 @@ public class McpServer {
     }
 
     private static String chatMessageTool(JsonObject args) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         String msg = requiredString(args, "message");
         if (mc.getNetworkHandler() == null) throw new IllegalStateException("Нет соединения с сервером");
         if (msg.startsWith("/")) {
@@ -1010,7 +1010,7 @@ public class McpServer {
     }
 
     private static String baritonePathTool(JsonObject args) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (args.has("stop") && parseBoolean(args.get("stop"))) {
             BaritoneBridge.clearGoal();
             return "Маршрут Baritone отменён";
@@ -1023,7 +1023,7 @@ public class McpServer {
     }
 
     private static String setRotationTool(JsonObject args) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         float yaw = args.has("yaw") ? args.get("yaw").getAsFloat() : 0f;
         float pitch = args.has("pitch") ? args.get("pitch").getAsFloat() : 0f;
 

@@ -2,16 +2,16 @@ package me.collective.mixin;
 
 import me.collective.module.ModuleManager;
 import me.collective.module.render.Tooltips;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.client.gui.tooltip.HoveredTooltipPositioner;
-import net.minecraft.client.gui.tooltip.TooltipComponent;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.tooltip.TooltipData;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.tooltip.DefaultTooltipPositioner;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.inventory.tooltip.TooltipComponent;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -23,7 +23,7 @@ import java.util.Optional;
 /**
  * Подмена отрисовки тултипа — порт {@code MixinHandledScreenTooltips} из b2xy.
  *
- * <p>Перехватывает {@code DrawContext.drawTooltip} в
+ * <p>Перехватывает {@code GuiGraphics.drawTooltip} в
  * {@code HandledScreen.drawMouseoverTooltip} через {@code @Redirect}, собирает
  * из строк и {@code TooltipData} список компонентов через
  * {@link Tooltips#buildComponents} и рисует результат штатным
@@ -46,11 +46,11 @@ public abstract class MixinHandledScreenTooltips {
     @Redirect(
         method = "drawMouseoverTooltip",
         at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/DrawContext;drawTooltip"
+            target = "Lnet/minecraft/client/gui/GuiGraphics;drawTooltip"
                 + "(Lnet/minecraft/client/font/TextRenderer;Ljava/util/List;Ljava/util/Optional;II"
                 + "Lnet/minecraft/util/Identifier;)V")
     )
-    private void collective$tooltips(DrawContext context, TextRenderer font, List<Text> lines,
+    private void collective$tooltips(GuiGraphics context, TextRenderer font, List<Component> lines,
                                 Optional<TooltipData> data, int mouseX, int mouseY,
                                 Identifier background) {
         Tooltips module = ModuleManager.INSTANCE.getModule(Tooltips.class);

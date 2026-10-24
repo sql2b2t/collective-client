@@ -4,14 +4,14 @@ import me.collective.category.Category;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.inventory.ClickType;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -72,7 +72,7 @@ public class ItemScroller extends Module {
         if (ctrlShiftAll.getValue() && isShiftDown() && isCtrlDown()) {
             if (!hovered.hasStack() || !hovered.canTakeItems(mc.player)) return false;
             lastDraggedSlotId = hovered.id;
-            boolean playerSide = hovered.inventory instanceof PlayerInventory;
+            boolean playerSide = hovered.inventory instanceof Inventory;
             return moveMatching(handler, hovered, playerSide);
         }
 
@@ -100,7 +100,7 @@ public class ItemScroller extends Module {
         if (click.button() == 0 && ctrlShiftAll.getValue() && isShiftDown() && isCtrlDown()) {
             if (!hovered.canTakeItems(mc.player)) return false;
             lastDraggedSlotId = hovered.id;
-            boolean playerSide = hovered.inventory instanceof PlayerInventory;
+            boolean playerSide = hovered.inventory instanceof Inventory;
             return moveMatching(handler, hovered, playerSide);
         }
 
@@ -124,7 +124,7 @@ public class ItemScroller extends Module {
         if (handler != mc.player.currentScreenHandler) return false;
         if (!handler.getCursorStack().isEmpty()) return false;
 
-        boolean playerSide = hovered.inventory instanceof PlayerInventory;
+        boolean playerSide = hovered.inventory instanceof Inventory;
         boolean push = !scrollDirection.getValue() || amount < 0;
 
         if (push) {
@@ -192,7 +192,7 @@ public class ItemScroller extends Module {
         int moved = 0;
         for (Slot slot : new ArrayList<>(handler.slots)) {
             if (moved >= limit) break;
-            if ((slot.inventory instanceof PlayerInventory) != playerSide) continue;
+            if ((slot.inventory instanceof Inventory) != playerSide) continue;
             ItemStack stack = slot.getStack();
             if (stack.isEmpty() || !stack.isOf(item) || !slot.canTakeItems(mc.player)) continue;
             mc.interactionManager.clickSlot(handler.syncId, slot.id, 0, SlotActionType.QUICK_MOVE, mc.player);
@@ -203,7 +203,7 @@ public class ItemScroller extends Module {
 
     private Slot findMatchingSlot(ScreenHandler handler, boolean playerSide, ItemStack sample) {
         for (Slot slot : handler.slots) {
-            if ((slot.inventory instanceof PlayerInventory) != playerSide) continue;
+            if ((slot.inventory instanceof Inventory) != playerSide) continue;
             ItemStack stack = slot.getStack();
             if (!stack.isEmpty() && ItemStack.areItemsAndComponentsEqual(stack, sample) && slot.canTakeItems(mc.player)) {
                 return slot;
@@ -214,7 +214,7 @@ public class ItemScroller extends Module {
 
     private Slot findFirstAvailableSlot(ScreenHandler handler, boolean playerSide) {
         for (Slot slot : handler.slots) {
-            if ((slot.inventory instanceof PlayerInventory) != playerSide) continue;
+            if ((slot.inventory instanceof Inventory) != playerSide) continue;
             if (slot.hasStack() && slot.canTakeItems(mc.player)) {
                 return slot;
             }
@@ -226,7 +226,7 @@ public class ItemScroller extends Module {
         Slot mergeable = null;
         Slot empty = null;
         for (Slot slot : handler.slots) {
-            if ((slot.inventory instanceof PlayerInventory) == sourcePlayerSide) continue;
+            if ((slot.inventory instanceof Inventory) == sourcePlayerSide) continue;
             if (!slot.canInsert(sample)) continue;
             ItemStack inSlot = slot.getStack();
             if (inSlot.isEmpty()) {

@@ -27,25 +27,25 @@ import me.collective.module.Module;
 import me.collective.category.Category;
 import me.collective.util.SettingColor;
 import me.collective.event.EventHandler;
-import net.minecraft.block.BarrelBlock;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemConvertible;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.screen.GenericContainerScreenHandler;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.client.gui.screen.ingame.InventoryScreen;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.SlotActionType;
-import net.minecraft.util.Hand;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.BarrelBlock;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.ItemLike;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3d;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -1443,8 +1443,8 @@ public class StashSorter extends Module {
 
         if (alignTicks++ < AIM_HOLD_TICKS) return OpenStep.WAITING;
 
-        mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
-        mc.player.swingHand(Hand.MAIN_HAND);
+        mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND, hit);
+        mc.player.swingHand(InteractionHand.MAIN_HAND);
         return OpenStep.CLICKED;
     }
 
@@ -1467,8 +1467,8 @@ public class StashSorter extends Module {
     }
 
     /** Доворачивает взгляд на точку и говорит, попал ли. */
-    private boolean turnTowards(Vec3d point) {
-        Vec3d eye = mc.player.getEyePos();
+    private boolean turnTowards(Vec3 point) {
+        Vec3 eye = mc.player.getEyePos();
         double dx = point.x - eye.x;
         double dy = point.y - eye.y;
         double dz = point.z - eye.z;
@@ -1585,7 +1585,7 @@ public class StashSorter extends Module {
 
     private boolean strangerNearby() {
         if (mc.player == null || mc.world == null) return false;
-        for (PlayerEntity player : mc.world.getPlayers()) {
+        for (Player player : mc.world.getPlayers()) {
             if (player == mc.player || player.isSpectator()) continue;
             if (FriendManager.INSTANCE.isFriend(player.getNameForScoreboard())) continue;
             if (player.squaredDistanceTo(mc.player) < 64) return true;
@@ -1765,8 +1765,8 @@ public class StashSorter extends Module {
             SettingColor c = zoneColor.get();
             if (c.a > 5) {
                 for (SortZone z : store().sourceZones(dimension())) {
-                    // Высоты берём из самой зоны: у World в 1.21.11 их больше не отдать
-                    Box box = z.box(Math.min(z.y1, z.y2), Math.max(z.y1, z.y2));
+                    // Высоты берём из самой зоны: у Level в 1.21.11 их больше не отдать
+                    AABB box = z.box(Math.min(z.y1, z.y2), Math.max(z.y1, z.y2));
                     event.renderer.box(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ,
                         new SettingColor(c.r, c.g, c.b, 0), c, ShapeMode.Both, 0);
                 }

@@ -1,7 +1,7 @@
 package me.collective.command.commands;
 
 import me.collective.command.Command;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 public class DisconnectCommand extends Command {
     public DisconnectCommand() {
@@ -10,6 +10,6 @@ public class DisconnectCommand extends Command {
 
     @Override
     public void execute(String[] args) {
-        mc.disconnect(Text.literal("Disconnected"));
+        mc.disconnect(Component.literal("Disconnected"));
     }
 }

@@ -1,6 +1,6 @@
 package me.collective.render;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.*;
 
@@ -176,7 +176,7 @@ public class SdfShader {
     }
 
     private void setupDraw(float x, float y, float width, float height) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         int sw = mc.getWindow().getScaledWidth();
         int sh = mc.getWindow().getScaledHeight();
 

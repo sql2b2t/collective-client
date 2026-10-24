@@ -3,18 +3,18 @@ package me.collective.mixin;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import me.collective.util.BaritoneBridge;
 import me.collective.util.RotationUtils;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.util.PlayerInput;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.entity.player.Input;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(ClientPlayerEntity.class)
+@Mixin(LocalPlayer.class)
 public abstract class MixinClientPlayerEntity {
 
-    @ModifyExpressionValue(method = "sendMovementPackets", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/ClientPlayerEntity;getYaw()F"))
+    @ModifyExpressionValue(method = "sendMovementPackets", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/LocalPlayer;getYaw()F"))
     private float collective$modifyGetYaw(float original) {
         RotationUtils rotUtils = RotationUtils.getInstance();
         if (rotUtils.isRotating() || rotUtils.isWireFresh()) {
@@ -24,7 +24,7 @@ public abstract class MixinClientPlayerEntity {
         return original;
     }
 
-    @ModifyExpressionValue(method = "sendMovementPackets", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/ClientPlayerEntity;getPitch()F"))
+    @ModifyExpressionValue(method = "sendMovementPackets", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/LocalPlayer;getPitch()F"))
     private float collective$modifyGetPitch(float original) {
         RotationUtils rotUtils = RotationUtils.getInstance();
         return !rotUtils.isRotating() && !rotUtils.isWireFresh() ? original : rotUtils.getSentPitch();
@@ -71,7 +71,7 @@ public abstract class MixinClientPlayerEntity {
     private net.minecraft.util.math.Vec2f collective$modifyMovementInput(net.minecraft.util.math.Vec2f original) {
         RotationUtils rotUtils = RotationUtils.getInstance();
         if (rotUtils.isRotating() && !rotUtils.isSyncMovement()) {
-            ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
+            LocalPlayer player = (LocalPlayer) (Object) this;
             if (player.input != null && player.input.playerInput != null) {
                 PlayerInput in = player.input.playerInput;
                 float s = (in.left() ? 1f : 0f) - (in.right() ? 1f : 0f);
@@ -86,9 +86,9 @@ public abstract class MixinClientPlayerEntity {
     }
 
     @org.spongepowered.asm.mixin.injection.ModifyVariable(method = "move", at = @At("HEAD"), argsOnly = true)
-    private Vec3d collective$onMove(Vec3d movement, net.minecraft.entity.MovementType type) {
+    private Vec3 collective$onMove(Vec3 movement, net.minecraft.entity.MovementType type) {
         if (me.collective.module.render.Freecam.INSTANCE != null && me.collective.module.render.Freecam.INSTANCE.isToggled()) {
-            return Vec3d.ZERO;
+            return Vec3.ZERO;
         }
         me.collective.event.events.PlayerMoveEvent event = new me.collective.event.events.PlayerMoveEvent(type, movement);
         me.collective.event.EventBus.INSTANCE.post(event);

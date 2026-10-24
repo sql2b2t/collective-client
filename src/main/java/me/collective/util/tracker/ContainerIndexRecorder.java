@@ -1,20 +1,20 @@
 package me.collective.util.tracker;
 
-import net.minecraft.network.packet.s2c.play.InventoryS2CPacket;
-import net.minecraft.block.BarrelBlock;
-import net.minecraft.block.Block;
-import net.minecraft.block.ChestBlock;
-import net.minecraft.block.DispenserBlock;
-import net.minecraft.block.DropperBlock;
-import net.minecraft.block.EnderChestBlock;
-import net.minecraft.block.HopperBlock;
-import net.minecraft.block.ShulkerBoxBlock;
-import net.minecraft.block.TrappedChestBlock;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket;
+import net.minecraft.world.level.block.BarrelBlock;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.DispenserBlock;
+import net.minecraft.world.level.block.DropperBlock;
+import net.minecraft.world.level.block.EnderChestBlock;
+import net.minecraft.world.level.block.HopperBlock;
+import net.minecraft.world.level.block.ShulkerBoxBlock;
+import net.minecraft.world.level.block.TrappedChestBlock;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.core.BlockPos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,13 +29,13 @@ import java.util.List;
  * закрытии — на случай, если сервер не прислал обновление.
  *
  * <p>Координаты контейнера берём из миксина
- * {@code ClientPlayerInteractionManager.interactBlock}: обработчик
+ * {@code MultiPlayerGameMode.interactBlock}: обработчик
  * контейнера в 1.21.11 координаты не хранит, а наведения может уже не быть.
  */
 public final class ContainerIndexRecorder {
     private static final Logger LOGGER = LoggerFactory.getLogger("B2XY/ChestTracker");
 
-    private static final MinecraftClient MC = MinecraftClient.getInstance();
+    private static final Minecraft MC = Minecraft.getInstance();
 
     private static boolean shulkerBoxes = true;
     private static boolean enderChests = false;

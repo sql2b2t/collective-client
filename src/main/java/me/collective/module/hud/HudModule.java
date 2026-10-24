@@ -6,7 +6,7 @@ import me.collective.module.Module;
 import me.collective.module.client.HUD;
 import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 
 import java.awt.Color;
 
@@ -38,9 +38,9 @@ public abstract class HudModule extends Module {
         setToggled(true);
     }
 
-    public abstract void render(DrawContext context, float delta);
+    public abstract void render(GuiGraphics context, float delta);
 
-    public void renderEditor(DrawContext context, float delta, double mouseX, double mouseY) {
+    public void renderEditor(GuiGraphics context, float delta, double mouseX, double mouseY) {
         if (!isToggled()) return;
 
         render(context, delta);

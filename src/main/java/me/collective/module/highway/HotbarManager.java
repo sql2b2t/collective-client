@@ -9,11 +9,11 @@ import me.collective.setting.NumberSetting;
 import me.collective.setting.StringSetting;
 import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
-import net.minecraft.registry.Registries;
-import net.minecraft.screen.slot.SlotActionType;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.inventory.ClickType;
+import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;

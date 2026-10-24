@@ -9,14 +9,14 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
-import net.minecraft.block.Blocks;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.*;
 
@@ -112,10 +112,10 @@ public class AutoTnt extends Module {
 
             if (flint.isOffhand()) {
                 igniting = true;
-                Vec3d hitVec = Vec3d.ofCenter(ignitePos);
+                Vec3 hitVec = Vec3.ofCenter(ignitePos);
                 BlockHitResult hit = new BlockHitResult(hitVec, Direction.UP, ignitePos, false);
-                mc.interactionManager.interactBlock(mc.player, Hand.OFF_HAND, hit);
-                mc.player.swingHand(Hand.OFF_HAND);
+                mc.interactionManager.interactBlock(mc.player, InteractionHand.OFF_HAND, hit);
+                mc.player.swingHand(InteractionHand.OFF_HAND);
                 ignitePos = null;
                 flintSlot = -1;
                 originalSlot = -1;
@@ -131,10 +131,10 @@ public class AutoTnt extends Module {
 
         if (ignitePos != null && !igniting && mc.player.getInventory().selectedSlot == flintSlot) {
             igniting = true;
-            Vec3d hitVec = Vec3d.ofCenter(ignitePos);
+            Vec3 hitVec = Vec3.ofCenter(ignitePos);
             BlockHitResult hit = new BlockHitResult(hitVec, Direction.UP, ignitePos, false);
-            mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
-            mc.player.swingHand(Hand.MAIN_HAND);
+            mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND, hit);
+            mc.player.swingHand(InteractionHand.MAIN_HAND);
 
             mc.player.getInventory().selectedSlot = originalSlot;
             if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
@@ -178,21 +178,21 @@ public class AutoTnt extends Module {
     }
 
     private void igniteNow(BlockPos pos, FindItemResult flint) {
-        if (mc.player.getEyePos().distanceTo(Vec3d.ofCenter(pos)) > reach.getValue()) return;
+        if (mc.player.getEyePos().distanceTo(Vec3.ofCenter(pos)) > reach.getValue()) return;
         igniting = true;
-        Vec3d hitVec = Vec3d.ofCenter(pos);
+        Vec3 hitVec = Vec3.ofCenter(pos);
         BlockHitResult hit = new BlockHitResult(hitVec, Direction.UP, pos, false);
 
         if (flint.isOffhand()) {
-            mc.interactionManager.interactBlock(mc.player, Hand.OFF_HAND, hit);
-            mc.player.swingHand(Hand.OFF_HAND);
+            mc.interactionManager.interactBlock(mc.player, InteractionHand.OFF_HAND, hit);
+            mc.player.swingHand(InteractionHand.OFF_HAND);
         } else {
             int prevSlot = mc.player.getInventory().selectedSlot;
             mc.player.getInventory().selectedSlot = flint.slot();
             if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
 
-            mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
-            mc.player.swingHand(Hand.MAIN_HAND);
+            mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND, hit);
+            mc.player.swingHand(InteractionHand.MAIN_HAND);
 
             mc.player.getInventory().selectedSlot = prevSlot;
             if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
@@ -202,7 +202,7 @@ public class AutoTnt extends Module {
 
     private void sendClientMessage(String msg) {
         if (mc.player != null) {
-            mc.player.sendMessage(net.minecraft.text.Text.literal("§7[§cAutoTnt§7] §f" + msg), false);
+            mc.player.sendMessage(net.minecraft.text.Component.literal("§7[§cAutoTnt§7] §f" + msg), false);
         }
     }
 }

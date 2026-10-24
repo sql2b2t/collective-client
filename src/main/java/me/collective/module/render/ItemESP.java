@@ -15,15 +15,15 @@ import me.collective.setting.ColorSetting;
 import me.collective.setting.ItemListSetting;
 import me.collective.setting.ModeSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.ItemEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Vector2f;
 
 import java.awt.Color;
@@ -106,7 +106,7 @@ public class ItemESP extends Module {
         double rangeBlocks = range.getValue();
         double rangeSq = rangeBlocks * rangeBlocks;
         ShapeMode mode = currentShape();
-        Vec3d cam = event.camera != null
+        Vec3 cam = event.camera != null
                 ? event.camera.getCameraPos()
                 : mc.gameRenderer.getCamera().getCameraPos();
         float delta = event.tickDelta;
@@ -121,19 +121,19 @@ public class ItemESP extends Module {
             Color line = fade(lineColor.getValue(), factor);
             if (side.getAlpha() <= 2 && line.getAlpha() <= 2) continue;
 
-            Box box = lerpedBox(itemEntity, delta).expand(0.06);
+            AABB box = lerpedBox(itemEntity, delta).expand(0.06);
             Renderer3D.box(box, side, line, mode, true);
 
             if (tracers.getValue()) {
-                Vec3d center = box.getCenter();
+                Vec3 center = box.getCenter();
                 Renderer3D.line(cam.x, cam.y, cam.z, center.x, center.y, center.z, line);
             }
         }
     }
 
     /** Бокс по интерполированной позиции кадра — без рывков тикового обновления. */
-    private static Box lerpedBox(ItemEntity entity, float delta) {
-        Vec3d lerped = entity.getLerpedPos(delta);
+    private static AABB lerpedBox(ItemEntity entity, float delta) {
+        Vec3 lerped = entity.getLerpedPos(delta);
         return entity.getBoundingBox().offset(
                 lerped.x - entity.getX(),
                 lerped.y - entity.getY(),
@@ -143,7 +143,7 @@ public class ItemESP extends Module {
     // ------------------------------------------------------------- 2D-таблички
 
     @Override
-    public void onRender2D(DrawContext context, float delta) {
+    public void onRender2D(GuiGraphics context, float delta) {
         if (!isToggled() || !names.getValue() || mc.world == null || mc.player == null
                 || this.cachedItems.isEmpty()) return;
 
@@ -163,7 +163,7 @@ public class ItemESP extends Module {
         }
     }
 
-    private void renderLabel(DrawContext context, ItemLabel label, float cx, float cy, double dist, double fadeFactor) {
+    private void renderLabel(GuiGraphics context, ItemLabel label, float cx, float cy, double dist, double fadeFactor) {
         FontManager fm = FontManager.INSTANCE;
         float fs = nameScale.getFloatValue();
         double textFactor = 0.25 + 0.75 * fadeFactor;
@@ -278,7 +278,7 @@ public class ItemESP extends Module {
 
         private void add(ItemEntity entity, float delta) {
             ItemStack stack = entity.getStack();
-            Vec3d lerped = entity.getLerpedPos(delta);
+            Vec3 lerped = entity.getLerpedPos(delta);
             double top = lerped.y + entity.getBoundingBox().getLengthY();
             if (parts.isEmpty()) {
                 x = lerped.x;
@@ -296,7 +296,7 @@ public class ItemESP extends Module {
         }
 
         private double distanceSqTo(ItemEntity entity, float delta) {
-            Vec3d lerped = entity.getLerpedPos(delta);
+            Vec3 lerped = entity.getLerpedPos(delta);
             double top = lerped.y + entity.getBoundingBox().getLengthY();
             double dx = x - lerped.x;
             double dy = y - top;

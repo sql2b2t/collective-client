@@ -8,11 +8,11 @@ import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.item.MaceItem;
-import net.minecraft.network.packet.c2s.play.PlayerInteractEntityC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.MaceItem;
+import net.minecraft.network.protocol.game.ServerboundInteractPacket;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 
 public class Criticals extends Module {
     public enum Mode {

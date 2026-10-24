@@ -6,12 +6,12 @@ import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.Enchantments;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.RegistryKeys;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.registries.Registries;
 import me.collective.util.InventoryUtil;
 
 public class AutoArmor extends Module {

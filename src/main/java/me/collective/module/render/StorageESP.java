@@ -10,18 +10,18 @@ import me.collective.render.Renderer3D;
 import me.collective.render.ShapeMode;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.util.math.Box;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.ChestBlockEntity;
-import net.minecraft.block.entity.EnderChestBlockEntity;
-import net.minecraft.block.entity.ShulkerBoxBlockEntity;
-import net.minecraft.block.entity.BarrelBlockEntity;
-import net.minecraft.block.entity.HopperBlockEntity;
-import net.minecraft.block.entity.DispenserBlockEntity;
-import net.minecraft.block.entity.DropperBlockEntity;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
+import net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity;
+import net.minecraft.world.level.block.entity.BarrelBlockEntity;
+import net.minecraft.world.level.block.entity.HopperBlockEntity;
+import net.minecraft.world.level.block.entity.DispenserBlockEntity;
+import net.minecraft.world.level.block.entity.DropperBlockEntity;
+import net.minecraft.network.chat.Component;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -115,7 +115,7 @@ public class StorageESP extends Module {
 
                 String type = null;
                 if (chests.getValue() && be instanceof ChestBlockEntity) type = "Chest";
-                else if (shulkers.getValue() && be instanceof ShulkerBoxBlockEntity) type = "Shulker Box";
+                else if (shulkers.getValue() && be instanceof ShulkerBoxBlockEntity) type = "Shulker AABB";
                 else if (enderChests.getValue() && be instanceof EnderChestBlockEntity) type = "Ender Chest";
                 else if (barrels.getValue() && be instanceof BarrelBlockEntity) type = "Barrel";
                 else if (hoppers.getValue() && be instanceof HopperBlockEntity) type = "Hopper";
@@ -126,7 +126,7 @@ public class StorageESP extends Module {
                     alertedPositions.add(pos);
                     double dist = mc.player.getEyePos().distanceTo(pos.toCenterPos());
                     if (dist > 8.0) { // only alert if not right next to player
-                        mc.player.sendMessage(Text.literal(String.format("§7[§6StorageESP§7] §e%s §7found at §aX: %d, Y: %d, Z: %d §7(§f%.0fm§7)",
+                        mc.player.sendMessage(Component.literal(String.format("§7[§6StorageESP§7] §e%s §7found at §aX: %d, Y: %d, Z: %d §7(§f%.0fm§7)",
                             type, pos.getX(), pos.getY(), pos.getZ(), dist)), false);
                     }
                 }
@@ -147,7 +147,7 @@ public class StorageESP extends Module {
             Color fill = ColorUtil.fadeByDistance(dist, rangeBlocks,
                 new Color(tint.getRed(), tint.getGreen(), tint.getBlue(), 70));
             Color line = ColorUtil.fadeLineByDistance(dist, rangeBlocks, tint, 220);
-            Renderer3D.box(new Box(pos), fill, line, ShapeMode.Both, true);
+            Renderer3D.box(new AABB(pos), fill, line, ShapeMode.Both, true);
         }
     }
 

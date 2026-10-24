@@ -5,7 +5,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.entrypoint.EntrypointContainer;
 import net.fabricmc.loader.api.metadata.ModMetadata;
 import net.fabricmc.loader.api.metadata.Person;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 import java.io.File;
 import java.io.IOException;
@@ -229,7 +229,7 @@ public class AddonManager {
         init();
 
         int failed = loadFailures.size();
-        ChatHelper.sendMessage(Text.literal("§a[Collective] Аддоны перезагружены! Загружено: §f" + addons.size()
+        ChatHelper.sendMessage(Component.literal("§a[Collective] Аддоны перезагружены! Загружено: §f" + addons.size()
                 + (failed > 0 ? " §7(§cне загрузилось: " + failed + "§7, подробности: §f.addon list§7)" : "")));
     }
 

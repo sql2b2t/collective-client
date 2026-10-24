@@ -3,8 +3,8 @@ package me.collective.module.movement;
 import me.collective.category.Category;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 
 /**
  * Порт Parkour из ThunderHack.

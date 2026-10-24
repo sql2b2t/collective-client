@@ -12,15 +12,15 @@ import me.collective.setting.NumberSetting;
 import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
 import me.collective.util.Utils;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.projectile.FireworkRocketEntity;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
-import net.minecraft.network.packet.s2c.play.DamageTiltS2CPacket;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.projectile.FireworkRocketEntity;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
+import net.minecraft.network.protocol.game.ClientboundHurtAnimationPacket;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
 
 /**
  * ElytraRecast: следит за полётом на элитрах и автоматически поднимает игрока,
@@ -140,10 +140,10 @@ public class ElytraRecast extends Module {
 
     private boolean looksLikeWallHit() {
         if (!mc.player.isGliding()) return false;
-        Vec3d vel = mc.player.getVelocity();
+        Vec3 vel = mc.player.getVelocity();
         if (Math.abs(vel.getX()) + Math.abs(vel.getZ()) < 0.1) return false;
-        Vec3d eye = mc.player.getEyePos();
-        Vec3d dir = new Vec3d(vel.getX(), 0.0, vel.getZ()).normalize();
+        Vec3 eye = mc.player.getEyePos();
+        Vec3 dir = new Vec3(vel.getX(), 0.0, vel.getZ()).normalize();
         HitResult hit = mc.world.raycast(
             new RaycastContext(eye, eye.add(dir.multiply(1.5)), RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, mc.player)
         );
@@ -359,8 +359,8 @@ public class ElytraRecast extends Module {
     }
 
     private boolean hasRocketClearance() {
-        Vec3d eye = mc.player.getEyePos();
-        Vec3d end = eye.add(mc.player.getRotationVec(1.0f).multiply(this.wallClearance.getIntValue()));
+        Vec3 eye = mc.player.getEyePos();
+        Vec3 end = eye.add(mc.player.getRotationVec(1.0f).multiply(this.wallClearance.getIntValue()));
         return mc.world.raycast(
             new RaycastContext(eye, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, mc.player)
         ).getType() == HitResult.Type.MISS;
@@ -430,12 +430,12 @@ public class ElytraRecast extends Module {
     }
 
     private boolean isInNether() {
-        return mc.world != null && mc.world.getRegistryKey() == World.NETHER;
+        return mc.world != null && mc.world.getRegistryKey() == Level.NETHER;
     }
 
     private void sendClientMessage(String msg) {
         if (mc.player != null) {
-            mc.player.sendMessage(net.minecraft.text.Text.literal("§7[§bElytraRecast§7] §f" + msg), false);
+            mc.player.sendMessage(net.minecraft.text.Component.literal("§7[§bElytraRecast§7] §f" + msg), false);
         }
     }
 

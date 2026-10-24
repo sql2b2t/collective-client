@@ -6,8 +6,8 @@ import me.collective.event.EventHandler;
 import me.collective.event.events.*;
 import me.collective.module.Module;
 import me.collective.setting.*;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
 
 import java.awt.Color;
 import java.util.function.BiConsumer;
@@ -25,7 +25,7 @@ public class ScriptModule extends Module {
     private Consumer<PacketEvent.Send> onPacketSendAction;
     private Consumer<PacketEvent.Receive> onPacketReceiveAction;
     private Consumer<Render3DEvent> onRender3DAction;
-    private BiConsumer<DrawContext, Float> onRender2DAction;
+    private BiConsumer<GuiGraphics, Float> onRender2DAction;
     private Consumer<PlayerMoveEvent> onPlayerMoveAction;
     private Consumer<StartBreakingBlockEvent> onBreakBlockAction;
     private Consumer<SendMessageEvent> onSendMessageAction;
@@ -105,7 +105,7 @@ public class ScriptModule extends Module {
         return this;
     }
 
-    public ScriptModule onRender2D(BiConsumer<DrawContext, Float> action) {
+    public ScriptModule onRender2D(BiConsumer<GuiGraphics, Float> action) {
         this.onRender2DAction = action;
         return this;
     }
@@ -153,7 +153,7 @@ public class ScriptModule extends Module {
     }
 
     @Override
-    public void onRender2D(DrawContext context, float delta) {
+    public void onRender2D(GuiGraphics context, float delta) {
         if (onRender2DAction == null || !isToggled()) return;
         try {
             onRender2DAction.accept(context, delta);
@@ -175,7 +175,7 @@ public class ScriptModule extends Module {
         if ((errorCount >= ScriptContext.MAX_ERRORS || reported >= ScriptContext.MAX_ERRORS) && isToggled()) {
             setToggled(false);
             if (scriptContext != null) {
-                ChatHelper.sendMessage(Text.literal("§c[Script] §f" + scriptContext.scriptName
+                ChatHelper.sendMessage(Component.literal("§c[Script] §f" + scriptContext.scriptName
                         + "§7: модуль §e" + getName() + " §7выключен после " + ScriptContext.MAX_ERRORS + " ошибок."));
             }
         }

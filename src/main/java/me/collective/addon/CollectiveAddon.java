@@ -12,13 +12,13 @@ import me.collective.render.BlurEngine;
 import me.collective.util.BaritoneBridge;
 import me.collective.util.InventoryUtil;
 import me.collective.util.RotationUtils;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public abstract class CollectiveAddon {
-    protected final MinecraftClient mc = MinecraftClient.getInstance();
+    protected final Minecraft mc = Minecraft.getInstance();
     private String name;
     private String version = "1.0.0";
     private String author = "Unknown";

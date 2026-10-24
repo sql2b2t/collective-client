@@ -9,9 +9,9 @@ import me.collective.render.ShapeMode;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.ColorSetting;
 import me.collective.setting.EnumSetting;
-import net.minecraft.entity.player.BlockBreakingInfo;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
+import net.minecraft.server.level.BlockDestructionProgress;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
 
 import java.awt.Color;
 
@@ -54,15 +54,15 @@ public class BreakProgress extends Module {
     }
 
     private void renderBreakBox(BlockPos pos, float progress) {
-        Box box;
+        AABB box;
         if (shrink.getValue()) {
             double inset = (1.0 - progress) * 0.5;
-            box = new Box(
+            box = new AABB(
                     pos.getX() + inset, pos.getY() + inset, pos.getZ() + inset,
                     pos.getX() + 1.0 - inset, pos.getY() + 1.0 - inset, pos.getZ() + 1.0 - inset
             );
         } else {
-            box = new Box(pos);
+            box = new AABB(pos);
         }
 
         Color mainColor;

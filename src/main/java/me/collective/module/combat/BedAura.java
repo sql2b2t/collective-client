@@ -8,15 +8,15 @@ import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
 import me.collective.util.PlacementUtils;
 import me.collective.manager.FriendManager;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.BedItem;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.BedItem;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.Level;
 
 /**
  * Порт BedAura из Meteor Client.
@@ -56,9 +56,9 @@ public class BedAura extends Module {
                 delayTimer--;
             } else if (mc.interactionManager != null
                 && mc.world.getBlockState(place).getBlock() instanceof net.minecraft.block.BedBlock) {
-                BlockHitResult hit = new BlockHitResult(Vec3d.ofCenter(place), Direction.UP, place, false);
-                mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
-                mc.player.swingHand(Hand.MAIN_HAND);
+                BlockHitResult hit = new BlockHitResult(Vec3.ofCenter(place), Direction.UP, place, false);
+                mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND, hit);
+                mc.player.swingHand(InteractionHand.MAIN_HAND);
             }
             delayTimer = delay.getIntValue();
             return;
@@ -70,11 +70,11 @@ public class BedAura extends Module {
         }
 
         if (dimensionCheck.getValue()) {
-            RegistryKey<World> dim = mc.world.getRegistryKey();
-            if (dim != World.NETHER && dim != World.END) return;
+            RegistryKey<Level> dim = mc.world.getRegistryKey();
+            if (dim != Level.NETHER && dim != Level.END) return;
         }
 
-        PlayerEntity target = getTarget(range.getFloatValue());
+        Player target = getTarget(range.getFloatValue());
         if (target == null) return;
 
         FindItemResult bed = InventoryUtil.findInHotbarOrOffhand(stack -> stack.getItem() instanceof BedItem);
@@ -90,10 +90,10 @@ public class BedAura extends Module {
         pendingExplode = place;
     }
 
-    private PlayerEntity getTarget(double range) {
-        PlayerEntity best = null;
+    private Player getTarget(double range) {
+        Player best = null;
         double bestDist = range;
-        for (PlayerEntity p : mc.world.getPlayers()) {
+        for (Player p : mc.world.getPlayers()) {
             if (p == mc.player || !p.isAlive() || p.isSpectator() || p.isCreative()) continue;
             if (FriendManager.getInstance().isFriend(p)) continue;
             double d = mc.player.distanceTo(p);

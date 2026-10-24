@@ -2,14 +2,14 @@ package me.collective.mixin;
 
 import me.collective.module.render.NoRender;
 import me.collective.module.render.TotemAnimation;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.hud.InGameOverlayRenderer;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.command.OrderedRenderCommandQueue;
-import net.minecraft.client.texture.Sprite;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.random.Random;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.ScreenEffectRenderer;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.util.RandomSource;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -40,7 +40,7 @@ public abstract class MixinInGameOverlayRenderer {
     }
 
     @Inject(method = "renderFloatingItem", at = @At("HEAD"), cancellable = true)
-    private void collective$onRenderFloatingItem(MatrixStack matrices, float tickDelta, OrderedRenderCommandQueue renderCommands, CallbackInfo ci) {
+    private void collective$onRenderFloatingItem(PoseStack matrices, float tickDelta, OrderedRenderCommandQueue renderCommands, CallbackInfo ci) {
         TotemAnimation mod = TotemAnimation.INSTANCE;
         if (mod != null && mod.isToggled()) {
             if (mod.renderCustomAnimation(matrices, tickDelta, renderCommands, this.floatingItem, this.floatingItemTimer)) {
@@ -52,7 +52,7 @@ public abstract class MixinInGameOverlayRenderer {
     // ------------------------------------------------------------- NoRender
 
     @Inject(method = "renderFireOverlay", at = @At("HEAD"), cancellable = true)
-    private static void collective$noRenderFire(MatrixStack matrices, VertexConsumerProvider vertexConsumers, Sprite sprite, CallbackInfo ci) {
+    private static void collective$noRenderFire(PoseStack matrices, VertexConsumerProvider vertexConsumers, Sprite sprite, CallbackInfo ci) {
         NoRender mod = NoRender.INSTANCE;
         if (mod != null && mod.isToggled() && mod.fire.getValue()) {
             ci.cancel();
@@ -60,7 +60,7 @@ public abstract class MixinInGameOverlayRenderer {
     }
 
     @Inject(method = "renderUnderwaterOverlay", at = @At("HEAD"), cancellable = true)
-    private static void collective$noRenderUnderwater(MinecraftClient client, MatrixStack matrices, VertexConsumerProvider vertexConsumers, CallbackInfo ci) {
+    private static void collective$noRenderUnderwater(Minecraft client, PoseStack matrices, VertexConsumerProvider vertexConsumers, CallbackInfo ci) {
         NoRender mod = NoRender.INSTANCE;
         if (mod != null && mod.isToggled() && mod.water.getValue()) {
             ci.cancel();
@@ -68,7 +68,7 @@ public abstract class MixinInGameOverlayRenderer {
     }
 
     @Inject(method = "renderInWallOverlay", at = @At("HEAD"), cancellable = true)
-    private static void collective$noRenderInWall(Sprite sprite, MatrixStack matrices, VertexConsumerProvider vertexConsumers, CallbackInfo ci) {
+    private static void collective$noRenderInWall(Sprite sprite, PoseStack matrices, VertexConsumerProvider vertexConsumers, CallbackInfo ci) {
         NoRender mod = NoRender.INSTANCE;
         if (mod != null && mod.isToggled() && mod.inWall.getValue()) {
             ci.cancel();

@@ -2,9 +2,9 @@ package me.collective.mixin;
 
 import me.collective.module.render.Tooltips;
 import me.collective.module.tooltips.DominantStacks;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.item.ItemStack;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -18,11 +18,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * предмет совпадает с записью из накопленного списка, рисует поверх иконку
  * доминирующего предмета с тем же искажением, что в оригинале: сдвиг
  * {@code +3.5 / -4} и масштаб {@code 10 / -10} (отрицательный Y зеркалит
- * иконку). Смещение и масштаб заданы явно через матрицы {@code DrawContext},
+ * иконку). Смещение и масштаб заданы явно через матрицы {@code GuiGraphics},
  * т.к. в 1.21.11 {@code drawItem} уходит в render-состояния и хуков на
  * {@code translate}/{@code scale} внутри может не оказаться.
  */
-@Mixin(DrawContext.class)
+@Mixin(GuiGraphics.class)
 public abstract class MixinDrawContextDominant {
 
     /** Модуль кэшируется один раз: drawStackOverlay вызывается на каждый отрисованный предмет. */
@@ -53,7 +53,7 @@ public abstract class MixinDrawContextDominant {
      * Отрисовывает доминирующий предмет поверх контейнера (шаposition/мешка).
      */
     private void renderDominantItem(ItemStack dominant, int x, int y, Tooltips.MajorityMode mode, Tooltips.MajorityPosition position) {
-        DrawContext context = (DrawContext) (Object) this;
+        GuiGraphics context = (GuiGraphics) (Object) this;
 
         if (mode == Tooltips.MajorityMode.FULL) {
             context.drawItem(dominant, x, y);

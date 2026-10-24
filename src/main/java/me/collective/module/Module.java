@@ -3,16 +3,16 @@ package me.collective.module;
 import me.collective.category.Category;
 import me.collective.setting.KeybindSetting;
 import me.collective.setting.Setting;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public abstract class Module {
-    protected static final MinecraftClient mc = MinecraftClient.getInstance();
-    public static final MinecraftClient client = mc;
+    protected static final Minecraft mc = Minecraft.getInstance();
+    public static final Minecraft client = mc;
 
     private final String name;
     private final String description;
@@ -103,15 +103,15 @@ public abstract class Module {
     public void onDeactivate() {}
     public void onUpdate() {}
     public void onWorldChange() {}
-    public void onRender2D(DrawContext context, float delta) {}
+    public void onRender2D(GuiGraphics context, float delta) {}
     public String getInfoString() { return null; }
 
     public void error(String msg) {
-        me.collective.command.ChatHelper.sendMessage(net.minecraft.text.Text.literal("§c" + msg));
+        me.collective.command.ChatHelper.sendMessage(net.minecraft.text.Component.literal("§c" + msg));
     }
 
     public void info(String msg) {
-        me.collective.command.ChatHelper.sendMessage(net.minecraft.text.Text.literal("§7[§b" + getName() + "§7] §f" + msg));
+        me.collective.command.ChatHelper.sendMessage(net.minecraft.text.Component.literal("§7[§b" + getName() + "§7] §f" + msg));
     }
 
     public void info(String format, Object... args) {
@@ -119,7 +119,7 @@ public abstract class Module {
     }
 
     public void warning(String msg) {
-        me.collective.command.ChatHelper.sendMessage(net.minecraft.text.Text.literal("§e" + msg));
+        me.collective.command.ChatHelper.sendMessage(net.minecraft.text.Component.literal("§e" + msg));
     }
 
     public void warning(String format, Object... args) {

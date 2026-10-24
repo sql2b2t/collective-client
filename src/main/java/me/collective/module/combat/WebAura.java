@@ -9,9 +9,9 @@ import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
 import me.collective.util.PlacementUtils;
 import me.collective.manager.FriendManager;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Items;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Items;
+import net.minecraft.core.BlockPos;
 
 /**
  * Порт WebAura из ThunderHack.
@@ -38,7 +38,7 @@ public class WebAura extends Module {
             return;
         }
 
-        PlayerEntity target = getTarget();
+        Player target = getTarget();
         if (target == null) return;
 
         FindItemResult web = InventoryUtil.findInHotbarOrOffhand(Items.COBWEB);
@@ -58,10 +58,10 @@ public class WebAura extends Module {
         if (placed) delayTimer = delay.getIntValue();
     }
 
-    private PlayerEntity getTarget() {
-        PlayerEntity best = null;
+    private Player getTarget() {
+        Player best = null;
         double bestDist = range.getFloatValue();
-        for (PlayerEntity p : mc.world.getPlayers()) {
+        for (Player p : mc.world.getPlayers()) {
             if (p == mc.player || !p.isAlive() || p.isSpectator() || p.isCreative()) continue;
             if (FriendManager.getInstance().isFriend(p)) continue;
             double d = mc.player.distanceTo(p);

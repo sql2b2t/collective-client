@@ -98,7 +98,7 @@ public class KeybindSetting extends Setting<Integer> {
     public boolean isPressed() {
         int key = getValue();
         if (key == GLFW.GLFW_KEY_UNKNOWN || key == -1) return false;
-        long window = net.minecraft.client.MinecraftClient.getInstance().getWindow().getHandle();
+        long window = net.minecraft.client.Minecraft.getInstance().getWindow().getHandle();
         if (key <= -100) {
             int button = -key - 100;
             return GLFW.glfwGetMouseButton(window, button) == GLFW.GLFW_PRESS;

@@ -1,12 +1,12 @@
 package me.collective.emotes;
 
-import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -28,7 +28,7 @@ public class EmoteWheelScreen extends Screen {
     private int listW = PANEL_W;
 
     public EmoteWheelScreen() {
-        super(Text.literal("Эмоции"));
+        super(Component.literal("Эмоции"));
     }
 
     private int pageCount() {
@@ -77,7 +77,7 @@ public class EmoteWheelScreen extends Screen {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         clampSelection();
         int size = Emote.ALL.size();
         int count = size == 0 ? 0 : Math.min(PAGE_SIZE, size - page * PAGE_SIZE);
@@ -89,12 +89,12 @@ public class EmoteWheelScreen extends Screen {
         context.fill(listX - 6, listY - 24, listX + listW + 6, listY + PAGE_SIZE * ROW_H + 22, 0xE0070B13);
 
         if (this.textRenderer != null) {
-            context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("Эмоции"), this.width / 2, listY - 16, 0xFFF8FBFF);
+            context.drawCenteredTextWithShadow(this.textRenderer, Component.literal("Эмоции"), this.width / 2, listY - 16, 0xFFF8FBFF);
         }
 
         if (size == 0) {
             if (this.textRenderer != null) {
-                context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("Нет эмоций"), this.width / 2, this.height / 2, 0xFF969EAE);
+                context.drawCenteredTextWithShadow(this.textRenderer, Component.literal("Нет эмоций"), this.width / 2, this.height / 2, 0xFF969EAE);
             }
         } else {
             int hovered = rowAt(mouseX, mouseY, count);
@@ -121,7 +121,7 @@ public class EmoteWheelScreen extends Screen {
 
             if (this.textRenderer != null) {
                 String pages = (page + 1) + " / " + pageCount();
-                context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(pages), this.width / 2, listY + PAGE_SIZE * ROW_H + 6, 0xFF969EAE);
+                context.drawCenteredTextWithShadow(this.textRenderer, Component.literal(pages), this.width / 2, listY + PAGE_SIZE * ROW_H + 6, 0xFF969EAE);
             }
         }
 

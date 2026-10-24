@@ -6,7 +6,7 @@ import me.collective.module.client.UI;
 import me.collective.render.RenderUtil;
 import me.collective.render.SoundUtil;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -30,7 +30,7 @@ public class SliderComponent extends Component {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         if (!setting.isVisible()) return;
 
         if (dragging) {

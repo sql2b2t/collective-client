@@ -5,11 +5,11 @@ import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.InventoryUtil;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.inventory.ClickType;
 
 import java.util.Set;
 

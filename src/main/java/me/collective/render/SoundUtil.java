@@ -1,14 +1,14 @@
 package me.collective.render;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.sound.PositionedSoundInstance;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.resources.Identifier;
 
 public class SoundUtil {
     public static void playClick(float volume, float pitch) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         try {
             Identifier id = Identifier.of("collective", "click");
             SoundEvent event = SoundEvent.of(id);
@@ -19,7 +19,7 @@ public class SoundUtil {
     }
 
     public static void playHover(float volume, float pitch) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         try {
             Identifier id = Identifier.of("collective", "hover");
             SoundEvent event = SoundEvent.of(id);

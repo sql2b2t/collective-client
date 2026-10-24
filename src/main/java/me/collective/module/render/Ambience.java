@@ -7,7 +7,7 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.ColorSetting;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.world.World;
+import net.minecraft.world.level.Level;
 import org.joml.Vector4f;
 
 import java.awt.Color;
@@ -73,7 +73,7 @@ public class Ambience extends Module {
     public boolean modifyFogBuffer(ByteBuffer buffer, int offset, Vector4f color, float envStart, float envEnd, float rdStart, float rdEnd, float skyEnd, float cloudEnd) {
         if (mc.world == null) return false;
 
-        boolean isNether = mc.world.getRegistryKey() == World.NETHER;
+        boolean isNether = mc.world.getRegistryKey() == Level.NETHER;
         if (netherOnly.getValue() && !isNether) return false;
 
         boolean clearing = clearFog.getValue();

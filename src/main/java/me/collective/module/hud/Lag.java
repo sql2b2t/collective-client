@@ -5,7 +5,7 @@ import me.collective.event.events.PacketEvent;
 import me.collective.font.FontManager;
 import me.collective.render.RenderUtil;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 
 import java.awt.Color;
 
@@ -34,7 +34,7 @@ public class Lag extends HudModule {
     }
 
     @Override
-    public void render(DrawContext context, float delta) {
+    public void render(GuiGraphics context, float delta) {
         if (!isToggled()) return;
         if (mc.player == null || mc.world == null) return;
         if (mc.isInSingleplayer()) return;

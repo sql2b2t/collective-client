@@ -6,11 +6,11 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.RotationUtils;
 import me.collective.manager.FriendManager;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Items;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Items;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Порт BowAimbot из Meteor Client.
@@ -35,19 +35,19 @@ public class BowAimbot extends Module {
         LivingEntity target = getTarget();
         if (target == null) return;
 
-        Vec3d aim = target.getBoundingBox().getCenter();
+        Vec3 aim = target.getBoundingBox().getCenter();
         if (predict.getValue()) {
             double dist = mc.player.distanceTo(target);
             double t = dist / 60.0;
-            Vec3d vel = target.getVelocity();
+            Vec3 vel = target.getVelocity();
             aim = aim.add(vel.x * t, vel.y * t, vel.z * t);
         }
         // Поправка на падение стрелы на дистанции
         double dist = mc.player.distanceTo(target);
         aim = aim.add(0, dist * dist * 0.0006, 0);
 
-        Vec3d eye = mc.player.getEyePos();
-        Vec3d diff = aim.subtract(eye);
+        Vec3 eye = mc.player.getEyePos();
+        Vec3 diff = aim.subtract(eye);
         float yaw = (float) (Math.toDegrees(Math.atan2(-diff.x, diff.z)));
         float pitch = (float) (-Math.toDegrees(Math.atan2(diff.y, Math.hypot(diff.x, diff.z))));
         pitch = MathHelper.clamp(pitch, -90f, 90f);
@@ -58,19 +58,19 @@ public class BowAimbot extends Module {
     private LivingEntity getTarget() {
         LivingEntity best = null;
         double bestAngle = fov.getFloatValue() / 2.0;
-        Vec3d eye = mc.player.getEyePos();
-        Vec3d look = mc.player.getRotationVec(1.0f).normalize();
+        Vec3 eye = mc.player.getEyePos();
+        Vec3 look = mc.player.getRotationVec(1.0f).normalize();
 
         for (var e : mc.world.getEntities()) {
             if (!(e instanceof LivingEntity living)) continue;
             if (living == mc.player || !living.isAlive()) continue;
-            if (playersOnly.getValue() && !(living instanceof PlayerEntity)) continue;
-            if (living instanceof PlayerEntity p) {
+            if (playersOnly.getValue() && !(living instanceof Player)) continue;
+            if (living instanceof Player p) {
                 if (p.isSpectator() || p.isCreative() || FriendManager.getInstance().isFriend(p)) continue;
             }
             if (mc.player.distanceTo(living) > range.getFloatValue()) continue;
 
-            Vec3d toTarget = living.getBoundingBox().getCenter().subtract(eye).normalize();
+            Vec3 toTarget = living.getBoundingBox().getCenter().subtract(eye).normalize();
             double angle = Math.toDegrees(Math.acos(MathHelper.clamp(look.dotProduct(toTarget), -1.0, 1.0)));
             if (angle < bestAngle) {
                 bestAngle = angle;

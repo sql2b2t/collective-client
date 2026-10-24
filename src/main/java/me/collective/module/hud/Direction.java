@@ -3,8 +3,8 @@ package me.collective.module.hud;
 import me.collective.font.FontManager;
 import me.collective.module.client.HUD;
 import me.collective.render.RenderUtil;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.util.math.Direction.AxisDirection;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.core.Direction.AxisDirection;
 
 import java.awt.Color;
 
@@ -14,7 +14,7 @@ public class Direction extends HudModule {
     }
 
     @Override
-    public void render(DrawContext context, float delta) {
+    public void render(GuiGraphics context, float delta) {
         if (!isToggled() || mc.player == null) return;
 
         net.minecraft.util.math.Direction dir = mc.player.getHorizontalFacing();

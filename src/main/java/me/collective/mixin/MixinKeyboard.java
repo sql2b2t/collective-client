@@ -1,8 +1,8 @@
 package me.collective.mixin;
 
 import me.collective.CollectiveClient;
-import net.minecraft.client.Keyboard;
-import net.minecraft.client.input.KeyInput;
+import net.minecraft.client.KeyboardHandler;
+import net.minecraft.client.input.KeyEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;

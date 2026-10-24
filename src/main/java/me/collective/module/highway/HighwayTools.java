@@ -13,7 +13,7 @@ import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
-import net.minecraft.item.Items;
+import net.minecraft.world.item.Items;
 
 import java.util.List;
 

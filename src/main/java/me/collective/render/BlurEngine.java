@@ -1,7 +1,7 @@
 package me.collective.render;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.*;
 
@@ -11,7 +11,7 @@ import java.util.List;
 
 public class BlurEngine {
     public static final BlurEngine INSTANCE = new BlurEngine();
-    private static final MinecraftClient mc = MinecraftClient.getInstance();
+    private static final Minecraft mc = Minecraft.getInstance();
 
     private int shaderProgram = -1;
     private int uDirection = -1;
@@ -150,23 +150,23 @@ public class BlurEngine {
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, restoreFbo);
     }
 
-    public void renderBlur(DrawContext context, float radius, float alpha) {
+    public void renderBlur(GuiGraphics context, float radius, float alpha) {
         renderBlur(context, (List<float[]>) null, radius, alpha);
     }
 
-    public void renderBlur(DrawContext context, float x, float y, float w, float h, float radius, float alpha) {
+    public void renderBlur(GuiGraphics context, float x, float y, float w, float h, float radius, float alpha) {
         java.util.List<float[]> list = new java.util.ArrayList<>();
         list.add(new float[]{ x, y, x + w, y + h });
         renderBlur(context, list, radius, alpha);
     }
 
-    public void renderBlur(DrawContext context, List<float[]> regions, float radius) {
+    public void renderBlur(GuiGraphics context, List<float[]> regions, float radius) {
         float alpha = (me.collective.module.render.Blur.INSTANCE != null && me.collective.module.render.Blur.INSTANCE.opacity != null)
                 ? me.collective.module.render.Blur.INSTANCE.opacity.getFloatValue() : 0.65f;
         renderBlur(context, regions, radius, alpha);
     }
 
-    public void renderBlur(DrawContext context, List<float[]> regions, float radius, float alpha) {
+    public void renderBlur(GuiGraphics context, List<float[]> regions, float radius, float alpha) {
         if (context != null) {
             context.drawDeferredElements();
         }
@@ -284,11 +284,11 @@ public class BlurEngine {
         }
     }
 
-    public void renderFallback(DrawContext context, List<float[]> regions) {
+    public void renderFallback(GuiGraphics context, List<float[]> regions) {
         renderFallback(context, regions, 0.65f);
     }
 
-    public void renderFallback(DrawContext context, List<float[]> regions, float alpha) {
+    public void renderFallback(GuiGraphics context, List<float[]> regions, float alpha) {
         if (regions == null || regions.isEmpty()) {
             int w = mc.getWindow().getScaledWidth();
             int h = mc.getWindow().getScaledHeight();

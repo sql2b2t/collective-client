@@ -5,7 +5,7 @@ import me.collective.event.EventHandler;
 import me.collective.event.events.PacketEvent;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
-import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
 
 /**
  * Порт AntiHunger из Meteor Client.

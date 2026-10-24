@@ -11,12 +11,12 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.ViaProtocolUtil;
-import net.minecraft.entity.EntityPosition;
-import net.minecraft.entity.MovementType;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
-import net.minecraft.network.packet.s2c.play.PositionFlag;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.entity.PositionMoveRotation;
+import net.minecraft.world.entity.MoverType;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.world.entity.Relative;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
@@ -59,7 +59,7 @@ public class GrimGlide extends Module {
 
     private int setbacks;
     private double bps;
-    private Vec3d lastPos;
+    private Vec3 lastPos;
 
     public GrimGlide() {
         super("GrimGlide", "Зависание на элитре с использованием погрешности физики GrimAC.", Category.MOVEMENT);
@@ -124,7 +124,7 @@ public class GrimGlide extends Module {
     private void onTick(TickEvent.Pre event) {
         if (mc.player == null || mc.world == null) return;
         if (lastPos != null) {
-            Vec3d delta = mc.player.getEntityPos().subtract(lastPos);
+            Vec3 delta = mc.player.getEntityPos().subtract(lastPos);
             bps = Math.sqrt(delta.x * delta.x + delta.z * delta.z) * 20.0;
         }
         lastPos = mc.player.getEntityPos();
@@ -144,16 +144,16 @@ public class GrimGlide extends Module {
         event.movement = envelope();
     }
 
-    private Vec3d envelope() {
+    private Vec3 envelope() {
         double h = horizontalBudget();
         double v = verticalBudget();
         double gravity = gravity();
         double y = Math.max(gravity - v, Math.min(gravity + v, climb.getValue()));
         if (steer.getValue() && !isMoveKeyDown()) {
-            return new Vec3d(0.0, y, 0.0);
+            return new Vec3(0.0, y, 0.0);
         }
         double yawRad = Math.toRadians(mc.player.getYaw());
-        return new Vec3d(-Math.sin(yawRad) * h, y, Math.cos(yawRad) * h);
+        return new Vec3(-Math.sin(yawRad) * h, y, Math.cos(yawRad) * h);
     }
 
     private boolean isMoveKeyDown() {
@@ -165,7 +165,7 @@ public class GrimGlide extends Module {
         double yawRad = Math.toRadians(mc.player.getYaw());
         double dx = -Math.sin(yawRad) * step;
         double dz = Math.cos(yawRad) * step;
-        Vec3d velocity = mc.player.getVelocity();
+        Vec3 velocity = mc.player.getVelocity();
         mc.player.setVelocity(dx * factor(), velocity.y - fall.getValue(), dz * factor());
         if (teleport.getValue()) {
             mc.player.setPosition(mc.player.getX() + dx, mc.player.getY(), mc.player.getZ() + dz);
@@ -180,10 +180,10 @@ public class GrimGlide extends Module {
         if (!(packet instanceof PlayerPositionLookS2CPacket positionLook)) return;
 
         EntityPosition changePacket = positionLook.change();
-        Vec3d change = changePacket.position();
-        Vec3d current = mc.player.getEntityPos();
+        Vec3 change = changePacket.position();
+        Vec3 current = mc.player.getEntityPos();
         Set<PositionFlag> relatives = positionLook.relatives();
-        Vec3d target = new Vec3d(
+        Vec3 target = new Vec3(
             relatives.contains(PositionFlag.X) ? current.x + change.x : change.x,
             relatives.contains(PositionFlag.Y) ? current.y + change.y : change.y,
             relatives.contains(PositionFlag.Z) ? current.z + change.z : change.z

@@ -1,8 +1,8 @@
 package me.collective.font;
 
 import me.collective.module.client.Fonts;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 
 import java.awt.Color;
 import java.awt.Font;
@@ -10,7 +10,7 @@ import java.io.InputStream;
 
 public class FontManager {
     public static final FontManager INSTANCE = new FontManager();
-    private final MinecraftClient mc = MinecraftClient.getInstance();
+    private final Minecraft mc = Minecraft.getInstance();
 
     private CFont currentFont;
     private String currentFontName = "Arial";
@@ -67,11 +67,11 @@ public class FontManager {
         }
     }
 
-    public void drawString(DrawContext context, String text, float x, float y, Color color) {
+    public void drawString(GuiGraphics context, String text, float x, float y, Color color) {
         drawString(context, text, x, y, color.getRGB());
     }
 
-    public void drawString(DrawContext context, String text, float x, float y, int color) {
+    public void drawString(GuiGraphics context, String text, float x, float y, int color) {
         if (text == null || text.isEmpty()) return;
         if (Fonts.INSTANCE != null && Fonts.INSTANCE.isToggled() && currentFont != null) {
             currentFont.drawString(context, text, x, y, color);
@@ -80,11 +80,11 @@ public class FontManager {
         }
     }
 
-    public void drawStringWithShadow(DrawContext context, String text, float x, float y, Color color) {
+    public void drawStringWithShadow(GuiGraphics context, String text, float x, float y, Color color) {
         drawStringWithShadow(context, text, x, y, color.getRGB());
     }
 
-    public void drawStringWithShadow(DrawContext context, String text, float x, float y, int color) {
+    public void drawStringWithShadow(GuiGraphics context, String text, float x, float y, int color) {
         if (text == null || text.isEmpty()) return;
         if (Fonts.INSTANCE != null && Fonts.INSTANCE.isToggled() && currentFont != null) {
             if (Fonts.INSTANCE.shadow.getValue()) {
@@ -139,11 +139,11 @@ public class FontManager {
         return (int) Math.ceil(mc.textRenderer.fontHeight * scale);
     }
 
-    public void drawStringScaled(DrawContext context, String text, float x, float y, Color color, float scale) {
+    public void drawStringScaled(GuiGraphics context, String text, float x, float y, Color color, float scale) {
         drawStringScaled(context, text, x, y, color.getRGB(), scale);
     }
 
-    public void drawStringScaled(DrawContext context, String text, float x, float y, int color, float scale) {
+    public void drawStringScaled(GuiGraphics context, String text, float x, float y, int color, float scale) {
         if (text == null || text.isEmpty()) return;
         if (Fonts.INSTANCE != null && Fonts.INSTANCE.isToggled() && currentFont != null) {
             currentFont.drawString(context, text, x, y, color, scale);
@@ -157,11 +157,11 @@ public class FontManager {
         }
     }
 
-    public void drawStringWithShadowScaled(DrawContext context, String text, float x, float y, Color color, float scale) {
+    public void drawStringWithShadowScaled(GuiGraphics context, String text, float x, float y, Color color, float scale) {
         drawStringWithShadowScaled(context, text, x, y, color.getRGB(), scale);
     }
 
-    public void drawStringWithShadowScaled(DrawContext context, String text, float x, float y, int color, float scale) {
+    public void drawStringWithShadowScaled(GuiGraphics context, String text, float x, float y, int color, float scale) {
         if (text == null || text.isEmpty()) return;
         if (Fonts.INSTANCE != null && Fonts.INSTANCE.isToggled() && currentFont != null) {
             if (Fonts.INSTANCE.shadow.getValue()) {
@@ -179,11 +179,11 @@ public class FontManager {
         }
     }
 
-    public void drawCustomString(DrawContext context, String text, float x, float y, Color color) {
+    public void drawCustomString(GuiGraphics context, String text, float x, float y, Color color) {
         drawCustomString(context, text, x, y, color.getRGB());
     }
 
-    public void drawCustomString(DrawContext context, String text, float x, float y, int color) {
+    public void drawCustomString(GuiGraphics context, String text, float x, float y, int color) {
         if (text == null || text.isEmpty()) return;
         if (currentFont == null) reloadFont();
         if (currentFont != null) {
@@ -193,11 +193,11 @@ public class FontManager {
         }
     }
 
-    public void drawCustomStringWithShadow(DrawContext context, String text, float x, float y, Color color) {
+    public void drawCustomStringWithShadow(GuiGraphics context, String text, float x, float y, Color color) {
         drawCustomStringWithShadow(context, text, x, y, color.getRGB());
     }
 
-    public void drawCustomStringWithShadow(DrawContext context, String text, float x, float y, int color) {
+    public void drawCustomStringWithShadow(GuiGraphics context, String text, float x, float y, int color) {
         if (text == null || text.isEmpty()) return;
         if (currentFont == null) reloadFont();
         if (currentFont != null) {

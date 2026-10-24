@@ -2,7 +2,7 @@ package me.collective.module.hud;
 
 import me.collective.font.FontManager;
 import me.collective.render.RenderUtil;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 
 import java.awt.Color;
 
@@ -12,7 +12,7 @@ public class Crypto extends HudModule {
     }
 
     @Override
-    public void render(DrawContext context, float delta) {
+    public void render(GuiGraphics context, float delta) {
         if (!isToggled()) return;
 
         String text = "BTC: §a$98,420 §f| ETH: §a$3,850";

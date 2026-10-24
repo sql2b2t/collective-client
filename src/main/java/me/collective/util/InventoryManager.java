@@ -4,20 +4,20 @@ import me.collective.event.EventBus;
 import me.collective.event.EventHandler;
 import me.collective.event.events.PacketEvent;
 import me.collective.event.events.TickEvent;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.c2s.play.ClickSlotC2SPacket;
-import net.minecraft.network.packet.c2s.play.CloseHandledScreenC2SPacket;
-import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
-import net.minecraft.network.packet.s2c.play.UpdateSelectedSlotS2CPacket;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ServerboundContainerClickPacket;
+import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
+import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
+import net.minecraft.network.protocol.game.ClientboundSetHeldSlotPacket;
 
 /**
  * Серверный менеджер слота: отделяет серверный слот от клиентского,
  * исключает дублирующиеся пакеты слота (GrimAC bounce-fix).
  */
 public class InventoryManager {
-    private static final MinecraftClient mc = MinecraftClient.getInstance();
+    private static final Minecraft mc = Minecraft.getInstance();
     private static InventoryManager INSTANCE;
 
     private int serverSlot = -1;
@@ -58,7 +58,7 @@ public class InventoryManager {
 
         int packetSlot = update.getSelectedSlot();
 
-        if (!PlayerInventory.isValidHotbarIndex(packetSlot) || this.serverSlot == packetSlot) {
+        if (!Inventory.isValidHotbarIndex(packetSlot) || this.serverSlot == packetSlot) {
             event.cancel();
             return;
         }
@@ -113,7 +113,7 @@ public class InventoryManager {
             this.serverSlot = mc.player.getInventory().selectedSlot;
         }
 
-        if (this.serverSlot != barSlot && PlayerInventory.isValidHotbarIndex(barSlot)) {
+        if (this.serverSlot != barSlot && Inventory.isValidHotbarIndex(barSlot)) {
             setSlotForced(barSlot);
             this.currentPriority = priority;
         }
@@ -121,7 +121,7 @@ public class InventoryManager {
 
     public void setSlotForced(int barSlot) {
         if (mc.getNetworkHandler() == null) return;
-        if (!PlayerInventory.isValidHotbarIndex(barSlot)) return;
+        if (!Inventory.isValidHotbarIndex(barSlot)) return;
         if (this.serverSlot == barSlot) return;
 
         this.sendingPacket = true;

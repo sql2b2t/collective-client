@@ -7,7 +7,7 @@ import me.collective.module.client.HUD;
 import me.collective.module.hud.HudModule;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 public class CollectiveClient implements ClientModInitializer {
     public static final String MOD_ID = "collective";
@@ -36,7 +36,7 @@ public class CollectiveClient implements ClientModInitializer {
 
         // Register HUD Render Callback
         HudRenderCallback.EVENT.register((drawContext, renderTickCounter) -> {
-            MinecraftClient mc = MinecraftClient.getInstance();
+            Minecraft mc = Minecraft.getInstance();
 
             // Do not render normal HUD when in ClickGUI or HudEditor
             if (mc.currentScreen instanceof ClickGuiScreen
@@ -122,11 +122,11 @@ public class CollectiveClient implements ClientModInitializer {
                 me.collective.util.ExplosionDamageUtil.clearCache();
             });
 
-        // Register World 3D Render Callback for Modules
+        // Register Level 3D Render Callback for Modules
         net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents.AFTER_ENTITIES.register(context -> {
             net.minecraft.client.render.Camera camera = context.gameRenderer() != null ? context.gameRenderer().getCamera() : null;
-            float tickDelta = MinecraftClient.getInstance().getRenderTickCounter() != null
-                ? MinecraftClient.getInstance().getRenderTickCounter().getTickProgress(false)
+            float tickDelta = Minecraft.getInstance().getRenderTickCounter() != null
+                ? Minecraft.getInstance().getRenderTickCounter().getTickProgress(false)
                 : 1.0f;
 
             // Один gizmo-скоуп на весь кадр: все Renderer3D.box/line рисуют в
@@ -171,7 +171,7 @@ public class CollectiveClient implements ClientModInitializer {
     }
 
     public static void onKeyPressed(int key) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.currentScreen == null) {
             if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT_SHIFT && me.collective.module.client.UI.INSTANCE != null) {
                 me.collective.module.client.UI.INSTANCE.getKeybind().setValue(org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT_SHIFT);

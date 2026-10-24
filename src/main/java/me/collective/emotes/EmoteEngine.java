@@ -1,13 +1,13 @@
 package me.collective.emotes;
 
 import me.collective.module.misc.EmotesModule;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.entity.model.BipedEntityModel;
-import net.minecraft.client.render.entity.model.PlayerEntityModel;
-import net.minecraft.client.model.ModelPart;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.RotationAxis;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.HumanoidModel;
+import net.minecraft.client.model.player.PlayerModel;
+import net.minecraft.client.model.geom.ModelPart;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.util.Mth;
+import com.mojang.math.Axis;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -24,7 +24,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * сдвиг тела. Анимирует ТОЛЬКО локального игрока.
  */
 public final class EmoteEngine {
-    private static final MinecraftClient mc = MinecraftClient.getInstance();
+    private static final Minecraft mc = Minecraft.getInstance();
     private static final float DEG = (float) Math.PI / 180.0F;
 
     /** Render-state -> UUID игрока (заполняется из updateRenderState). */
@@ -418,7 +418,7 @@ public final class EmoteEngine {
     }
 
     /** Сдвиг/поворот всего тела (после ванильных трансформов). */
-    public static void applyBodyTransform(Object state, MatrixStack matrices) {
+    public static void applyBodyTransform(Object state, PoseStack matrices) {
         boolean local = isLocal(state);
         UUID stateUuid = local ? null : STATE_UUID.get(state);
         ActiveEmote a = local ? active : (stateUuid == null ? null : REMOTES.get(stateUuid));

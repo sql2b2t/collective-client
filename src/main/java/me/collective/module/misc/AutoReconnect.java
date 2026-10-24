@@ -8,13 +8,13 @@ import me.collective.render.SoundUtil;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.IntegerSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.DisconnectedScreen;
-import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
-import net.minecraft.client.network.ServerAddress;
-import net.minecraft.client.network.ServerInfo;
-import net.minecraft.network.packet.s2c.common.DisconnectS2CPacket;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.DisconnectedScreen;
+import net.minecraft.client.gui.screens.ConnectScreen;
+import net.minecraft.client.multiplayer.resolver.ServerAddress;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.network.protocol.common.ClientboundDisconnectPacket;
+import net.minecraft.network.chat.Component;
 
 /**
  * AutoReconnect: авто-переподключение к последнему серверу после кика.
@@ -66,7 +66,7 @@ public class AutoReconnect extends Module {
     /** Called by the client lifecycle even while no world/player exists. */
     public void onClientTick() {
         if (!isToggled()) return;
-        MinecraftClient client = mc;
+        Minecraft client = mc;
 
         // одобряющее соединение в игре: запоминаем сервер и обнуляем счётчик
         if (client.player != null) {
@@ -120,12 +120,12 @@ public class AutoReconnect extends Module {
     @EventHandler
     private void onPacketReceive(PacketEvent.Receive event) {
         if (event.packet instanceof DisconnectS2CPacket packet) {
-            Text reason = packet.reason();
+            Component reason = packet.reason();
             lastReason = reason == null ? "" : reason.getString();
         }
     }
 
-    private void connect(MinecraftClient client) {
+    private void connect(Minecraft client) {
         ServerInfo info = lastServer;
         if (info == null || info.address == null || info.address.isBlank()) return;
         used++;

@@ -7,7 +7,7 @@ import me.collective.module.ModuleManager;
 import me.collective.module.client.UI;
 import me.collective.render.RenderUtil;
 import me.collective.render.SoundUtil;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -95,7 +95,7 @@ public class Panel {
 
     private float scrollOffset = 0;
 
-    public void render(DrawContext context, int mouseX, int mouseY, float delta, String searchQuery) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta, String searchQuery) {
         if (dragging) {
             this.x = mouseX - dragX;
             this.y = mouseY - dragY;
@@ -124,7 +124,7 @@ public class Panel {
 
         if (openProgress > 0.001f) {
             float contentHeight = getContentHeight(searchQuery);
-            int screenH = net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaledHeight();
+            int screenH = net.minecraft.client.Minecraft.getInstance().getWindow().getScaledHeight();
             float availableH = Math.max(80, screenH - y - HEADER_HEIGHT - 12);
             float visibleH = Math.min(contentHeight, availableH) * openProgress;
             float maxScroll = Math.max(0, contentHeight - availableH);
@@ -203,7 +203,7 @@ public class Panel {
         }
 
         if (open) {
-            int screenH = net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaledHeight();
+            int screenH = net.minecraft.client.Minecraft.getInstance().getWindow().getScaledHeight();
             float availableH = Math.max(80, screenH - y - HEADER_HEIGHT - 12);
             float visibleH = Math.min(getContentHeight(searchQuery), availableH) * openProgress;
             if (mouseY >= y + HEADER_HEIGHT && mouseY <= y + HEADER_HEIGHT + visibleH) {
@@ -262,7 +262,7 @@ public class Panel {
             }
 
             float contentHeight = getContentHeight(searchQuery);
-            int screenH = net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaledHeight();
+            int screenH = net.minecraft.client.Minecraft.getInstance().getWindow().getScaledHeight();
             float availableH = Math.max(80, screenH - y - HEADER_HEIGHT - 12);
             float maxScroll = Math.max(0, contentHeight - availableH);
 
@@ -273,7 +273,7 @@ public class Panel {
         }
 
         // Adjust whole panel position if content didn't scroll
-        int screenH = net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaledHeight();
+        int screenH = net.minecraft.client.Minecraft.getInstance().getWindow().getScaledHeight();
         this.y += (float) (verticalAmount * 16.0);
         this.y = Math.max(5, Math.min(screenH - HEADER_HEIGHT - 10, this.y));
         return true;
@@ -308,7 +308,7 @@ public class Panel {
     public boolean isHovered(double mouseX, double mouseY, String searchQuery) {
         float h = HEADER_HEIGHT;
         if (open) {
-            int screenH = net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaledHeight();
+            int screenH = net.minecraft.client.Minecraft.getInstance().getWindow().getScaledHeight();
             float availableH = Math.max(80, screenH - y - HEADER_HEIGHT - 12);
             h += Math.min(getContentHeight(searchQuery), availableH) * openProgress;
         }
@@ -329,7 +329,7 @@ public class Panel {
     public boolean isOpen() { return open; }
 
     public void scroll(float delta) {
-        int screenH = net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaledHeight();
+        int screenH = net.minecraft.client.Minecraft.getInstance().getWindow().getScaledHeight();
         this.y += delta;
         this.y = Math.max(5, Math.min(screenH - HEADER_HEIGHT - 10, this.y));
     }

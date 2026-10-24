@@ -4,7 +4,7 @@ import me.collective.font.FontManager;
 import me.collective.module.client.HUD;
 import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 
 import java.awt.Color;
 
@@ -17,7 +17,7 @@ public class Position extends HudModule {
     }
 
     @Override
-    public void render(DrawContext context, float delta) {
+    public void render(GuiGraphics context, float delta) {
         if (!isToggled() || mc.player == null) return;
 
         double posX = mc.player.getX();
@@ -27,8 +27,8 @@ public class Position extends HudModule {
         String coords = String.format("XYZ: §f%.1f, %.1f, %.1f", posX, posY, posZ);
 
         if (nether.getValue() && mc.world != null) {
-            boolean isNether = mc.world.getRegistryKey() == net.minecraft.world.World.NETHER;
-            boolean isOverworld = mc.world.getRegistryKey() == net.minecraft.world.World.OVERWORLD;
+            boolean isNether = mc.world.getRegistryKey() == net.minecraft.world.Level.NETHER;
+            boolean isOverworld = mc.world.getRegistryKey() == net.minecraft.world.Level.OVERWORLD;
             if (isNether || isOverworld) {
                 double nX = isNether ? posX * 8.0 : posX / 8.0;
                 double nZ = isNether ? posZ * 8.0 : posZ / 8.0;

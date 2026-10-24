@@ -6,17 +6,17 @@ import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.setting.*;
 import me.collective.util.InvUtils;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.client.gui.screen.ingame.InventoryScreen;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.BowItem;
-import net.minecraft.item.CrossbowItem;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.item.PotionItem;
-import net.minecraft.item.TridentItem;
-import net.minecraft.text.Text;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.BowItem;
+import net.minecraft.world.item.CrossbowItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.PotionItem;
+import net.minecraft.world.item.TridentItem;
+import net.minecraft.network.chat.Component;
 
 import java.util.HashMap;
 import java.util.List;
@@ -343,7 +343,7 @@ public class Replenish extends Module {
 
     private String itemName(ItemStack stack) {
         if (stack.contains(DataComponentTypes.CUSTOM_NAME)) {
-            Text customName = stack.get(DataComponentTypes.CUSTOM_NAME);
+            Component customName = stack.get(DataComponentTypes.CUSTOM_NAME);
             if (customName != null) return customName.getString();
         }
 

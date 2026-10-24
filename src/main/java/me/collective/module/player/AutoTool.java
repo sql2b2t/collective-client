@@ -6,10 +6,10 @@ import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.util.InventoryUtil;
-import net.minecraft.block.BlockState;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 
 public class AutoTool extends Module {
     public final BooleanSetting switchBack = add(new BooleanSetting("SwitchBack", true));

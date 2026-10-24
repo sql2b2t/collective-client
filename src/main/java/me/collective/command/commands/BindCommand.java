@@ -4,9 +4,9 @@ import me.collective.command.ChatHelper;
 import me.collective.command.Command;
 import me.collective.module.Module;
 import me.collective.module.ModuleManager;
-import net.minecraft.client.util.InputUtil;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
 import org.lwjgl.glfw.GLFW;
 
 public class BindCommand extends Command {
@@ -17,7 +17,7 @@ public class BindCommand extends Command {
     @Override
     public void execute(String[] args) {
         if (args.length < 2) {
-            ChatHelper.sendMessage(Text.literal("Usage: " + getSyntax()).styled(s -> s.withColor(Formatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Usage: " + getSyntax()).styled(s -> s.withColor(ChatFormatting.RED)));
             return;
         }
 
@@ -28,18 +28,18 @@ public class BindCommand extends Command {
                 for (Module m : ModuleManager.INSTANCE.getModules()) {
                     m.getKeybind().setValue(GLFW.GLFW_KEY_UNKNOWN);
                 }
-                ChatHelper.sendMessage(Text.literal("Bind for all modules has been reset").styled(s -> s.withColor(Formatting.GRAY)));
+                ChatHelper.sendMessage(Component.literal("Bind for all modules has been reset").styled(s -> s.withColor(ChatFormatting.GRAY)));
                 return;
             }
             Module mod = ModuleManager.INSTANCE.getModule(args[1]);
             if (mod == null) {
-                ChatHelper.sendMessage(Text.literal("Module not found: " + args[1]).styled(s -> s.withColor(Formatting.RED)));
+                ChatHelper.sendMessage(Component.literal("Module not found: " + args[1]).styled(s -> s.withColor(ChatFormatting.RED)));
                 return;
             }
             mod.getKeybind().setValue(GLFW.GLFW_KEY_UNKNOWN);
-            ChatHelper.sendMessage(Text.literal("Bind for ").styled(s -> s.withColor(Formatting.GRAY))
-                .append(Text.literal(mod.getName()).styled(s -> s.withColor(ChatHelper.getPrimaryTextColor())))
-                .append(Text.literal(" has been reset").styled(s -> s.withColor(Formatting.GRAY))));
+            ChatHelper.sendMessage(Component.literal("Bind for ").styled(s -> s.withColor(ChatFormatting.GRAY))
+                .append(Component.literal(mod.getName()).styled(s -> s.withColor(ChatHelper.getPrimaryTextColor())))
+                .append(Component.literal(" has been reset").styled(s -> s.withColor(ChatFormatting.GRAY))));
             return;
         }
 
@@ -49,15 +49,15 @@ public class BindCommand extends Command {
 
         Module mod = ModuleManager.INSTANCE.getModule(modName);
         if (mod == null) {
-            ChatHelper.sendMessage(Text.literal("Module not found: " + modName).styled(s -> s.withColor(Formatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Module not found: " + modName).styled(s -> s.withColor(ChatFormatting.RED)));
             return;
         }
 
         if (keyStr.equalsIgnoreCase("none") || keyStr.equalsIgnoreCase("clear") || keyStr.equals("0")) {
             mod.getKeybind().setValue(GLFW.GLFW_KEY_UNKNOWN);
-            ChatHelper.sendMessage(Text.literal("Bind for ").styled(s -> s.withColor(Formatting.GRAY))
-                .append(Text.literal(mod.getName()).styled(s -> s.withColor(ChatHelper.getPrimaryTextColor())))
-                .append(Text.literal(" has been reset").styled(s -> s.withColor(Formatting.GRAY))));
+            ChatHelper.sendMessage(Component.literal("Bind for ").styled(s -> s.withColor(ChatFormatting.GRAY))
+                .append(Component.literal(mod.getName()).styled(s -> s.withColor(ChatHelper.getPrimaryTextColor())))
+                .append(Component.literal(" has been reset").styled(s -> s.withColor(ChatFormatting.GRAY))));
             return;
         }
 
@@ -96,12 +96,12 @@ public class BindCommand extends Command {
             }
 
             mod.getKeybind().setValue(code);
-            ChatHelper.sendMessage(Text.literal("Bind for ").styled(s -> s.withColor(Formatting.GRAY))
-                .append(Text.literal(mod.getName()).styled(s -> s.withColor(ChatHelper.getPrimaryTextColor())))
-                .append(Text.literal(" has been set to ").styled(s -> s.withColor(Formatting.GRAY)))
-                .append(Text.literal(mod.getKeybind().getKeyName().toUpperCase()).styled(s -> s.withColor(Formatting.GREEN))));
+            ChatHelper.sendMessage(Component.literal("Bind for ").styled(s -> s.withColor(ChatFormatting.GRAY))
+                .append(Component.literal(mod.getName()).styled(s -> s.withColor(ChatHelper.getPrimaryTextColor())))
+                .append(Component.literal(" has been set to ").styled(s -> s.withColor(ChatFormatting.GRAY)))
+                .append(Component.literal(mod.getKeybind().getKeyName().toUpperCase()).styled(s -> s.withColor(ChatFormatting.GREEN))));
         } catch (Exception e) {
-            ChatHelper.sendMessage(Text.literal("Invalid key: " + keyStr).styled(s -> s.withColor(Formatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Invalid key: " + keyStr).styled(s -> s.withColor(ChatFormatting.RED)));
         }
     }
 }

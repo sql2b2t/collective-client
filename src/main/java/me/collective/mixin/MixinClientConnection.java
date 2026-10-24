@@ -13,7 +13,7 @@ import me.collective.event.EventBus;
 import me.collective.event.events.PacketEvent;
 import me.collective.proxy.ProxyEntry;
 import me.collective.proxy.ProxyManager;
-import net.minecraft.network.packet.Packet;
+import net.minecraft.network.protocol.Packet;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;

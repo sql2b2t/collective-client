@@ -11,18 +11,18 @@ import me.collective.util.GrimUtils;
 import me.collective.util.InventoryUtil;
 import me.collective.util.RotationUtils;
 import me.collective.util.SwapManager;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -111,7 +111,7 @@ public class Surround extends Module {
             }
         }
 
-        Vec3d eyePos = mc.player.getEyePos();
+        Vec3 eyePos = mc.player.getEyePos();
         Comparator<BlockPos> byDistance
             = Comparator.comparingDouble(p -> eyePos.squaredDistanceTo(p.toCenterPos()));
         tier0.sort(byDistance);
@@ -128,7 +128,7 @@ public class Surround extends Module {
             if (!mc.world.getBlockState(pos).isReplaceable()) continue;
 
             // Не ставим, если хитбокс игрока пересекает блок
-            Box blockBox = new Box(pos).contract(0.01);
+            AABB blockBox = new AABB(pos).contract(0.01);
             if (mc.player.getBoundingBox().intersects(blockBox)) continue;
 
             if (placeBlock(pos, obsidian)) {
@@ -160,7 +160,7 @@ public class Surround extends Module {
             }
         }
 
-        Vec3d hitVec;
+        Vec3 hitVec;
         BlockHitResult hitResult;
 
         if (neighborPos != null && placeSide != null) {
@@ -169,7 +169,7 @@ public class Surround extends Module {
             double ry = (RANDOM.nextDouble() - 0.5) * 0.4;
             double rz = (RANDOM.nextDouble() - 0.5) * 0.4;
 
-            hitVec = new Vec3d(
+            hitVec = new Vec3(
                 neighborPos.getX() + 0.5 + placeSide.getOffsetX() * 0.5 + (placeSide.getAxis() != Direction.Axis.X ? rx : 0),
                 neighborPos.getY() + 0.5 + placeSide.getOffsetY() * 0.5 + (placeSide.getAxis() != Direction.Axis.Y ? ry : 0),
                 neighborPos.getZ() + 0.5 + placeSide.getOffsetZ() * 0.5 + (placeSide.getAxis() != Direction.Axis.Z ? rz : 0)
@@ -177,7 +177,7 @@ public class Surround extends Module {
             hitResult = new BlockHitResult(hitVec, placeSide, neighborPos, false);
         } else {
             // Grim Air place fallback
-            hitVec = Vec3d.ofCenter(pos);
+            hitVec = Vec3.ofCenter(pos);
             hitResult = new BlockHitResult(hitVec, Direction.UP, pos, false);
         }
 
@@ -188,7 +188,7 @@ public class Surround extends Module {
             RotationUtils.getInstance().keepWireFresh();
         }
 
-        Hand hand = obsidian.getHand();
+        InteractionHand hand = obsidian.getHand();
         if (!obsidian.isOffhand()) {
             if (!SwapManager.getInstance().hold(this, obsidian.slot(), SwapManager.Priority.PLACE, 2)) {
                 return false;

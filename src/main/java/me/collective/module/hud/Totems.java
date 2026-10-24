@@ -2,9 +2,9 @@ package me.collective.module.hud;
 
 import me.collective.font.FontManager;
 import me.collective.render.RenderUtil;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 import java.awt.Color;
 
@@ -18,7 +18,7 @@ public class Totems extends HudModule {
     }
 
     @Override
-    public void render(DrawContext context, float delta) {
+    public void render(GuiGraphics context, float delta) {
         if (!isToggled() || mc.player == null) return;
 
         int count = 0;

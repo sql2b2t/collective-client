@@ -31,20 +31,20 @@ import me.collective.util.InvUtils;
 import me.collective.util.SettingColor;
 import me.collective.event.EventHandler;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.MultifaceBlock;
-import net.minecraft.block.enums.SlabType;
-import net.minecraft.client.input.Input;
-import net.minecraft.item.ItemStack;
-import net.minecraft.state.property.BooleanProperty;
-import net.minecraft.state.property.IntProperty;
-import net.minecraft.state.property.Properties;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.block.ShapeContext;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.MultifaceBlock;
+import net.minecraft.world.level.block.state.properties.SlabType;
+import net.minecraft.client.player.ClientInput;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.CollisionContext;
 
 /**
  * LitematicaPrinter (порт из BepHax): автоматическая сборка выбранной схемы Litematica.
@@ -756,7 +756,7 @@ public class LitematicaPrinter extends Module {
     private List<BlockPos> scan() {
         this.preview.clear();
         List<BlockPos> out = new ArrayList<>();
-        Vec3d eye = this.mc.player.getEyePos();
+        Vec3 eye = this.mc.player.getEyePos();
         BlockPos origin = BlockPos.ofFloored(eye);
         int r = (int) Math.ceil(this.range.get()) + 1;
         double reachSq = this.range.get() * this.range.get();
@@ -774,14 +774,14 @@ public class LitematicaPrinter extends Module {
                         || ignored.contains(ts.getBlock())
                         || !(ws = this.mc.world.getBlockState(pos)).isReplaceable() && !LitematicaPrinter.isMergeCandidate(ws, ts)
                         || PlacementSolver.statesMatch(ts, ws)
-                        || eye.squaredDistanceTo(Vec3d.ofCenter(pos)) > reachSq) {
+                        || eye.squaredDistanceTo(Vec3.ofCenter(pos)) > reachSq) {
                         continue;
                     }
                     out.add(pos.toImmutable());
                 }
             }
         }
-        out.sort(Comparator.comparingDouble(p -> eye.squaredDistanceTo(Vec3d.ofCenter(p))));
+        out.sort(Comparator.comparingDouble(p -> eye.squaredDistanceTo(Vec3.ofCenter(p))));
         if (this.render.get()) {
             this.preview.addAll(out);
         }

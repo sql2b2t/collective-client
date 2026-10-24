@@ -9,30 +9,30 @@ import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.AirPlaceExecutor;
 import me.collective.util.GrimUtils;
-import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
-import net.minecraft.util.math.Direction;
+import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
+import net.minecraft.core.Direction;
 import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
 import me.collective.util.PlacementUtils;
 import me.collective.util.RotationUtils;
 import me.collective.util.SwapManager;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.FallingBlock;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.ExperienceOrbEntity;
-import net.minecraft.entity.ItemEntity;
-import net.minecraft.entity.decoration.EndCrystalEntity;
-import net.minecraft.entity.projectile.ProjectileEntity;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.FallingBlock;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ExperienceOrb;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -138,8 +138,8 @@ public class AirPlaceScaffold extends Module {
         if (checkBlocksRunOut()) return;
 
         boolean towering = this.tower.getValue() && shouldTower();
-        Vec3d basePos = mc.player.getEntityPos();
-        Vec3d aimCenter = towering ? basePos : predict(basePos);
+        Vec3 basePos = mc.player.getEntityPos();
+        Vec3 aimCenter = towering ? basePos : predict(basePos);
 
         List<BlockPos> candidates = buildCandidates(basePos, aimCenter, towering);
         if (candidates.isEmpty()) {
@@ -194,7 +194,7 @@ public class AirPlaceScaffold extends Module {
      * от центра, ближние в приоритете: сначала перекрываем путь прямо под
      * игроком, оттуда расходимся наружу.
      */
-    private List<BlockPos> buildCandidates(Vec3d basePos, Vec3d center, boolean towering) {
+    private List<BlockPos> buildCandidates(Vec3 basePos, Vec3 center, boolean towering) {
         List<BlockPos> positions = new ArrayList<>();
         int feetLevel = (int) Math.floor(basePos.y) - 1;
 
@@ -215,7 +215,7 @@ public class AirPlaceScaffold extends Module {
     }
 
     private void fillRadius(List<BlockPos> positions, BlockPos.Mutable cursor,
-                            int feetLevel, Vec3d center, double radius) {
+                            int feetLevel, Vec3 center, double radius) {
         int bound = (int) Math.ceil(radius - 1e-9);
         double radiusSq = radius * radius;
         int centerX = (int) Math.floor(center.x);
@@ -311,7 +311,7 @@ public class AirPlaceScaffold extends Module {
     private boolean placeAt(BlockPos pos, BlockHitResult hit, FindItemResult item) {
         if (this.tickBudget <= 0) return false;
 
-        Hand hand = item.getHand();
+        InteractionHand hand = item.getHand();
 
         if (!item.isOffhand()
             && !SwapManager.getInstance().hold(this, item.slot(), SwapManager.Priority.PLACE, true, 2)) {
@@ -339,7 +339,7 @@ public class AirPlaceScaffold extends Module {
      * фиктивный START_DESTROY_BLOCK сбрасывает блок-трекинг, затем interact
      * с sequence, swing и второй START_DESTROY.
      */
-    private void grimAirPlace(BlockHitResult hit, BlockPos pos, BlockState predicted, Hand hand) {
+    private void grimAirPlace(BlockHitResult hit, BlockPos pos, BlockState predicted, InteractionHand hand) {
         var connection = mc.getNetworkHandler();
         if (connection == null || mc.world == null) return;
 
@@ -373,9 +373,9 @@ public class AirPlaceScaffold extends Module {
         if (this.cooldown.containsKey(pos)) return false;
         if (mc.world.isOutOfHeightLimit(pos)) return false;
         if (!mc.world.getBlockState(pos).isReplaceable()) return false;
-        if (mc.player.getBoundingBox().intersects(new Box(pos))) return false;
+        if (mc.player.getBoundingBox().intersects(new AABB(pos))) return false;
 
-        return mc.world.getEntitiesByClass(Entity.class, new Box(pos), e ->
+        return mc.world.getEntitiesByClass(Entity.class, new AABB(pos), e ->
             e instanceof ItemEntity
                 || e instanceof ExperienceOrbEntity
                 || e instanceof ProjectileEntity
@@ -383,7 +383,7 @@ public class AirPlaceScaffold extends Module {
                 || e == mc.player).isEmpty();
     }
 
-    private boolean isReachable(Vec3d hitPos) {
+    private boolean isReachable(Vec3 hitPos) {
         return mc.player.getEyePos().squaredDistanceTo(hitPos)
             <= Math.pow(REACH - REACH_MARGIN, 2);
     }
@@ -397,11 +397,11 @@ public class AirPlaceScaffold extends Module {
      */
     private boolean isAimValid(BlockHitResult hit) {
         RotationUtils rot = RotationUtils.getInstance();
-        Vec3d ray = Vec3d.fromPolar(rot.getSentPitch(), rot.getSentYaw());
-        Vec3d eye = mc.player.getEyePos();
+        Vec3 ray = Vec3.fromPolar(rot.getSentPitch(), rot.getSentYaw());
+        Vec3 eye = mc.player.getEyePos();
 
-        Vec3d normal = Vec3d.of(hit.getSide().getVector());
-        Vec3d planePoint = hit.getPos();
+        Vec3 normal = Vec3.of(hit.getSide().getVector());
+        Vec3 planePoint = hit.getPos();
 
         double denom = normal.dotProduct(ray);
         if (Math.abs(denom) < 1e-6) return false;
@@ -409,14 +409,14 @@ public class AirPlaceScaffold extends Module {
         double t = planePoint.subtract(eye).dotProduct(normal) / denom;
         if (t < 0.0 || t > REACH) return false;
 
-        Vec3d intersection = eye.add(ray.multiply(t));
+        Vec3 intersection = eye.add(ray.multiply(t));
         return intersection.squaredDistanceTo(planePoint) <= 0.65 * 0.65;
     }
 
 
     private double eyeCenterDistanceSq(BlockPos pos) {
         return mc.player.getEyePos().squaredDistanceTo(
-            new Vec3d(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5));
+            new Vec3(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5));
     }
 
     private double horizontalDistanceSq(BlockPos pos, double cx, double cz) {
@@ -425,31 +425,31 @@ public class AirPlaceScaffold extends Module {
         return dx * dx + dz * dz;
     }
 
-    private Vec3d predict(Vec3d basePos) {
-        Vec3d velocity = mc.player.getVelocity();
-        Vec3d center = basePos;
+    private Vec3 predict(Vec3 basePos) {
+        Vec3 velocity = mc.player.getVelocity();
+        Vec3 center = basePos;
 
         if (this.velocityPredict.getValue() && Math.abs(velocity.y) > 0.1) {
             double mult = this.velocityMultiplier.getValue();
             center = center.add(velocity.x * mult, velocity.y * mult, velocity.z * mult);
         }
 
-        Vec3d move = movementVector();
-        if (move != Vec3d.ZERO && this.extendDistance.getValue() > 0.0) {
+        Vec3 move = movementVector();
+        if (move != Vec3.ZERO && this.extendDistance.getValue() > 0.0) {
             center = center.add(move.multiply(this.extendDistance.getValue()));
         }
 
         return center;
     }
 
-    private Vec3d movementVector() {
+    private Vec3 movementVector() {
         float yaw = mc.player.getYaw();
-        Vec3d v = Vec3d.ZERO;
+        Vec3 v = Vec3.ZERO;
 
-        if (mc.options.forwardKey.isPressed()) v = v.add(Vec3d.fromPolar(0.0f, yaw));
-        if (mc.options.backKey.isPressed()) v = v.add(Vec3d.fromPolar(0.0f, yaw + 180.0f));
-        if (mc.options.leftKey.isPressed()) v = v.add(Vec3d.fromPolar(0.0f, yaw - 90.0f));
-        if (mc.options.rightKey.isPressed()) v = v.add(Vec3d.fromPolar(0.0f, yaw + 90.0f));
+        if (mc.options.forwardKey.isPressed()) v = v.add(Vec3.fromPolar(0.0f, yaw));
+        if (mc.options.backKey.isPressed()) v = v.add(Vec3.fromPolar(0.0f, yaw + 180.0f));
+        if (mc.options.leftKey.isPressed()) v = v.add(Vec3.fromPolar(0.0f, yaw - 90.0f));
+        if (mc.options.rightKey.isPressed()) v = v.add(Vec3.fromPolar(0.0f, yaw + 90.0f));
 
         return v.lengthSquared() > 0.0 ? v.normalize() : v;
     }
@@ -513,7 +513,7 @@ public class AirPlaceScaffold extends Module {
     public boolean isAtEdge() {
         if (mc.player == null || mc.world == null || !mc.player.isOnGround()) return false;
 
-        Box box = mc.player.getBoundingBox().expand(0.1);
+        AABB box = mc.player.getBoundingBox().expand(0.1);
         double feetY = box.minY - 0.01;
         int y = (int) Math.floor(feetY);
         int minX = (int) Math.floor(box.minX);

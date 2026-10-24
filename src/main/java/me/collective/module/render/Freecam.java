@@ -5,18 +5,18 @@ import me.collective.event.EventHandler;
 import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.setting.NumberSetting;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
 
 public class Freecam extends Module {
     public static Freecam INSTANCE;
 
     public final NumberSetting speed = add(new NumberSetting("Speed", 1.0, 0.1, 5.0, 0.1));
 
-    private net.minecraft.client.world.ClientWorld cameraWorld;
-    private net.minecraft.client.network.ClientPlayerEntity cameraPlayer;
-    private Vec3d pos = Vec3d.ZERO;
-    private Vec3d prevPos = Vec3d.ZERO;
+    private net.minecraft.client.world.ClientLevel cameraWorld;
+    private net.minecraft.client.network.LocalPlayer cameraPlayer;
+    private Vec3 pos = Vec3.ZERO;
+    private Vec3 prevPos = Vec3.ZERO;
     private float yaw = 0f;
     private float pitch = 0f;
     private float prevYaw = 0f;
@@ -47,7 +47,7 @@ public class Freecam extends Module {
             return;
         }
         if (mc.world != null && mc.player != null) {
-            Vec3d eyePos = mc.player.getEyePos();
+            Vec3 eyePos = mc.player.getEyePos();
             pos = eyePos;
             prevPos = eyePos;
             yaw = mc.player.getYaw();
@@ -61,8 +61,8 @@ public class Freecam extends Module {
     public void onDisable() {
         cameraWorld = null;
         cameraPlayer = null;
-        pos = Vec3d.ZERO;
-        prevPos = Vec3d.ZERO;
+        pos = Vec3.ZERO;
+        prevPos = Vec3.ZERO;
     }
 
     @EventHandler
@@ -75,10 +75,10 @@ public class Freecam extends Module {
         prevPitch = pitch;
 
         double s = speed.getValue();
-        Vec3d forward = Vec3d.fromPolar(0, yaw).multiply(s);
-        Vec3d strafe = Vec3d.fromPolar(0, yaw + 90).multiply(s);
+        Vec3 forward = Vec3.fromPolar(0, yaw).multiply(s);
+        Vec3 strafe = Vec3.fromPolar(0, yaw + 90).multiply(s);
 
-        Vec3d move = Vec3d.ZERO;
+        Vec3 move = Vec3.ZERO;
         if (mc.options.forwardKey.isPressed()) move = move.add(forward);
         if (mc.options.backKey.isPressed()) move = move.subtract(forward);
         if (mc.options.leftKey.isPressed()) move = move.subtract(strafe);
@@ -89,15 +89,15 @@ public class Freecam extends Module {
         pos = pos.add(move);
     }
 
-    public Vec3d getInterpolatedPos(float tickProgress) {
+    public Vec3 getInterpolatedPos(float tickProgress) {
         synchronizeCamera();
         if (mc.player == null || mc.world == null) {
-            return mc.player != null ? mc.player.getEyePos() : Vec3d.ZERO;
+            return mc.player != null ? mc.player.getEyePos() : Vec3.ZERO;
         }
         double x = MathHelper.lerp(tickProgress, prevPos.x, pos.x);
         double y = MathHelper.lerp(tickProgress, prevPos.y, pos.y);
         double z = MathHelper.lerp(tickProgress, prevPos.z, pos.z);
-        return new Vec3d(x, y, z);
+        return new Vec3(x, y, z);
     }
 
     public float getYaw() {

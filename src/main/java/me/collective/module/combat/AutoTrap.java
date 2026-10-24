@@ -9,9 +9,9 @@ import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
 import me.collective.util.PlacementUtils;
 import me.collective.manager.FriendManager;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Items;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Items;
+import net.minecraft.core.BlockPos;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -49,7 +49,7 @@ public class AutoTrap extends Module {
             return;
         }
 
-        PlayerEntity target = getTarget();
+        Player target = getTarget();
         if (target == null) return;
 
         FindItemResult obby = InventoryUtil.findInHotbarOrOffhand(Items.OBSIDIAN, Items.CRYING_OBSIDIAN, Items.NETHERITE_BLOCK);
@@ -70,10 +70,10 @@ public class AutoTrap extends Module {
         }
     }
 
-    private PlayerEntity getTarget() {
-        PlayerEntity best = null;
+    private Player getTarget() {
+        Player best = null;
         double bestDist = range.getFloatValue();
-        for (PlayerEntity p : mc.world.getPlayers()) {
+        for (Player p : mc.world.getPlayers()) {
             if (p == mc.player || !p.isAlive() || p.isSpectator() || p.isCreative()) continue;
             if (p.getHealth() + p.getAbsorptionAmount() <= 0) continue;
             if (FriendManager.getInstance().isFriend(p)) continue;
@@ -87,7 +87,7 @@ public class AutoTrap extends Module {
         return best;
     }
 
-    private List<BlockPos> getBlocks(PlayerEntity target) {
+    private List<BlockPos> getBlocks(Player target) {
         List<BlockPos> offsets = new ArrayList<>();
         BlockPos base = target.getBlockPos();
         int[][] sides = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};

@@ -11,10 +11,10 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.ColorSetting;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.block.Blocks;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.world.World;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.level.Level;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -61,7 +61,7 @@ public class VoidESP extends Module {
         BlockPos playerPos = mc.player.getBlockPos();
         int r = radius.getValue().intValue();
         int bottomY = mc.world.getBottomY();
-        boolean isNether = mc.world.getRegistryKey() == World.NETHER;
+        boolean isNether = mc.world.getRegistryKey() == Level.NETHER;
 
         BlockPos.Mutable mutable = new BlockPos.Mutable();
 
@@ -116,7 +116,7 @@ public class VoidESP extends Module {
         ShapeMode mode = shapeMode.getValue();
 
         for (BlockPos pos : voidHoles) {
-            Renderer3D.box(new Box(pos), fillColor, lineColor, mode, true);
+            Renderer3D.box(new AABB(pos), fillColor, lineColor, mode, true);
         }
     }
 }

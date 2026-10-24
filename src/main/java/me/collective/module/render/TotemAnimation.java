@@ -4,14 +4,14 @@ import me.collective.category.Category;
 import me.collective.module.Module;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.render.OverlayTexture;
-import net.minecraft.client.render.command.OrderedRenderCommandQueue;
-import net.minecraft.client.render.item.ItemRenderState;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.item.ItemDisplayContext;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.RotationAxis;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.item.ItemStackRenderState;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.world.item.ItemDisplayContext;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.util.Mth;
+import com.mojang.math.Axis;
 
 public class TotemAnimation extends Module {
     public static TotemAnimation INSTANCE;
@@ -34,7 +34,7 @@ public class TotemAnimation extends Module {
         // Track item activation
     }
 
-    public boolean renderCustomAnimation(MatrixStack matrices, float tickDelta, OrderedRenderCommandQueue renderCommands, ItemStack floatingItem, int floatingItemTimer) {
+    public boolean renderCustomAnimation(PoseStack matrices, float tickDelta, OrderedRenderCommandQueue renderCommands, ItemStack floatingItem, int floatingItemTimer) {
         if (!isToggled() || mode.getValue() == Mode.Off) return false;
         if (floatingItem == null || floatingItemTimer <= 0) return false;
 

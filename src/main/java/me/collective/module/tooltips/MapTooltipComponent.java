@@ -1,13 +1,13 @@
 package me.collective.module.tooltips;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.gui.tooltip.TooltipComponent;
-import net.minecraft.component.type.MapIdComponent;
-import net.minecraft.item.map.MapState;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
+import net.minecraft.world.level.saveddata.maps.MapId;
+import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
+import net.minecraft.resources.Identifier;
 
 /**
  * Превью карты в тултипе.
@@ -47,7 +47,7 @@ public class MapTooltipComponent implements TooltipComponent {
     }
 
     @Override
-    public void drawItems(TextRenderer textRenderer, int x, int y, int width, int height, DrawContext context) {
+    public void drawItems(TextRenderer textRenderer, int x, int y, int width, int height, GuiGraphics context) {
         var matrices = context.getMatrices();
 
         // подложка: масштаб 1.5, как в оригинале
@@ -57,7 +57,7 @@ public class MapTooltipComponent implements TooltipComponent {
         context.drawTexture(RenderPipelines.GUI_TEXTURED, BACKGROUND, 0, 0, 0f, 0f, 64, 64, 64, 64);
         matrices.popMatrix();
 
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         var texture = mc.getMapTextureManager().getTextureId(new MapIdComponent(id), mapState);
         if (texture == null) return;
 

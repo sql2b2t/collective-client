@@ -6,9 +6,9 @@ import me.collective.baritone.OverworldElytraProcess;
 import me.collective.command.ChatHelper;
 import me.collective.command.Command;
 import me.collective.util.BaritoneHelper;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
 
 public class ElytraFlyCommand extends Command {
 
@@ -21,26 +21,26 @@ public class ElytraFlyCommand extends Command {
         // Класс OverworldElytraProcess недогружаем без Baritone (его интерфейсы
         // — из baritone.api) — сначала проверка доступности.
         if (!BaritoneHelper.isAvailable()) {
-            ChatHelper.sendMessage(Text.literal("Baritone не установлен - команда недоступна").styled(s -> s.withColor(Formatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Baritone не установлен - команда недоступна").styled(s -> s.withColor(ChatFormatting.RED)));
             return;
         }
         OverworldElytraProcess.init();
         OverworldElytraProcess process = OverworldElytraProcess.getInstance();
 
         if (process == null) {
-            ChatHelper.sendMessage(Text.literal("Baritone не инициализирован!").styled(s -> s.withColor(Formatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Baritone не инициализирован!").styled(s -> s.withColor(ChatFormatting.RED)));
             return;
         }
 
         if (args.length == 0) {
-            ChatHelper.sendMessage(Text.literal("Использование: " + getSyntax()).styled(s -> s.withColor(Formatting.YELLOW)));
+            ChatHelper.sendMessage(Component.literal("Использование: " + getSyntax()).styled(s -> s.withColor(ChatFormatting.YELLOW)));
             return;
         }
 
         String sub = args[0].toLowerCase();
         if (sub.equals("cancel") || sub.equals("stop")) {
             process.cancel();
-            ChatHelper.sendMessage(Text.literal("Полет на элитрах остановлен.").styled(s -> s.withColor(Formatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Полет на элитрах остановлен.").styled(s -> s.withColor(ChatFormatting.RED)));
             return;
         }
 
@@ -48,12 +48,12 @@ public class ElytraFlyCommand extends Command {
             try {
                 Goal currentGoal = BaritoneAPI.getProvider().getPrimaryBaritone().getCustomGoalProcess().getGoal();
                 if (currentGoal == null) {
-                    ChatHelper.sendMessage(Text.literal("В Baritone не установлена цель (#goal)!").styled(s -> s.withColor(Formatting.RED)));
+                    ChatHelper.sendMessage(Component.literal("В Baritone не установлена цель (#goal)!").styled(s -> s.withColor(ChatFormatting.RED)));
                     return;
                 }
                 process.pathTo(currentGoal);
             } catch (Throwable t) {
-                ChatHelper.sendMessage(Text.literal("Ошибка взятия цели: " + t.getMessage()).styled(s -> s.withColor(Formatting.RED)));
+                ChatHelper.sendMessage(Component.literal("Ошибка взятия цели: " + t.getMessage()).styled(s -> s.withColor(ChatFormatting.RED)));
             }
             return;
         }
@@ -75,7 +75,7 @@ public class ElytraFlyCommand extends Command {
             }
             process.pathTo(new BlockPos(x, y, z));
         } catch (NumberFormatException e) {
-            ChatHelper.sendMessage(Text.literal("Неверные координаты! Использование: " + getSyntax()).styled(s -> s.withColor(Formatting.RED)));
+            ChatHelper.sendMessage(Component.literal("Неверные координаты! Использование: " + getSyntax()).styled(s -> s.withColor(ChatFormatting.RED)));
         }
     }
 }

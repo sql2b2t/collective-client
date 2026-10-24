@@ -14,17 +14,17 @@ import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
 import me.collective.util.PlacementUtils;
 import me.collective.manager.FriendManager;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.TntBlock;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.TntBlock;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -85,7 +85,7 @@ public class TNTAura extends Module {
             return;
         }
 
-        PlayerEntity target = getTarget();
+        Player target = getTarget();
         boolean strict = placeMode.process("Strict");
         boolean silent = rotate.process("Silent");
 
@@ -119,23 +119,23 @@ public class TNTAura extends Module {
                 InventoryUtil.swap(flint.slot(), true);
                 if (mc.getNetworkHandler() != null) {
                     mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(
-                        Hand.MAIN_HAND, ignite, me.collective.util.GrimUtils.nextSequence()));
+                        InteractionHand.MAIN_HAND, ignite, me.collective.util.GrimUtils.nextSequence()));
                 }
-                mc.player.swingHand(Hand.MAIN_HAND);
+                mc.player.swingHand(InteractionHand.MAIN_HAND);
                 InventoryUtil.swapBack();
             }
             renderPoses.put(head, System.currentTimeMillis());
         }
     }
 
-    private BlockPos getSequentialPos(PlayerEntity target) {
+    private BlockPos getSequentialPos(Player target) {
         for (BlockPos bp : getBlocks(target)) {
             if (PlacementUtils.canPlace(bp, false) && mc.world.isAir(bp)) return bp;
         }
         return null;
     }
 
-    private List<BlockPos> getBlocks(PlayerEntity target) {
+    private List<BlockPos> getBlocks(Player target) {
         List<BlockPos> blocks = new ArrayList<>();
         if (target == null) return blocks;
         BlockPos base = BlockPos.ofFloored(target.getEntityPos());
@@ -146,7 +146,7 @@ public class TNTAura extends Module {
                 if (dir == Direction.UP || dir == Direction.DOWN) continue;
                 blocks.add(bp.offset(dir));
                 blocks.add(bp.offset(dir).up(1));
-                Box up2 = new Box(bp.offset(dir).up(1));
+                AABB up2 = new AABB(bp.offset(dir).up(1));
                 if (!up2.intersects(target.getBoundingBox())) blocks.add(bp.offset(dir).up(2));
                 blocks.add(bp.offset(dir).down(1));
             }
@@ -164,10 +164,10 @@ public class TNTAura extends Module {
         return new BlockHitResult(pos.toCenterPos().add(0, -0.5, 0), Direction.DOWN, pos, false);
     }
 
-    private PlayerEntity getTarget() {
-        PlayerEntity best = null;
+    private Player getTarget() {
+        Player best = null;
         double bestDist = range.getFloatValue();
-        for (PlayerEntity p : mc.world.getPlayers()) {
+        for (Player p : mc.world.getPlayers()) {
             if (p == mc.player || !p.isAlive() || p.isSpectator() || p.isCreative()) continue;
             if (FriendManager.getInstance().isFriend(p)) continue;
             double d = mc.player.distanceTo(p);
@@ -194,10 +194,10 @@ public class TNTAura extends Module {
             Color fill = withAlpha(fillColor.getValue(), (int) (100 * k));
             if (renderMode.process("Fade")) {
                 Color line = withAlpha(lineColor.getValue(), (int) (100 * k));
-                Renderer3D.box(new Box(pos), fill, line, ShapeMode.Both, true);
+                Renderer3D.box(new AABB(pos), fill, line, ShapeMode.Both, true);
             } else {
                 float scale = 1f - age / 500f;
-                Box b = new Box(pos.getX(), pos.getY(), pos.getZ(), pos.getX(), pos.getY(), pos.getZ())
+                AABB b = new AABB(pos.getX(), pos.getY(), pos.getZ(), pos.getX(), pos.getY(), pos.getZ())
                     .shrink(scale, scale, scale)
                     .offset(0.5 + scale * 0.5, 0.5 + scale * 0.5, 0.5 + scale * 0.5);
                 Renderer3D.box(b, fill, lineColor.getValue(), ShapeMode.Both, true);

@@ -6,8 +6,8 @@ import me.collective.event.events.PacketEvent;
 import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.setting.NumberSetting;
-import net.minecraft.network.packet.c2s.play.UpdateSignC2SPacket;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.network.protocol.game.ServerboundSignUpdatePacket;
+import net.minecraft.core.BlockPos;
 
 import java.util.ArrayDeque;
 import java.util.Queue;

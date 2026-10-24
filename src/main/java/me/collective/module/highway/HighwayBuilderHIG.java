@@ -24,52 +24,52 @@ import me.collective.render.RenderUtil3D;
 import me.collective.util.RotationUtils;
 import me.collective.font.FontManager;
 import me.collective.util.sort.ShulkerDataParser;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.ingame.GenericContainerScreen;
-import net.minecraft.screen.GenericContainerScreenHandler;
-import net.minecraft.client.gui.screen.ingame.ShulkerBoxScreen;
-import net.minecraft.block.AirBlock;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.EnderChestBlock;
-import net.minecraft.block.ShulkerBoxBlock;
-import net.minecraft.block.SignBlock;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.Enchantments;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.ItemEntity;
-import net.minecraft.entity.decoration.EndCrystalEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.item.ArrowItem;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.BowItem;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.c2s.play.CloseHandledScreenC2SPacket;
-import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
-import net.minecraft.network.packet.s2c.play.InventoryS2CPacket;
-import net.minecraft.network.packet.s2c.play.WorldTimeUpdateS2CPacket;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.registry.tag.ItemTags;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.SlotActionType;
-import net.minecraft.text.Text;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.inventory.ContainerScreen;
+import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.client.gui.screens.inventory.ShulkerBoxScreen;
+import net.minecraft.world.level.block.AirBlock;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.EnderChestBlock;
+import net.minecraft.world.level.block.ShulkerBoxBlock;
+import net.minecraft.world.level.block.StandingSignBlock;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ArrowItem;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.BowItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
+import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTimePacket;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.core.Holder;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ClickType;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.core.Direction;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.ClipContext;
 
 import java.awt.Color;
 import java.util.ArrayDeque;
@@ -211,7 +211,7 @@ public class HighwayBuilderHIG extends Module {
     private State lastState;
     private IBlockPosProvider blockPosProvider;
 
-    public Vec3d start;
+    public Vec3 start;
     public int blocksBroken;
     public int blocksPlaced;
     private final MBlockPos lastBreakingPos = new MBlockPos();
@@ -309,7 +309,7 @@ public class HighwayBuilderHIG extends Module {
     private void disconnect(String msg) {
         if (mc.getNetworkHandler() == null) return;
         mc.getNetworkHandler().getConnection().disconnect(
-            Text.literal("§7[§9HighwayBuilderHIG§7] §c" + msg));
+            Component.literal("§7[§9HighwayBuilderHIG§7] §c" + msg));
     }
 
     @EventHandler
@@ -385,7 +385,7 @@ public class HighwayBuilderHIG extends Module {
     }
 
     @EventHandler
-    public void onRender2D(net.minecraft.client.gui.DrawContext context, float delta) {
+    public void onRender2D(net.minecraft.client.gui.GuiGraphics context, float delta) {
         if (!isToggled() || suspended || !renderMine.getValue()) return;
         if (normalMining != null) normalMining.renderLetter(context);
         if (packetMining != null) packetMining.renderLetter(context);
@@ -443,7 +443,7 @@ public class HighwayBuilderHIG extends Module {
             int alpha = (int) (lineBase.getAlpha() * (1f - age));
             if (alpha <= 4) continue;
             BlockPos pos = e.getKey();
-            Renderer3D.box(new Box(pos),
+            Renderer3D.box(new AABB(pos),
                 new Color(sideBase.getRed(), sideBase.getGreen(), sideBase.getBlue(), (int) (sideBase.getAlpha() * (1f - age))),
                 new Color(lineBase.getRed(), lineBase.getGreen(), lineBase.getBlue(), alpha),
                 renderPlaceShape.getValue(), true);
@@ -531,7 +531,7 @@ public class HighwayBuilderHIG extends Module {
         return (System.currentTimeMillis() - lastTickMs) / 1000f;
     }
 
-    private float[] lookAt(Vec3d from, Vec3d to) {
+    private float[] lookAt(Vec3 from, Vec3 to) {
         double dx = to.x - from.x;
         double dy = to.y - from.y;
         double dz = to.z - from.z;
@@ -543,12 +543,12 @@ public class HighwayBuilderHIG extends Module {
     }
 
     private float[] lookAt(Entity e) {
-        return lookAt(mc.player.getEyePos(), new Vec3d(e.getX(), e.getY() + 0.5, e.getZ()));
+        return lookAt(mc.player.getEyePos(), new Vec3(e.getX(), e.getY() + 0.5, e.getZ()));
     }
 
     private float[] lookAt(BlockPos bp) {
         return lookAt(mc.player.getEyePos(),
-            new Vec3d(bp.getX() + 0.5, bp.getY() + 0.5, bp.getZ() + 0.5));
+            new Vec3(bp.getX() + 0.5, bp.getY() + 0.5, bp.getZ() + 0.5));
     }
 
     private void rotateTo(float yaw, float pitch) {
@@ -567,13 +567,13 @@ public class HighwayBuilderHIG extends Module {
 
     public static Direction getInteractDirection(BlockPos pos) {
         if (mc.player == null) return Direction.UP;
-        Vec3d eyePos = mc.player.getEyePos();
-        Vec3d posVec = Vec3d.ofCenter(pos);
+        Vec3 eyePos = mc.player.getEyePos();
+        Vec3 posVec = Vec3.ofCenter(pos);
         Direction bestDir = Direction.UP;
         double bestDot = -Double.MAX_VALUE;
 
         for (Direction dir : Direction.values()) {
-            Vec3d dirVec = Vec3d.of(dir.getVector());
+            Vec3 dirVec = Vec3.of(dir.getVector());
             double dot = eyePos.subtract(posVec).normalize().dotProduct(dirVec);
             if (dot > bestDot) {
                 bestDot = dot;
@@ -590,12 +590,12 @@ public class HighwayBuilderHIG extends Module {
             BlockPos neighbor = pos.offset(dir);
             BlockState ns = mc.world.getBlockState(neighbor);
             if (ns.isReplaceable() || !ns.isSolidBlock(mc.world, neighbor)) continue;
-            if (!mc.world.getOtherEntities(mc.player, new Box(pos)).stream()
+            if (!mc.world.getOtherEntities(mc.player, new AABB(pos)).stream()
                 .filter(e -> !(e instanceof net.minecraft.entity.ItemEntity)).toList().isEmpty()) {
                 return false;
             }
             Direction side = dir.getOpposite();
-            Vec3d hitVec = new Vec3d(neighbor.getX() + 0.5 + side.getOffsetX() * 0.45,
+            Vec3 hitVec = new Vec3(neighbor.getX() + 0.5 + side.getOffsetX() * 0.45,
                 neighbor.getY() + 0.5 + side.getOffsetY() * 0.45,
                 neighbor.getZ() + 0.5 + side.getOffsetZ() * 0.45);
 
@@ -606,10 +606,10 @@ public class HighwayBuilderHIG extends Module {
                 float[] yp = lookAt(mc.player.getEyePos(), hitVec);
                 rotateTo(yp[0], yp[1]);
             }
-            mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND,
+            mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND,
                 new BlockHitResult(hitVec, side, neighbor, false));
             if (mc.getNetworkHandler() != null) {
-                mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+                mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
             }
             InventoryUtil.swapBack();
             return true;
@@ -626,7 +626,7 @@ public class HighwayBuilderHIG extends Module {
         }
         boolean started = mc.interactionManager.attackBlock(bp, dir);
         if (mc.getNetworkHandler() != null) {
-            mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+            mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
         }
         return started;
     }
@@ -1023,8 +1023,8 @@ public class HighwayBuilderHIG extends Module {
             double d = crystal.squaredDistanceTo(mc.player);
             if (d > 12 * 12 || d < 24 * 24) continue;
             if (ignoreCrystals.contains(crystal)) continue;
-            Vec3d vec1 = mc.player.getEyePos();
-            Vec3d vec2 = new Vec3d(entity.getX(), entity.getY() + 0.5, entity.getZ());
+            Vec3 vec1 = mc.player.getEyePos();
+            Vec3 vec2 = new Vec3(entity.getX(), entity.getY() + 0.5, entity.getZ());
             if (mc.world.raycast(new RaycastContext(vec1, vec2,
                 RaycastContext.ShapeType.OUTLINE, RaycastContext.FluidHandling.NONE, mc.player)).getType() != HitResult.Type.MISS) {
                 continue;
@@ -1038,7 +1038,7 @@ public class HighwayBuilderHIG extends Module {
     }
 
     /** Квадрат дистанции от центра блока до глаз (без аллокаций). */
-    private double distToCenterSq(BlockPos pos, Vec3d eye) {
+    private double distToCenterSq(BlockPos pos, Vec3 eye) {
         double dx = pos.getX() + 0.5 - eye.x;
         double dy = pos.getY() + 0.5 - eye.y;
         double dz = pos.getZ() + 0.5 - eye.z;
@@ -1050,7 +1050,7 @@ public class HighwayBuilderHIG extends Module {
             @Override
             protected void start(HighwayBuilderHIG b) {
                 if (b.mc.player.getEntityPos().distanceTo(
-                    new Vec3d(Math.floor(b.mc.player.getX()) + 0.5, b.mc.player.getY(), Math.floor(b.mc.player.getZ()) + 0.5)) < 0.1) {
+                    new Vec3(Math.floor(b.mc.player.getX()) + 0.5, b.mc.player.getY(), Math.floor(b.mc.player.getZ()) + 0.5)) < 0.1) {
                     stop(b);
                 }
             }
@@ -1098,7 +1098,7 @@ public class HighwayBuilderHIG extends Module {
 
             private void stop(HighwayBuilderHIG b) {
                 b.stopInput();
-                b.mc.player.setVelocity(Vec3d.ZERO);
+                b.mc.player.setVelocity(Vec3.ZERO);
                 b.mc.player.setPosition((int) b.mc.player.getX() + (b.mc.player.getX() < 0 ? -0.5 : 0.5),
                     b.mc.player.getY(), (int) b.mc.player.getZ() + (b.mc.player.getZ() < 0 ? -0.5 : 0.5));
                 b.setState(b.lastState);
@@ -1155,8 +1155,8 @@ public class HighwayBuilderHIG extends Module {
                     if (d > 12 * 12 || d < 24 * 24) continue;
                     if (b.ignoreCrystals.contains(endCrystal)) continue;
 
-                    Vec3d vec1 = b.mc.player.getEyePos();
-                    Vec3d vec2 = new Vec3d(entity.getX(), entity.getY() + 0.5, entity.getZ());
+                    Vec3 vec1 = b.mc.player.getEyePos();
+                    Vec3 vec2 = new Vec3(entity.getX(), entity.getY() + 0.5, entity.getZ());
                     if (b.mc.world.raycast(new RaycastContext(vec1, vec2,
                         RaycastContext.ShapeType.OUTLINE, RaycastContext.FluidHandling.NONE, b.mc.player)).getType() == HitResult.Type.MISS) {
                         return true;
@@ -1178,7 +1178,7 @@ public class HighwayBuilderHIG extends Module {
 
             @Override
             protected void tick(HighwayBuilderHIG b) {
-                Vec3d vec = b.mc.player.getEntityPos().add(b.mc.player.getVelocity()).add(0, -0.75, 0);
+                Vec3 vec = b.mc.player.getEntityPos().add(b.mc.player.getVelocity()).add(0, -0.75, 0);
                 pos = new BlockPos(b.mc.player.getBlockX(), (int) Math.floor(vec.y), b.mc.player.getBlockZ());
 
                 if (pos.getY() >= b.mc.player.getBlockPos().getY()) {
@@ -1530,7 +1530,7 @@ public class HighwayBuilderHIG extends Module {
                 int obsidianCount = 0;
 
                 for (Entity entity : b.mc.world.getOtherEntities(b.mc.player,
-                    new Box(pos.x, pos.y, pos.z, pos.x + 1, pos.y + 2, pos.z + 1))) {
+                    new AABB(pos.x, pos.y, pos.z, pos.x + 1, pos.y + 2, pos.z + 1))) {
                     if (entity instanceof ItemEntity itemEntity && itemEntity.getStack().getItem() == Items.OBSIDIAN) {
                         obsidianCount += itemEntity.getStack().getCount();
                     }
@@ -1559,14 +1559,14 @@ public class HighwayBuilderHIG extends Module {
 
                     if (!EChestMemory.isKnown()) {
                         Direction interactDir = getInteractDirection(bp);
-                        Vec3d hitVec = new Vec3d(bp.getX() + 0.5 + interactDir.getOffsetX() * 0.45,
+                        Vec3 hitVec = new Vec3(bp.getX() + 0.5 + interactDir.getOffsetX() * 0.45,
                             bp.getY() + 0.5 + interactDir.getOffsetY() * 0.45,
                             bp.getZ() + 0.5 + interactDir.getOffsetZ() * 0.45);
                         if (b.rotation.getValue().place) {
                             float[] yp = b.lookAt(b.mc.player.getEyePos(), hitVec);
                             b.rotateTo(yp[0], yp[1]);
                         }
-                        b.mc.interactionManager.interactBlock(b.mc.player, Hand.MAIN_HAND,
+                        b.mc.interactionManager.interactBlock(b.mc.player, InteractionHand.MAIN_HAND,
                             new BlockHitResult(hitVec, interactDir, bp, false));
                         return;
                     }
@@ -1629,7 +1629,7 @@ public class HighwayBuilderHIG extends Module {
                     if (!first) primed = true;
 
                     Direction placeDir = getInteractDirection(bp);
-                    Vec3d hitVec = new Vec3d(bp.getX() + 0.5 + placeDir.getOffsetX() * 0.45,
+                    Vec3 hitVec = new Vec3(bp.getX() + 0.5 + placeDir.getOffsetX() * 0.45,
                         bp.getY() + 0.5 + placeDir.getOffsetY() * 0.45,
                         bp.getZ() + 0.5 + placeDir.getOffsetZ() * 0.45);
                     BlockHitResult hit = new BlockHitResult(hitVec, placeDir, bp, false);
@@ -1638,8 +1638,8 @@ public class HighwayBuilderHIG extends Module {
                         float[] yp = b.lookAt(b.mc.player.getEyePos(), hitVec);
                         b.rotateTo(yp[0], yp[1]);
                     }
-                    b.mc.interactionManager.interactBlock(b.mc.player, Hand.MAIN_HAND, hit);
-                    b.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+                    b.mc.interactionManager.interactBlock(b.mc.player, InteractionHand.MAIN_HAND, hit);
+                    b.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
                     InventoryUtil.swapBack();
                     timeout = 0;
                 }
@@ -1924,7 +1924,7 @@ public class HighwayBuilderHIG extends Module {
                     }
                     b.breakBlockAt(bp);
                     Direction dir = getInteractDirection(bp);
-                    Vec3d hitVec = new Vec3d(bp.getX() + 0.5 + dir.getOffsetX() * 0.45,
+                    Vec3 hitVec = new Vec3(bp.getX() + 0.5 + dir.getOffsetX() * 0.45,
                         bp.getY() + 0.5 + dir.getOffsetY() * 0.45,
                         bp.getZ() + 0.5 + dir.getOffsetZ() * 0.45);
                     InventoryUtil.swap(slot);
@@ -1932,9 +1932,9 @@ public class HighwayBuilderHIG extends Module {
                         float[] yp = b.lookAt(b.mc.player.getEyePos(), hitVec);
                         b.rotateTo(yp[0], yp[1]);
                     }
-                    b.mc.interactionManager.interactBlock(b.mc.player, Hand.MAIN_HAND,
+                    b.mc.interactionManager.interactBlock(b.mc.player, InteractionHand.MAIN_HAND,
                         new BlockHitResult(hitVec, dir, bp, false));
-                    b.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+                    b.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
                     delayTimer = b.inventoryDelay.getIntValue();
                 }
             }
@@ -2064,14 +2064,14 @@ public class HighwayBuilderHIG extends Module {
                 } else {
                     if (!b.drawingBow) drawStartMs = System.currentTimeMillis();
                     b.drawingBow = true;
-                    b.mc.interactionManager.interactItem(b.mc.player, Hand.MAIN_HAND);
+                    b.mc.interactionManager.interactItem(b.mc.player, InteractionHand.MAIN_HAND);
                 }
             }
 
             private float aim(HighwayBuilderHIG b, Entity target) {
                 float velocity = BowItem.getPullProgress(drawStartMs == 0L ? 0 : (int) ((System.currentTimeMillis() - drawStartMs) / 50L));
 
-                Vec3d pos = target.getEntityPos();
+                Vec3 pos = target.getEntityPos();
 
                 double relativeX = pos.x - b.mc.player.getX();
                 double relativeY = pos.y + 0.5 - b.mc.player.getEyePos().y;
@@ -2724,7 +2724,7 @@ public class HighwayBuilderHIG extends Module {
 
         private final Block block;
         private final HighwayBuilderHIG b;
-        private final Vec3d vec = new Vec3d(0, 0, 0);
+        private final Vec3 vec = new Vec3(0, 0, 0);
 
         private int normalStartTime;
         private int packetStartTime;
@@ -2743,7 +2743,7 @@ public class HighwayBuilderHIG extends Module {
                 int seq = me.collective.util.GrimUtils.nextSequence();
                 b.mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
                     PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, this.blockPos, dir, seq));
-                b.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+                b.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
             }
             normalStartTime = b.mc.player.age;
             return this;
@@ -2759,7 +2759,7 @@ public class HighwayBuilderHIG extends Module {
                 }
                 b.mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
                     PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK, this.blockPos, dir, seq));
-                b.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+                b.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
             }
             return this;
         }
@@ -2775,7 +2775,7 @@ public class HighwayBuilderHIG extends Module {
         }
 
         public boolean shouldRemove() {
-            Vec3d eye = b.mc.player.getEyePos();
+            Vec3 eye = b.mc.player.getEyePos();
             double dx = blockPos.getX() - eye.x;
             double dy = blockPos.getY() - eye.y;
             double dz = blockPos.getZ() - eye.z;
@@ -2792,7 +2792,7 @@ public class HighwayBuilderHIG extends Module {
             return blockState.calcBlockBreakingDelta(b.mc.player, b.mc.world, blockPos) * (elapsed + 1);
         }
 
-        public void renderLetter(DrawContext context) {
+        public void renderLetter(GuiGraphics context) {
             double cx = blockPos.getX() + 0.5;
             double cy = blockPos.getY() + 0.5;
             double cz = blockPos.getZ() + 0.5;

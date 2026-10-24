@@ -4,8 +4,8 @@ import me.collective.command.ChatHelper;
 import me.collective.command.Command;
 import me.collective.module.ModuleManager;
 import me.collective.module.hud.ImageHUD;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
 
 public class HudImageCommand extends Command {
     public HudImageCommand() {
@@ -18,8 +18,8 @@ public class HudImageCommand extends Command {
         if (hud == null) return;
 
         if (args.length == 0) {
-            ChatHelper.sendMessage(Text.literal("Использование: .hudimage <Collective|Komod1|Komod2|Komod3>")
-                .styled(s -> s.withColor(Formatting.GRAY)));
+            ChatHelper.sendMessage(Component.literal("Использование: .hudimage <Collective|Komod1|Komod2|Komod3>")
+                .styled(s -> s.withColor(ChatFormatting.GRAY)));
             return;
         }
 

@@ -2,13 +2,13 @@ package me.collective.scripting;
 
 import me.collective.module.hud.HudModule;
 import me.collective.setting.*;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 
 import java.awt.Color;
 import java.util.function.BiConsumer;
 
 public class ScriptHudElement extends HudModule {
-    private BiConsumer<DrawContext, Float> renderAction;
+    private BiConsumer<GuiGraphics, Float> renderAction;
     private ScriptContext scriptContext;
     private int errorCount;
 
@@ -49,7 +49,7 @@ public class ScriptHudElement extends HudModule {
         return add(new EnumSetting<>(name, defaultValue));
     }
 
-    public void onRender(BiConsumer<DrawContext, Float> renderAction) {
+    public void onRender(BiConsumer<GuiGraphics, Float> renderAction) {
         this.renderAction = renderAction;
     }
 
@@ -83,7 +83,7 @@ public class ScriptHudElement extends HudModule {
     }
 
     @Override
-    public void render(DrawContext context, float delta) {
+    public void render(GuiGraphics context, float delta) {
         if (renderAction != null) {
             // Встроенные HUD-модули (Watermark/Bps) рисуют в абсолютных x,y.
             // Скрипты рисуют в локальных 0,0 — сдвигаем матрицы, иначе картинка

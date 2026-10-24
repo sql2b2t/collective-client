@@ -3,8 +3,8 @@ package me.collective.module.hud;
 import me.collective.font.FontManager;
 import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.item.ItemStack;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.world.item.ItemStack;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -20,7 +20,7 @@ public class Armor extends HudModule {
     }
 
     @Override
-    public void render(DrawContext context, float delta) {
+    public void render(GuiGraphics context, float delta) {
         if (!isToggled() || mc.player == null) return;
 
         List<ItemStack> items = new ArrayList<>();

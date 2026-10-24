@@ -5,8 +5,8 @@ import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.phys.Vec3;
 
 public class Speed extends Module {
     public static Speed INSTANCE;
@@ -86,7 +86,7 @@ public class Speed extends Module {
 
     public static double getSpeed() {
         if (mc.player == null) return 0.0;
-        Vec3d vel = mc.player.getVelocity();
+        Vec3 vel = mc.player.getVelocity();
         return Math.sqrt(vel.x * vel.x + vel.z * vel.z);
     }
 
@@ -99,7 +99,7 @@ public class Speed extends Module {
         float yaw = mc.player.getYaw();
 
         if (forward == 0.0f && sideways == 0.0f) {
-            Vec3d v = mc.player.getVelocity();
+            Vec3 v = mc.player.getVelocity();
             mc.player.setVelocity(0.0, v.y, 0.0);
             return;
         }
@@ -125,7 +125,7 @@ public class Speed extends Module {
         double x = forward * speed * cos + sideways * speed * sin;
         double z = forward * speed * sin - sideways * speed * cos;
 
-        Vec3d v = mc.player.getVelocity();
+        Vec3 v = mc.player.getVelocity();
         mc.player.setVelocity(x, v.y, z);
     }
 }

@@ -10,9 +10,9 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.client.Minecraft;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.Mth;
 import org.joml.Vector3f;
 
 public final class EmoteData {
@@ -68,7 +68,7 @@ public final class EmoteData {
 
     public static EmoteData load(Emote emote, String animName) {
         Identifier id = Identifier.of("collective", "player_animation/" + emote.file() + ".json");
-        try (BufferedReader reader = MinecraftClient.getInstance().getResourceManager().getResource(id).orElseThrow().getReader()) {
+        try (BufferedReader reader = Minecraft.getInstance().getResourceManager().getResource(id).orElseThrow().getReader()) {
             JsonObject root = JsonParser.parseReader(reader).getAsJsonObject();
             JsonObject allAnims = root.getAsJsonObject("animations");
             JsonObject anim = allAnims.getAsJsonObject(animName);
@@ -111,7 +111,7 @@ public final class EmoteData {
 
     private static JsonObject loadVariant(Emote emote, String animName, String suffix) {
         Identifier id = Identifier.of("collective", "player_animation/" + emote.file() + suffix + ".json");
-        try (BufferedReader reader = MinecraftClient.getInstance().getResourceManager().getResource(id).orElseThrow().getReader()) {
+        try (BufferedReader reader = Minecraft.getInstance().getResourceManager().getResource(id).orElseThrow().getReader()) {
             JsonObject root = JsonParser.parseReader(reader).getAsJsonObject();
             return root.getAsJsonObject("animations").getAsJsonObject(animName);
         } catch (Exception e) {

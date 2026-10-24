@@ -2,10 +2,10 @@ package me.collective.mixin;
 
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import me.collective.render.RenderFrame;
-import net.minecraft.client.render.Camera;
-import net.minecraft.client.render.RenderTickCounter;
-import net.minecraft.client.render.WorldRenderer;
-import net.minecraft.client.util.memory.ObjectAllocator;
+import net.minecraft.client.Camera;
+import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.renderer.LevelRenderer;
+import com.mojang.blaze3d.resource.GraphicsResourceAllocator;
 import org.joml.Matrix4f;
 import org.joml.Vector4f;
 import org.spongepowered.asm.mixin.Mixin;

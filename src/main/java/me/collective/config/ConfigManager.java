@@ -28,7 +28,7 @@ import me.collective.setting.Setting;
 import me.collective.setting.SettingColorSetting;
 import me.collective.setting.StringSetting;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 import java.awt.Color;
 import java.io.File;
@@ -223,7 +223,7 @@ public class ConfigManager {
             return true;
         } catch (Exception e) {
             System.err.println("[Collective-Config] Load failed (" + name + "): " + e.getMessage());
-            ChatHelper.sendMessage(Text.literal("§c[Config] Ошибка загрузки конфига: " + e.getMessage()));
+            ChatHelper.sendMessage(Component.literal("§c[Config] Ошибка загрузки конфига: " + e.getMessage()));
             return false;
         }
     }

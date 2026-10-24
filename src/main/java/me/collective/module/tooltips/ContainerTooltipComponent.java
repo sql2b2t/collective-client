@@ -1,15 +1,15 @@
 package me.collective.module.tooltips;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.tooltip.TooltipComponent;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.MapIdComponent;
-import net.minecraft.item.FilledMapItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.item.map.MapState;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.level.saveddata.maps.MapId;
+import net.minecraft.world.item.MapItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 
 import java.util.List;
 
@@ -73,8 +73,8 @@ public class ContainerTooltipComponent implements TooltipComponent {
     }
 
     @Override
-    public void drawItems(TextRenderer textRenderer, int x, int y, int width, int height, DrawContext context) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+    public void drawItems(TextRenderer textRenderer, int x, int y, int width, int height, GuiGraphics context) {
+        Minecraft mc = Minecraft.getInstance();
         ItemStack hovered = null;
 
         for (int i = 0; i < list.size(); i++) {
@@ -122,7 +122,7 @@ public class ContainerTooltipComponent implements TooltipComponent {
      * <p>Перенос {@code getMapState2654}: сперва пробуем серверное состояние,
      * затем — кэш по имени, если у предмета есть своё имя.
      */
-    private static MapState mapStateOf(ItemStack stack, MapIdComponent id, MinecraftClient mc) {
+    private static MapState mapStateOf(ItemStack stack, MapIdComponent id, Minecraft mc) {
         if (mc.world == null) return null;
 
         MapState state = FilledMapItem.getMapState(id, mc.world);
@@ -136,8 +136,8 @@ public class ContainerTooltipComponent implements TooltipComponent {
     }
 
     /** Блит текстуры карты в ячейку сетки. */
-    private static void drawMap(DrawContext context, MapIdComponent id, MapState state, int x, int y) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+    private static void drawMap(GuiGraphics context, MapIdComponent id, MapState state, int x, int y) {
+        Minecraft mc = Minecraft.getInstance();
 
         var texture = mc.getMapTextureManager().getTextureId(id, state);
         if (texture == null) return;
@@ -153,7 +153,7 @@ public class ContainerTooltipComponent implements TooltipComponent {
         matrices.popMatrix();
     }
 
-    private static boolean isAltPressed(MinecraftClient mc) {
+    private static boolean isAltPressed(Minecraft mc) {
         return org.lwjgl.glfw.GLFW.glfwGetKey(mc.getWindow().getHandle(), org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_ALT) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
     }
 

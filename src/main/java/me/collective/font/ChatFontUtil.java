@@ -2,11 +2,11 @@ package me.collective.font;
 
 import me.collective.module.ModuleManager;
 import me.collective.module.client.Fonts;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.OrderedText;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
-import net.minecraft.text.TextColor;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextColor;
 
 import java.util.Optional;
 
@@ -19,7 +19,7 @@ public final class ChatFontUtil {
     }
 
     /** Возвращает true если отрисовали сами и ваниллу надо пропустить. */
-    public static boolean drawCustomChat(DrawContext context, int y, float opacity, OrderedText text) {
+    public static boolean drawCustomChat(GuiGraphics context, int y, float opacity, OrderedText text) {
         Fonts fonts = ModuleManager.INSTANCE.getModule(Fonts.class);
         if (fonts == null || !fonts.isToggled() || !fonts.chat.getValue()) return false;
         if (text == null) return false;
@@ -43,8 +43,8 @@ public final class ChatFontUtil {
         return sb.toString();
     }
 
-    /** Text со стилями → строка с §-кодами (сегменты сохраняют свои стили). */
-    public static String toSectionString(Text text) {
+    /** Component со стилями → строка с §-кодами (сегменты сохраняют свои стили). */
+    public static String toSectionString(Component text) {
         StringBuilder sb = new StringBuilder("§r§f");
         final int[] last = {-1, 0, 0, 0, 0, 0};
         final boolean[] first = {true};

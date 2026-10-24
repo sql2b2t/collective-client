@@ -7,9 +7,9 @@ import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.IntegerSetting;
 import me.collective.setting.StringSetting;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.PlayerListEntry;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.network.chat.Component;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -436,9 +436,9 @@ public class Irc extends Module {
     private static String baseName() {
         String name = null;
         try {
-            MinecraftClient client = MinecraftClient.getInstance();
-            if (client.getSession() != null) {
-                name = client.getSession().getUsername();
+            Minecraft client = Minecraft.getInstance();
+            if (client.getUser() != null) {
+                name = client.getUser().getUsername();
             }
         } catch (Throwable ignored) {
         }

@@ -5,7 +5,7 @@ import me.collective.module.client.HUD;
 import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.EnumSetting;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 
 import java.awt.Color;
 import java.util.Locale;
@@ -25,7 +25,7 @@ public class Bps extends HudModule {
     }
 
     @Override
-    public void render(DrawContext context, float delta) {
+    public void render(GuiGraphics context, float delta) {
         if (!isToggled() || mc.player == null) return;
 
         double dX = mc.player.getX() - mc.player.lastX;

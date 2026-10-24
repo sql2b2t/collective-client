@@ -23,7 +23,7 @@ public class FriendManager {
         return friends.contains(norm(name));
     }
 
-    public boolean isFriend(net.minecraft.entity.player.PlayerEntity player) {
+    public boolean isFriend(net.minecraft.entity.player.Player player) {
         if (player == null) return false;
         return isFriend(player.getName().getString());
     }

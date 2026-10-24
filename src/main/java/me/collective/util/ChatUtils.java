@@ -1,10 +1,10 @@
 package me.collective.util;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 public class ChatUtils {
     public static void sendPlayerMsg(String msg) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.getNetworkHandler() == null) return;
         if (msg.startsWith("/")) {
             mc.getNetworkHandler().sendChatCommand(msg.substring(1));

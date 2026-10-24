@@ -5,7 +5,7 @@ import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.ColorSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 import java.awt.Color;
 
@@ -34,13 +34,13 @@ public class Notifications extends Module {
 
         String state = enabled ? "§aenabled" : "§cdisabled";
         String msg = "§f" + module.getName() + " §7has been " + state + "§7.";
-        me.collective.command.ChatHelper.sendMessage(Text.literal(msg));
+        me.collective.command.ChatHelper.sendMessage(Component.literal(msg));
     }
 
     public void notifyTotemPop(String name, int pops) {
         if (!isToggled() || !totemPops.getValue()) return;
 
         String msg = "§f" + name + " §7has popped §d" + pops + " §7totem" + (pops > 1 ? "s" : "") + "!";
-        me.collective.command.ChatHelper.sendMessage(Text.literal(msg));
+        me.collective.command.ChatHelper.sendMessage(Component.literal(msg));
     }
 }

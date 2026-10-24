@@ -1,8 +1,8 @@
 package me.collective.render;
 
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.model.BakedQuad;
-import net.minecraft.client.util.math.MatrixStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.renderer.block.model.BakedQuad;
+import com.mojang.blaze3d.vertex.PoseStack;
 
 public final class NoOpVertexConsumer implements VertexConsumer {
     public static final NoOpVertexConsumer INSTANCE = new NoOpVertexConsumer();
@@ -54,10 +54,10 @@ public final class NoOpVertexConsumer implements VertexConsumer {
     }
 
     @Override
-    public void quad(MatrixStack.Entry matrixEntry, BakedQuad quad, float red, float green, float blue, float alpha, int light, int overlay) {
+    public void quad(PoseStack.Entry matrixEntry, BakedQuad quad, float red, float green, float blue, float alpha, int light, int overlay) {
     }
 
     @Override
-    public void quad(MatrixStack.Entry matrixEntry, BakedQuad quad, float[] brightnesses, float red, float green, float blue, float alpha, int[] lights, int overlay) {
+    public void quad(PoseStack.Entry matrixEntry, BakedQuad quad, float[] brightnesses, float red, float green, float blue, float alpha, int[] lights, int overlay) {
     }
 }

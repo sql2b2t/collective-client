@@ -2,7 +2,7 @@ package me.collective.module.highway;
 
 import me.collective.event.EventHandler;
 import me.collective.event.events.TickEvent;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
 
 public class PosNegBorer extends BorerModule {
     public PosNegBorer() {

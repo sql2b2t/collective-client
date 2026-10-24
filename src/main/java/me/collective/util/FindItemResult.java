@@ -1,6 +1,6 @@
 package me.collective.util;
 
-import net.minecraft.util.Hand;
+import net.minecraft.world.InteractionHand;
 
 public record FindItemResult(int slot, int count) {
     public boolean found() {
@@ -19,8 +19,8 @@ public record FindItemResult(int slot, int count) {
         return slot >= 9 && slot < 36;
     }
 
-    public Hand getHand() {
-        if (slot == 40) return Hand.OFF_HAND;
-        return Hand.MAIN_HAND;
+    public InteractionHand getHand() {
+        if (slot == 40) return InteractionHand.OFF_HAND;
+        return InteractionHand.MAIN_HAND;
     }
 }

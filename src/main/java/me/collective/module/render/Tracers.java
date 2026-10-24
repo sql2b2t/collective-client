@@ -9,11 +9,11 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.ColorSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.manager.FriendManager;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.ItemEntity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
 
 import java.awt.Color;
 
@@ -40,26 +40,26 @@ public class Tracers extends Module {
     @EventHandler
     public void onRender3D(Render3DEvent event) {
         if (!isToggled() || mc.player == null || mc.world == null) return;
-        Vec3d cam = mc.gameRenderer.getCamera().getCameraPos();
+        Vec3 cam = mc.gameRenderer.getCamera().getCameraPos();
         double rangeSq = this.range.getFloatValue() * this.range.getFloatValue();
 
         // Игроки — через готовый маленький список игроков; полный скан всех
         // сущностей мира стартует только когда включены предметы или мобы.
-        for (PlayerEntity p : mc.world.getPlayers()) {
+        for (Player p : mc.world.getPlayers()) {
             if (p == mc.player || !p.isAlive() || p.isSpectator()) continue;
             boolean friend = FriendManager.getInstance().isFriend(p);
             if (friend && !friends.getValue()) continue;
             if (!friend && !players.getValue()) continue;
             if (mc.player.squaredDistanceTo(p) > rangeSq) continue;
 
-            Vec3d target = p.getBoundingBox().getCenter();
+            Vec3 target = p.getBoundingBox().getCenter();
             Renderer3D.line(cam.x, cam.y, cam.z, target.x, target.y, target.z,
                     friend ? friendColor.getValue() : playerColor.getValue());
         }
 
         if (items.getValue() || mobs.getValue()) {
             for (Entity e : mc.world.getEntities()) {
-                if (e == mc.player || !e.isAlive() || e instanceof PlayerEntity) continue;
+                if (e == mc.player || !e.isAlive() || e instanceof Player) continue;
                 if (mc.player.squaredDistanceTo(e) > rangeSq) continue;
 
                 Color c;
@@ -73,7 +73,7 @@ public class Tracers extends Module {
                     continue;
                 }
 
-                Vec3d target = e.getBoundingBox().getCenter();
+                Vec3 target = e.getBoundingBox().getCenter();
                 Renderer3D.line(cam.x, cam.y, cam.z, target.x, target.y, target.z, c);
             }
         }

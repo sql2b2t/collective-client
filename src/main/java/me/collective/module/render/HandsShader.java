@@ -8,9 +8,9 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.ColorSetting;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.render.VertexConsumer;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.util.Util;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.Mth;
 
 import java.awt.Color;
 

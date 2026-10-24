@@ -2,7 +2,7 @@ package me.collective.util;
 
 import baritone.api.BaritoneAPI;
 import baritone.api.pathing.goals.GoalBlock;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
 
 /**
  * Изолированный мост к Baritone API.

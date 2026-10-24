@@ -9,11 +9,11 @@ import me.collective.module.ModuleManager;
 import me.collective.module.hud.HudModule;
 import me.collective.util.BaritoneBridge;
 import me.collective.util.RotationUtils;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.chat.Component;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,7 +24,7 @@ public class ScriptContext {
     /** Сколько ошибок допускается от одного источника (модуль/таймер), прежде чем он будет остановлен. */
     public static final int MAX_ERRORS = 5;
 
-    public final MinecraftClient mc = MinecraftClient.getInstance();
+    public final Minecraft mc = Minecraft.getInstance();
     public final String scriptName;
 
     private final List<Module> registeredModules = new ArrayList<>();
@@ -189,7 +189,7 @@ public class ScriptContext {
                 error.printStackTrace();
             }
             String message = error == null || error.getMessage() == null ? "unknown error" : error.getMessage();
-            ChatHelper.sendMessage(Text.literal("§c[Script] §f" + scriptName + " §7(" + source + "): §c" + message));
+            ChatHelper.sendMessage(Component.literal("§c[Script] §f" + scriptName + " §7(" + source + "): §c" + message));
         }
         return count;
     }
@@ -241,7 +241,7 @@ public class ScriptContext {
         RotationUtils.getInstance().setRotationSilentInstant(null, 0, yaw, pitch);
     }
 
-    public void rotateTo(Vec3d target) {
+    public void rotateTo(Vec3 target) {
         if (mc.player != null) {
             float[] rots = RotationUtils.getLegitRotations(target);
             RotationUtils.getInstance().setRotationSilent(rots[0], rots[1]);
@@ -249,7 +249,7 @@ public class ScriptContext {
     }
 
     public void rotateTo(double x, double y, double z) {
-        rotateTo(new Vec3d(x, y, z));
+        rotateTo(new Vec3(x, y, z));
     }
 
     public void pathTo(int x, int y, int z) {
@@ -277,7 +277,7 @@ public class ScriptContext {
     // --- Output & Logging ---
 
     public void print(Object msg) {
-        ChatHelper.sendMessage(Text.literal("§7[§d" + scriptName + "§7] §f" + String.valueOf(msg)));
+        ChatHelper.sendMessage(Component.literal("§7[§d" + scriptName + "§7] §f" + String.valueOf(msg)));
     }
 
     public void log(Object msg) {

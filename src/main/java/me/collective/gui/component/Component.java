@@ -1,10 +1,10 @@
 package me.collective.gui.component;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 
 public abstract class Component {
-    protected static final MinecraftClient mc = MinecraftClient.getInstance();
+    protected static final Minecraft mc = Minecraft.getInstance();
 
     protected float x;
     protected float y;
@@ -18,7 +18,7 @@ public abstract class Component {
         this.height = height;
     }
 
-    public abstract void render(DrawContext context, int mouseX, int mouseY, float delta);
+    public abstract void render(GuiGraphics context, int mouseX, int mouseY, float delta);
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         return false;

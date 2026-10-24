@@ -1,8 +1,8 @@
 package me.collective.event.events;
 
 import me.collective.event.CancellableEvent;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 
 public class StartBreakingBlockEvent extends CancellableEvent {
     public final BlockPos blockPos;

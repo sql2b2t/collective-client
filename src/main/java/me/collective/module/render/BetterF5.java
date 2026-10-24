@@ -3,13 +3,13 @@ package me.collective.module.render;
 import me.collective.category.Category;
 import me.collective.module.Module;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.option.Perspective;
-import net.minecraft.client.render.Camera;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.CameraType;
+import net.minecraft.client.Camera;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.Direction;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
 
 public class BetterF5 extends Module {
     public static BetterF5 INSTANCE;
@@ -86,7 +86,7 @@ public class BetterF5 extends Module {
             : MathHelper.clamp((float) (now - this.lastFrame) / 1000.0F, 0.001F, 0.1F);
         this.lastFrame = now;
 
-        if (camera.getFocusedEntity() instanceof PlayerEntity player) {
+        if (camera.getFocusedEntity() instanceof Player player) {
             if (this.needsInit) {
                 init(camera);
                 this.needsInit = false;
@@ -133,7 +133,7 @@ public class BetterF5 extends Module {
         double d = this.distance.getValue();
         double h = this.height.getValue();
 
-        Vec3d pos = camera.getCameraPos();
+        Vec3 pos = camera.getCameraPos();
         this.currentDistance = d;
         this.currentHeight = h;
         this.smoothX = pos.x;
@@ -147,7 +147,7 @@ public class BetterF5 extends Module {
         this.lastFrame = System.currentTimeMillis();
     }
 
-    private void computeTargets(PlayerEntity player) {
+    private void computeTargets(Player player) {
         double baseDist = this.distance.getValue();
         double baseHeight = this.height.getValue();
         boolean frontView = mc.options.getPerspective() == Perspective.THIRD_PERSON_FRONT;
@@ -156,7 +156,7 @@ public class BetterF5 extends Module {
         double h = baseHeight;
         float yawOff = 0.0F;
 
-        Vec3d vel = player.getVelocity();
+        Vec3 vel = player.getVelocity();
         double speed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
 
         if (player.isSprinting() && speed > 0.100000001116534) {
@@ -234,7 +234,7 @@ public class BetterF5 extends Module {
     private void apply(Camera camera) {
         this.resultDistance = (float) this.currentDistance;
 
-        Vec3d pos = camera.getCameraPos();
+        Vec3 pos = camera.getCameraPos();
         double targetX = pos.x;
         double targetY = pos.y + this.currentHeight;
         double targetZ = pos.z;

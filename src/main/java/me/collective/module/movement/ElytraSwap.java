@@ -9,13 +9,13 @@ import me.collective.setting.KeybindSetting;
 import me.collective.setting.ModeSetting;
 import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
-import net.minecraft.network.packet.c2s.play.CloseHandledScreenC2SPacket;
-import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
-import net.minecraft.screen.slot.SlotActionType;
-import net.minecraft.util.Hand;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
+import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
+import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.InteractionHand;
 
 /**
  * Порт ElytraSwap из ThunderHack-Recode.
@@ -122,18 +122,18 @@ public class ElytraSwap extends Module {
 
         FindItemResult hotbar = InventoryUtil.findInHotbarOrOffhand(Items.FIREWORK_ROCKET);
         if (hotbar.isOffhand()) {
-            mc.interactionManager.interactItem(mc.player, Hand.OFF_HAND);
+            mc.interactionManager.interactItem(mc.player, InteractionHand.OFF_HAND);
             return;
         }
         if (hotbar.isHotbar()) {
             if (silent) {
                 InventoryUtil.swap(hotbar.slot(), true);
-                mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
+                mc.interactionManager.interactItem(mc.player, InteractionHand.MAIN_HAND);
                 InventoryUtil.swapBack();
             } else {
                 mc.player.getInventory().selectedSlot = hotbar.slot();
                 mc.interactionManager.syncSelectedSlot();
-                mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
+                mc.interactionManager.interactItem(mc.player, InteractionHand.MAIN_HAND);
             }
             sendSwing();
             return;
@@ -144,7 +144,7 @@ public class ElytraSwap extends Module {
             int syncId = mc.player.currentScreenHandler.syncId;
             mc.interactionManager.clickSlot(syncId, inv.slot(), mc.player.getInventory().selectedSlot, SlotActionType.SWAP, mc.player);
             sendClose(syncId);
-            mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
+            mc.interactionManager.interactItem(mc.player, InteractionHand.MAIN_HAND);
             sendSwing();
             if (silent) {
                 mc.interactionManager.clickSlot(syncId, inv.slot(), mc.player.getInventory().selectedSlot, SlotActionType.SWAP, mc.player);
@@ -248,7 +248,7 @@ public class ElytraSwap extends Module {
 
     private void sendSwing() {
         if (mc.getNetworkHandler() != null) {
-            mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+            mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
         }
     }
 

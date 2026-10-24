@@ -1,29 +1,29 @@
 package me.collective.event.events;
 
-import net.minecraft.client.render.Camera;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.Camera;
+import net.minecraft.client.renderer.MultiBufferSource;
+import com.mojang.blaze3d.vertex.PoseStack;
 
 public class Render3DEvent {
-    public final MatrixStack matrices;
+    public final PoseStack matrices;
     public final Camera camera;
     public final float tickDelta;
     public final VertexConsumerProvider consumers;
     /** Все методы Renderer3D статические — разделяем один экземпляр вместо аллокации на каждый кадр. */
     public final me.collective.render.Renderer3D renderer = me.collective.render.Renderer3D.SHARED;
 
-    public Render3DEvent(MatrixStack matrices, Camera camera, float tickDelta, VertexConsumerProvider consumers) {
+    public Render3DEvent(PoseStack matrices, Camera camera, float tickDelta, VertexConsumerProvider consumers) {
         this.matrices = matrices;
         this.camera = camera;
         this.tickDelta = tickDelta;
         this.consumers = consumers;
     }
 
-    public Render3DEvent(MatrixStack matrices, Camera camera, float tickDelta) {
+    public Render3DEvent(PoseStack matrices, Camera camera, float tickDelta) {
         this(matrices, camera, tickDelta, null);
     }
 
-    public MatrixStack getMatrices() {
+    public PoseStack getMatrices() {
         return matrices;
     }
 
@@ -39,4 +39,3 @@ public class Render3DEvent {
         return consumers;
     }
 }
-

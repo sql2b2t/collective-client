@@ -11,20 +11,20 @@ import me.collective.setting.NumberSetting;
 import me.collective.util.BaritoneHelper;
 import me.collective.util.RotationUtils;
 import me.collective.util.ViaProtocolUtil;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.FireworksComponent;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.entity.projectile.FireworkRocketEntity;
-import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.component.Fireworks;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.projectile.FireworkRocketEntity;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.ClipContext;
 
 import java.util.List;
 
@@ -49,9 +49,9 @@ public class RocketBoost extends Module {
     public final BooleanSetting pauseInFluid = add(new BooleanSetting("PauseInFluid", true));
     public final BooleanSetting baritoneSync = add(new BooleanSetting("BaritoneSync", true));
 
-    private Vec3d lastMovement = Vec3d.ZERO;
-    private Vec3d prevPos = null;
-    private Vec3d lastGlidePos = null;
+    private Vec3 lastMovement = Vec3.ZERO;
+    private Vec3 prevPos = null;
+    private Vec3 lastGlidePos = null;
     private volatile boolean repositioned = false;
     private boolean windowOpen = false;
     private int latchedRocketId = -1;
@@ -73,7 +73,7 @@ public class RocketBoost extends Module {
 
     @Override
     public void onEnable() {
-        lastMovement = mc.player == null ? Vec3d.ZERO : mc.player.getVelocity();
+        lastMovement = mc.player == null ? Vec3.ZERO : mc.player.getVelocity();
         prevPos = mc.player == null ? null : mc.player.getEntityPos();
         lastGlidePos = null;
         repositioned = false;
@@ -121,10 +121,10 @@ public class RocketBoost extends Module {
         keepAimFresh();
 
         // Tick post debug logging
-        Vec3d pos = mc.player.getEntityPos();
-        Vec3d travelled = prevPos == null ? Vec3d.ZERO : pos.subtract(prevPos);
+        Vec3 pos = mc.player.getEntityPos();
+        Vec3 travelled = prevPos == null ? Vec3.ZERO : pos.subtract(prevPos);
         if (travelled.length() > MAX_PLAUSIBLE_MOVEMENT) {
-            travelled = Vec3d.ZERO;
+            travelled = Vec3.ZERO;
         }
         prevPos = pos;
         if (debug.getValue() && ++debugTicks >= 20) {
@@ -175,12 +175,12 @@ public class RocketBoost extends Module {
         }
     }
 
-    public Vec3d glideVelocity(Vec3d oldVelocity, Vec3d vanilla) {
+    public Vec3 glideVelocity(Vec3 oldVelocity, Vec3 vanilla) {
         if (mc.player == null || mc.world == null) {
             return null;
         }
-        Vec3d pos = mc.player.getEntityPos();
-        Vec3d start = lastGlidePos == null ? oldVelocity : pos.subtract(lastGlidePos);
+        Vec3 pos = mc.player.getEntityPos();
+        Vec3 start = lastGlidePos == null ? oldVelocity : pos.subtract(lastGlidePos);
         boolean desynced = lastGlidePos != null && (repositioned || start.length() > MAX_PLAUSIBLE_MOVEMENT);
         repositioned = false;
         lastGlidePos = pos;
@@ -202,11 +202,11 @@ public class RocketBoost extends Module {
         }
         RotationUtils rotations = RotationUtils.getInstance();
         float pitch = rotations.getSentPitch();
-        Vec3d look = Vec3d.fromPolar(pitch, rotations.getSentYaw());
+        Vec3 look = Vec3.fromPolar(pitch, rotations.getSentYaw());
         if (look.lengthSquared() < 1.0E-9) {
             return note("нет направления взгляда");
         }
-        Vec3d velocity = rideBox(start, look, pitch, throttledSpeed(look));
+        Vec3 velocity = rideBox(start, look, pitch, throttledSpeed(look));
         if (velocity == null) {
             return note("нет места в окне");
         }
@@ -221,48 +221,48 @@ public class RocketBoost extends Module {
         return velocity;
     }
 
-    private Vec3d note(String why) {
+    private Vec3 note(String why) {
         state = why;
         return null;
     }
 
-    private Vec3d rideBox(Vec3d start, Vec3d look, float pitch, double cap) {
+    private Vec3 rideBox(Vec3 start, Vec3 look, float pitch, double cap) {
         RotationUtils rotations = RotationUtils.getInstance();
-        Vec3d lastLook = Vec3d.fromPolar(rotations.getServerPitch(), rotations.getServerYaw());
+        Vec3 lastLook = Vec3.fromPolar(rotations.getServerPitch(), rotations.getServerYaw());
         return rideWindow(start, look, lastLook, pitch, effectiveGravity(start.y), amount.getValue(), antiTickSkipping(), effectiveAlignment(), cap);
     }
 
-    public static Vec3d rideWindow(Vec3d start, Vec3d look, Vec3d lastLook, float pitch, double gravity, double threshold, double anti, double alignmentDeg, double cap) {
+    public static Vec3 rideWindow(Vec3 start, Vec3 look, Vec3 lastLook, float pitch, double gravity, double threshold, double anti, double alignmentDeg, double cap) {
         double[] box = axisBox(look, lastLook, threshold, anti);
-        Vec3d predicted = predictGliding(start, look, pitch, gravity);
+        Vec3 predicted = predictGliding(start, look, pitch, gravity);
         double[] w = new double[]{
             predicted.x + Math.min(0.0, box[0] - start.x), predicted.y + Math.min(0.0, box[1] - start.y), predicted.z + Math.min(0.0, box[2] - start.z),
             predicted.x + Math.max(0.0, box[3] - start.x), predicted.y + Math.max(0.0, box[4] - start.y), predicted.z + Math.max(0.0, box[5] - start.z)
         };
-        Vec3d heading = heading(look, w, alignmentDeg, anti);
+        Vec3 heading = heading(look, w, alignmentDeg, anti);
         double reach = reach(heading, w, anti);
         if (reach <= 1.0E-9) {
             return null;
         }
-        Vec3d ride = heading.multiply(Math.min(reach, cap));
-        return new Vec3d(
+        Vec3 ride = heading.multiply(Math.min(reach, cap));
+        return new Vec3(
             MathHelper.clamp(ride.x, w[0], w[3]),
             MathHelper.clamp(ride.y, w[1], w[4]),
             MathHelper.clamp(ride.z, w[2], w[5])
         );
     }
 
-    private static Vec3d heading(Vec3d look, double[] w, double alignmentDeg, double anti) {
+    private static Vec3 heading(Vec3 look, double[] w, double alignmentDeg, double anti) {
         double slack = Math.toRadians(alignmentDeg);
         if (slack <= 1.0E-6) {
             return look;
         }
-        Vec3d corner = new Vec3d(axisEdge(look.x, w[0], w[3], anti), axisEdge(look.y, w[1], w[4], anti), axisEdge(look.z, w[2], w[5], anti));
+        Vec3 corner = new Vec3(axisEdge(look.x, w[0], w[3], anti), axisEdge(look.y, w[1], w[4], anti), axisEdge(look.z, w[2], w[5], anti));
         double len = corner.length();
         if (len <= 1.0E-9) {
             return look;
         }
-        Vec3d target = corner.multiply(1.0 / len);
+        Vec3 target = corner.multiply(1.0 / len);
         double angle = Math.acos(MathHelper.clamp(target.dotProduct(look), -1.0, 1.0));
         if (angle <= slack) {
             return target;
@@ -275,7 +275,7 @@ public class RocketBoost extends Module {
         return look.multiply(Math.sin((1.0 - t) * angle) / sin).add(target.multiply(Math.sin(t * angle) / sin));
     }
 
-    private static double reach(Vec3d dir, double[] w, double anti) {
+    private static double reach(Vec3 dir, double[] w, double anti) {
         double reach = Double.MAX_VALUE;
         reach = Math.min(reach, axisReach(dir.x, w[0], w[3], anti));
         reach = Math.min(reach, axisReach(dir.y, w[1], w[4], anti));
@@ -307,7 +307,7 @@ public class RocketBoost extends Module {
         return ViaProtocolUtil.isLegacyBand(ViaProtocolUtil.targetProtocol()) ? 0.0 : ANTI_TICK_SKIPPING;
     }
 
-    private static double[] axisBox(Vec3d look, Vec3d lastLook, double threshold, double a) {
+    private static double[] axisBox(Vec3 look, Vec3 lastLook, double threshold, double a) {
         double minX = Math.min(-a, look.x) + Math.min(-a, lastLook.x);
         double minY = Math.min(-a, look.y) + Math.min(-a, lastLook.y);
         double minZ = Math.min(-a, look.z) + Math.min(-a, lastLook.z);
@@ -320,13 +320,13 @@ public class RocketBoost extends Module {
         };
     }
 
-    public static Vec3d predictGliding(Vec3d old, Vec3d look, float pitchDeg, double gravity) {
+    public static Vec3 predictGliding(Vec3 old, Vec3 look, float pitchDeg, double gravity) {
         float pitchRad = pitchDeg * ((float) Math.PI / 180);
         double horizSqrt = Math.sqrt(look.x * look.x + look.z * look.z);
         double horizLen = old.horizontalLength();
         double vertCos = Math.cos(pitchRad);
         vertCos = vertCos * vertCos * Math.min(1.0, look.length() / 0.4);
-        Vec3d v = old.add(0.0, gravity * (-1.0 + vertCos * 0.75), 0.0);
+        Vec3 v = old.add(0.0, gravity * (-1.0 + vertCos * 0.75), 0.0);
         if (v.y < 0.0 && horizSqrt > 0.0) {
             double d = v.y * -0.1 * vertCos;
             v = v.add(look.x * d / horizSqrt, d, look.z * d / horizSqrt);
@@ -349,14 +349,14 @@ public class RocketBoost extends Module {
         return gravity;
     }
 
-    private double throttledSpeed(Vec3d look) {
+    private double throttledSpeed(Vec3 look) {
         double capped = speed.getValue();
         int ticks = lookahead.getValue().intValue();
         double reach = Math.max(4.0, capped * ticks);
-        Vec3d eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePos();
         limiter = "speed";
         if (wallCheck.getValue()) {
-            Vec3d end = eye.add(look.multiply(reach));
+            Vec3 end = eye.add(look.multiply(reach));
             BlockHitResult hit = mc.world.raycast(new RaycastContext(eye, end, RaycastContext.ShapeType.OUTLINE, RaycastContext.FluidHandling.NONE, mc.player));
             if (hit.getType() != HitResult.Type.MISS) {
                 double limit = hit.getBlockPos().toCenterPos().distanceTo(eye) / ticks;
@@ -368,7 +368,7 @@ public class RocketBoost extends Module {
         }
         if (chunkCheck.getValue()) {
             for (double d = 16.0; d <= reach; d += 16.0) {
-                Vec3d at = eye.add(look.multiply(d));
+                Vec3 at = eye.add(look.multiply(d));
                 BlockPos atPos = BlockPos.ofFloored(at);
                 if (mc.world.isChunkLoaded(atPos.getX() >> 4, atPos.getZ() >> 4)) continue;
                 if (!(d / ticks < capped)) break;
@@ -431,7 +431,7 @@ public class RocketBoost extends Module {
     private FireworkRocketEntity findAttachedRocket() {
         FireworkRocketEntity best = null;
         int bestRemaining = Integer.MIN_VALUE;
-        Box box = new Box(mc.player.getEntityPos().subtract(64, 64, 64), mc.player.getEntityPos().add(64, 64, 64));
+        AABB box = new AABB(mc.player.getEntityPos().subtract(64, 64, 64), mc.player.getEntityPos().add(64, 64, 64));
         List<Entity> entities = mc.world.getOtherEntities(mc.player, box, e -> e instanceof FireworkRocketEntity);
         for (Entity entity : entities) {
             FireworkRocketEntity firework = (FireworkRocketEntity) entity;

@@ -1,6 +1,6 @@
 package me.collective.util.sort;
 
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
 
 import java.util.ArrayList;
 import java.util.Comparator;

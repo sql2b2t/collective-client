@@ -4,9 +4,9 @@ import me.collective.category.Category;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.manager.FriendManager;
-import net.minecraft.client.network.PlayerListEntry;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -47,7 +47,7 @@ public class AntiBot extends Module {
             }
         }
 
-        for (PlayerEntity p : new java.util.ArrayList<>(mc.world.getPlayers())) {
+        for (Player p : new java.util.ArrayList<>(mc.world.getPlayers())) {
             // Player-list packets can arrive after entity spawn; never delete a fresh
             // real player or our explicit test dummy based on that transient absence.
             if (p == mc.player || !p.isAlive() || p.age < 100 || FakePlayer.isLocalFake(p)) continue;

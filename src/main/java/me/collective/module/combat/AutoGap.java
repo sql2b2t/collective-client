@@ -8,7 +8,7 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
-import net.minecraft.item.Items;
+import net.minecraft.world.item.Items;
 
 public class AutoGap extends Module {
     public final NumberSetting health = add(new NumberSetting("Health", 15.0, 1.0, 36.0, 1.0));

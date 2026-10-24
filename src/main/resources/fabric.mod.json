@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "id": "collective",
-  "version": "1.3.9",
+  "version": "1.0.0-26.3",
   "name": "Collective Client",
-  "description": "Collective Client for Minecraft 1.21.11",
+  "description": "Collective Client for Minecraft 26.3",
   "authors": [
     "sql"
   ],
@@ -17,9 +17,10 @@
     "collective.mixins.json"
   ],
   "depends": {
-    "minecraft": "1.21.11",
+    "minecraft": "~26.3",
     "fabric-api": "*",
-    "fabricloader": ">=0.16"
+    "fabricloader": ">=0.19.5",
+    "java": ">=25"
   },
   "suggests": {
     "baritone": "*"

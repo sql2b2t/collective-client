@@ -1,7 +1,7 @@
 package me.collective.mixin;
 
 import me.collective.module.render.Ambience;
-import net.minecraft.client.render.fog.FogRenderer;
+import net.minecraft.client.renderer.fog.FogRenderer;
 import org.joml.Vector4f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

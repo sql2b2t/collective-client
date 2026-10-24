@@ -10,28 +10,28 @@ import me.collective.setting.*;
 import me.collective.util.AuraCoordination;
 import me.collective.util.RotationUtils;
 import me.collective.util.SwapManager;
-import net.minecraft.block.BlockState;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.decoration.ArmorStandEntity;
-import net.minecraft.entity.mob.AmbientEntity;
-import net.minecraft.entity.mob.Monster;
-import net.minecraft.entity.mob.SlimeEntity;
-import net.minecraft.entity.mob.WaterCreatureEntity;
-import net.minecraft.entity.passive.AnimalEntity;
-import net.minecraft.entity.passive.MerchantEntity;
-import net.minecraft.entity.passive.VillagerEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.item.ShieldItem;
-import net.minecraft.registry.tag.ItemTags;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.entity.ambient.AmbientCreature;
+import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.monster.Slime;
+import net.minecraft.world.entity.animal.fish.WaterAnimal;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.npc.villager.AbstractVillager;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ShieldItem;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
@@ -158,7 +158,7 @@ public class KillAura extends Module {
         if (textureRun == null) return;
 
         if (followTarget.getValue()) {
-            Vec3d diff = textureRun.getEntityPos().subtract(mc.player.getEntityPos());
+            Vec3 diff = textureRun.getEntityPos().subtract(mc.player.getEntityPos());
             if (diff.lengthSquared() > 1.0) {
                 float targetAngle = (float) MathHelper.wrapDegrees(Math.toDegrees(Math.atan2(diff.z, diff.x)) - 90.0);
                 mc.player.setYaw(MathHelper.lerpAngleDegrees(0.2f, mc.player.getYaw(), targetAngle));
@@ -204,8 +204,8 @@ public class KillAura extends Module {
     private void findTarget() {
         LivingEntity best = null;
         double bestScore = Double.MAX_VALUE;
-        Vec3d eyePos = mc.player.getEyePos();
-        Vec3d lookVec = mc.player.getRotationVec(1.0F).normalize();
+        Vec3 eyePos = mc.player.getEyePos();
+        Vec3 lookVec = mc.player.getRotationVec(1.0F).normalize();
 
         // Ближайший отклонённый кандидат — чтобы отладка объясняла,
         // почему цели нет, а не просто констатировала факт.
@@ -229,8 +229,8 @@ public class KillAura extends Module {
             if (nearestTarget.getValue()) {
                 score = boxDistance(mc.player, living);
             } else {
-                Vec3d targetCenter = living.getBoundingBox().getCenter();
-                Vec3d toTarget = targetCenter.subtract(eyePos).normalize();
+                Vec3 targetCenter = living.getBoundingBox().getCenter();
+                Vec3 toTarget = targetCenter.subtract(eyePos).normalize();
                 score = Math.acos(MathHelper.clamp(lookVec.dotProduct(toTarget), -1.0, 1.0));
             }
 
@@ -259,7 +259,7 @@ public class KillAura extends Module {
         return boxDistance(a.getBoundingBox(), b.getBoundingBox());
     }
 
-    private static double boxDistance(net.minecraft.util.math.Box ba, net.minecraft.util.math.Box bb) {
+    private static double boxDistance(net.minecraft.util.math.AABB ba, net.minecraft.util.math.AABB bb) {
         double dx = Math.max(0.0, Math.max(ba.minX - bb.maxX, bb.minX - ba.maxX));
         double dy = Math.max(0.0, Math.max(ba.minY - bb.maxY, bb.minY - ba.maxY));
         double dz = Math.max(0.0, Math.max(ba.minZ - bb.maxZ, bb.minZ - ba.maxZ));
@@ -274,13 +274,13 @@ public class KillAura extends Module {
      * {@code Entity.getBoundingBox()}, но сервер считает удары по настоящему
      * боксу — поэтому все боевые проверки (луч, дистанция) берут его отсюда.
      */
-    private static net.minecraft.util.math.Box realBox(Entity entity) {
+    private static net.minecraft.util.math.AABB realBox(Entity entity) {
         return entity.getDimensions(entity.getPose()).getBoxAt(entity.getEntityPos());
     }
 
     /** Почему сущность не годится в цель. {@code null} — годится. */
     private String rejectReason(LivingEntity entity) {
-        if (entity == null || entity == mc.player || entity instanceof ClientPlayerEntity) return "это мы сами";
+        if (entity == null || entity == mc.player || entity instanceof LocalPlayer) return "это мы сами";
         if (!entity.isAlive()) return "мёртв";
         if (entity.isInvulnerable()) return "неуязвим";
         if (entity instanceof ArmorStandEntity) return "арморстенд";
@@ -300,7 +300,7 @@ public class KillAura extends Module {
             return entity.getName().getString() + " NPC";
         }
 
-        if (entity instanceof PlayerEntity player) {
+        if (entity instanceof Player player) {
             if (player.isCreative()) return entity.getName().getString() + " креатив";
             if (player.isSpectator()) return entity.getName().getString() + " спектатор";
 
@@ -333,7 +333,7 @@ public class KillAura extends Module {
         return rejectReason(entity) == null;
     }
 
-    private boolean isNaked(PlayerEntity player) {
+    private boolean isNaked(Player player) {
         return player.getEquippedStack(EquipmentSlot.HEAD).isEmpty()
             && player.getEquippedStack(EquipmentSlot.CHEST).isEmpty()
             && player.getEquippedStack(EquipmentSlot.LEGS).isEmpty()
@@ -349,7 +349,7 @@ public class KillAura extends Module {
             return true;
         }
 
-        if (entity instanceof PlayerEntity player) {
+        if (entity instanceof Player player) {
             boolean noTabEntry = mc.getNetworkHandler() != null && mc.getNetworkHandler().getPlayerListEntry(player.getUuid()) == null;
             boolean numericOrCit = name.matches("\\d{1,8}") || name.startsWith("cit-");
             return noTabEntry || (numericOrCit && !display.equals(name));
@@ -383,7 +383,7 @@ public class KillAura extends Module {
     private boolean aimAtTarget() {
         if (textureRun == null) return false;
 
-        Vec3d targetPos = textureRun.getBoundingBox().getCenter();
+        Vec3 targetPos = textureRun.getBoundingBox().getCenter();
         float[] rots = RotationUtils.getLegitRotations(targetPos);
         this.targetYaw = rots[0];
         this.targetPitch = rots[1];
@@ -449,7 +449,7 @@ public class KillAura extends Module {
         if (!colorMeasure.process("Проверка на луч")) return false;
         if (textureRun == null || mc.player == null || mc.world == null) return true;
 
-        Vec3d eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePos();
 
         // Луч строится строго по углу, который сервер уже видел: удар и луч
         // идут с одним углом — проверку «куда смотрели — туда ударили» не
@@ -458,16 +458,16 @@ public class KillAura extends Module {
         float yaw   = rotUtils.getSentYaw();
         float pitch = rotUtils.getSentPitch();
 
-        Vec3d look = RotationUtils.getRotationVector(pitch, yaw);
+        Vec3 look = RotationUtils.getRotationVector(pitch, yaw);
         double reach = getAttackDistance(textureRun);
-        Vec3d end = eye.add(look.multiply(reach));
+        Vec3 end = eye.add(look.multiply(reach));
 
         // 1. Raycast to real target bounding box (сервер считает по настоящим)
-        net.minecraft.util.math.Box targetBox = realBox(textureRun).expand(0.1);
-        java.util.Optional<Vec3d> hit = targetBox.raycast(eye, end);
+        net.minecraft.util.math.AABB targetBox = realBox(textureRun).expand(0.1);
+        java.util.Optional<Vec3> hit = targetBox.raycast(eye, end);
 
         if (hit.isEmpty()) {
-            net.minecraft.util.math.Box searchBox = mc.player.getBoundingBox().stretch(look.multiply(reach)).expand(1.0, 1.0, 1.0);
+            net.minecraft.util.math.AABB searchBox = mc.player.getBoundingBox().stretch(look.multiply(reach)).expand(1.0, 1.0, 1.0);
             net.minecraft.util.hit.EntityHitResult entityHit = net.minecraft.entity.projectile.ProjectileUtil.raycast(
                 mc.player, eye, end, searchBox, e -> e == textureRun, reach * reach
             );
@@ -573,11 +573,11 @@ public class KillAura extends Module {
         }
 
         mc.interactionManager.attackEntity(mc.player, textureRun);
-        mc.player.swingHand(Hand.MAIN_HAND);
+        mc.player.swingHand(InteractionHand.MAIN_HAND);
 
         // Отжим восстанавливаем тем же слотом предмета.
         if (wasUsingShield) {
-            mc.interactionManager.interactItem(mc.player, Hand.OFF_HAND);
+            mc.interactionManager.interactItem(mc.player, InteractionHand.OFF_HAND);
         }
     }
 

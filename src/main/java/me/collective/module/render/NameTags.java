@@ -8,11 +8,11 @@ import me.collective.module.client.UI;
 import me.collective.render.RenderUtil3D;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Vector2f;
 
 import java.awt.Color;
@@ -51,14 +51,14 @@ public class NameTags extends Module {
     }
 
     @Override
-    public void onRender2D(DrawContext context, float delta) {
+    public void onRender2D(GuiGraphics context, float delta) {
         if (!isToggled() || mc.world == null || mc.player == null) return;
 
         int sw = mc.getWindow().getScaledWidth();
         int sh = mc.getWindow().getScaledHeight();
         double cullSq = this.cullDist.getValue() * this.cullDist.getValue();
 
-        for (PlayerEntity player : mc.world.getPlayers()) {
+        for (Player player : mc.world.getPlayers()) {
             if (player == null || !player.isAlive()) continue;
             if (player == mc.player && !self.getValue()) continue;
             if (player != mc.player && mc.player.squaredDistanceTo(player) > cullSq) continue;
@@ -66,7 +66,7 @@ public class NameTags extends Module {
             TagData data = this.tagCache.get(player.getId());
             if (data == null) continue; // выйдет из кэша на следующем тике
 
-            Vec3d pos = player.getLerpedPos(delta);
+            Vec3 pos = player.getLerpedPos(delta);
             Vector2f screen = RenderUtil3D.worldToScreen(pos.x, pos.y + player.getHeight() + 0.25, pos.z, sw, sh);
             if (screen == null) continue;
 
@@ -102,7 +102,7 @@ public class NameTags extends Module {
         FontManager fm = FontManager.INSTANCE;
         float s = scale.getFloatValue();
 
-        for (PlayerEntity player : mc.world.getPlayers()) {
+        for (Player player : mc.world.getPlayers()) {
             if (player == null || !player.isAlive()) continue;
 
             TagData d = new TagData();
@@ -137,7 +137,7 @@ public class NameTags extends Module {
         return Math.max(3f, 4f * s);
     }
 
-    private void renderTag(DrawContext context, PlayerEntity player, float x, float y, TagData d) {
+    private void renderTag(GuiGraphics context, Player player, float x, float y, TagData d) {
         FontManager fm = FontManager.INSTANCE;
         float s = scale.getFloatValue();
 

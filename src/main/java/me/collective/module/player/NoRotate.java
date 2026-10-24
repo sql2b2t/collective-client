@@ -5,7 +5,7 @@ import me.collective.event.EventHandler;
 import me.collective.event.events.PacketEvent;
 import me.collective.module.Module;
 import me.collective.util.RotationUtils;
-import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
 
 /**
  * Порт NoRotate из ThunderHack.

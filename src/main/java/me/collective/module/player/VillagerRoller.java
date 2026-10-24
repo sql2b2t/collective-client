@@ -14,32 +14,32 @@ import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.category.Category;
 import me.collective.event.EventHandler;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.ItemEnchantmentsComponent;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.entity.passive.VillagerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
-import net.minecraft.network.packet.s2c.play.SetTradeOffersS2CPacket;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.registry.tag.EnchantmentTags;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.Hand;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.village.TradeOffer;
-import net.minecraft.village.TradeOfferList;
-import net.minecraft.village.VillagerProfession;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ClientboundMerchantOffersPacket;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.core.Holder;
+import net.minecraft.tags.EnchantmentTags;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.resources.Identifier;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.item.trading.MerchantOffer;
+import net.minecraft.world.item.trading.MerchantOffers;
+import net.minecraft.world.entity.npc.villager.VillagerProfession;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -339,7 +339,7 @@ public class VillagerRoller extends Module {
             if (!mc.interactionManager.updateBlockBreakingProgress(rollingBlockPos, Direction.UP)) {
                 mc.interactionManager.attackBlock(rollingBlockPos, Direction.UP);
             }
-            mc.player.swingHand(net.minecraft.util.Hand.MAIN_HAND);
+            mc.player.swingHand(net.minecraft.util.InteractionHand.MAIN_HAND);
         }
     }
 
@@ -380,10 +380,10 @@ public class VillagerRoller extends Module {
         // прошлый вариант добавлял ещё 0.5 и вылезал за хитбокс — сервер
         // отклонял interact, потому пюпитр и «не ставился».
         net.minecraft.util.hit.BlockHitResult hit = new net.minecraft.util.hit.BlockHitResult(
-            net.minecraft.util.math.Vec3d.ofCenter(rollingBlockPos).add(0, 0.5, 0),
+            net.minecraft.util.math.Vec3.ofCenter(rollingBlockPos).add(0, 0.5, 0),
             Direction.UP, rollingBlockPos, false);
 
-        var result = mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
+        var result = mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND, hit);
         if (!result.isAccepted()) {
             // Не переходим в ожидание профессии: сервер не принял установку.
             retryPlaceTicks++;
@@ -454,7 +454,7 @@ public class VillagerRoller extends Module {
         }
 
         if (rollingVillager == null) return;
-        mc.interactionManager.interactEntity(mc.player, rollingVillager, Hand.MAIN_HAND);
+        mc.interactionManager.interactEntity(mc.player, rollingVillager, InteractionHand.MAIN_HAND);
         waitingForTradesTicks = 0;
     }
 
@@ -536,7 +536,7 @@ public class VillagerRoller extends Module {
                     }
 
                     if (disconnectIfFound.get()) {
-                        mc.getNetworkHandler().getConnection().disconnect(net.minecraft.text.Text.literal(
+                        mc.getNetworkHandler().getConnection().disconnect(net.minecraft.text.Component.literal(
                             "Villager Roller: найдено %s%s за %d изумрудов — выход.".formatted(
                                 name, level > 1 ? " " + level : "", cost)));
                     }

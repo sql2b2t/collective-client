@@ -1,7 +1,7 @@
 package me.collective.util;
 
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -316,8 +316,8 @@ public final class PorpoiseSolver {
         int legTick = 0;
 
         float pitch = legs.pitch(true, 0, 0.0, half);
-        Vec3d look = Vec3d.fromPolar(pitch, yaw);
-        Vec3d v = look.multiply(0.5);
+        Vec3 look = Vec3.fromPolar(pitch, yaw);
+        Vec3 v = look.multiply(0.5);
 
         double alt = 0.0;
         double travelledX = 0.0;
@@ -359,16 +359,16 @@ public final class PorpoiseSolver {
             }
 
             float wanted = legs.pitch(diving, legTick, alt, half);
-            Vec3d lastLook = look;
+            Vec3 lastLook = look;
 
             if (wanted != pitch) {
                 pitch = wanted;
-                look = Vec3d.fromPolar(wanted, yaw);
+                look = Vec3.fromPolar(wanted, yaw);
             }
 
             double g = slowFalling && v.y <= 0.0 ? Math.min(gravity, 0.01) : gravity;
 
-            Vec3d next = RideWindow.ride(v, look, lastLook, pitch, g, threshold, anti,
+            Vec3 next = RideWindow.ride(v, look, lastLook, pitch, g, threshold, anti,
                 yawAlign, pitchAlign, Double.MAX_VALUE);
 
             // коридор не выдержал — летим как в ванилле

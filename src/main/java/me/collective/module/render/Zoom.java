@@ -7,8 +7,8 @@ import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.util.InputUtil;
-import net.minecraft.util.math.MathHelper;
+import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.util.Mth;
 import org.lwjgl.glfw.GLFW;
 
 /**

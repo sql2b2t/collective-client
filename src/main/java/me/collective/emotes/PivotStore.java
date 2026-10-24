@@ -1,7 +1,7 @@
 package me.collective.emotes;
 
 import java.util.WeakHashMap;
-import net.minecraft.client.model.ModelPart;
+import net.minecraft.client.model.geom.ModelPart;
 
 public final class PivotStore {
     private PivotStore() {

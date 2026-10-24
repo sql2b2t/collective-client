@@ -8,21 +8,21 @@ import me.collective.render.Renderer3D;
 import me.collective.render.ShapeMode;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.ColorSetting;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.projectile.ProjectileUtil;
-import net.minecraft.item.BowItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.projectile.ProjectileUtil;
+import net.minecraft.world.item.BowItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.ClipContext;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -38,7 +38,7 @@ public class Trajectories extends Module {
     public final BooleanSetting potions = add(new BooleanSetting("Potions", true));
     public final BooleanSetting snowballs = add(new BooleanSetting("Snowballs", true));
     public final BooleanSetting windCharges = add(new BooleanSetting("WindCharges", true));
-    public final BooleanSetting box = add(new BooleanSetting("Box", true));
+    public final BooleanSetting box = add(new BooleanSetting("AABB", true));
 
     public final ColorSetting color = add(new ColorSetting("Color", new Color(0, 200, 255, 220)));
     public final ColorSetting hitColor = add(new ColorSetting("HitColor", new Color(50, 255, 100, 255)));
@@ -61,7 +61,7 @@ public class Trajectories extends Module {
         ProjectileInfo info = getProjectileInfo(stack);
         if (info == null) return;
 
-        List<Vec3d> points = new ArrayList<>();
+        List<Vec3> points = new ArrayList<>();
         HitResult hit = simulateTrajectory(info, points);
 
         renderTrajectory(points, hit);
@@ -106,8 +106,8 @@ public class Trajectories extends Module {
         return null;
     }
 
-    private HitResult simulateTrajectory(ProjectileInfo info, List<Vec3d> points) {
-        Vec3d eyePos = mc.player.getEyePos();
+    private HitResult simulateTrajectory(ProjectileInfo info, List<Vec3> points) {
+        Vec3 eyePos = mc.player.getEyePos();
         float pitch = mc.player.getPitch() + info.pitchOffset;
         float yaw = mc.player.getYaw();
 
@@ -116,21 +116,21 @@ public class Trajectories extends Module {
         float cosYaw = MathHelper.cos(-yaw * MathHelper.RADIANS_PER_DEGREE - MathHelper.PI);
         float sinYaw = MathHelper.sin(-yaw * MathHelper.RADIANS_PER_DEGREE - MathHelper.PI);
 
-        Vec3d dir = new Vec3d(-sinYaw * cosPitch, sinPitch, cosYaw * cosPitch).normalize();
-        Vec3d velocity = dir.multiply(info.speed);
-        Vec3d pos = eyePos;
+        Vec3 dir = new Vec3(-sinYaw * cosPitch, sinPitch, cosYaw * cosPitch).normalize();
+        Vec3 velocity = dir.multiply(info.speed);
+        Vec3 pos = eyePos;
 
         points.add(pos);
         HitResult finalHit = null;
 
         for (int i = 0; i < 200; i++) {
-            Vec3d nextPos = pos.add(velocity);
+            Vec3 nextPos = pos.add(velocity);
 
             BlockHitResult bhr = mc.world.raycast(new RaycastContext(
                     pos, nextPos, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, mc.player
             ));
 
-            Box stepBox = new Box(pos, nextPos).expand(1.0);
+            AABB stepBox = new AABB(pos, nextPos).expand(1.0);
             EntityHitResult ehr = ProjectileUtil.raycast(
                     mc.player, pos, nextPos, stepBox,
                     entity -> !entity.isSpectator() && entity.isAlive() && entity != mc.player, 0.0
@@ -150,7 +150,7 @@ public class Trajectories extends Module {
 
             points.add(nextPos);
             pos = nextPos;
-            velocity = new Vec3d(velocity.x * info.drag, velocity.y * info.drag - info.gravity, velocity.z * info.drag);
+            velocity = new Vec3(velocity.x * info.drag, velocity.y * info.drag - info.gravity, velocity.z * info.drag);
 
             if (pos.y < mc.world.getBottomY() - 30) {
                 break;
@@ -160,11 +160,11 @@ public class Trajectories extends Module {
         return finalHit;
     }
 
-    private void renderTrajectory(List<Vec3d> points, HitResult hit) {
+    private void renderTrajectory(List<Vec3> points, HitResult hit) {
         Color lineColor = color.getValue();
         for (int i = 0; i < points.size() - 1; i++) {
-            Vec3d p1 = points.get(i);
-            Vec3d p2 = points.get(i + 1);
+            Vec3 p1 = points.get(i);
+            Vec3 p2 = points.get(i + 1);
             Renderer3D.line(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, lineColor);
         }
 
@@ -188,7 +188,7 @@ public class Trajectories extends Module {
             }
 
             Color fill = new Color(targetColor.getRed(), targetColor.getGreen(), targetColor.getBlue(), 60);
-            Renderer3D.box(new Box(pos), fill, targetColor, ShapeMode.Both, false);
+            Renderer3D.box(new AABB(pos), fill, targetColor, ShapeMode.Both, false);
         } else if (hit instanceof EntityHitResult ehr) {
             Entity target = ehr.getEntity();
             Color targetColor = dangerColor.getValue();

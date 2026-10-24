@@ -2,8 +2,8 @@ package me.collective.module.hud;
 
 import me.collective.render.RenderUtil;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.ingame.InventoryScreen;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 
 import java.awt.Color;
 
@@ -17,7 +17,7 @@ public class PlayerModel extends HudModule {
     }
 
     @Override
-    public void render(DrawContext context, float delta) {
+    public void render(GuiGraphics context, float delta) {
         if (!isToggled() || mc.player == null) return;
 
         this.width = size.getIntValue() * 1.4f;

@@ -11,11 +11,11 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.ColorSetting;
 import me.collective.setting.ModeSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -96,12 +96,12 @@ public class Search extends Module {
     public void onRender3D(Render3DEvent event) {
         if (!isToggled() || found.isEmpty() || mc.player == null) return;
         Color fill = color.getValue();
-        Vec3d cam = mc.gameRenderer.getCamera().getCameraPos();
+        Vec3 cam = mc.gameRenderer.getCamera().getCameraPos();
         double rangeBlocks = this.range.getValue();
         // found меняется только в тиковых обработчиках того же потока —
         // обход напрямую, без защитной копии на каждый кадр
         for (BlockPos pos : found) {
-            Box box = new Box(pos);
+            AABB box = new AABB(pos);
             double dist = Math.sqrt(mc.player.squaredDistanceTo(
                 pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5));
             Color fillF = ColorUtil.fadeByDistance(dist, rangeBlocks, fill);

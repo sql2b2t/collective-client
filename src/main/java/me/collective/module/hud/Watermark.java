@@ -5,12 +5,12 @@ import me.collective.module.client.HUD;
 import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.StringSetting;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 
 import java.awt.Color;
 
 public class Watermark extends HudModule {
-    public final StringSetting text = add(new StringSetting("Text", "Collective"));
+    public final StringSetting text = add(new StringSetting("Component", "Collective"));
     public final BooleanSetting version = add(new BooleanSetting("Version", true));
 
     public Watermark() {
@@ -18,7 +18,7 @@ public class Watermark extends HudModule {
     }
 
     @Override
-    public void render(DrawContext context, float delta) {
+    public void render(GuiGraphics context, float delta) {
         if (!isToggled()) return;
 
         // Версия — из метаданных мода (fabric.mod.json), чтобы не врать в релизах

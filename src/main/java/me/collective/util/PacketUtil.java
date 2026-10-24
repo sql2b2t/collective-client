@@ -1,7 +1,7 @@
 package me.collective.util;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.network.packet.Packet;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.protocol.Packet;
 
 import java.util.Collections;
 import java.util.Set;
@@ -12,7 +12,7 @@ public class PacketUtil {
 
     public static void sendSilently(Packet<?> packet) {
         SILENT_PACKETS.add(packet);
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.getNetworkHandler() != null && mc.getNetworkHandler().getConnection() != null) {
             mc.getNetworkHandler().getConnection().send(packet);
         }

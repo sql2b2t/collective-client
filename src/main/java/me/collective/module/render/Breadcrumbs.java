@@ -9,7 +9,7 @@ import me.collective.render.Renderer3D;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.ColorSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.phys.Vec3;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -25,7 +25,7 @@ public class Breadcrumbs extends Module {
     public final BooleanSetting fade = add(new BooleanSetting("Fade", true));
     public final ColorSetting color = add(new ColorSetting("Color", new Color(0, 220, 255, 220)));
 
-    private record TrailPoint(Vec3d pos, long time) {}
+    private record TrailPoint(Vec3 pos, long time) {}
     private final List<TrailPoint> points = new ArrayList<>();
 
     public Breadcrumbs() {
@@ -46,7 +46,7 @@ public class Breadcrumbs extends Module {
     public void onTick(TickEvent.Pre event) {
         if (mc.player == null || mc.world == null) return;
 
-        Vec3d current = new Vec3d(mc.player.getX(), mc.player.getY() + 0.05, mc.player.getZ());
+        Vec3 current = new Vec3(mc.player.getX(), mc.player.getY() + 0.05, mc.player.getZ());
         long now = System.currentTimeMillis();
 
         if (points.isEmpty() || points.get(points.size() - 1).pos.squaredDistanceTo(current) >= 0.04) {

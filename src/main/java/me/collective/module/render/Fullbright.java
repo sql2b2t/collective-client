@@ -4,11 +4,11 @@ import me.collective.category.Category;
 import me.collective.event.EventHandler;
 import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
-import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 
 public class Fullbright extends Module {
-    private net.minecraft.client.network.ClientPlayerEntity owner;
+    private net.minecraft.client.network.LocalPlayer owner;
     private StatusEffectInstance ownedEffect;
 
     public Fullbright() {

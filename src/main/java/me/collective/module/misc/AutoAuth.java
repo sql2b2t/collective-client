@@ -6,7 +6,7 @@ import me.collective.event.events.PacketEvent;
 import me.collective.module.Module;
 import me.collective.setting.ModeSetting;
 import me.collective.setting.StringSetting;
-import net.minecraft.network.packet.s2c.play.GameMessageS2CPacket;
+import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 
 import java.io.Reader;
 import java.io.Writer;
@@ -94,7 +94,7 @@ public class AutoAuth extends Module {
     }
 
     private String resolvePassword(String serverKey) {
-        String nick = mc.getSession().getUsername().toLowerCase(Locale.ROOT);
+        String nick = mc.getUser().getUsername().toLowerCase(Locale.ROOT);
         if (nick.isBlank()) return null;
         String pass;
         if (authMode.process("Random")) {

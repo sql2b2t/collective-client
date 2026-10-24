@@ -4,8 +4,8 @@ import me.collective.font.FontManager;
 import me.collective.module.client.HUD;
 import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.network.PlayerListEntry;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.multiplayer.PlayerInfo;
 
 import java.awt.Color;
 
@@ -19,7 +19,7 @@ public class Metrics extends HudModule {
     }
 
     @Override
-    public void render(DrawContext context, float delta) {
+    public void render(GuiGraphics context, float delta) {
         if (!isToggled()) return;
 
         StringBuilder sb = new StringBuilder();

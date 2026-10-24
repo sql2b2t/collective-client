@@ -6,8 +6,8 @@ import me.collective.module.client.UI;
 import me.collective.render.RenderUtil;
 import me.collective.render.SoundUtil;
 import me.collective.setting.StringSetting;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -29,7 +29,7 @@ public class TextComponent extends Component {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         if (!setting.isVisible()) return;
 
         boolean hov = isHovered(mouseX, mouseY);
@@ -145,7 +145,7 @@ public class TextComponent extends Component {
         }
         // Paste support: Ctrl+V
         if (key == GLFW.GLFW_KEY_V && isCtrlDown()) {
-            MinecraftClient mc = MinecraftClient.getInstance();
+            Minecraft mc = Minecraft.getInstance();
             if (mc != null && mc.keyboard != null) {
                 String clip = mc.keyboard.getClipboard();
                 if (clip != null && !clip.isEmpty()) {
@@ -161,7 +161,7 @@ public class TextComponent extends Component {
         }
         // Copy support: Ctrl+C
         if (key == GLFW.GLFW_KEY_C && isCtrlDown()) {
-            MinecraftClient mc = MinecraftClient.getInstance();
+            Minecraft mc = Minecraft.getInstance();
             if (mc != null && mc.keyboard != null) {
                 mc.keyboard.setClipboard(val);
             }
@@ -171,7 +171,7 @@ public class TextComponent extends Component {
     }
 
     private boolean isCtrlDown() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc == null || mc.getWindow() == null) return false;
         long h = mc.getWindow().getHandle();
         return GLFW.glfwGetKey(h, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS

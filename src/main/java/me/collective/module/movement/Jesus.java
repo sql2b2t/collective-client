@@ -6,9 +6,9 @@ import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.fluid.FluidState;
-import net.minecraft.registry.tag.FluidTags;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.core.BlockPos;
 
 /**
  * Ходьба по поверхности жидкостей.

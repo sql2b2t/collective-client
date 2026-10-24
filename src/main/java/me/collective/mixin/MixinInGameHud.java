@@ -1,10 +1,10 @@
 package me.collective.mixin;
 
 import me.collective.module.render.NoRender;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.hud.InGameHud;
-import net.minecraft.entity.Entity;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.Gui;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.resources.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -18,24 +18,24 @@ public abstract class MixinInGameHud {
         return NoRender.INSTANCE;
     }
 
-    @Inject(method = "renderPortalOverlay(Lnet/minecraft/client/gui/DrawContext;F)V", at = @At("HEAD"), cancellable = true)
-    private void collective$noRenderPortal(DrawContext context, float nauseaStrength, CallbackInfo ci) {
+    @Inject(method = "renderPortalOverlay(Lnet/minecraft/client/gui/GuiGraphics;F)V", at = @At("HEAD"), cancellable = true)
+    private void collective$noRenderPortal(GuiGraphics context, float nauseaStrength, CallbackInfo ci) {
         NoRender mod = collective$noRender();
         if (mod != null && mod.isToggled() && mod.portal.getValue()) {
             ci.cancel();
         }
     }
 
-    @Inject(method = "renderNauseaOverlay(Lnet/minecraft/client/gui/DrawContext;F)V", at = @At("HEAD"), cancellable = true)
-    private void collective$noRenderNausea(DrawContext context, float nauseaStrength, CallbackInfo ci) {
+    @Inject(method = "renderNauseaOverlay(Lnet/minecraft/client/gui/GuiGraphics;F)V", at = @At("HEAD"), cancellable = true)
+    private void collective$noRenderNausea(GuiGraphics context, float nauseaStrength, CallbackInfo ci) {
         NoRender mod = collective$noRender();
         if (mod != null && mod.isToggled() && mod.nausea.getValue()) {
             ci.cancel();
         }
     }
 
-    @Inject(method = "renderVignetteOverlay(Lnet/minecraft/client/gui/DrawContext;Lnet/minecraft/entity/Entity;)V", at = @At("HEAD"), cancellable = true)
-    private void collective$noRenderVignette(DrawContext context, Entity entity, CallbackInfo ci) {
+    @Inject(method = "renderVignetteOverlay(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/entity/Entity;)V", at = @At("HEAD"), cancellable = true)
+    private void collective$noRenderVignette(GuiGraphics context, Entity entity, CallbackInfo ci) {
         NoRender mod = collective$noRender();
         if (mod != null && mod.isToggled() && mod.vignette.getValue()) {
             ci.cancel();
@@ -46,8 +46,8 @@ public abstract class MixinInGameHud {
      * renderOverlay используется для накладок экипировки (тыква) и порошкового
      * снега — фильтруем по пути текстуры.
      */
-    @Inject(method = "renderOverlay(Lnet/minecraft/client/gui/DrawContext;Lnet/minecraft/util/Identifier;F)V", at = @At("HEAD"), cancellable = true)
-    private void collective$noRenderOverlay(DrawContext context, Identifier texture, float opacity, CallbackInfo ci) {
+    @Inject(method = "renderOverlay(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/util/Identifier;F)V", at = @At("HEAD"), cancellable = true)
+    private void collective$noRenderOverlay(GuiGraphics context, Identifier texture, float opacity, CallbackInfo ci) {
         NoRender mod = collective$noRender();
         if (mod == null || !mod.isToggled()) return;
         String path = texture.getPath();

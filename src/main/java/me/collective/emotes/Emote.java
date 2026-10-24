@@ -1,7 +1,7 @@
 package me.collective.emotes;
 
 import java.util.List;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.Identifier;
 
 public record Emote(String id, String title, String file, java.util.List<String> animations, boolean loop) {
     public static final List<Emote> ALL = List.of(

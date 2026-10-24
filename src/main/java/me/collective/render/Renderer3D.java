@@ -1,11 +1,11 @@
 package me.collective.render;
 
 import me.collective.util.SettingColor;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.DrawStyle;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.debug.gizmo.GizmoDrawing;
+import net.minecraft.client.Minecraft;
+import net.minecraft.gizmos.GizmoStyle;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.gizmos.Gizmos;
 
 import java.awt.Color;
 
@@ -25,7 +25,7 @@ public class Renderer3D {
     }
 
     public static void beginFrameScope() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.worldRenderer == null) return;
         try {
             frameScope = mc.worldRenderer.startDrawingGizmos();
@@ -67,7 +67,7 @@ public class Renderer3D {
             return;
         }
 
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.worldRenderer == null) return;
         try (var scope = mc.worldRenderer.startDrawingGizmos()) {
             drawBoxRaw(x1, y1, z1, x2, y2, z2, fill, line, shapeMode, ignoreOcclusion);
@@ -88,7 +88,7 @@ public class Renderer3D {
         double maxX = Math.max(x1, x2);
         double maxY = Math.max(y1, y2);
         double maxZ = Math.max(z1, z2);
-        Box box = new Box(minX, minY, minZ, maxX, maxY, maxZ);
+        AABB box = new AABB(minX, minY, minZ, maxX, maxY, maxZ);
 
         int fillRgba = fill != null ? rgba(fill) : 0;
         int lineRgba = line != null ? rgba(line) : 0;
@@ -119,28 +119,28 @@ public class Renderer3D {
         box(x1, y1, z1, x2, y2, z2, fill, line, ShapeMode.Both);
     }
 
-    public static void box(Box box, Color fill, Color line) {
+    public static void box(AABB box, Color fill, Color line) {
         if (box == null) return;
         box(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ, fill, line, ShapeMode.Both);
     }
 
-    public static void box(Box box, Color fill, Color line, ShapeMode shapeMode) {
+    public static void box(AABB box, Color fill, Color line, ShapeMode shapeMode) {
         if (box == null) return;
         box(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ, fill, line, shapeMode, false);
     }
 
-    public static void box(Box box, Color fill, Color line, ShapeMode shapeMode, boolean ignoreOcclusion) {
+    public static void box(AABB box, Color fill, Color line, ShapeMode shapeMode, boolean ignoreOcclusion) {
         if (box == null) return;
         box(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ, fill, line, shapeMode, ignoreOcclusion);
     }
 
-    public static void box(Box box, Color fill, Color line, ShapeMode shapeMode, boolean ignoreOcclusion, float lineWidth) {
+    public static void box(AABB box, Color fill, Color line, ShapeMode shapeMode, boolean ignoreOcclusion, float lineWidth) {
         if (box == null) return;
         if (frameScope != null) {
             drawBoxRaw(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ, fill, line, shapeMode, ignoreOcclusion, lineWidth);
             return;
         }
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.worldRenderer == null) return;
         try (var scope = mc.worldRenderer.startDrawingGizmos()) {
             drawBoxRaw(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ, fill, line, shapeMode, ignoreOcclusion, lineWidth);
@@ -154,14 +154,14 @@ public class Renderer3D {
 
         if (frameScope != null) {
             // Общий скоуп кадра — без собственного try-with-resources на каждую линию.
-            GizmoDrawing.line(new Vec3d(x1, y1, z1), new Vec3d(x2, y2, z2), rgba(c), 1.5f);
+            GizmoDrawing.line(new Vec3(x1, y1, z1), new Vec3(x2, y2, z2), rgba(c), 1.5f);
             return;
         }
 
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.worldRenderer == null) return;
         try (var scope = mc.worldRenderer.startDrawingGizmos()) {
-            GizmoDrawing.line(new Vec3d(x1, y1, z1), new Vec3d(x2, y2, z2), rgba(c), 1.5f);
+            GizmoDrawing.line(new Vec3(x1, y1, z1), new Vec3(x2, y2, z2), rgba(c), 1.5f);
         } catch (Exception ignored) {
         }
     }

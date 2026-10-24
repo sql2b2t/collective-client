@@ -4,8 +4,8 @@ import me.collective.font.FontManager;
 import me.collective.module.client.UI;
 import me.collective.render.RenderUtil;
 import me.collective.setting.Setting;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 import java.awt.Color;
@@ -65,7 +65,7 @@ public abstract class RegistryListComponent<T> extends Component {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         if (lastName.isEmpty()) lastName = setting.getName();
         float fs = FontManager.settingsScale();
         int fh = FontManager.INSTANCE.getFontHeightScaled(fs);

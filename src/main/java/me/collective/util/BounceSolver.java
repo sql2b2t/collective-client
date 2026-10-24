@@ -1,9 +1,9 @@
 package me.collective.util;
 
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,8 +44,8 @@ public final class BounceSolver {
     }
 
     /** Свободная высота над игроком в его колонке. */
-    public static double measureHeadroom(PlayerEntity player, World world) {
-        Box box = new Box(player.getX() - 0.3, player.getY(), player.getZ() - 0.3,
+    public static double measureHeadroom(Player player, Level world) {
+        AABB box = new AABB(player.getX() - 0.3, player.getY(), player.getZ() - 0.3,
             player.getX() + 0.3, player.getY() + 0.6, player.getZ() + 0.3);
 
         double free = 0.0;

@@ -8,7 +8,7 @@ import me.collective.module.client.UI;
 import me.collective.render.RenderUtil;
 import me.collective.render.SoundUtil;
 import me.collective.setting.*;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 import org.lwjgl.glfw.GLFW;
 
 import java.awt.Color;
@@ -87,7 +87,7 @@ public class ModuleButton extends Component {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         float speed = UI.INSTANCE.animSpeed.getFloatValue() * 0.1f;
         if (module.isToggled()) {
             toggleProgress = Math.min(1.0f, toggleProgress + speed);

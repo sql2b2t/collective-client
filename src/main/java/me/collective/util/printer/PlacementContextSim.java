@@ -3,13 +3,13 @@ package me.collective.util.printer;
 import me.collective.util.RotationUtils;
 import java.util.Arrays;
 import java.util.Comparator;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Симуляция контекста установки блока (порт из BepHax NEW-SRC).
@@ -24,16 +24,16 @@ import net.minecraft.util.math.Vec3d;
  */
 public class PlacementContextSim extends ItemPlacementContext {
     private final float simYaw;
-    private final Vec3d look;
+    private final Vec3 look;
 
-    public PlacementContextSim(PlayerEntity player, Hand hand, ItemStack stack, BlockHitResult hit, float yaw, float pitch) {
+    public PlacementContextSim(Player player, InteractionHand hand, ItemStack stack, BlockHitResult hit, float yaw, float pitch) {
         super(player, hand, stack, hit);
         this.simYaw = yaw;
         this.look = RotationUtils.getRotationVector(pitch, yaw);
     }
 
-    private static Vec3d normal(Direction d) {
-        return new Vec3d(d.getOffsetX(), d.getOffsetY(), d.getOffsetZ());
+    private static Vec3 normal(Direction d) {
+        return new Vec3(d.getOffsetX(), d.getOffsetY(), d.getOffsetZ());
     }
 
     private boolean ready() {

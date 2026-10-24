@@ -2,32 +2,32 @@ package me.collective.util;
 
 import me.collective.util.SwapManager;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import me.collective.event.events.PacketEvent;
 import me.collective.module.Module;
 import me.collective.util.InvUtils;
-import net.minecraft.client.network.PendingUpdateManager;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.EnchantmentEffectComponentTypes;
-import net.minecraft.component.type.EquippableComponent;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.projectile.FireworkRocketEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.c2s.common.CommonPongC2SPacket;
-import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInteractItemC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
-import net.minecraft.network.packet.s2c.common.CommonPingS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntityTrackerUpdateS2CPacket;
-import net.minecraft.network.packet.s2c.play.InventoryS2CPacket;
-import net.minecraft.network.packet.s2c.play.PlayerActionResponseS2CPacket;
-import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
-import net.minecraft.network.packet.s2c.play.PositionFlag;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.multiplayer.prediction.BlockStatePredictionHandler;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.enchantment.EnchantmentEffectComponents;
+import net.minecraft.world.item.equipment.Equippable;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.projectile.FireworkRocketEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.common.ServerboundPongPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemPacket;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import net.minecraft.network.protocol.common.ClientboundPingPacket;
+import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket;
+import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket;
+import net.minecraft.network.protocol.game.ClientboundBlockChangedAckPacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.world.entity.Relative;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.Vec3;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayDeque;
@@ -184,8 +184,8 @@ public class ChestSwapGlide {
     public boolean isServerGliding() {
         return !this.engaged
             || this.burstNow
-            || MinecraftClient.getInstance().player != null
-                && isGlider(MinecraftClient.getInstance().player.getEquippedStack(EquipmentSlot.CHEST));
+            || Minecraft.getInstance().player != null
+                && isGlider(Minecraft.getInstance().player.getEquippedStack(EquipmentSlot.CHEST));
     }
 
     public int bursts() {
@@ -193,49 +193,49 @@ public class ChestSwapGlide {
     }
 
     public static boolean gliderWorn() {
-        return MinecraftClient.getInstance().player != null
-            && isGlider(MinecraftClient.getInstance().player.getEquippedStack(EquipmentSlot.CHEST));
+        return Minecraft.getInstance().player != null
+            && isGlider(Minecraft.getInstance().player.getEquippedStack(EquipmentSlot.CHEST));
     }
 
     /** Элитра где угодно на теле: надета, в руке или в хотбаре. */
     public static ItemStack gliderStack() {
-        if (MinecraftClient.getInstance().player == null) return ItemStack.EMPTY;
+        if (Minecraft.getInstance().player == null) return ItemStack.EMPTY;
 
-        ItemStack chest = MinecraftClient.getInstance().player.getEquippedStack(EquipmentSlot.CHEST);
+        ItemStack chest = Minecraft.getInstance().player.getEquippedStack(EquipmentSlot.CHEST);
         if (isGlider(chest)) return chest;
 
-        if (isGlider(MinecraftClient.getInstance().player.getOffHandStack())) return MinecraftClient.getInstance().player.getOffHandStack();
-        if (isGlider(MinecraftClient.getInstance().player.getMainHandStack())) return MinecraftClient.getInstance().player.getMainHandStack();
+        if (isGlider(Minecraft.getInstance().player.getOffHandStack())) return Minecraft.getInstance().player.getOffHandStack();
+        if (isGlider(Minecraft.getInstance().player.getMainHandStack())) return Minecraft.getInstance().player.getMainHandStack();
 
         return ItemStack.EMPTY;
     }
 
     public static boolean gliderAtHand() {
-        return MinecraftClient.getInstance().player != null
+        return Minecraft.getInstance().player != null
             && (gliderWorn() || gliderHand() != null || gliderHotbarSlot() >= 0);
     }
 
     /** Надевает элитру один раз, чтобы начать полёт. */
     public static boolean putGliderOn() {
-        if (instance != null || MinecraftClient.getInstance().player == null || gliderWorn()) return false;
+        if (instance != null || Minecraft.getInstance().player == null || gliderWorn()) return false;
 
-        Hand hand = gliderHand();
+        InteractionHand hand = gliderHand();
         if (hand != null) return handUsable(hand) && useSwap(hand) >= 0;
 
         int slot = gliderHotbarSlot();
-        if (slot < 0 || !handUsable(Hand.MAIN_HAND)) return false;
+        if (slot < 0 || !handUsable(InteractionHand.MAIN_HAND)) return false;
 
         InvUtils.swap(slot, true);
         try {
-            return useSwap(Hand.MAIN_HAND) >= 0;
+            return useSwap(InteractionHand.MAIN_HAND) >= 0;
         } finally {
             InvUtils.swapBack();
         }
     }
 
-    private static Hand gliderHand() {
-        for (Hand hand : new Hand[]{Hand.OFF_HAND, Hand.MAIN_HAND}) {
-            ItemStack held = MinecraftClient.getInstance().player.getStackInHand(hand);
+    private static InteractionHand gliderHand() {
+        for (InteractionHand hand : new InteractionHand[]{InteractionHand.OFF_HAND, InteractionHand.MAIN_HAND}) {
+            ItemStack held = Minecraft.getInstance().player.getStackInHand(hand);
             if (!isGlider(held) || !isChestEquippable(held)) continue;
 
             return hand;
@@ -246,7 +246,7 @@ public class ChestSwapGlide {
 
     private static int gliderHotbarSlot() {
         for (int slot = 0; slot < 9; slot++) {
-            ItemStack stack = MinecraftClient.getInstance().player.getInventory().getStack(slot);
+            ItemStack stack = Minecraft.getInstance().player.getInventory().getStack(slot);
             if (!isGlider(stack) || !isChestEquippable(stack)) continue;
 
             return slot;
@@ -307,7 +307,7 @@ public class ChestSwapGlide {
 
         settleSwapVerdicts();
 
-        if (MinecraftClient.getInstance().player == null) {
+        if (Minecraft.getInstance().player == null) {
             if (this.engaged) disengage();
             this.attachedFireworks.clear();
             return;
@@ -349,8 +349,8 @@ public class ChestSwapGlide {
         // тик без пакетов движения: сервер не видел угла, шевелим пакет
         if (wireIdle) RotationUtils.getInstance().keepWireFresh();
 
-        ItemStack chest = MinecraftClient.getInstance().player.getEquippedStack(EquipmentSlot.CHEST);
-        Hand hand = pairHand(chest);
+        ItemStack chest = Minecraft.getInstance().player.getEquippedStack(EquipmentSlot.CHEST);
+        InteractionHand hand = pairHand(chest);
 
         if (this.finishing) {
             finish(chest, hand);
@@ -384,22 +384,22 @@ public class ChestSwapGlide {
 
     /** Сброс состояния — при выключении модуля или смене мира. */
     public void reset() {
-        if (this.engaged && MinecraftClient.getInstance().player != null) {
+        if (this.engaged && Minecraft.getInstance().player != null) {
             boolean handed;
 
-            ItemStack chest = MinecraftClient.getInstance().player.getEquippedStack(EquipmentSlot.CHEST);
-            Hand hand = pairHand(chest);
+            ItemStack chest = Minecraft.getInstance().player.getEquippedStack(EquipmentSlot.CHEST);
+            InteractionHand hand = pairHand(chest);
 
             // если ещё летит — успеваем вернуть элитру
-            handed = !MinecraftClient.getInstance().player.isOnGround()
-                && MinecraftClient.getInstance().player.isGliding()
+            handed = !Minecraft.getInstance().player.isOnGround()
+                && Minecraft.getInstance().player.isGliding()
                 && this.clearHeld
                 && burst(chest, hand, false);
 
             if (!handed) {
                 if (this.holdActive || this.clearHeld) release("the chest swap stopped");
 
-                chest = MinecraftClient.getInstance().player.getEquippedStack(EquipmentSlot.CHEST);
+                chest = Minecraft.getInstance().player.getEquippedStack(EquipmentSlot.CHEST);
 
                 if (!isGlider(chest) && hand != null && handUsable(hand)) sendSwap(hand, false);
             }
@@ -458,8 +458,8 @@ public class ChestSwapGlide {
 
     /** Догоняет пакет движения с текущим углом после старта планирования. */
     public static void afterSendPosition() {
-        if (!startAwaitsMove || MinecraftClient.getInstance().player == null
-            || MinecraftClient.getInstance().getNetworkHandler() == null) {
+        if (!startAwaitsMove || Minecraft.getInstance().player == null
+            || Minecraft.getInstance().getNetworkHandler() == null) {
             return;
         }
 
@@ -467,21 +467,21 @@ public class ChestSwapGlide {
 
         RotationUtils rot = RotationUtils.getInstance();
 
-        MinecraftClient.getInstance().getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.LookAndOnGround(
+        Minecraft.getInstance().getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.LookAndOnGround(
             rot.getSentYaw(), rot.getSentPitch(),
-            MinecraftClient.getInstance().player.isOnGround(), MinecraftClient.getInstance().player.horizontalCollision));
+            Minecraft.getInstance().player.isOnGround(), Minecraft.getInstance().player.horizontalCollision));
     }
 
     /** Исчез ли один из наших фейерверков. */
     private boolean trackFireworks() {
-        if (MinecraftClient.getInstance().world == null) {
+        if (Minecraft.getInstance().world == null) {
             this.attachedFireworks.clear();
             return false;
         }
 
-        List<FireworkRocketEntity> attached = MinecraftClient.getInstance().world.getEntitiesByClass(
-            FireworkRocketEntity.class, MinecraftClient.getInstance().player.getBoundingBox().expand(2.0),
-            rocket -> rocket.shooter == MinecraftClient.getInstance().player);
+        List<FireworkRocketEntity> attached = Minecraft.getInstance().world.getEntitiesByClass(
+            FireworkRocketEntity.class, Minecraft.getInstance().player.getBoundingBox().expand(2.0),
+            rocket -> rocket.shooter == Minecraft.getInstance().player);
 
         IntOpenHashSet ids = new IntOpenHashSet(attached.size());
         for (FireworkRocketEntity rocket : attached) ids.add(rocket.getId());
@@ -517,9 +517,9 @@ public class ChestSwapGlide {
     }
 
     private String swapState() {
-        if (MinecraftClient.getInstance().player == null) return "no player";
+        if (Minecraft.getInstance().player == null) return "no player";
 
-        String worn = isGlider(MinecraftClient.getInstance().player.getEquippedStack(EquipmentSlot.CHEST))
+        String worn = isGlider(Minecraft.getInstance().player.getEquippedStack(EquipmentSlot.CHEST))
             ? "elytra worn"
             : "chest armour worn";
 
@@ -549,17 +549,17 @@ public class ChestSwapGlide {
         boolean grim = packet.teleportId() < 0;
         if (grim) this.grimSetbacks++;
 
-        if (!false || MinecraftClient.getInstance().player == null) return;
+        if (!false || Minecraft.getInstance().player == null) return;
 
         Set<PositionFlag> relatives = packet.relatives();
-        Vec3d target = packet.change().position();
+        Vec3 target = packet.change().position();
 
-        double tx = relatives.contains(PositionFlag.X) ? MinecraftClient.getInstance().player.getX() + target.x : target.x;
-        double ty = relatives.contains(PositionFlag.Y) ? MinecraftClient.getInstance().player.getY() + target.y : target.y;
-        double tz = relatives.contains(PositionFlag.Z) ? MinecraftClient.getInstance().player.getZ() + target.z : target.z;
+        double tx = relatives.contains(PositionFlag.X) ? Minecraft.getInstance().player.getX() + target.x : target.x;
+        double ty = relatives.contains(PositionFlag.Y) ? Minecraft.getInstance().player.getY() + target.y : target.y;
+        double tz = relatives.contains(PositionFlag.Z) ? Minecraft.getInstance().player.getZ() + target.z : target.z;
 
-        Vec3d back = MinecraftClient.getInstance().player.getEntityPos().subtract(tx, ty, tz);
-        Vec3d delta = packet.change().deltaMovement();
+        Vec3 back = Minecraft.getInstance().player.getEntityPos().subtract(tx, ty, tz);
+        Vec3 delta = packet.change().deltaMovement();
 
         String velocity;
         if (relatives.contains(PositionFlag.DELTA_X) || relatives.contains(PositionFlag.DELTA_Y)
@@ -602,7 +602,7 @@ public class ChestSwapGlide {
     }
 
     /** Обслуживание удержания: ждём окно, в котором можно взорвать. */
-    private void serviceHold(ItemStack chest, Hand hand) {
+    private void serviceHold(ItemStack chest, InteractionHand hand) {
         this.holdTicks++;
         if (this.holdTicks > this.maxHold) this.maxHold = this.holdTicks;
 
@@ -628,8 +628,8 @@ public class ChestSwapGlide {
     }
 
     /** Возврат обычного полёта с тратом прочности. */
-    private void finish(ItemStack chest, Hand hand) {
-        if (MinecraftClient.getInstance().player.isOnGround() || !MinecraftClient.getInstance().player.isGliding()) {
+    private void finish(ItemStack chest, InteractionHand hand) {
+        if (Minecraft.getInstance().player.isOnGround() || !Minecraft.getInstance().player.isGliding()) {
             if (this.holdActive || this.clearHeld) release("the glide ended");
 
             if (!isGlider(chest) && hand != null && handUsable(hand)) sendSwap(hand, false);
@@ -691,9 +691,9 @@ public class ChestSwapGlide {
      *
      * @param swapOut сразу вернуть нагрудник, чтобы сервер не увидел элитру
      */
-    private boolean burst(ItemStack chest, Hand hand, boolean swapOut) {
-        if (MinecraftClient.getInstance().getNetworkHandler() == null) return false;
-        if (MinecraftClient.getInstance().player.isOnGround()) return false;
+    private boolean burst(ItemStack chest, InteractionHand hand, boolean swapOut) {
+        if (Minecraft.getInstance().getNetworkHandler() == null) return false;
+        if (Minecraft.getInstance().player.isOnGround()) return false;
 
         // раньше двух тиков после прошлого взрыва нельзя
         if (this.preTick - this.burstTick < 2) return false;
@@ -723,8 +723,8 @@ public class ChestSwapGlide {
             this.owner.warning("Chest swap: the elytra could not be swapped in ahead of a glide start.");
         }
 
-        MinecraftClient.getInstance().getNetworkHandler().sendPacket(new ClientCommandC2SPacket(
-            MinecraftClient.getInstance().player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
+        Minecraft.getInstance().getNetworkHandler().sendPacket(new ClientCommandC2SPacket(
+            Minecraft.getInstance().player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
 
         startAwaitsMove = true;
         this.jumpThisTick = true;
@@ -741,7 +741,7 @@ public class ChestSwapGlide {
         this.outTick = -1;
 
         if (swapOut) {
-            Hand outHand = pairHand(MinecraftClient.getInstance().player.getEquippedStack(EquipmentSlot.CHEST));
+            InteractionHand outHand = pairHand(Minecraft.getInstance().player.getEquippedStack(EquipmentSlot.CHEST));
 
             if (outHand != null && sendSwap(outHand, true)) this.outTick = this.preTick;
         }
@@ -766,8 +766,8 @@ public class ChestSwapGlide {
         if (this.clearHeld) {
             this.clearHeld = false;
 
-            if (MinecraftClient.getInstance().player != null && MinecraftClient.getInstance().player.isGliding()) {
-                MinecraftClient.getInstance().player.stopGliding();
+            if (Minecraft.getInstance().player != null && Minecraft.getInstance().player.isGliding()) {
+                Minecraft.getInstance().player.stopGliding();
             }
         }
 
@@ -815,7 +815,7 @@ public class ChestSwapGlide {
      * дальше сервер проверяет землю.
      */
     private boolean groundClear() {
-        double vy = MinecraftClient.getInstance().player.getVelocity().y;
+        double vy = Minecraft.getInstance().player.getVelocity().y;
 
         double travel = vy < 0.0
             ? -vy * (this.clearRttTicks + 4)
@@ -863,9 +863,9 @@ public class ChestSwapGlide {
     }
 
     private static boolean airBelow(double depth) {
-        return MinecraftClient.getInstance().world != null && MinecraftClient.getInstance().world.isBlockSpaceEmpty(
-            MinecraftClient.getInstance().player,
-            MinecraftClient.getInstance().player.getBoundingBox().stretch(0.0, -depth, 0.0));
+        return Minecraft.getInstance().world != null && Minecraft.getInstance().world.isBlockSpaceEmpty(
+            Minecraft.getInstance().player,
+            Minecraft.getInstance().player.getBoundingBox().stretch(0.0, -depth, 0.0));
     }
 
     /** Сообщение показывается один раз, а не каждый тик. */
@@ -903,7 +903,7 @@ public class ChestSwapGlide {
     public static void flushHeldPongs() {
         if (heldPongs.isEmpty()) return;
 
-        if (MinecraftClient.getInstance().getNetworkHandler() == null) {
+        if (Minecraft.getInstance().getNetworkHandler() == null) {
             heldPongs.clear();
             return;
         }
@@ -911,7 +911,7 @@ public class ChestSwapGlide {
         while (!heldPongs.isEmpty()) {
             int id = heldPongs.pollFirst();
 
-            MinecraftClient.getInstance().getNetworkHandler().sendPacket(new CommonPongC2SPacket(id));
+            Minecraft.getInstance().getNetworkHandler().sendPacket(new CommonPongC2SPacket(id));
             lastPongSent = id;
         }
     }
@@ -1005,7 +1005,7 @@ public class ChestSwapGlide {
         readingRawJump = true;
 
         try {
-            return MinecraftClient.getInstance().options.jumpKey.isPressed();
+            return Minecraft.getInstance().options.jumpKey.isPressed();
         } finally {
             readingRawJump = false;
         }
@@ -1030,9 +1030,9 @@ public class ChestSwapGlide {
         packet = event.packet;
 
         if (packet instanceof EntityTrackerUpdateS2CPacket data) {
-            if (!this.holdsClears || MinecraftClient.getInstance().player == null) return;
-            if (data.id() != MinecraftClient.getInstance().player.getId()) return;
-            if (!MinecraftClient.getInstance().player.isGliding()) return;
+            if (!this.holdsClears || Minecraft.getInstance().player == null) return;
+            if (data.id() != Minecraft.getInstance().player.getId()) return;
+            if (!Minecraft.getInstance().player.isGliding()) return;
 
             int flagsId = net.minecraft.entity.Entity.FLAGS.id();
 
@@ -1082,7 +1082,7 @@ public class ChestSwapGlide {
     }
 
     /** Смена брони и удерживаемого предмета местами одним использованием. */
-    private boolean sendSwap(Hand hand, boolean out) {
+    private boolean sendSwap(InteractionHand hand, boolean out) {
         int sequence = useSwap(hand);
         if (sequence < 0) return false;
 
@@ -1111,14 +1111,14 @@ public class ChestSwapGlide {
             this.unappliedSwaps.clear();
         }
 
-        if (MinecraftClient.getInstance().player == null) return;
+        if (Minecraft.getInstance().player == null) return;
 
         for (PendingSwap swap : undo) {
-            ItemStack chest = MinecraftClient.getInstance().player.getEquippedStack(EquipmentSlot.CHEST);
-            ItemStack held = MinecraftClient.getInstance().player.getStackInHand(swap.hand());
+            ItemStack chest = Minecraft.getInstance().player.getEquippedStack(EquipmentSlot.CHEST);
+            ItemStack held = Minecraft.getInstance().player.getStackInHand(swap.hand());
 
-            MinecraftClient.getInstance().player.equipStack(EquipmentSlot.CHEST, held);
-            MinecraftClient.getInstance().player.setStackInHand(swap.hand(), chest);
+            Minecraft.getInstance().player.equipStack(EquipmentSlot.CHEST, held);
+            Minecraft.getInstance().player.setStackInHand(swap.hand(), chest);
 
             if (swap.sentTick() != this.outTick) continue;
 
@@ -1133,12 +1133,12 @@ public class ChestSwapGlide {
     }
 
     /** Рука, в которой лежит «вторая часть» пары: элитра или нагрудник. */
-    private static Hand pairHand(ItemStack chest) {
+    private static InteractionHand pairHand(ItemStack chest) {
         boolean gliderOn = isGlider(chest);
         if (!gliderOn && !isChestArmor(chest)) return null;
 
-        for (Hand hand : new Hand[]{Hand.OFF_HAND, Hand.MAIN_HAND}) {
-            ItemStack held = MinecraftClient.getInstance().player.getStackInHand(hand);
+        for (InteractionHand hand : new InteractionHand[]{InteractionHand.OFF_HAND, InteractionHand.MAIN_HAND}) {
+            ItemStack held = Minecraft.getInstance().player.getStackInHand(hand);
 
             if (gliderOn) {
                 if (isChestArmor(held)) return hand;
@@ -1151,11 +1151,11 @@ public class ChestSwapGlide {
     }
 
     /** Главная рука свободна только если сервер видит тот же слот. */
-    private static boolean handUsable(Hand hand) {
-        if (hand == Hand.OFF_HAND) return true;
+    private static boolean handUsable(InteractionHand hand) {
+        if (hand == InteractionHand.OFF_HAND) return true;
 
         int server = SwapManager.getInstance().getServerSlot();
-        return server < 0 || server == MinecraftClient.getInstance().player.getInventory().selectedSlot;
+        return server < 0 || server == Minecraft.getInstance().player.getInventory().selectedSlot;
     }
 
     private static boolean isGlider(ItemStack stack) {
@@ -1173,9 +1173,9 @@ public class ChestSwapGlide {
     }
 
     /** Можно ли сейчас поменять слот: рука свободна, броня не защищена, вещи разные. */
-    private static boolean canSwap(Hand hand) {
-        ItemStack held = MinecraftClient.getInstance().player.getStackInHand(hand);
-        ItemStack chest = MinecraftClient.getInstance().player.getEquippedStack(EquipmentSlot.CHEST);
+    private static boolean canSwap(InteractionHand hand) {
+        ItemStack held = Minecraft.getInstance().player.getStackInHand(hand);
+        ItemStack chest = Minecraft.getInstance().player.getEquippedStack(EquipmentSlot.CHEST);
 
         return isChestEquippable(held)
             && held.getCount() <= 1
@@ -1192,39 +1192,39 @@ public class ChestSwapGlide {
      *
      * @return sequence отправки или -1, если смена невозможна
      */
-    private static int useSwap(Hand hand) {
-        if (MinecraftClient.getInstance().world == null) return -1;
-        if (MinecraftClient.getInstance().getNetworkHandler() == null) return -1;
+    private static int useSwap(InteractionHand hand) {
+        if (Minecraft.getInstance().world == null) return -1;
+        if (Minecraft.getInstance().getNetworkHandler() == null) return -1;
         if (!canSwap(hand)) return -1;
 
-        ItemStack stack = MinecraftClient.getInstance().player.getStackInHand(hand);
+        ItemStack stack = Minecraft.getInstance().player.getStackInHand(hand);
         RotationUtils rot = RotationUtils.getInstance();
 
         int sequence;
 
         try (PendingUpdateManager prediction =
-                 MinecraftClient.getInstance().world.getPendingUpdateManager().incrementSequence()) {
+                 Minecraft.getInstance().world.getPendingUpdateManager().incrementSequence()) {
             sequence = prediction.getSequence();
 
-            MinecraftClient.getInstance().getNetworkHandler().sendPacket(new PlayerInteractItemC2SPacket(
+            Minecraft.getInstance().getNetworkHandler().sendPacket(new PlayerInteractItemC2SPacket(
                 hand, sequence, rot.getSentYaw(), rot.getSentPitch()));
         }
 
-        ActionResult result = stack.use(MinecraftClient.getInstance().world, MinecraftClient.getInstance().player, hand);
+        InteractionResult result = stack.use(Minecraft.getInstance().world, Minecraft.getInstance().player, hand);
 
         ItemStack held;
-        if (result instanceof ActionResult.Success success && success.getNewHandStack() != null) {
+        if (result instanceof InteractionResult.Success success && success.getNewHandStack() != null) {
             held = success.getNewHandStack();
         } else {
-            held = MinecraftClient.getInstance().player.getStackInHand(hand);
+            held = Minecraft.getInstance().player.getStackInHand(hand);
         }
 
-        if (held != stack) MinecraftClient.getInstance().player.setStackInHand(hand, held);
+        if (held != stack) Minecraft.getInstance().player.setStackInHand(hand, held);
 
         return result.isAccepted() ? sequence : -1;
     }
 
     /** Отложенная смена брони, ждущая подтверждения сервера. */
-    private record PendingSwap(int sentTick, Hand hand, int sequence) {
+    private record PendingSwap(int sentTick, InteractionHand hand, int sequence) {
     }
 }

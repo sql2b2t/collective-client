@@ -5,12 +5,12 @@ import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.ModeSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.registry.tag.ItemTags;
-import net.minecraft.screen.PlayerScreenHandler;
-import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.inventory.ClickType;
 
 /**
  * Порт AutoCraft из Meteor Client (рецепты 2x2 для инвентаря).

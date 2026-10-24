@@ -5,7 +5,7 @@ import me.collective.gui.ClickGuiTheme;
 import me.collective.module.client.UI;
 import me.collective.render.SoundUtil;
 import me.collective.setting.BooleanSetting;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 
 /**
  * Modern BooleanComponent matching ClickGUI 2 iOS-style toggle design.
@@ -26,7 +26,7 @@ public class BooleanComponent extends Component {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         if (!setting.isVisible()) return;
 
         float speed = UI.INSTANCE.animSpeed.getFloatValue() * 0.15f;

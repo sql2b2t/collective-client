@@ -10,12 +10,12 @@ import me.collective.module.client.UI;
 import me.collective.module.render.Blur;
 import me.collective.render.BlurEngine;
 import me.collective.render.RenderUtil;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.input.CharInput;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.text.Text;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
 import java.awt.Color;
@@ -47,7 +47,7 @@ public class ClickGuiScreen extends Screen {
     private final Random random = new Random();
 
     public ClickGuiScreen() {
-        super(Text.literal("Collective"));
+        super(Component.literal("Collective"));
 
         float startX = 10;
         float startY = 10;
@@ -74,7 +74,7 @@ public class ClickGuiScreen extends Screen {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         // Detect hovered module first
         hoveredModule = null;
         String query = searchActive ? searchQuery : "";
@@ -376,7 +376,7 @@ public class ClickGuiScreen extends Screen {
         return new float[]{ cardX, cardY, cardW, cardH };
     }
 
-    private void renderModuleTooltip(DrawContext context, Module module, float mouseX, float mouseY) {
+    private void renderModuleTooltip(GuiGraphics context, Module module, float mouseX, float mouseY) {
         float[] b = getTooltipBounds(module, mouseX, mouseY);
         if (b[2] <= 0 || b[3] <= 0) return;
 

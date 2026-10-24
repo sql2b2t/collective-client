@@ -4,8 +4,8 @@ import me.collective.category.Category;
 import me.collective.event.EventHandler;
 import me.collective.event.events.PlayerMoveEvent;
 import me.collective.module.Module;
-import net.minecraft.entity.MovementType;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.phys.Vec3;
 
 /** Clips horizontal walking at unsupported edges without forging sneak packets. */
 public class SafeWalk extends Module {
@@ -18,13 +18,13 @@ public class SafeWalk extends Module {
         if (mc.player == null || mc.world == null || !mc.player.isOnGround()
             || mc.player.getAbilities().flying || mc.player.isGliding()
             || event.type != MovementType.SELF) return;
-        Vec3d movement = event.movement;
+        Vec3 movement = event.movement;
         double x = movement.x;
         double z = movement.z;
         if (!Double.isFinite(x) || !Double.isFinite(z)) return;
         // Bound work even if another module supplies an unusually large displacement.
         if (Math.abs(x) > 10 || Math.abs(z) > 10) {
-            event.movement = new Vec3d(0, movement.y, 0);
+            event.movement = new Vec3(0, movement.y, 0);
             return;
         }
         while (x != 0 && unsupported(x, 0)) x = towardZero(x);
@@ -33,7 +33,7 @@ public class SafeWalk extends Module {
             x = towardZero(x);
             z = towardZero(z);
         }
-        event.movement = new Vec3d(x, movement.y, z);
+        event.movement = new Vec3(x, movement.y, z);
     }
 
     private boolean unsupported(double x, double z) {

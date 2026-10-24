@@ -15,21 +15,21 @@ import me.collective.util.BaritoneHelper;
 import me.collective.util.BounceSolver;
 import me.collective.util.RotationUtils;
 import me.collective.util.Utils;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
-import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.resources.Identifier;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.chunk.LevelChunk;
 
 import java.util.List;
 
@@ -68,7 +68,7 @@ public class ElytraBounce extends Module {
     private BlockPos portalTrap = null;
     private boolean paused = false;
     private boolean elytraToggled = false;
-    private Vec3d lastUnstuckPos;
+    private Vec3 lastUnstuckPos;
     private int stuckTimer = 0;
     private int targetY = 120;
     private BlockPos startPos = new BlockPos(0, 0, 0);
@@ -286,11 +286,11 @@ public class ElytraBounce extends Module {
                             return;
                         }
 
-                        Vec3d unitYawVec = Utils.yawToDirection(this.yaw.getValue());
-                        Vec3d travelVec = playerPos().subtract(this.startPos.toCenterPos());
-                        double parallelCurrPosDot = travelVec.multiply(new Vec3d(1.0, 0.0, 1.0)).dotProduct(unitYawVec);
-                        Vec3d parallelCurrPosComponent = unitYawVec.multiply(parallelCurrPosDot);
-                        Vec3d pos = this.startPos.toCenterPos().add(parallelCurrPosComponent);
+                        Vec3 unitYawVec = Utils.yawToDirection(this.yaw.getValue());
+                        Vec3 travelVec = playerPos().subtract(this.startPos.toCenterPos());
+                        double parallelCurrPosDot = travelVec.multiply(new Vec3(1.0, 0.0, 1.0)).dotProduct(unitYawVec);
+                        Vec3 parallelCurrPosComponent = unitYawVec.multiply(parallelCurrPosDot);
+                        Vec3 pos = this.startPos.toCenterPos().add(parallelCurrPosComponent);
                         pos = Utils.positionInDirection(pos, this.yaw.getValue(), currDistance);
                         goal = new BlockPos((int) Math.floor(pos.getX()), this.targetY, (int) Math.floor(pos.getZ()));
                         currDistance++;
@@ -404,8 +404,8 @@ public class ElytraBounce extends Module {
         this.pendingPortalScan = null;
         if (pos == null || mc.world == null || mc.player == null) return;
 
-        Vec3d moveDir = Utils.yawToDirection(this.yaw.getValue());
-        if (Utils.distancePointToDirection(Vec3d.of(pos.getCenterAtY(this.targetY)), moveDir, playerPos()) > 21.0) {
+        Vec3 moveDir = Utils.yawToDirection(this.yaw.getValue());
+        if (Utils.distancePointToDirection(Vec3.of(pos.getCenterAtY(this.targetY)), moveDir, playerPos()) > 21.0) {
             return;
         }
 
@@ -415,7 +415,7 @@ public class ElytraBounce extends Module {
             for (int z = 0; z < 16; z++) {
                 for (int y = this.targetY; y < this.targetY + 3; y++) {
                     BlockPos position = new BlockPos(pos.getStartX() + x, y, pos.getStartZ() + z);
-                    if ((Utils.distancePointToDirection(Vec3d.of(position), moveDir, playerPos())
+                    if ((Utils.distancePointToDirection(Vec3.of(position), moveDir, playerPos())
                             <= this.portalScanWidth.getValue().intValue())
                         && mc.world.getBlockState(position).getBlock().equals(Blocks.NETHER_PORTAL)) {
                         BlockPos posBehind = new BlockPos(
@@ -567,8 +567,8 @@ public class ElytraBounce extends Module {
         return false;
     }
 
-    private Vec3d playerPos() {
-        return new Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ());
+    private Vec3 playerPos() {
+        return new Vec3(mc.player.getX(), mc.player.getY(), mc.player.getZ());
     }
 
     private boolean hasEnoughFood() {

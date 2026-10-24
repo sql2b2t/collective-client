@@ -6,7 +6,7 @@ import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.entity.attribute.EntityAttributes;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 
 public class Step extends Module {
     public final BooleanSetting grimBypass = add(new BooleanSetting("GrimBypass", true));

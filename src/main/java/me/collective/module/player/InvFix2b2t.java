@@ -8,11 +8,11 @@ import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.setting.ActionSetting;
 import me.collective.setting.BooleanSetting;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
-import net.minecraft.network.packet.s2c.play.ScreenHandlerSlotUpdateS2CPacket;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 
 /**
  * InvFix2b2t: устраняет рассинхронизацию инвентаря («ghost items»),

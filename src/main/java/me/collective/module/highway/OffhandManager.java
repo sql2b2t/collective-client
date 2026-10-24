@@ -11,14 +11,14 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 
 /**
  * Порт OffhandManager: держит тотем/геп в левой руке, авто-ест гепы.
@@ -167,7 +167,7 @@ public class OffhandManager extends Module {
         if (mc.player.isUsingItem()) return;
 
         mc.options.useKey.setPressed(true);
-        mc.interactionManager.interactItem(mc.player, Hand.OFF_HAND);
+        mc.interactionManager.interactItem(mc.player, InteractionHand.OFF_HAND);
     }
 
     private void stopEating() {

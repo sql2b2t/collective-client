@@ -13,7 +13,7 @@ public class Chat extends HudModule {
     }
 
     @Override
-    public void render(net.minecraft.client.gui.DrawContext context, float delta) {
+    public void render(net.minecraft.client.gui.GuiGraphics context, float delta) {
         // Chat module settings applied to ChatHud
     }
 }

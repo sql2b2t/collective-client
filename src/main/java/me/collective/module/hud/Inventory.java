@@ -1,8 +1,8 @@
 package me.collective.module.hud;
 
 import me.collective.render.RenderUtil;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.item.ItemStack;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.world.item.ItemStack;
 
 import java.awt.Color;
 
@@ -14,7 +14,7 @@ public class Inventory extends HudModule {
     }
 
     @Override
-    public void render(DrawContext context, float delta) {
+    public void render(GuiGraphics context, float delta) {
         if (!isToggled() || mc.player == null) return;
 
         RenderUtil.drawRect(context, x, y, x + width, y + height, new Color(20, 20, 20, 180));

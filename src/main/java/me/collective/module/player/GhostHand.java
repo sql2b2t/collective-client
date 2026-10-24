@@ -6,19 +6,19 @@ import me.collective.event.events.MouseClickEvent;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.block.BarrelBlock;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.ChestBlock;
-import net.minecraft.block.EnderChestBlock;
-import net.minecraft.block.FurnaceBlock;
-import net.minecraft.block.HopperBlock;
-import net.minecraft.block.ShulkerBoxBlock;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.BarrelBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.EnderChestBlock;
+import net.minecraft.world.level.block.FurnaceBlock;
+import net.minecraft.world.level.block.HopperBlock;
+import net.minecraft.world.level.block.ShulkerBoxBlock;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Порт GhostHand из Meteor Client.
@@ -39,8 +39,8 @@ public class GhostHand extends Module {
         if (event.button != 1 || mc.player == null || mc.world == null || mc.interactionManager == null) return;
         if (mc.currentScreen != null) return;
 
-        Vec3d eye = mc.player.getEyePos();
-        Vec3d look = mc.player.getRotationVec(1.0f);
+        Vec3 eye = mc.player.getEyePos();
+        Vec3 look = mc.player.getRotationVec(1.0f);
 
         for (double d = 1.0; d <= range.getFloatValue(); d += 0.25) {
             BlockPos pos = BlockPos.ofFloored(eye.add(look.multiply(d)));
@@ -50,11 +50,11 @@ public class GhostHand extends Module {
             // Ванилла сама достала — дубль не нужен
             if (mc.crosshairTarget instanceof BlockHitResult bhr && bhr.getBlockPos().equals(pos)) return;
 
-            Vec3d hitVec = eye.add(look.multiply(d));
+            Vec3 hitVec = eye.add(look.multiply(d));
             Direction side = Direction.getFacing(look.x, look.y, look.z).getOpposite();
             BlockHitResult hit = new BlockHitResult(hitVec, side, pos, false);
-            mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
-            mc.player.swingHand(Hand.MAIN_HAND);
+            mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND, hit);
+            mc.player.swingHand(InteractionHand.MAIN_HAND);
             return;
         }
     }

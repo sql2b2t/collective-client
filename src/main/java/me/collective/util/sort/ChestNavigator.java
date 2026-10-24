@@ -7,19 +7,19 @@ import baritone.api.pathing.goals.Goal;
 import baritone.api.pathing.goals.GoalBlock;
 import baritone.api.pathing.goals.GoalComposite;
 import baritone.api.pathing.goals.GoalNear;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.registry.tag.BlockTags;
-import net.minecraft.registry.tag.FluidTags;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult.Type;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.shape.VoxelShape;
-import net.minecraft.world.RaycastContext;
-import net.minecraft.world.RaycastContext.FluidHandling;
-import net.minecraft.world.RaycastContext.ShapeType;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult.Type;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.ClipContext.FluidHandling;
+import net.minecraft.world.level.ClipContext.ShapeType;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -68,7 +68,7 @@ public final class ChestNavigator {
             failure = "Baritone не установлен";
             return Status.UNREACHABLE;
         }
-        if (net.minecraft.client.MinecraftClient.getInstance().player == null || net.minecraft.client.MinecraftClient.getInstance().world == null || canonical == null) {
+        if (net.minecraft.client.Minecraft.getInstance().player == null || net.minecraft.client.Minecraft.getInstance().world == null || canonical == null) {
             failure = "не в мире";
             return Status.UNREACHABLE;
         }
@@ -107,7 +107,7 @@ public final class ChestNavigator {
             if (phaseChanged) attempts = 0;
 
             if (idle) {
-                BlockPos feet = net.minecraft.client.MinecraftClient.getInstance().player.getBlockPos();
+                BlockPos feet = net.minecraft.client.Minecraft.getInstance().player.getBlockPos();
                 // Baritone считает цель достигнутой, но кликнуть нечем —
                 // это не «не дошли», это «встали не туда»
                 if (issuedPrecise && issued.isInGoal(feet.getX(), feet.getY(), feet.getZ())) {
@@ -135,7 +135,7 @@ public final class ChestNavigator {
             b.getCustomGoalProcess().setGoal(goal);
         }
 
-        double dist = net.minecraft.client.MinecraftClient.getInstance().player.getEntityPos().distanceTo(Vec3d.ofCenter(canonical));
+        double dist = net.minecraft.client.Minecraft.getInstance().player.getEntityPos().distanceTo(Vec3.ofCenter(canonical));
         if (dist < bestDist - 0.5) {
             bestDist = dist;
             stallTicks = 0;
@@ -167,9 +167,9 @@ public final class ChestNavigator {
     /** Лучший видимый сундук из текущей точки, либо null. */
     @Nullable
     public BlockHitResult openHit(BlockPos canonical) {
-        if (net.minecraft.client.MinecraftClient.getInstance().player == null || net.minecraft.client.MinecraftClient.getInstance().world == null || canonical == null) return null;
+        if (net.minecraft.client.Minecraft.getInstance().player == null || net.minecraft.client.Minecraft.getInstance().world == null || canonical == null) return null;
 
-        Vec3d eye = net.minecraft.client.MinecraftClient.getInstance().player.getEyePos();
+        Vec3 eye = net.minecraft.client.Minecraft.getInstance().player.getEyePos();
         BlockHitResult best = null;
         double bestD = Double.MAX_VALUE;
 
@@ -251,8 +251,8 @@ public final class ChestNavigator {
 
         if (candidates.isEmpty()) return List.of();
 
-        Vec3d me = net.minecraft.client.MinecraftClient.getInstance().player.getEntityPos();
-        candidates.sort(Comparator.comparingDouble(px -> me.squaredDistanceTo(Vec3d.ofCenter(px))));
+        Vec3 me = net.minecraft.client.Minecraft.getInstance().player.getEntityPos();
+        candidates.sort(Comparator.comparingDouble(px -> me.squaredDistanceTo(Vec3.ofCenter(px))));
 
         List<BlockPos> visible = new ArrayList<>();
         int traced = 0;
@@ -261,7 +261,7 @@ public final class ChestNavigator {
             if (visible.size() >= MAX_SPOTS || traced >= MAX_TRACES) break;
             traced++;
 
-            Vec3d eye = eyeAt(p);
+            Vec3 eye = eyeAt(p);
             for (BlockPos half : halves) {
                 if (cubeDistance(eye, half) <= SPOT_REACH && trace(eye, half) != null) {
                     visible.add(p);
@@ -275,21 +275,21 @@ public final class ChestNavigator {
     }
 
     private static List<BlockPos> halves(BlockPos canonical) {
-        BlockPos other = ContainerGeometry.otherHalf(net.minecraft.client.MinecraftClient.getInstance().world, canonical);
+        BlockPos other = ContainerGeometry.otherHalf(net.minecraft.client.Minecraft.getInstance().world, canonical);
         return other == null ? List.of(canonical) : List.of(canonical, other);
     }
 
-    private static Vec3d eyeAt(BlockPos feet) {
-        return new Vec3d(feet.getX() + 0.5, feet.getY() + EYE_HEIGHT, feet.getZ() + 0.5);
+    private static Vec3 eyeAt(BlockPos feet) {
+        return new Vec3(feet.getX() + 0.5, feet.getY() + EYE_HEIGHT, feet.getZ() + 0.5);
     }
 
-    private static boolean inReach(Vec3d eye, List<BlockPos> halves) {
+    private static boolean inReach(Vec3 eye, List<BlockPos> halves) {
         for (BlockPos half : halves) if (cubeDistance(eye, half) <= SPOT_REACH) return true;
         return false;
     }
 
     /** Расстояние от глаза до кубика блока, а не до его центра. */
-    private static double cubeDistance(Vec3d eye, BlockPos pos) {
+    private static double cubeDistance(Vec3 eye, BlockPos pos) {
         double dx = Math.max(Math.max(pos.getX() - eye.x, 0.0), eye.x - (pos.getX() + 1));
         double dy = Math.max(Math.max(pos.getY() - eye.y, 0.0), eye.y - (pos.getY() + 1));
         double dz = Math.max(Math.max(pos.getZ() - eye.z, 0.0), eye.z - (pos.getZ() + 1));
@@ -298,33 +298,33 @@ public final class ChestNavigator {
 
     /** Виден ли блок из точки глаза: луч в ближайшую точку его контура. */
     @Nullable
-    private static BlockHitResult trace(Vec3d eye, BlockPos pos) {
-        VoxelShape shape = net.minecraft.client.MinecraftClient.getInstance().world.getBlockState(pos).getOutlineShape(net.minecraft.client.MinecraftClient.getInstance().world, pos);
-        Box box = shape.isEmpty() ? new Box(pos) : shape.getBoundingBox().offset(pos);
-        Vec3d aim = new Vec3d(clamp(eye.x, box.minX, box.maxX), clamp(eye.y, box.minY, box.maxY), clamp(eye.z, box.minZ, box.maxZ));
-        Vec3d dir = aim.subtract(eye);
+    private static BlockHitResult trace(Vec3 eye, BlockPos pos) {
+        VoxelShape shape = net.minecraft.client.Minecraft.getInstance().world.getBlockState(pos).getOutlineShape(net.minecraft.client.Minecraft.getInstance().world, pos);
+        AABB box = shape.isEmpty() ? new AABB(pos) : shape.getBoundingBox().offset(pos);
+        Vec3 aim = new Vec3(clamp(eye.x, box.minX, box.maxX), clamp(eye.y, box.minY, box.maxY), clamp(eye.z, box.minZ, box.maxZ));
+        Vec3 dir = aim.subtract(eye);
         double len = dir.length();
         if (len < 1.0E-4) return null;
 
-        Vec3d end = aim.add(dir.multiply(0.1 / len));
-        BlockHitResult hit = net.minecraft.client.MinecraftClient.getInstance().world.raycast(
-            new RaycastContext(eye, end, ShapeType.OUTLINE, FluidHandling.NONE, net.minecraft.client.MinecraftClient.getInstance().player));
+        Vec3 end = aim.add(dir.multiply(0.1 / len));
+        BlockHitResult hit = net.minecraft.client.Minecraft.getInstance().world.raycast(
+            new RaycastContext(eye, end, ShapeType.OUTLINE, FluidHandling.NONE, net.minecraft.client.Minecraft.getInstance().player));
         return hit.getType() == Type.BLOCK && hit.getBlockPos().equals(pos) ? hit : null;
     }
 
     /** Можно ли стоять: ноги и голова свободны, под ногами опора, рядом безопасно. */
     private static boolean standable(BlockPos pos) {
-        if (!net.minecraft.client.MinecraftClient.getInstance().world.isPosLoaded(pos)) return false;
+        if (!net.minecraft.client.Minecraft.getInstance().world.isPosLoaded(pos)) return false;
 
         BlockPos above = pos.up();
         BlockPos below = pos.down();
-        BlockState feet = net.minecraft.client.MinecraftClient.getInstance().world.getBlockState(pos);
-        BlockState head = net.minecraft.client.MinecraftClient.getInstance().world.getBlockState(above);
-        BlockState floor = net.minecraft.client.MinecraftClient.getInstance().world.getBlockState(below);
+        BlockState feet = net.minecraft.client.Minecraft.getInstance().world.getBlockState(pos);
+        BlockState head = net.minecraft.client.Minecraft.getInstance().world.getBlockState(above);
+        BlockState floor = net.minecraft.client.Minecraft.getInstance().world.getBlockState(below);
 
-        if (!feet.getCollisionShape(net.minecraft.client.MinecraftClient.getInstance().world, pos).isEmpty()) return false;
-        if (!head.getCollisionShape(net.minecraft.client.MinecraftClient.getInstance().world, above).isEmpty()) return false;
-        if (floor.getCollisionShape(net.minecraft.client.MinecraftClient.getInstance().world, below).isEmpty()) return false;
+        if (!feet.getCollisionShape(net.minecraft.client.Minecraft.getInstance().world, pos).isEmpty()) return false;
+        if (!head.getCollisionShape(net.minecraft.client.Minecraft.getInstance().world, above).isEmpty()) return false;
+        if (floor.getCollisionShape(net.minecraft.client.Minecraft.getInstance().world, below).isEmpty()) return false;
 
         return !hazard(feet) && !hazard(head) && !hazard(floor);
     }
@@ -341,11 +341,11 @@ public final class ChestNavigator {
 
     /** Загружен ли весь квадрат, в котором ищем точки стояния. */
     private static boolean regionLoaded(BlockPos pos) {
-        return net.minecraft.client.MinecraftClient.getInstance().world.isPosLoaded(pos)
-            && net.minecraft.client.MinecraftClient.getInstance().world.isPosLoaded(pos.add(SPOT_RADIUS, 0, SPOT_RADIUS))
-            && net.minecraft.client.MinecraftClient.getInstance().world.isPosLoaded(pos.add(SPOT_RADIUS, 0, -SPOT_RADIUS))
-            && net.minecraft.client.MinecraftClient.getInstance().world.isPosLoaded(pos.add(-SPOT_RADIUS, 0, SPOT_RADIUS))
-            && net.minecraft.client.MinecraftClient.getInstance().world.isPosLoaded(pos.add(-SPOT_RADIUS, 0, -SPOT_RADIUS));
+        return net.minecraft.client.Minecraft.getInstance().world.isPosLoaded(pos)
+            && net.minecraft.client.Minecraft.getInstance().world.isPosLoaded(pos.add(SPOT_RADIUS, 0, SPOT_RADIUS))
+            && net.minecraft.client.Minecraft.getInstance().world.isPosLoaded(pos.add(SPOT_RADIUS, 0, -SPOT_RADIUS))
+            && net.minecraft.client.Minecraft.getInstance().world.isPosLoaded(pos.add(-SPOT_RADIUS, 0, SPOT_RADIUS))
+            && net.minecraft.client.Minecraft.getInstance().world.isPosLoaded(pos.add(-SPOT_RADIUS, 0, -SPOT_RADIUS));
     }
 
     private static double clamp(double v, double min, double max) {

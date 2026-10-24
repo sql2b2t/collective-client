@@ -1,9 +1,9 @@
 package me.collective.gui;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.resources.Identifier;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.system.MemoryUtil;
@@ -29,7 +29,7 @@ public final class BlurBackground {
     }
 
     /** Захват фона. Null при любой ошибке (тогда экран рисует обычный фон). */
-    public static Captured capture(MinecraftClient mc) {
+    public static Captured capture(Minecraft mc) {
         if (mc == null || mc.getWindow() == null) return null;
         int fw = mc.getWindow().getFramebufferWidth();
         int fh = mc.getWindow().getFramebufferHeight();
@@ -100,7 +100,7 @@ public final class BlurBackground {
         return BLUR_ID;
     }
 
-    public static void release(MinecraftClient mc) {
+    public static void release(Minecraft mc) {
         if (mc == null) return;
         try {
             mc.getTextureManager().destroyTexture(BLUR_ID);

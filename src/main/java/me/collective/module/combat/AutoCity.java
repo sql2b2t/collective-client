@@ -6,12 +6,12 @@ import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.module.player.SpeedMine;
 import me.collective.setting.NumberSetting;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.network.chat.Component;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -50,7 +50,7 @@ public class AutoCity extends Module {
         double r = targetRange.getValue();
         double rSq = r * r;
 
-        PlayerEntity target = StreamSupport.stream(mc.world.getPlayers().spliterator(), false)
+        Player target = StreamSupport.stream(mc.world.getPlayers().spliterator(), false)
             .filter(p -> p != mc.player && p.isAlive() && !p.isCreative() && !p.isSpectator())
             .filter(p -> !me.collective.manager.FriendManager.getInstance().isFriend(p))
             .filter(p -> mc.player.squaredDistanceTo(p) <= rSq)
@@ -85,12 +85,12 @@ public class AutoCity extends Module {
         if (!candidates.isEmpty()) {
             BlockPos pos = candidates.get(0);
             cityPos = pos;
-            mc.player.sendMessage(Text.literal("§7[§cAutoCity§7] §aMining city block at: §e" + pos.toShortString()), false);
+            mc.player.sendMessage(Component.literal("§7[§cAutoCity§7] §aMining city block at: §e" + pos.toShortString()), false);
 
             if (SpeedMine.INSTANCE != null) {
                 if (!SpeedMine.INSTANCE.isToggled()) {
                     SpeedMine.INSTANCE.setToggled(true);
-                    mc.player.sendMessage(Text.literal("§7[§cAutoCity§7] §6Сам включил SpeedMine — её настройки (скорость/обход/дальность) теперь копают твои блоки и могут флагать Grim."), false);
+                    mc.player.sendMessage(Component.literal("§7[§cAutoCity§7] §6Сам включил SpeedMine — её настройки (скорость/обход/дальность) теперь копают твои блоки и могут флагать Grim."), false);
                 }
                 SpeedMine.INSTANCE.mineBlock(cityPos, Direction.UP);
             }

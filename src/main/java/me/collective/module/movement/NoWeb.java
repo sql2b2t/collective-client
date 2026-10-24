@@ -6,15 +6,15 @@ import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.EnumSetting;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.CobwebBlock;
-import net.minecraft.client.network.PendingUpdateManager;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec2f;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.WebBlock;
+import net.minecraft.client.multiplayer.prediction.BlockStatePredictionHandler;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec2;
 
 public class NoWeb extends Module {
     public static NoWeb INSTANCE;
@@ -49,7 +49,7 @@ public class NoWeb extends Module {
         NoWeb module = INSTANCE;
         if (module == null || !module.isToggled() || module.mode.getValue() != Mode.Игнор) return;
         if (!module.grim.getValue()) return;
-        if (module.mc.player == null || !(module.mc.world instanceof ClientWorld world)) return;
+        if (module.mc.player == null || !(module.mc.world instanceof ClientLevel world)) return;
 
         PendingUpdateManager pending = world.getPendingUpdateManager();
         try (PendingUpdateManager updates = pending.incrementSequence()) {
@@ -172,14 +172,14 @@ public class NoWeb extends Module {
     private boolean isInWeb() {
         if (this.mc.player == null || this.mc.world == null) return false;
 
-        Box playerBox = this.mc.player.getBoundingBox();
+        AABB playerBox = this.mc.player.getBoundingBox();
         BlockPos playerPosition = this.mc.player.getBlockPos();
 
         for (int x = -1; x <= 1; x++) {
             for (int y = -1; y <= 1; y++) {
                 for (int z = -1; z <= 1; z++) {
                     BlockPos pos = playerPosition.add(x, y, z);
-                    if (playerBox.intersects(new Box(pos))
+                    if (playerBox.intersects(new AABB(pos))
                         && this.mc.world.getBlockState(pos).isOf(Blocks.COBWEB)) return true;
                 }
             }

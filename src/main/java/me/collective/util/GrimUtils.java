@@ -1,21 +1,21 @@
 package me.collective.util;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.PendingUpdateManager;
-import net.minecraft.entity.EntityPose;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.PlayerInput;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.prediction.BlockStatePredictionHandler;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.player.Input;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Вспомогательные проверки для GrimAC.
  * Расчет расстояний ведется по всем возможным высотам глаз игрока.
  */
 public final class GrimUtils {
-    private static final MinecraftClient mc = MinecraftClient.getInstance();
+    private static final Minecraft mc = Minecraft.getInstance();
 
     private GrimUtils() {
     }
@@ -32,7 +32,7 @@ public final class GrimUtils {
         return inputClickClean() && mc.player != null && !mc.player.isSprinting();
     }
 
-    public static double[] getPossibleEyeHeights(PlayerEntity player) {
+    public static double[] getPossibleEyeHeights(Player player) {
         float scale = (float) player.getAttributeValue(EntityAttributes.SCALE);
 
         double standing = 1.62 * scale;
@@ -51,12 +51,12 @@ public final class GrimUtils {
         return new double[]{standing, sneaking, swimming};
     }
 
-    public static double closestEyeDistanceSqTo(PlayerEntity player, BlockPos pos) {
-        return closestEyeDistanceSqTo(player, Vec3d.ofCenter(pos));
+    public static double closestEyeDistanceSqTo(Player player, BlockPos pos) {
+        return closestEyeDistanceSqTo(player, Vec3.ofCenter(pos));
     }
 
-    public static double closestEyeDistanceSqTo(PlayerEntity player, Vec3d target) {
-        Vec3d base = player.getEntityPos();
+    public static double closestEyeDistanceSqTo(Player player, Vec3 target) {
+        Vec3 base = player.getEntityPos();
         double best = Double.MAX_VALUE;
 
         for (double h : getPossibleEyeHeights(player)) {
@@ -69,12 +69,12 @@ public final class GrimUtils {
         return best;
     }
 
-    public static double closestEyeDistanceSqTo(PlayerEntity player, Box box) {
-        Vec3d base = player.getEntityPos();
+    public static double closestEyeDistanceSqTo(Player player, AABB box) {
+        Vec3 base = player.getEntityPos();
         double best = Double.MAX_VALUE;
 
         for (double h : getPossibleEyeHeights(player)) {
-            Vec3d eye = base.add(0.0, h, 0.0);
+            Vec3 eye = base.add(0.0, h, 0.0);
 
             double d = eye.squaredDistanceTo(
                 clamp(eye.x, box.minX, box.maxX),

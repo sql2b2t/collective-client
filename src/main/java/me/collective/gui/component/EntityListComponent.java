@@ -1,9 +1,9 @@
 package me.collective.gui.component;
 
 import me.collective.setting.EntityListSetting;
-import net.minecraft.entity.EntityType;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 
 /** Список сущностей (EntityListSetting) с поиском и чекбоксами. */
 public class EntityListComponent extends RegistryListComponent<EntityType<?>> {

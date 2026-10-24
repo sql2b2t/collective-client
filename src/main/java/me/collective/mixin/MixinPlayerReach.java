@@ -1,8 +1,8 @@
 package me.collective.mixin;
 
 import me.collective.module.combat.Reach;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  *
  * <p>Подменяет дальность взаимодействия с блоками и сущностями для себя.
  */
-@Mixin(PlayerEntity.class)
+@Mixin(Player.class)
 public abstract class MixinPlayerReach {
 
     /** Модуль кэшируется один раз: проверки дальности вызываются на каждый блок/сущность. */
@@ -27,7 +27,7 @@ public abstract class MixinPlayerReach {
 
     @Inject(method = "getBlockInteractionRange", at = @At("HEAD"), cancellable = true)
     private void reach$blocks(CallbackInfoReturnable<Double> cir) {
-        if ((Object) this != MinecraftClient.getInstance().player) return;
+        if ((Object) this != Minecraft.getInstance().player) return;
 
         Reach mod = reach$module();
         if (mod == null || !mod.isToggled()) return;
@@ -38,7 +38,7 @@ public abstract class MixinPlayerReach {
 
     @Inject(method = "getEntityInteractionRange", at = @At("HEAD"), cancellable = true)
     private void reach$entities(CallbackInfoReturnable<Double> cir) {
-        if ((Object) this != MinecraftClient.getInstance().player) return;
+        if ((Object) this != Minecraft.getInstance().player) return;
 
         Reach mod = reach$module();
         if (mod == null || !mod.isToggled()) return;

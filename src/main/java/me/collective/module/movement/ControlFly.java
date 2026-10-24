@@ -24,24 +24,24 @@ import me.collective.category.Category;
 import me.collective.module.ModuleManager;
 import me.collective.util.InvUtils;
 import me.collective.event.EventHandler;
-import net.minecraft.client.network.PlayerListEntry;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.FireworksComponent;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.entity.projectile.FireworkRocketEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
-import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.component.Fireworks;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.projectile.FireworkRocketEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.ClipContext;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -129,13 +129,13 @@ public class ControlFly extends Module {
     // Часть этих полей читается в пакетных хендлерах (PacketEvent.Send может идти
     // не из игрового потока), поэтому всё, что видно с обеих сторон, volatile.
     private volatile boolean frozen;
-    private volatile Vec3d wirePos;
+    private volatile Vec3 wirePos;
     private volatile int pinArmTick;
     private volatile int keepaliveTicks;
     private volatile int lastWirePosTick;
     private volatile int rotOnlyRun;
     private volatile boolean stepDue;
-    private volatile Vec3d pendingStep;
+    private volatile Vec3 pendingStep;
     private volatile boolean parkedWithRocket;
     private String parkBlocked;
 
@@ -527,7 +527,7 @@ public class ControlFly extends Module {
                     if (this.parkBlocked != null && TickPacer.clientTick() > this.lastWirePosTick + 1) {
                         clearPark();
                     } else {
-                        this.mc.player.setVelocity(Vec3d.ZERO);
+                        this.mc.player.setVelocity(Vec3.ZERO);
                     }
                 }
             }
@@ -594,7 +594,7 @@ public class ControlFly extends Module {
 
         this.pendingStep = null;
 
-        this.wirePos = new Vec3d(
+        this.wirePos = new Vec3(
             move.getX(this.mc.player.getX()),
             move.getY(this.mc.player.getY()),
             move.getZ(this.mc.player.getZ()));
@@ -622,7 +622,7 @@ public class ControlFly extends Module {
 
         if (this.mc.getCameraEntity() != this.mc.player) {
             this.mc.player.setPosition(this.wirePos);
-            this.mc.player.setVelocity(Vec3d.ZERO);
+            this.mc.player.setVelocity(Vec3.ZERO);
             return;
         }
 
@@ -631,14 +631,14 @@ public class ControlFly extends Module {
         // раз в секунду сервер ждёт хоть какое-то движение планера
         if ((this.keepaliveTicks >= POSITION_REMINDER_TICKS || this.stepDue)
             && TickPacer.clientTick() > this.lastWirePosTick + 1) {
-            Vec3d step = restingGlideStep();
+            Vec3 step = restingGlideStep();
 
             this.wirePos = this.wirePos.add(step);
             this.pendingStep = step;
         }
 
         this.mc.player.setPosition(this.wirePos);
-        this.mc.player.setVelocity(Vec3d.ZERO);
+        this.mc.player.setVelocity(Vec3.ZERO);
     }
 
     private boolean parkPinned() {
@@ -652,13 +652,13 @@ public class ControlFly extends Module {
     }
 
     /** Один тик планера на месте — ровно столько сервер принимает от покоящего. */
-    private Vec3d restingGlideStep() {
+    private Vec3 restingGlideStep() {
         RotationUtils rotations = RotationUtils.getInstance();
 
         float pitch = rotations.getSentPitch();
-        Vec3d look = Vec3d.fromPolar(pitch, rotations.getSentYaw());
+        Vec3 look = Vec3.fromPolar(pitch, rotations.getSentYaw());
 
-        return RideWindow.predictGliding(Vec3d.ZERO, look, pitch,
+        return RideWindow.predictGliding(Vec3.ZERO, look, pitch,
             this.mc.player.getAttributeValue(EntityAttributes.GRAVITY));
     }
 
@@ -817,8 +817,8 @@ public class ControlFly extends Module {
             this.swapBackTicks = 2;
         }
 
-        this.mc.interactionManager.interactItem(this.mc.player, Hand.MAIN_HAND);
-        this.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+        this.mc.interactionManager.interactItem(this.mc.player, InteractionHand.MAIN_HAND);
+        this.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
 
         this.lastFireworkTime = System.currentTimeMillis();
         this.ticksSinceFirework = 0;
@@ -907,7 +907,7 @@ public class ControlFly extends Module {
 
     /** Клавиши → курс и угол. */
     private void handleMovement() {
-        Vec3d vec = Vec3d.ZERO;
+        Vec3 vec = Vec3.ZERO;
 
         float yaw = this.mc.player.getYaw();
         boolean jumpHeld = false;
@@ -916,10 +916,10 @@ public class ControlFly extends Module {
         Freecam freecam = ModuleManager.INSTANCE.getModule(Freecam.class);
 
         if (freecam == null || !freecam.isActive()) {
-            if (this.mc.options.forwardKey.isPressed()) vec = vec.add(Vec3d.fromPolar(0.0f, yaw));
-            if (this.mc.options.backKey.isPressed()) vec = vec.add(Vec3d.fromPolar(0.0f, yaw + 180.0f));
-            if (this.mc.options.leftKey.isPressed()) vec = vec.add(Vec3d.fromPolar(0.0f, yaw - 90.0f));
-            if (this.mc.options.rightKey.isPressed()) vec = vec.add(Vec3d.fromPolar(0.0f, yaw + 90.0f));
+            if (this.mc.options.forwardKey.isPressed()) vec = vec.add(Vec3.fromPolar(0.0f, yaw));
+            if (this.mc.options.backKey.isPressed()) vec = vec.add(Vec3.fromPolar(0.0f, yaw + 180.0f));
+            if (this.mc.options.leftKey.isPressed()) vec = vec.add(Vec3.fromPolar(0.0f, yaw - 90.0f));
+            if (this.mc.options.rightKey.isPressed()) vec = vec.add(Vec3.fromPolar(0.0f, yaw + 90.0f));
 
             jumpHeld = ChestSwapGlide.rawJumpDown();
             sneakHeld = this.mc.options.sneakKey.isPressed();
@@ -1037,7 +1037,7 @@ public class ControlFly extends Module {
 
         // после зависания разгоняемся на скорости терминальной
         if (wasIdle && fireworkAttached()) {
-            this.mc.player.setVelocity(Vec3d.fromPolar(pitch, rot[0]).multiply(FIREWORK_TERMINAL_SPEED));
+            this.mc.player.setVelocity(Vec3.fromPolar(pitch, rot[0]).multiply(FIREWORK_TERMINAL_SPEED));
 
             RocketBoost boost = ModuleManager.INSTANCE.getModule(RocketBoost.class);
             if (boost != null && boost.isActive()) boost.clearSuppression();
@@ -1142,9 +1142,9 @@ public class ControlFly extends Module {
         double ground = Math.abs(rise) / (2.0 * half) * legs.ground(descending);
         ground = MathHelper.clamp(ground, MIN_LEG_LOOKAHEAD, MAX_LEG_LOOKAHEAD);
 
-        Vec3d eye = this.mc.player.getEyePos();
-        Vec3d along = Vec3d.fromPolar(0.0f, yaw).multiply(ground);
-        Vec3d end3 = eye.add(along.x, rise, along.z);
+        Vec3 eye = this.mc.player.getEyePos();
+        Vec3 along = Vec3.fromPolar(0.0f, yaw).multiply(ground);
+        Vec3 end3 = eye.add(along.x, rise, along.z);
 
         return this.mc.world.raycast(new RaycastContext(eye, end3,
             RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, this.mc.player))
@@ -1165,7 +1165,7 @@ public class ControlFly extends Module {
         return findFireworkHotbar() != -1 || hasFireworkInInventory();
     }
 
-    private float[] getYawPitch(Vec3d vec) {
+    private float[] getYawPitch(Vec3 vec) {
         if (vec.lengthSquared() < 1.0E-8) {
             return new float[]{this.mc.player.getYaw(), this.mc.player.getPitch()};
         }
@@ -1209,7 +1209,7 @@ public class ControlFly extends Module {
     private String flightContext() {
         if (this.mc.player == null || this.mc.world == null) return "no player";
 
-        Vec3d velocity = this.mc.player.getVelocity();
+        Vec3 velocity = this.mc.player.getVelocity();
 
         return String.format(
             "%s at %.0f b/s (%.1f vertical), pitch %.0f, Y %.0f, %s, last rocket %d ticks ago",
@@ -1223,7 +1223,7 @@ public class ControlFly extends Module {
 
         this.debugTicks = 0;
 
-        Vec3d velocity = this.mc.player.getVelocity();
+        Vec3 velocity = this.mc.player.getVelocity();
 
         info("%.1f b/s | %.1f b/s vertical | Y %.0f | pitch %.0f | %s%s | %s, %d catch-up ticks paced",
             velocity.horizontalLength() * 20.0, velocity.y * 20.0, this.mc.player.getY(),

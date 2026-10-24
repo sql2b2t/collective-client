@@ -3,8 +3,8 @@ package me.collective.module.hud;
 import me.collective.font.FontManager;
 import me.collective.render.RenderUtil;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.world.entity.player.Player;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -42,7 +42,7 @@ public class TextRadar extends HudModule {
 
         double rangeSq = (double) this.range.getIntValue() * this.range.getIntValue();
         List<Row> list = new ArrayList<>();
-        for (PlayerEntity p : mc.world.getPlayers()) {
+        for (Player p : mc.world.getPlayers()) {
             if (p == mc.player || !p.isAlive()) continue;
             double dSq = mc.player.squaredDistanceTo(p);
             if (dSq > rangeSq) continue;
@@ -57,7 +57,7 @@ public class TextRadar extends HudModule {
     }
 
     @Override
-    public void render(DrawContext context, float delta) {
+    public void render(GuiGraphics context, float delta) {
         if (!isToggled() || mc.player == null || mc.world == null) return;
 
         List<Row> players = rows();

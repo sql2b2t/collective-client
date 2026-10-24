@@ -1,11 +1,11 @@
 package me.collective.gui.settings;
 
 import me.collective.setting.ItemListSetting;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.registry.Registries;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 /**
  * Порт ItemListSettingScreen из Meteor Client (через CollectionListSettingScreen):

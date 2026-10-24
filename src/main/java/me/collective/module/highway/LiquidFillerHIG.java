@@ -13,19 +13,19 @@ import me.collective.util.FindItemResult;
 import me.collective.util.GrimUtils;
 import me.collective.util.InventoryUtil;
 import me.collective.util.RotationUtils;
-import net.minecraft.block.Block;
-import net.minecraft.fluid.Fluid;
-import net.minecraft.fluid.Fluids;
-import net.minecraft.item.BlockItem;
-import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Hand;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -166,18 +166,18 @@ public class LiquidFillerHIG extends Module {
             if (!mc.world.getBlockState(neighbor).isReplaceable()
                 && mc.world.getBlockState(neighbor).isSolidBlock(mc.world, neighbor)) {
                 Direction side = dir.getOpposite();
-                Vec3d hitVec = Vec3d.ofCenter(neighbor).add(
+                Vec3 hitVec = Vec3.ofCenter(neighbor).add(
                     side.getOffsetX() * 0.45, side.getOffsetY() * 0.45, side.getOffsetZ() * 0.45);
 
                 if (GrimUtils.closestEyeDistanceSqTo(mc.player, hitVec) > 18.0) continue;
 
-                Hand hand = item.getHand();
+                InteractionHand hand = item.getHand();
                 if (!item.isOffhand()) {
                     InventoryUtil.swap(item.slot(), true);
                 }
 
                 if (rotate.getValue()) {
-                    Vec3d eyes = mc.player.getEyePos();
+                    Vec3 eyes = mc.player.getEyePos();
                     double dx = hitVec.x - eyes.x;
                     double dy = hitVec.y - eyes.y;
                     double dz = hitVec.z - eyes.z;

@@ -7,8 +7,8 @@ import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.network.packet.s2c.common.DisconnectS2CPacket;
-import net.minecraft.text.Text;
+import net.minecraft.network.protocol.common.ClientboundDisconnectPacket;
+import net.minecraft.network.chat.Component;
 
 import me.collective.module.misc.AutoReconnect;
 
@@ -42,7 +42,7 @@ public class AfkLogout extends Module {
             if (autoToggle.getValue()) setToggled(false);
             AutoReconnect.markAfkLogout();
             if (mc.getNetworkHandler() != null && mc.getNetworkHandler().getConnection() != null) {
-                mc.getNetworkHandler().getConnection().disconnect(Text.literal("[AfkLogout] Arrived at destination."));
+                mc.getNetworkHandler().getConnection().disconnect(Component.literal("[AfkLogout] Arrived at destination."));
             }
         }
     }

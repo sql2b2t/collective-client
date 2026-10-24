@@ -1,24 +1,24 @@
 package me.collective.util;
 
-import net.minecraft.block.BlockState;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayNetworkHandler;
-import net.minecraft.client.network.PendingUpdateManager;
-import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.client.multiplayer.prediction.BlockStatePredictionHandler;
+import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 
 public final class AirPlaceExecutor {
-    private static final MinecraftClient mc = MinecraftClient.getInstance();
+    private static final Minecraft mc = Minecraft.getInstance();
 
     private AirPlaceExecutor() {
     }
 
-    public static void place(BlockHitResult hit, BlockPos placePos, Hand hand, BlockState predicted, Method method) {
+    public static void place(BlockHitResult hit, BlockPos placePos, InteractionHand hand, BlockState predicted, Method method) {
         if (hit.isInsideBlock()) {
             airPlace(hit, predicted, method);
         } else {
@@ -38,7 +38,7 @@ public final class AirPlaceExecutor {
         if (method == Method.Grim) {
             grimAirPlace(wireHit, placePos, predicted);
         } else {
-            silentPlace(wireHit, placePos, predicted, Hand.MAIN_HAND, true);
+            silentPlace(wireHit, placePos, predicted, InteractionHand.MAIN_HAND, true);
         }
     }
 
@@ -50,8 +50,8 @@ public final class AirPlaceExecutor {
             connection.sendPacket(new PlayerActionC2SPacket(
                 PlayerActionC2SPacket.Action.SWAP_ITEM_WITH_OFFHAND, BlockPos.ORIGIN, Direction.DOWN));
             connection.sendPacket(new PlayerInteractBlockC2SPacket(
-                Hand.OFF_HAND, wireHit, prediction.getSequence()));
-            connection.sendPacket(new HandSwingC2SPacket(Hand.OFF_HAND));
+                InteractionHand.OFF_HAND, wireHit, prediction.getSequence()));
+            connection.sendPacket(new HandSwingC2SPacket(InteractionHand.OFF_HAND));
             connection.sendPacket(new PlayerActionC2SPacket(
                 PlayerActionC2SPacket.Action.SWAP_ITEM_WITH_OFFHAND, BlockPos.ORIGIN, Direction.DOWN));
 
@@ -61,7 +61,7 @@ public final class AirPlaceExecutor {
         }
     }
 
-    public static void silentPlace(BlockHitResult hit, BlockPos placePos, BlockState predicted, Hand hand, boolean visualSwing) {
+    public static void silentPlace(BlockHitResult hit, BlockPos placePos, BlockState predicted, InteractionHand hand, boolean visualSwing) {
         if (mc.player == null || mc.world == null || mc.getNetworkHandler() == null) return;
 
         ClientPlayNetworkHandler connection = mc.getNetworkHandler();
@@ -74,8 +74,8 @@ public final class AirPlaceExecutor {
             }
         }
 
-        if (visualSwing && hand == Hand.MAIN_HAND) {
-            mc.player.swingHand(Hand.MAIN_HAND);
+        if (visualSwing && hand == InteractionHand.MAIN_HAND) {
+            mc.player.swingHand(InteractionHand.MAIN_HAND);
         } else {
             connection.sendPacket(new HandSwingC2SPacket(hand));
         }

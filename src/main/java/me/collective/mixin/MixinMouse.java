@@ -2,8 +2,8 @@ package me.collective.mixin;
 
 import me.collective.event.EventBus;
 import me.collective.event.events.MouseClickEvent;
-import net.minecraft.client.Mouse;
-import net.minecraft.client.input.MouseInput;
+import net.minecraft.client.MouseHandler;
+import net.minecraft.client.input.MouseButtonInfo;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -29,4 +29,3 @@ public class MixinMouse {
         }
     }
 }
-

@@ -6,7 +6,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,7 +45,7 @@ public class SorterWorldStore {
 
     private void initializeFiles() {
         try {
-            File baseFolder = new File(new File(net.minecraft.client.MinecraftClient.getInstance().runDirectory, "collective"), "StashSorter");
+            File baseFolder = new File(new File(net.minecraft.client.Minecraft.getInstance().runDirectory, "collective"), "StashSorter");
             if (!baseFolder.exists() && !baseFolder.mkdirs()) LOGGER.error("Не удалось создать папку StashSorter");
 
             File folder = new File(baseFolder, ContainerGeometry.serverId());

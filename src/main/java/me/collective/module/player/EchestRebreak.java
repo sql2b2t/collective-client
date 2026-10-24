@@ -10,27 +10,27 @@ import me.collective.module.ModuleManager;
 import me.collective.render.ShapeMode;
 import me.collective.setting.*;
 import me.collective.util.*;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.component.type.ItemEnchantmentsComponent;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.Enchantments;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
-import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.registry.tag.ItemTags;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
+import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
+import net.minecraft.core.Holder;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.ClipContext;
 
 /**
  * EchestRebreak — автоматическая установка и моментальное разрушение эндер-сундуков
@@ -310,7 +310,7 @@ public class EchestRebreak extends Module {
 
         this.pendingPlaceHit = hit;
 
-        Vec3d eye = this.mc.player.getEyePos();
+        Vec3 eye = this.mc.player.getEyePos();
         float[] rot = RotationUtils.getRotationsTo(eye, hit.getPos());
 
         RotationUtils rotUtils = RotationUtils.getInstance();
@@ -340,8 +340,8 @@ public class EchestRebreak extends Module {
         }
 
         int seq = GrimUtils.nextSequence();
-        this.mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, hit, seq));
-        this.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+        this.mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(InteractionHand.MAIN_HAND, hit, seq));
+        this.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
 
         this.placedWaitTimer = 10;
         this.actionTimer = this.placeDelay.get();
@@ -371,8 +371,8 @@ public class EchestRebreak extends Module {
             return;
         }
 
-        Vec3d center = this.targetPos.toCenterPos();
-        Vec3d eye = this.mc.player.getEyePos();
+        Vec3 center = this.targetPos.toCenterPos();
+        Vec3 eye = this.mc.player.getEyePos();
         float[] rot = RotationUtils.getRotationsTo(eye, center);
         RotationUtils.getInstance().setRotationSilentDirect(this, ROTATION_PRIORITY, rot[0], rot[1], this.turnSpeed.get());
 
@@ -424,7 +424,7 @@ public class EchestRebreak extends Module {
     private BlockHitResult findBestSupportHit(BlockPos placePos) {
         if (this.mc.player == null || this.mc.world == null) return null;
 
-        Vec3d eye = this.mc.player.getEyePos();
+        Vec3 eye = this.mc.player.getEyePos();
         BlockHitResult best = null;
         double bestDist = Double.MAX_VALUE;
 
@@ -441,11 +441,11 @@ public class EchestRebreak extends Module {
                 continue;
             }
 
-            Vec3d sample = getFaceSamplePoint(neighbor, clickFace, eye);
-            Vec3d dirVec = sample.subtract(eye);
+            Vec3 sample = getFaceSamplePoint(neighbor, clickFace, eye);
+            Vec3 dirVec = sample.subtract(eye);
             if (dirVec.lengthSquared() < 1.0E-6) continue;
 
-            Vec3d end = eye.add(dirVec.normalize().multiply(REACH + 0.1));
+            Vec3 end = eye.add(dirVec.normalize().multiply(REACH + 0.1));
             BlockHitResult clip = this.mc.world.raycast(new RaycastContext(
                 eye, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, this.mc.player
             ));
@@ -468,12 +468,12 @@ public class EchestRebreak extends Module {
         if (this.mc.player == null || this.mc.world == null) return null;
 
         RotationUtils rotUtils = RotationUtils.getInstance();
-        Vec3d eye = this.mc.player.getEyePos();
+        Vec3 eye = this.mc.player.getEyePos();
         float yaw = rotUtils.getSentYaw();
         float pitch = rotUtils.getSentPitch();
 
-        Vec3d look = RotationUtils.getRotationVector(pitch, yaw);
-        Vec3d end = eye.add(look.multiply(REACH + 0.1));
+        Vec3 look = RotationUtils.getRotationVector(pitch, yaw);
+        Vec3 end = eye.add(look.multiply(REACH + 0.1));
         BlockHitResult clip = this.mc.world.raycast(new RaycastContext(
             eye, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, this.mc.player
         ));
@@ -487,7 +487,7 @@ public class EchestRebreak extends Module {
         return null;
     }
 
-    private boolean isFaceFacingEye(Vec3d eye, BlockPos pos, Direction face) {
+    private boolean isFaceFacingEye(Vec3 eye, BlockPos pos, Direction face) {
         return switch (face) {
             case DOWN -> eye.y < pos.getY();
             case UP -> eye.y > pos.getY() + 1.0;
@@ -498,24 +498,24 @@ public class EchestRebreak extends Module {
         };
     }
 
-    private Vec3d getFaceSamplePoint(BlockPos pos, Direction face, Vec3d eye) {
+    private Vec3 getFaceSamplePoint(BlockPos pos, Direction face, Vec3 eye) {
         double minX = pos.getX();
         double minY = pos.getY();
         double minZ = pos.getZ();
 
         return switch (face) {
-            case DOWN -> new Vec3d(minX + 0.5, minY, minZ + 0.5);
-            case UP -> new Vec3d(minX + 0.5, minY + 1.0, minZ + 0.5);
-            case NORTH -> new Vec3d(minX + 0.5, minY + 0.5, minZ);
-            case SOUTH -> new Vec3d(minX + 0.5, minY + 0.5, minZ + 1.0);
-            case WEST -> new Vec3d(minX, minY + 0.5, minZ + 0.5);
-            case EAST -> new Vec3d(minX + 1.0, minY + 0.5, minZ + 0.5);
+            case DOWN -> new Vec3(minX + 0.5, minY, minZ + 0.5);
+            case UP -> new Vec3(minX + 0.5, minY + 1.0, minZ + 0.5);
+            case NORTH -> new Vec3(minX + 0.5, minY + 0.5, minZ);
+            case SOUTH -> new Vec3(minX + 0.5, minY + 0.5, minZ + 1.0);
+            case WEST -> new Vec3(minX, minY + 0.5, minZ + 0.5);
+            case EAST -> new Vec3(minX + 1.0, minY + 0.5, minZ + 0.5);
         };
     }
 
     private void sendSwing() {
         if (this.mc.getNetworkHandler() != null) {
-            this.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+            this.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
         }
     }
 

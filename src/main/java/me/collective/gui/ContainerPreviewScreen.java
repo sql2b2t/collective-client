@@ -1,11 +1,11 @@
 package me.collective.gui;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.ingame.ShulkerBoxScreen;
-import net.minecraft.inventory.SimpleInventory;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.ShulkerBoxScreenHandler;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.ShulkerBoxScreen;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.inventory.ShulkerBoxMenu;
+import net.minecraft.network.chat.Component;
 
 import java.util.List;
 
@@ -17,7 +17,7 @@ import java.util.List;
  * {@code syncId}, которого на сервере нет, поэтому окно только для чтения —
  * сервер клики в нём проигнорирует.
  *
- * <p>У оригинала был подкласс {@code DrawContext}, подменявший счётчик на «0»
+ * <p>У оригинала был подкласс {@code GuiGraphics}, подменявший счётчик на «0»
  * для служебного значения 69. Здесь это не воспроизводится: 69 — внутренняя
  * пасхалка мода, а не признак пустого слота.
  */
@@ -28,7 +28,7 @@ public class ContainerPreviewScreen extends ShulkerBoxScreen {
 
     public ContainerPreviewScreen(List<ItemStack> contents, ItemStack container) {
         super(createHandler(contents),
-                MinecraftClient.getInstance().player.getInventory(),
+                Minecraft.getInstance().player.getInventory(),
                 title(container));
     }
 
@@ -41,10 +41,10 @@ public class ContainerPreviewScreen extends ShulkerBoxScreen {
         }
 
         return new ShulkerBoxScreenHandler(FAKE_SYNC_ID,
-                MinecraftClient.getInstance().player.getInventory(), inventory);
+                Minecraft.getInstance().player.getInventory(), inventory);
     }
 
-    private static Text title(ItemStack container) {
-        return container.getName().copy().append(Text.literal(" (просмотр)"));
+    private static Component title(ItemStack container) {
+        return container.getName().copy().append(Component.literal(" (просмотр)"));
     }
 }

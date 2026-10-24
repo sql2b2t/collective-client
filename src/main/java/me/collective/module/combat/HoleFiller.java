@@ -8,11 +8,11 @@ import me.collective.setting.NumberSetting;
 import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
 import me.collective.util.PlacementUtils;
-import net.minecraft.block.BlockState;
-import net.minecraft.item.Items;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Direction;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.item.Items;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.core.Direction;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -84,7 +84,7 @@ public class HoleFiller extends Module {
 
     /** Дыру, внутри которой уже кто-то стоит, не заливаем — блоки тратить зря. */
     private boolean isOccupedByEntity(BlockPos pos) {
-        Box box = new Box(pos);
+        AABB box = new AABB(pos);
         for (net.minecraft.entity.Entity entity : mc.world.getEntities()) {
             if (entity == mc.player) continue;
             if (entity.getBoundingBox().intersects(box)) return true;

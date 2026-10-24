@@ -4,8 +4,8 @@ import me.collective.category.Category;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Порт AntiVoid из ThunderHack.
@@ -61,7 +61,7 @@ public class AntiVoid extends Module {
         if (!isOverVoid()) return;
 
         // Гасим падение, тянем вверх
-        Vec3d vel = mc.player.getVelocity();
+        Vec3 vel = mc.player.getVelocity();
         mc.player.setVelocity(vel.x * 0.7, Math.max(vel.y, -0.15), vel.z * 0.7);
         if (jump.getValue()) {
             mc.options.jumpKey.setPressed(true);

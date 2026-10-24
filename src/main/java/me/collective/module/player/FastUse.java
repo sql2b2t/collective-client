@@ -6,10 +6,10 @@ import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ExperienceBottleItem;
-import net.minecraft.item.FireworkRocketItem;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ExperienceBottleItem;
+import net.minecraft.world.item.FireworkRocketItem;
+import net.minecraft.world.item.ItemStack;
 
 public class FastUse extends Module {
     public final BooleanSetting expOnly = add(new BooleanSetting("ExpOnly", false));

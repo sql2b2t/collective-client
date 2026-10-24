@@ -9,21 +9,21 @@ import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.RotationUtils;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.ButtonBlock;
-import net.minecraft.block.RailBlock;
-import net.minecraft.block.TorchBlock;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec2f;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ButtonBlock;
+import net.minecraft.world.level.block.RailBlock;
+import net.minecraft.world.level.block.TorchBlock;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.core.Direction;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.ClipContext;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -54,7 +54,7 @@ public class HoleSnap extends Module {
     private long lastHoleTime = NEVER;
     private volatile long lastTeleportTime = NEVER;
     private boolean active;
-    private Vec3d target;
+    private Vec3 target;
 
     public HoleSnap() {
         super("HoleSnap", "Затягивает игрока в ближайшую дыру, мимо которой он пробежал.", Category.MOVEMENT);
@@ -106,7 +106,7 @@ public class HoleSnap extends Module {
             return;
         }
 
-        Vec3d hole = findHole();
+        Vec3 hole = findHole();
         if (hole == null) {
             stop();
             return;
@@ -128,20 +128,20 @@ public class HoleSnap extends Module {
         double hDistSq = (this.target.x - mc.player.getX()) * (this.target.x - mc.player.getX())
                 + (this.target.z - mc.player.getZ()) * (this.target.z - mc.player.getZ());
         if (hDistSq < 0.08 && mc.player.getY() > this.target.y && !mc.player.isOnGround()) {
-            event.movement = new Vec3d(0, Math.min(event.movement.y, -0.4), 0);
+            event.movement = new Vec3(0, Math.min(event.movement.y, -0.4), 0);
             return;
         }
 
-        Vec3d delta = this.target.subtract(playerPos());
+        Vec3 delta = this.target.subtract(playerPos());
         double length = delta.length();
         if (length < 1.0E-4) return;
 
-        Vec3d motion = delta.normalize().multiply(Math.min(baseSpeed() * this.speedMult.getValue(), length));
-        event.movement = new Vec3d(motion.x, event.movement.y, motion.z);
+        Vec3 motion = delta.normalize().multiply(Math.min(baseSpeed() * this.speedMult.getValue(), length));
+        event.movement = new Vec3(motion.x, event.movement.y, motion.z);
     }
 
-    private Vec3d playerPos() {
-        return new Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ());
+    private Vec3 playerPos() {
+        return new Vec3(mc.player.getX(), mc.player.getY(), mc.player.getZ());
     }
 
     private void stop() {
@@ -226,7 +226,7 @@ public class HoleSnap extends Module {
             }
         }
 
-        Box box = stretch == null ? new Box(pos) : new Box(pos).stretch(stretch.getOffsetX(), 0.0, stretch.getOffsetZ());
+        AABB box = stretch == null ? new AABB(pos) : new AABB(pos).stretch(stretch.getOffsetX(), 0.0, stretch.getOffsetZ());
         return new Hole(pos.toImmutable(), box, covered);
     }
 
@@ -241,16 +241,16 @@ public class HoleSnap extends Module {
             && !state.isOf(Blocks.LIGHT);
     }
 
-    private Vec3d findHole() {
-        Vec3d pos = playerPos();
+    private Vec3 findHole() {
+        Vec3 pos = playerPos();
         double best = Double.MAX_VALUE;
-        Vec3d result = null;
+        Vec3 result = null;
 
         for (Hole hole : this.holes) {
             if (hole.pos().getY() >= pos.getY() || hole.covered()) continue;
 
-            Vec3d center = hole.box().getCenter();
-            Vec3d target = center.withAxis(Direction.Axis.Y, MathHelper.clamp(pos.getY(), center.y, center.y + this.height.getValue() - 0.5));
+            Vec3 center = hole.box().getCenter();
+            Vec3 target = center.withAxis(Direction.Axis.Y, MathHelper.clamp(pos.getY(), center.y, center.y + this.height.getValue() - 0.5));
 
             double distance = pos.distanceTo(target);
             if (distance > this.range.getValue()) continue;
@@ -270,24 +270,24 @@ public class HoleSnap extends Module {
         return result;
     }
 
-    private boolean movingTowards(Vec3d target) {
+    private boolean movingTowards(Vec3 target) {
         Vec2f input = mc.player.input.getMovementInput();
         if (input.x == 0.0f && input.y == 0.0f) return false;
 
-        Vec3d velocity = mc.player.getVelocity();
-        Vec3d pos = playerPos();
+        Vec3 velocity = mc.player.getVelocity();
+        Vec3 pos = playerPos();
         return pos.add(velocity.x * 10000.0, 0.0, velocity.z * 10000.0).squaredDistanceTo(target)
             < pos.add(velocity.x * -10000.0, 0.0, velocity.z * -10000.0).squaredDistanceTo(target);
     }
 
-    private boolean blockedBetween(Vec3d from, Vec3d to) {
+    private boolean blockedBetween(Vec3 from, Vec3 to) {
         return mc.world.raycast(new RaycastContext(from, to,
             RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, mc.player
         )).getType() != HitResult.Type.MISS;
     }
 
-    private float[] rotationTo(Vec3d target) {
-        Vec3d eye = mc.player.getCameraPosVec(1.0f);
+    private float[] rotationTo(Vec3 target) {
+        Vec3 eye = mc.player.getCameraPosVec(1.0f);
         double dx = target.x - eye.x;
         double dy = target.y - eye.y;
         double dz = target.z - eye.z;
@@ -300,10 +300,10 @@ public class HoleSnap extends Module {
     private boolean isInHole() {
         BlockPos pos = BlockPos.ofFloored(mc.player.getX(), Math.round(mc.player.getY()), mc.player.getZ());
         for (Hole hole : this.holes) {
-            if (hole.box().intersects(new Box(pos))) return true;
+            if (hole.box().intersects(new AABB(pos))) return true;
         }
         return false;
     }
 
-    private record Hole(BlockPos pos, Box box, boolean covered) {}
+    private record Hole(BlockPos pos, AABB box, boolean covered) {}
 }

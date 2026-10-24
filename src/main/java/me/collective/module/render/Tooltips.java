@@ -15,28 +15,28 @@ import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.category.Category;
 import me.collective.event.EventHandler;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.client.gui.tooltip.TooltipComponent;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.BeesComponent;
-import net.minecraft.component.type.MapIdComponent;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.FilledMapItem;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.item.map.MapState;
-import net.minecraft.block.MapColor;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.network.packet.s2c.play.InventoryS2CPacket;
-import net.minecraft.network.packet.s2c.play.ScreenHandlerSlotUpdateS2CPacket;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.component.Bees;
+import net.minecraft.world.level.saveddata.maps.MapId;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.MapItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
+import net.minecraft.world.level.material.MapColor;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket;
+import net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.registry.RegistryOps;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.resources.RegistryOps;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -52,10 +52,10 @@ import java.util.List;
  * {@link MapTooltipComponent}.
  *
  * <p>Архитектура оригинала — подмена вызова
- * {@code DrawContext.drawTooltip} через {@code @Redirect} с передачей готового
+ * {@code GuiGraphics.drawTooltip} через {@code @Redirect} с передачей готового
  * списка компонентов в {@code drawTooltipsHook} — в Yarn 1.21.11 воспроизведена
  * один в один: тот же перехват и тот же
- * {@code DrawContext.drawTooltipImmediately}.
+ * {@code GuiGraphics.drawTooltipImmediately}.
  *
  * <p>Тултип собирается как список компонентов: строки текста плюс наши
  * компоненты-сетка и карта. Отрисовку рамки в оригинале подкрашивали через
@@ -226,12 +226,12 @@ public class Tooltips extends Module {
      *
      * @return готовый список компонентов
      */
-    public List<TooltipComponent> buildComponents(List<Text> lines,
+    public List<TooltipComponent> buildComponents(List<Component> lines,
                                                    net.minecraft.item.tooltip.TooltipData data,
                                                    ItemStack stack, int mouseX, int mouseY) {
         List<TooltipComponent> components = new ArrayList<>();
 
-        for (Text line : lines) {
+        for (Component line : lines) {
             // «3/27» и «и ещё N…» не показываем: содержимое уже видно сеткой
             if (isContainerLabel(line)) continue;
 
@@ -285,7 +285,7 @@ public class Tooltips extends Module {
 
                 if (mapOverlay.get()) {
                     components.add(TooltipComponent.of(
-                            Text.literal(ALT_HINT).formatted(Formatting.YELLOW).asOrderedText()));
+                            Component.literal(ALT_HINT).formatted(ChatFormatting.YELLOW).asOrderedText()));
                 }
             }
         }
@@ -301,7 +301,7 @@ public class Tooltips extends Module {
                     BlockPos pos = flowerPos(nbt);
                     if (pos != null) {
                         components.add(TooltipComponent.of(
-                                Text.literal("Position " + pos.toShortString()).asOrderedText()));
+                                Component.literal("Position " + pos.toShortString()).asOrderedText()));
                     }
                 }
             }
@@ -311,7 +311,7 @@ public class Tooltips extends Module {
         if (size.get()) {
             String sizeText = sizeOf(stack);
             if (sizeText != null) {
-                components.add(TooltipComponent.of(Text.literal(sizeText).asOrderedText()));
+                components.add(TooltipComponent.of(Component.literal(sizeText).asOrderedText()));
             }
         }
 
@@ -326,7 +326,7 @@ public class Tooltips extends Module {
      * {@code item.container.more_items} («и ещё N…»). Они и есть надписи о том,
      * что лежит внутри, поэтому отсекаются; содержимое показывает сетка.
      */
-    private static boolean isContainerLabel(Text line) {
+    private static boolean isContainerLabel(Component line) {
         if (!(line.getContent() instanceof net.minecraft.text.TranslatableTextContent content)) {
             return false;
         }
@@ -352,7 +352,7 @@ public class Tooltips extends Module {
      * имени для карт с собственным названием.
      */
     private static MapState mapStateOf(ItemStack stack, MapIdComponent id) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.world == null || id == null) return null;
 
         MapState state = FilledMapItem.getMapState(id, mc.world);
@@ -385,7 +385,7 @@ public class Tooltips extends Module {
 
     /** Вес предмета: считается объём сериализованного NBT. */
     private static String sizeOf(ItemStack stack) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return null;
 
         try {
@@ -435,7 +435,7 @@ public class Tooltips extends Module {
 
     /** Средняя кнопка мыши открывает содержимое в отдельном окне. */
     private void openPreviewScreenOnMiddleClick(List<ItemStack> slots, ItemStack stack) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (!(mc.currentScreen instanceof HandledScreen<?>)) return;
         // уже открыто окно просмотра — повторно не открываем
         if (mc.currentScreen instanceof ContainerPreviewScreen) return;

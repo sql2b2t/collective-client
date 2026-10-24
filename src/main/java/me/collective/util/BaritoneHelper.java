@@ -1,6 +1,6 @@
 package me.collective.util;
 
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
 
 /**
  * Безопасный доступ к Baritone, если он установлен.

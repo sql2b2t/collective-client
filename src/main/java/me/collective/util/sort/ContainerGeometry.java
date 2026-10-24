@@ -1,18 +1,18 @@
 package me.collective.util.sort;
 
-import net.minecraft.block.BarrelBlock;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.ChestBlock;
-import net.minecraft.block.TrappedChestBlock;
-import net.minecraft.block.enums.ChestType;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.tag.ItemTags;
-import net.minecraft.state.property.Properties;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.world.World;
+import net.minecraft.world.level.block.BarrelBlock;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.TrappedChestBlock;
+import net.minecraft.world.level.block.state.properties.ChestType;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -28,7 +28,7 @@ public final class ContainerGeometry {
      * Для одинарных сундуков, бочек и разнотипных половин — null.
      */
     @Nullable
-    public static BlockPos otherHalf(World level, BlockPos pos) {
+    public static BlockPos otherHalf(Level level, BlockPos pos) {
         if (level == null) return null;
 
         BlockState state = level.getBlockState(pos);
@@ -49,7 +49,7 @@ public final class ContainerGeometry {
     }
 
     /** Меньшая из двух половин — чтобы индекс не дублировал двойные сундуки. */
-    public static BlockPos canonical(World level, BlockPos pos) {
+    public static BlockPos canonical(Level level, BlockPos pos) {
         BlockPos other = otherHalf(level, pos);
         return other == null || pos.compareTo(other) <= 0 ? pos : other;
     }
@@ -64,7 +64,7 @@ public final class ContainerGeometry {
     }
 
     /** 54 слота у двойного сундука, 27 у одинарного. */
-    public static int slotCount(World level, BlockPos pos) {
+    public static int slotCount(Level level, BlockPos pos) {
         return otherHalf(level, pos) != null ? 54 : 27;
     }
 
@@ -72,7 +72,7 @@ public final class ContainerGeometry {
      * Число слотов контейнера. Если блок загружен — считаем точно,
      * иначе оцениваем по типу и занятым стопкам (чанк мог выгрузиться).
      */
-    public static int slotCount(World level, BlockPos canonical, String containerType, int usedStacks) {
+    public static int slotCount(Level level, BlockPos canonical, String containerType, int usedStacks) {
         return level != null && level.isPosLoaded(canonical) && isContainerBlock(level.getBlockState(canonical))
             ? slotCount(level, canonical)
             : estimatedSlots(containerType, usedStacks);
@@ -85,7 +85,7 @@ public final class ContainerGeometry {
 
     /** Идентификатор сервера: папка с данными не должна смешивать серверы. */
     public static String serverId() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc == null) return "unknown";
         if (mc.getCurrentServerEntry() != null) return sanitizeFileName(mc.getCurrentServerEntry().address);
         return mc.isInSingleplayer() && mc.getServer() != null

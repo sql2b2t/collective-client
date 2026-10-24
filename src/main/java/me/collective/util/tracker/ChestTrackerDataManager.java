@@ -1,6 +1,6 @@
 package me.collective.util.tracker;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 import java.io.File;
 
@@ -93,7 +93,7 @@ public class ChestTrackerDataManager {
     }
 
     private static String currentServerIdentifier() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc == null) return "unknown";
         if (mc.getCurrentServerEntry() != null) return mc.getCurrentServerEntry().address;
         return mc.isInSingleplayer() && mc.getServer() != null
@@ -103,6 +103,6 @@ public class ChestTrackerDataManager {
 
     /** Куда класть экспорт — рядом с остальными файлами индекса. */
     static File exportTarget(String filename) {
-        return new File(new File(net.minecraft.client.MinecraftClient.getInstance().runDirectory, "collective/ChestTracker"), filename);
+        return new File(new File(net.minecraft.client.Minecraft.getInstance().runDirectory, "collective/ChestTracker"), filename);
     }
 }

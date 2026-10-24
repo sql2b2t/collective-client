@@ -2,25 +2,25 @@ package me.collective.util.printer;
 
 import me.collective.util.RotationUtils;
 import java.util.Set;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.CakeBlock;
-import net.minecraft.block.ComposterBlock;
-import net.minecraft.block.DragonEggBlock;
-import net.minecraft.block.FlowerPotBlock;
-import net.minecraft.block.MultifaceBlock;
-import net.minecraft.block.RespawnAnchorBlock;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.state.property.Property;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.CakeBlock;
+import net.minecraft.world.level.block.ComposterBlock;
+import net.minecraft.world.level.block.DragonEggBlock;
+import net.minecraft.world.level.block.FlowerPotBlock;
+import net.minecraft.world.level.block.MultifaceBlock;
+import net.minecraft.world.level.block.RespawnAnchorBlock;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.ClipContext;
 
 /**
  * Решатель вариантов установки блока (порт из BepHax NEW-SRC). Подбирает точку
@@ -28,7 +28,7 @@ import net.minecraft.world.RaycastContext;
  * заблокирован соседями, с учётом reach-лимита и трешхолдов Grim.
  *
  * Адаптация под 1.21.11 (Yarn): ClipContext -> RaycastContext (ShapeType/FluidHandling),
- * Level.clip -> World.raycast, Vec3 -> Vec3d, InteractionHand -> Hand,
+ * Level.clip -> Level.raycast, Vec3 -> Vec3, InteractionHand -> InteractionHand,
  * getStateForPlacement -> Block.getPlacementState, canBeReplaced -> isReplaceable.
  */
 public final class PlacementSolver {
@@ -87,7 +87,7 @@ public final class PlacementSolver {
     }
 
     public static Solution solve(BlockPos target, BlockState desired, ItemStack stack, double reach, boolean allowFace, boolean allowAir) {
-        if (MinecraftClient.getInstance().player == null || MinecraftClient.getInstance().world == null) {
+        if (Minecraft.getInstance().player == null || Minecraft.getInstance().world == null) {
             return null;
         }
 
@@ -95,10 +95,10 @@ public final class PlacementSolver {
             return null;
         }
 
-        Vec3d eye = MinecraftClient.getInstance().player.getEyePos();
+        Vec3 eye = Minecraft.getInstance().player.getEyePos();
         double reachSq = reach * reach;
         if (allowFace) {
-            BlockState ws = MinecraftClient.getInstance().world.getBlockState(target);
+            BlockState ws = Minecraft.getInstance().world.getBlockState(target);
             if (!ws.isAir() && !clickTriggersAction(ws.getBlock())) {
                 Solution self = solveFaces(target, desired, stack, eye, reachSq, target, false);
                 if (self != null) {
@@ -116,21 +116,21 @@ public final class PlacementSolver {
     }
 
     public static Solution solveAnyRotation(BlockPos target, BlockState desired, ItemStack stack, double reach) {
-        if (MinecraftClient.getInstance().player != null && MinecraftClient.getInstance().world != null) {
+        if (Minecraft.getInstance().player != null && Minecraft.getInstance().world != null) {
             if (!(stack.getItem() instanceof BlockItem)) {
                 return null;
             }
 
-            Vec3d eye = MinecraftClient.getInstance().player.getEyePos();
+            Vec3 eye = Minecraft.getInstance().player.getEyePos();
             double reachSq = reach * reach;
             latticeBudget = 400;
-            BlockState ws = MinecraftClient.getInstance().world.getBlockState(target);
+            BlockState ws = Minecraft.getInstance().world.getBlockState(target);
             if (!ws.isAir() && clickTriggersAction(ws.getBlock())) {
                 return null;
             }
 
             for (Direction face : Direction.values()) {
-                Vec3d faceCenter = Vec3d.ofCenter(target).add(normal(face).multiply(0.5));
+                Vec3 faceCenter = Vec3.ofCenter(target).add(normal(face).multiply(0.5));
 
                 for (double u : LATTICE_SAMPLES) {
                     for (double v : LATTICE_SAMPLES) {
@@ -138,7 +138,7 @@ public final class PlacementSolver {
                             return null;
                         }
 
-                        Vec3d sample = faceOffset(faceCenter, face, u - 0.5, v - 0.5);
+                        Vec3 sample = faceOffset(faceCenter, face, u - 0.5, v - 0.5);
                         Solution s = tryAnyRotation(target, desired, stack, eye, reachSq, target, face, sample);
                         if (s != null) {
                             return s;
@@ -154,7 +154,7 @@ public final class PlacementSolver {
     }
 
     private static Solution tryAnyRotation(
-        BlockPos target, BlockState desired, ItemStack stack, Vec3d eye, double reachSq, BlockPos hitBlock, Direction clickFace, Vec3d sample
+        BlockPos target, BlockState desired, ItemStack stack, Vec3 eye, double reachSq, BlockPos hitBlock, Direction clickFace, Vec3 sample
     ) {
         if (!faceVisible(eye, hitBlock, clickFace)) {
             return null;
@@ -180,28 +180,28 @@ public final class PlacementSolver {
         }
 
         return new Solution(
-            hit, Hand.MAIN_HAND, MinecraftClient.getInstance().player.getYaw(), MinecraftClient.getInstance().player.getPitch(), result, null, true
+            hit, InteractionHand.MAIN_HAND, Minecraft.getInstance().player.getYaw(), Minecraft.getInstance().player.getPitch(), result, null, true
         );
     }
 
     public static Solution solveMoving(
         BlockPos target, BlockState desired, ItemStack stack, double reach, boolean allowFace, boolean allowAir, boolean sprinting
     ) {
-        if (MinecraftClient.getInstance().player != null && MinecraftClient.getInstance().world != null) {
+        if (Minecraft.getInstance().player != null && Minecraft.getInstance().world != null) {
             if (!(stack.getItem() instanceof BlockItem)) {
                 return null;
             }
 
-            Vec3d eye = MinecraftClient.getInstance().player.getEyePos();
+            Vec3 eye = Minecraft.getInstance().player.getEyePos();
             double reachSq = reach * reach;
-            float realYaw = MinecraftClient.getInstance().player.getYaw();
+            float realYaw = Minecraft.getInstance().player.getYaw();
             latticeBudget = 800;
 
             for (int k : sprinting ? K_ORDER_SPRINT : K_ORDER) {
                 for (float pitch : LATTICE_PITCHES) {
                     float yaw = realYaw + k * 45.0F;
                     if (allowFace) {
-                        BlockState ws = MinecraftClient.getInstance().world.getBlockState(target);
+                        BlockState ws = Minecraft.getInstance().world.getBlockState(target);
                         if (!ws.isAir() && !clickTriggersAction(ws.getBlock())) {
                             Solution self = latticeFaces(target, desired, stack, eye, reachSq, target, false, yaw, pitch, k);
                             if (self != null) {
@@ -211,9 +211,9 @@ public final class PlacementSolver {
 
                         for (Direction face : Direction.values()) {
                             BlockPos neighbor = target.offset(face);
-                            BlockState neighborState = MinecraftClient.getInstance().world.getBlockState(neighbor);
+                            BlockState neighborState = Minecraft.getInstance().world.getBlockState(neighbor);
                             if (!neighborState.isReplaceable()
-                                && !neighborState.getCollisionShape(MinecraftClient.getInstance().world, neighbor).isEmpty()
+                                && !neighborState.getCollisionShape(Minecraft.getInstance().world, neighbor).isEmpty()
                                 && !clickTriggersAction(neighborState.getBlock())) {
                                 Solution s = latticeSamples(
                                     target, desired, stack, eye, reachSq, neighbor, face.getOpposite(), false, yaw, pitch, k
@@ -248,7 +248,7 @@ public final class PlacementSolver {
         BlockPos target,
         BlockState desired,
         ItemStack stack,
-        Vec3d eye,
+        Vec3 eye,
         double reachSq,
         BlockPos hitBlock,
         boolean inside,
@@ -270,7 +270,7 @@ public final class PlacementSolver {
         BlockPos target,
         BlockState desired,
         ItemStack stack,
-        Vec3d eye,
+        Vec3 eye,
         double reachSq,
         BlockPos hitBlock,
         Direction clickFace,
@@ -279,11 +279,11 @@ public final class PlacementSolver {
         float pitch,
         int k
     ) {
-        Vec3d faceCenter = Vec3d.ofCenter(hitBlock).add(normal(clickFace).multiply(0.5));
+        Vec3 faceCenter = Vec3.ofCenter(hitBlock).add(normal(clickFace).multiply(0.5));
 
         for (double u : LATTICE_SAMPLES) {
             for (double v : LATTICE_SAMPLES) {
-                Vec3d sample = faceOffset(faceCenter, clickFace, u - 0.5, v - 0.5);
+                Vec3 sample = faceOffset(faceCenter, clickFace, u - 0.5, v - 0.5);
                 Solution s = tryLattice(target, desired, stack, eye, reachSq, hitBlock, clickFace, sample, inside, yaw, pitch, k);
                 if (s != null) {
                     return s;
@@ -298,11 +298,11 @@ public final class PlacementSolver {
         BlockPos target,
         BlockState desired,
         ItemStack stack,
-        Vec3d eye,
+        Vec3 eye,
         double reachSq,
         BlockPos hitBlock,
         Direction clickFace,
-        Vec3d sample,
+        Vec3 sample,
         boolean inside,
         float yaw,
         float pitch,
@@ -324,7 +324,7 @@ public final class PlacementSolver {
             return null;
         }
 
-        Vec3d hitVec = validateRay(eye, sample, hitBlock, clickFace, inside);
+        Vec3 hitVec = validateRay(eye, sample, hitBlock, clickFace, inside);
         if (hitVec != null && !(eye.squaredDistanceTo(hitVec) > reachSq)) {
             BlockHitResult hit = new BlockHitResult(hitVec, clickFace, hitBlock, inside);
             latticeBudget -= 3;
@@ -337,7 +337,7 @@ public final class PlacementSolver {
                     }
                 }
 
-                return new Solution(hit, Hand.MAIN_HAND, yaw, pitch, result, k, false);
+                return new Solution(hit, InteractionHand.MAIN_HAND, yaw, pitch, result, k, false);
             } else {
                 return null;
             }
@@ -349,7 +349,7 @@ public final class PlacementSolver {
     public static boolean confirmSent(Solution s, BlockPos target, BlockState desired, ItemStack stack) {
         if (s.anyRotation()) {
             return true;
-        } else if (MinecraftClient.getInstance().player != null && MinecraftClient.getInstance().world != null) {
+        } else if (Minecraft.getInstance().player != null && Minecraft.getInstance().world != null) {
             RotationUtils rot = RotationUtils.getInstance();
             BlockState result = simulate(s.hit(), stack, rot.getServerYaw(), rot.getServerPitch(), target);
             return result != null && statesMatch(desired, result);
@@ -361,8 +361,8 @@ public final class PlacementSolver {
     public static Solution revalidate(
         Solution s, BlockPos target, BlockState desired, ItemStack stack, double reach, boolean sprinting
     ) {
-        if (MinecraftClient.getInstance().player != null && MinecraftClient.getInstance().world != null) {
-            Vec3d eye = MinecraftClient.getInstance().player.getEyePos();
+        if (Minecraft.getInstance().player != null && Minecraft.getInstance().world != null) {
+            Vec3 eye = Minecraft.getInstance().player.getEyePos();
             double reachSq = reach * reach;
             BlockHitResult h = s.hit();
             if (s.anyRotation()) {
@@ -374,7 +374,7 @@ public final class PlacementSolver {
                 return tryCandidate(target, desired, stack, eye, reachSq, h.getBlockPos(), h.getSide(), h.getPos(), h.isInsideBlock());
             }
 
-            float realYaw = MinecraftClient.getInstance().player.getYaw();
+            float realYaw = Minecraft.getInstance().player.getYaw();
             latticeBudget = 800;
 
             for (int k : sprinting ? K_ORDER_SPRINT : K_ORDER) {
@@ -405,12 +405,12 @@ public final class PlacementSolver {
         }
     }
 
-    private static Solution solveAgainstFace(BlockPos target, BlockState desired, ItemStack stack, Vec3d eye, double reachSq) {
+    private static Solution solveAgainstFace(BlockPos target, BlockState desired, ItemStack stack, Vec3 eye, double reachSq) {
         for (Direction face : Direction.values()) {
             BlockPos neighbor = target.offset(face);
-            BlockState neighborState = MinecraftClient.getInstance().world.getBlockState(neighbor);
+            BlockState neighborState = Minecraft.getInstance().world.getBlockState(neighbor);
             if (!neighborState.isReplaceable()
-                && !neighborState.getCollisionShape(MinecraftClient.getInstance().world, neighbor).isEmpty()
+                && !neighborState.getCollisionShape(Minecraft.getInstance().world, neighbor).isEmpty()
                 && !clickTriggersAction(neighborState.getBlock())) {
                 Solution s = trySamples(target, desired, stack, eye, reachSq, neighbor, face.getOpposite(), false);
                 if (s != null) {
@@ -423,7 +423,7 @@ public final class PlacementSolver {
     }
 
     private static Solution solveFaces(
-        BlockPos target, BlockState desired, ItemStack stack, Vec3d eye, double reachSq, BlockPos hitBlock, boolean inside
+        BlockPos target, BlockState desired, ItemStack stack, Vec3 eye, double reachSq, BlockPos hitBlock, boolean inside
     ) {
         for (Direction face : Direction.values()) {
             Solution s = trySamples(target, desired, stack, eye, reachSq, hitBlock, face, inside);
@@ -436,13 +436,13 @@ public final class PlacementSolver {
     }
 
     private static Solution trySamples(
-        BlockPos target, BlockState desired, ItemStack stack, Vec3d eye, double reachSq, BlockPos hitBlock, Direction clickFace, boolean inside
+        BlockPos target, BlockState desired, ItemStack stack, Vec3 eye, double reachSq, BlockPos hitBlock, Direction clickFace, boolean inside
     ) {
-        Vec3d faceCenter = Vec3d.ofCenter(hitBlock).add(normal(clickFace).multiply(0.5));
+        Vec3 faceCenter = Vec3.ofCenter(hitBlock).add(normal(clickFace).multiply(0.5));
 
         for (double u : SAMPLES) {
             for (double v : SAMPLES) {
-                Vec3d sample = faceOffset(faceCenter, clickFace, u - 0.5, v - 0.5);
+                Vec3 sample = faceOffset(faceCenter, clickFace, u - 0.5, v - 0.5);
                 Solution s = tryCandidate(target, desired, stack, eye, reachSq, hitBlock, clickFace, sample, inside);
                 if (s != null) {
                     return s;
@@ -457,11 +457,11 @@ public final class PlacementSolver {
         BlockPos target,
         BlockState desired,
         ItemStack stack,
-        Vec3d eye,
+        Vec3 eye,
         double reachSq,
         BlockPos hitBlock,
         Direction clickFace,
-        Vec3d sample,
+        Vec3 sample,
         boolean inside
     ) {
         if (inside && !faceVisible(eye, hitBlock, clickFace)) {
@@ -476,7 +476,7 @@ public final class PlacementSolver {
             return null;
         }
 
-        Vec3d hitVec = validateRay(eye, sample, hitBlock, clickFace, inside);
+        Vec3 hitVec = validateRay(eye, sample, hitBlock, clickFace, inside);
         if (hitVec != null && !(eye.squaredDistanceTo(hitVec) > reachSq)) {
             float[] rot = RotationUtils.getRotationsTo(eye, hitVec);
             BlockHitResult hit = new BlockHitResult(hitVec, clickFace, hitBlock, inside);
@@ -498,7 +498,7 @@ public final class PlacementSolver {
                     return null;
                 }
 
-                return new Solution(hit, Hand.MAIN_HAND, rot[0], rot[1], result, null, false);
+                return new Solution(hit, InteractionHand.MAIN_HAND, rot[0], rot[1], result, null, false);
             } else {
                 return null;
             }
@@ -507,15 +507,15 @@ public final class PlacementSolver {
         }
     }
 
-    private static Vec3d validateRay(Vec3d eye, Vec3d sample, BlockPos hitBlock, Direction clickFace, boolean inside) {
+    private static Vec3 validateRay(Vec3 eye, Vec3 sample, BlockPos hitBlock, Direction clickFace, boolean inside) {
         if (inside) {
             return sample;
         } else {
-            Vec3d dir = sample.subtract(eye);
-            Vec3d end = eye.add(dir.multiply(1.0 + 0.01 / dir.length()));
-            BlockHitResult clip = MinecraftClient.getInstance()
+            Vec3 dir = sample.subtract(eye);
+            Vec3 end = eye.add(dir.multiply(1.0 + 0.01 / dir.length()));
+            BlockHitResult clip = Minecraft.getInstance()
                 .world
-                .raycast(new RaycastContext(eye, end, RaycastContext.ShapeType.OUTLINE, RaycastContext.FluidHandling.NONE, MinecraftClient.getInstance().player));
+                .raycast(new RaycastContext(eye, end, RaycastContext.ShapeType.OUTLINE, RaycastContext.FluidHandling.NONE, Minecraft.getInstance().player));
             if (clip.getType() != HitResult.Type.BLOCK) {
                 return null;
             } else {
@@ -524,7 +524,7 @@ public final class PlacementSolver {
         }
     }
 
-    private static boolean faceVisible(Vec3d eye, BlockPos pos, Direction face) {
+    private static boolean faceVisible(Vec3 eye, BlockPos pos, Direction face) {
         return switch (face) {
             case DOWN -> eye.y < pos.getY();
             case UP -> eye.y > pos.getY() + 1.0;
@@ -535,7 +535,7 @@ public final class PlacementSolver {
         };
     }
 
-    private static Vec3d faceOffset(Vec3d center, Direction face, double du, double dv) {
+    private static Vec3 faceOffset(Vec3 center, Direction face, double du, double dv) {
         return switch (face.getAxis()) {
             case X -> center.add(0.0, dv, du);
             case Y -> center.add(du, 0.0, dv);
@@ -545,7 +545,7 @@ public final class PlacementSolver {
 
     private static BlockState simulate(BlockHitResult hit, ItemStack stack, float yaw, float pitch, BlockPos target) {
         if (stack.getItem() instanceof BlockItem blockItem) {
-            PlacementContextSim ctx = new PlacementContextSim(MinecraftClient.getInstance().player, Hand.MAIN_HAND, stack, hit, yaw, pitch);
+            PlacementContextSim ctx = new PlacementContextSim(Minecraft.getInstance().player, InteractionHand.MAIN_HAND, stack, hit, yaw, pitch);
             if (!ctx.canPlace()) {
                 return null;
             } else {
@@ -597,10 +597,10 @@ public final class PlacementSolver {
         return state.getBlock() instanceof MultifaceBlock;
     }
 
-    private static Vec3d normal(Direction d) {
-        return new Vec3d(d.getOffsetX(), d.getOffsetY(), d.getOffsetZ());
+    private static Vec3 normal(Direction d) {
+        return new Vec3(d.getOffsetX(), d.getOffsetY(), d.getOffsetZ());
     }
 
-    public record Solution(BlockHitResult hit, Hand hand, float yaw, float pitch, BlockState predicted, Integer latticeK, boolean anyRotation) {
+    public record Solution(BlockHitResult hit, InteractionHand hand, float yaw, float pitch, BlockState predicted, Integer latticeK, boolean anyRotation) {
     }
 }

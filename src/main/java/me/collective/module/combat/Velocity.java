@@ -9,10 +9,10 @@ import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.network.packet.s2c.play.EntityVelocityUpdateS2CPacket;
-import net.minecraft.network.packet.s2c.play.ExplosionS2CPacket;
-import net.minecraft.util.math.Vec2f;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
+import net.minecraft.network.protocol.game.ClientboundExplodePacket;
+import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Optional;
 
@@ -81,9 +81,9 @@ public class Velocity extends Module {
                 if (h <= 0.0 && v <= 0.0) {
                     event.cancel();
                 } else {
-                    Vec3d vel = packet.getVelocity();
+                    Vec3 vel = packet.getVelocity();
                     ((EntityVelocityUpdateS2CPacketAccessor) (Object) packet).setVelocity(
-                        new Vec3d(vel.x * h, vel.y * v, vel.z * h)
+                        new Vec3(vel.x * h, vel.y * v, vel.z * h)
                     );
                 }
             }
@@ -113,11 +113,11 @@ public class Velocity extends Module {
                 if (h <= 0.0 && v <= 0.0) {
                     ((ExplosionS2CPacketAccessor) (Object) explosion).setPlayerKnockback(Optional.empty());
                 } else {
-                    Optional<Vec3d> opt = explosion.playerKnockback();
+                    Optional<Vec3> opt = explosion.playerKnockback();
                     if (opt.isPresent()) {
-                        Vec3d kb = opt.get();
+                        Vec3 kb = opt.get();
                         ((ExplosionS2CPacketAccessor) (Object) explosion).setPlayerKnockback(
-                            Optional.of(new Vec3d(kb.x * h, kb.y * v, kb.z * h))
+                            Optional.of(new Vec3(kb.x * h, kb.y * v, kb.z * h))
                         );
                     }
                 }

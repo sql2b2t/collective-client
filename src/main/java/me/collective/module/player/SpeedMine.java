@@ -16,37 +16,37 @@ import me.collective.util.GrimUtils;
 import me.collective.util.RotationUtils;
 import me.collective.util.SettingColor;
 import me.collective.util.SwapManager;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.network.PlayerListEntry;
-import net.minecraft.component.type.ItemEnchantmentsComponent;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.Enchantments;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityPose;
-import net.minecraft.entity.ItemEntity;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.effect.StatusEffectUtil;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
-import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;
-import net.minecraft.network.packet.s2c.play.ChunkDeltaUpdateS2CPacket;
-import net.minecraft.network.packet.s2c.play.WorldTimeUpdateS2CPacket;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.registry.tag.FluidTags;
-import net.minecraft.text.Text;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.shape.VoxelShape;
-import net.minecraft.util.shape.VoxelShapes;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.effect.MobEffectUtil;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundSetTimePacket;
+import net.minecraft.core.Holder;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.core.Direction;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.world.phys.shapes.Shapes;
 
 import java.awt.Color;
 import java.util.ArrayDeque;
@@ -351,7 +351,7 @@ public class SpeedMine extends Module {
     private boolean instantTogglePressed = false;
     private boolean autoMineTogglePressed = false;
     private boolean clearQueuePressed = false;
-    private PlayerEntity currentTarget = null;
+    private Player currentTarget = null;
     private long lastAutoMineTime = 0L;
     private long lastAntiCrawlTime = 0L;
     private static final long AUTO_MINE_DELAY_MS = 250L;
@@ -499,7 +499,7 @@ public class SpeedMine extends Module {
             this.autoMineTogglePressed = true;
             this.autoMine.set(!this.autoMine.get());
             String status = this.autoMine.get() ? "§aвключён" : "§cвыключен";
-            this.mc.player.sendMessage(Text.literal("§7[§bFast Mine§7] §fАвто-майн " + status), false);
+            this.mc.player.sendMessage(Component.literal("§7[§bFast Mine§7] §fАвто-майн " + status), false);
         }
 
         if (!this.instantToggleKey.get().isPressed() || this.mc.currentScreen != null) {
@@ -512,7 +512,7 @@ public class SpeedMine extends Module {
             }
 
             String status = this.instantConfig.get() ? "§aвключён" : "§cвыключен";
-            this.mc.player.sendMessage(Text.literal("§7[§bFast Mine§7] §fМгновенный майнинг " + status), false);
+            this.mc.player.sendMessage(Component.literal("§7[§bFast Mine§7] §fМгновенный майнинг " + status), false);
         }
 
         if (!this.clearQueueKey.get().isPressed() || this.mc.currentScreen != null) {
@@ -528,7 +528,7 @@ public class SpeedMine extends Module {
                 this.activeMine = null;
                 this.clearSecondary();
                 this.pending.clear();
-                this.mc.player.sendMessage(Text.literal("§7[§bFast Mine§7] §fОчередь очищена §7(" + cleared + ")"), false);
+                this.mc.player.sendMessage(Component.literal("§7[§bFast Mine§7] §fОчередь очищена §7(" + cleared + ")"), false);
             }
         }
     }
@@ -594,7 +594,7 @@ public class SpeedMine extends Module {
                     }
 
                     if (!this.rebreakAirSeen) {
-                        for (Entity drop : this.mc.world.getOtherEntities(this.mc.player, new Box(this.rebreakPos), e -> e instanceof ItemEntity)) {
+                        for (Entity drop : this.mc.world.getOtherEntities(this.mc.player, new AABB(this.rebreakPos), e -> e instanceof ItemEntity)) {
                             if (drop.age <= 3) {
                                 this.noteRebreakAir();
                                 this.rebreakReplaceSeen = true;
@@ -1171,7 +1171,7 @@ public class SpeedMine extends Module {
                         this.renderLineColor.set(base.r, base.g, base.b, lineAlpha);
                         BlockPos mining = data.pos;
                         VoxelShape outlineShape = state.getOutlineShape(this.mc.world, mining);
-                        Box bounds = (outlineShape.isEmpty() ? VoxelShapes.fullCube() : outlineShape).getBoundingBox();
+                        AABB bounds = (outlineShape.isEmpty() ? VoxelShapes.fullCube() : outlineShape).getBoundingBox();
                         float scale = !queued && !air
                             ? MathHelper.clamp((data.damage + (data.damage - data.lastDamage) * event.tickDelta) / total, 0.0F, 1.0F)
                             : 1.0F;
@@ -1248,7 +1248,7 @@ public class SpeedMine extends Module {
 
     private boolean inRange(BlockPos pos) {
         double r = this.rangeConfig.get();
-        return GrimUtils.closestEyeDistanceSqTo(this.mc.player, new Box(pos)) <= r * r;
+        return GrimUtils.closestEyeDistanceSqTo(this.mc.player, new AABB(pos)) <= r * r;
     }
 
     private void noteStart(BlockPos pos) {
@@ -1280,10 +1280,10 @@ public class SpeedMine extends Module {
     private void sendSwing() {
         switch (this.swingConfig.get()) {
             case FULL:
-                this.mc.player.swingHand(Hand.MAIN_HAND);
+                this.mc.player.swingHand(InteractionHand.MAIN_HAND);
                 break;
             case PACKET:
-                this.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+                this.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
             case NONE:
         }
     }
@@ -1518,12 +1518,12 @@ public class SpeedMine extends Module {
         return !state.isToolRequired() || stack.isSuitableFor(state);
     }
 
-    private PlayerEntity getClosestEnemy() {
+    private Player getClosestEnemy() {
         if (this.mc.world != null && this.mc.player != null) {
-            PlayerEntity closest = null;
+            Player closest = null;
             double closestDist = this.enemyRange.get() * this.enemyRange.get();
 
-            for (PlayerEntity player : this.mc.world.getPlayers()) {
+            for (Player player : this.mc.world.getPlayers()) {
                 if (player != this.mc.player && !player.isSpectator() && !player.isDead() && !FriendManager.getInstance().isFriend(player)) {
                     double dist = this.mc.player.squaredDistanceTo(player);
                     if (dist < closestDist) {
@@ -1539,7 +1539,7 @@ public class SpeedMine extends Module {
         }
     }
 
-    private BlockPos findBestEnemyBlock(PlayerEntity enemy) {
+    private BlockPos findBestEnemyBlock(Player enemy) {
         if (enemy == null) {
             return null;
         }
@@ -1593,7 +1593,7 @@ public class SpeedMine extends Module {
                     && !this.isMiningBlock(pos)
                     && !this.isOwnSurroundBlock(pos)
                     && this.isResistantBlock(state)) {
-                    double dist = GrimUtils.closestEyeDistanceSqTo(this.mc.player, new Box(pos));
+                    double dist = GrimUtils.closestEyeDistanceSqTo(this.mc.player, new AABB(pos));
                     if (dist < bestDist) {
                         bestDist = dist;
                         bestBlock = pos;
@@ -1649,13 +1649,13 @@ public class SpeedMine extends Module {
 
     private boolean sentAimHitsBlock(BlockPos pos) {
         RotationUtils rot = RotationUtils.getInstance();
-        Vec3d dir = RotationUtils.getRotationVector(rot.getServerPitch(), rot.getServerYaw());
-        Box box = new Box(pos);
+        Vec3 dir = RotationUtils.getRotationVector(rot.getServerPitch(), rot.getServerYaw());
+        AABB box = new AABB(pos);
         double reach = this.mc.player.getBlockInteractionRange();
-        Vec3d base = new Vec3d(this.mc.player.getX(), this.mc.player.getY(), this.mc.player.getZ());
+        Vec3 base = new Vec3(this.mc.player.getX(), this.mc.player.getY(), this.mc.player.getZ());
 
         for (double h : GrimUtils.getPossibleEyeHeights(this.mc.player)) {
-            Vec3d eye = base.add(0.0, h, 0.0);
+            Vec3 eye = base.add(0.0, h, 0.0);
             if (box.contains(eye) || box.raycast(eye, eye.add(dir.multiply(reach))).isPresent()) {
                 return true;
             }
@@ -1664,13 +1664,13 @@ public class SpeedMine extends Module {
         return false;
     }
 
-    private Vec3d aimPointIn(BlockPos pos) {
-        Vec3d eye = this.mc.player.getEyePos();
-        Vec3d camDir = RotationUtils.getRotationVector(this.mc.player.getPitch(), this.mc.player.getYaw());
-        Box box = new Box(pos).contract(0.15);
+    private Vec3 aimPointIn(BlockPos pos) {
+        Vec3 eye = this.mc.player.getEyePos();
+        Vec3 camDir = RotationUtils.getRotationVector(this.mc.player.getPitch(), this.mc.player.getYaw());
+        AABB box = new AABB(pos).contract(0.15);
         double t = MathHelper.clamp(box.getCenter().subtract(eye).dotProduct(camDir), 0.0, this.mc.player.getBlockInteractionRange());
-        Vec3d p = eye.add(camDir.multiply(t));
-        return new Vec3d(
+        Vec3 p = eye.add(camDir.multiply(t));
+        return new Vec3(
             MathHelper.clamp(p.x, box.minX, box.maxX),
             MathHelper.clamp(p.y, box.minY, box.maxY),
             MathHelper.clamp(p.z, box.minZ, box.maxZ)
@@ -1687,13 +1687,13 @@ public class SpeedMine extends Module {
     }
 
     private Direction getInteractDirection(BlockPos pos) {
-        Vec3d eyePos = this.mc.player.getEyePos();
-        Vec3d posVec = Vec3d.ofCenter(pos);
+        Vec3 eyePos = this.mc.player.getEyePos();
+        Vec3 posVec = Vec3.ofCenter(pos);
         Direction bestDir = null;
         double bestDot = -1.0;
 
         for (Direction dir : Direction.values()) {
-            Vec3d dirVec = Vec3d.of(dir.getVector());
+            Vec3 dirVec = Vec3.of(dir.getVector());
             double dot = eyePos.subtract(posVec).normalize().dotProduct(dirVec);
             if (dot > bestDot) {
                 bestDot = dot;

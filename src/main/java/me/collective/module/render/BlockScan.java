@@ -1,8 +1,8 @@
 package me.collective.module.render;
 
-import net.minecraft.block.Block;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.BlockPos;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,7 +13,7 @@ final class BlockScan {
     static final int POSITIONS_PER_TICK = 8192;
     private static final int MAX_RESULTS = 1000;
 
-    private ClientWorld world;
+    private ClientLevel world;
     private BlockPos center;
     private int radius;
     private Set<Block> targets = Set.of();
@@ -32,7 +32,7 @@ final class BlockScan {
         completedAt = 0L;
     }
 
-    List<BlockPos> tick(ClientWorld currentWorld, BlockPos playerPos, int range, Set<Block> selected, long now) {
+    List<BlockPos> tick(ClientLevel currentWorld, BlockPos playerPos, int range, Set<Block> selected, long now) {
         boolean changed = world != currentWorld || radius != range || !targets.equals(selected);
         // A moving player must not restart a large scan every tick. Finish the
         // captured cube, but discard it immediately on a teleport outside it.

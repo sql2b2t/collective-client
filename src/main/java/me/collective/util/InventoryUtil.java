@@ -1,15 +1,15 @@
 package me.collective.util;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerInteractionManager;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.MultiPlayerGameMode;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.inventory.ClickType;
 
 import java.util.function.Predicate;
 
 public class InventoryUtil {
-    private static final MinecraftClient mc = MinecraftClient.getInstance();
+    private static final Minecraft mc = Minecraft.getInstance();
     public static int previousSlot = -1;
     /** Inventory-index helpers deliberately skip foreign containers and user cursors. */
     public static boolean canUsePlayerInventory() {
@@ -54,7 +54,7 @@ public class InventoryUtil {
         return new FindItemResult(bestSlot, count);
     }
 
-    /** Оффхенд как слот 40 — только для модулей, умеющих Hand.OFF_HAND. */
+    /** Оффхенд как слот 40 — только для модулей, умеющих InteractionHand.OFF_HAND. */
     public static FindItemResult findInOffhand(Predicate<ItemStack> predicate) {
         if (mc.player == null) return new FindItemResult(-1, 0);
         ItemStack stack = mc.player.getOffHandStack();
@@ -65,7 +65,7 @@ public class InventoryUtil {
 
     /**
      * Сначала хотбар, если там пусто — оффхенд. Только для модулей, которые
-     * реально умеют ставить/использовать предмет из Off Hand.
+     * реально умеют ставить/использовать предмет из Off InteractionHand.
      */
     public static FindItemResult findInHotbarOrOffhand(Predicate<ItemStack> predicate) {
         FindItemResult hotbar = findInHotbar(predicate);
@@ -114,7 +114,7 @@ public class InventoryUtil {
     public static boolean swap(int slot, boolean swapBack) {
         if (mc.player == null) return false;
         // Оффхенд нельзя выбрать как слот хотбара: модуль обязан сам
-        // использовать Hand.OFF_HAND.
+        // использовать InteractionHand.OFF_HAND.
         if (slot == 40) return false;
         if (slot < 0 || slot > 8) return false;
 

@@ -11,14 +11,14 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.ColorSetting;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.ButtonBlock;
-import net.minecraft.block.RailBlock;
-import net.minecraft.block.TorchBlock;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Direction;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ButtonBlock;
+import net.minecraft.world.level.block.RailBlock;
+import net.minecraft.world.level.block.TorchBlock;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.core.Direction;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -126,14 +126,14 @@ public class HoleESP extends Module {
         Color c = bedrock ? bedrockColor.getValue() : indestructibleColor.getValue();
 
         if (secondPos == null) {
-            Box box = new Box(pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1.0, pos.getY() + h, pos.getZ() + 1.0);
+            AABB box = new AABB(pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1.0, pos.getY() + h, pos.getZ() + 1.0);
             return new Hole(box, c);
         } else {
             double minX = Math.min(pos.getX(), secondPos.getX());
             double minZ = Math.min(pos.getZ(), secondPos.getZ());
             double maxX = Math.max(pos.getX(), secondPos.getX()) + 1.0;
             double maxZ = Math.max(pos.getZ(), secondPos.getZ()) + 1.0;
-            Box box = new Box(minX, pos.getY(), minZ, maxX, pos.getY() + h, maxZ);
+            AABB box = new AABB(minX, pos.getY(), minZ, maxX, pos.getY() + h, maxZ);
             return new Hole(box, c);
         }
     }
@@ -180,5 +180,5 @@ public class HoleESP extends Module {
         }
     }
 
-    public record Hole(Box box, Color color) {}
+    public record Hole(AABB box, Color color) {}
 }

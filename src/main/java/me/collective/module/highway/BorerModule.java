@@ -10,14 +10,14 @@ import me.collective.setting.NumberSetting;
 import me.collective.util.GrimUtils;
 import me.collective.util.PacketUtil;
 import me.collective.util.RotationUtils;
-import net.minecraft.block.BlockState;
-import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -168,7 +168,7 @@ public abstract class BorerModule extends Module {
                 }
                 currentMiningDamage += state.calcBlockBreakingDelta(mc.player, mc.world, currentMiningPos);
                 if (mc.getNetworkHandler() != null) {
-                    mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+                    mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
                 }
 
                 if (currentMiningDamage >= 1.0f) {
@@ -223,7 +223,7 @@ public abstract class BorerModule extends Module {
                 if (mc.getNetworkHandler() != null) {
                     mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
                         PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, bp, dir, seq));
-                    mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+                    mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
                     mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
                         PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK, bp, dir, seq));
                 }
@@ -237,7 +237,7 @@ public abstract class BorerModule extends Module {
                 if (mc.getNetworkHandler() != null) {
                     mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
                         PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, bp, dir, seq));
-                    mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+                    mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
                 }
                 break;
             }
@@ -246,13 +246,13 @@ public abstract class BorerModule extends Module {
 
     protected Direction getInteractDirection(BlockPos pos) {
         if (mc.player == null) return Direction.UP;
-        Vec3d eyePos = mc.player.getEyePos();
-        Vec3d posVec = Vec3d.ofCenter(pos);
+        Vec3 eyePos = mc.player.getEyePos();
+        Vec3 posVec = Vec3.ofCenter(pos);
         Direction bestDir = Direction.UP;
         double bestDot = -Double.MAX_VALUE;
 
         for (Direction dir : Direction.values()) {
-            Vec3d dirVec = Vec3d.of(dir.getVector());
+            Vec3 dirVec = Vec3.of(dir.getVector());
             double dot = eyePos.subtract(posVec).normalize().dotProduct(dirVec);
             if (dot > bestDot) {
                 bestDot = dot;
@@ -264,8 +264,8 @@ public abstract class BorerModule extends Module {
 
     protected void rotateTo(BlockPos bp) {
         if (mc.player == null) return;
-        Vec3d eye = mc.player.getEyePos();
-        Vec3d target = Vec3d.ofCenter(bp);
+        Vec3 eye = mc.player.getEyePos();
+        Vec3 target = Vec3.ofCenter(bp);
         double dx = target.x - eye.x;
         double dy = target.y - eye.y;
         double dz = target.z - eye.z;

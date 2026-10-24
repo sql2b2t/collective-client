@@ -1,23 +1,23 @@
 package me.collective.util;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.Enchantments;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
-import net.minecraft.world.World;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.core.Holder;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -82,7 +82,7 @@ public final class ExplosionDamageUtil {
         if (!RAW_CACHE.isEmpty()) RAW_CACHE.clear();
     }
 
-    private static float cachedRaw(World world, Vec3d center, float power, LivingEntity entity,
+    private static float cachedRaw(Level world, Vec3 center, float power, LivingEntity entity,
                                    BlockPos transparentBlock) {
         long key = key(center, power, entity, transparentBlock);
         Float hit = RAW_CACHE.get(key);
@@ -95,7 +95,7 @@ public final class ExplosionDamageUtil {
         return value;
     }
 
-    private static long key(Vec3d center, float power, LivingEntity entity, BlockPos transparentBlock) {
+    private static long key(Vec3 center, float power, LivingEntity entity, BlockPos transparentBlock) {
         long h = BlockPos.ofFloored(center).asLong() * 31L + entity.getId();
         h = h * 31L + (long) (power * 8.0f);          // 6.0 и 5.0 разводятся по разным битам
         if (transparentBlock != null) h = h * 31L + transparentBlock.asLong();
@@ -107,11 +107,11 @@ public final class ExplosionDamageUtil {
     // ──────────────────────────────────────────────────────
 
     /** Полный расчёт урона с учётом брони и Blast Protection. */
-    public static float getDamage(World world, BlockPos anchorPos, LivingEntity entity) {
+    public static float getDamage(Level world, BlockPos anchorPos, LivingEntity entity) {
         return getDamage(world, anchorPos.toCenterPos(), ANCHOR_POWER, entity, null);
     }
 
-    public static float getDamage(World world, Vec3d center, float power, LivingEntity entity) {
+    public static float getDamage(Level world, Vec3 center, float power, LivingEntity entity) {
         return getDamage(world, center, power, entity, null);
     }
 
@@ -121,7 +121,7 @@ public final class ExplosionDamageUtil {
      *                        (сейчас там воздух), либо блок, который мы ломаем
      *                        прямо перед взрывом. Может быть {@code null}.
      */
-    public static float getDamage(World world, Vec3d center, float power, LivingEntity entity,
+    public static float getDamage(Level world, Vec3 center, float power, LivingEntity entity,
                                   BlockPos transparentBlock) {
         if (world == null || entity == null || entity.isDead()) return 0.0f;
 
@@ -138,11 +138,11 @@ public final class ExplosionDamageUtil {
      * Сырой урон без редукций — для сравнения позиций в цикле подбора.
      * Значение кэшируется на текущий тик.
      */
-    public static float getDamageRaw(World world, BlockPos anchorPos, LivingEntity entity) {
+    public static float getDamageRaw(Level world, BlockPos anchorPos, LivingEntity entity) {
         return getDamageRaw(world, anchorPos, entity, null);
     }
 
-    public static float getDamageRaw(World world, BlockPos anchorPos, LivingEntity entity,
+    public static float getDamageRaw(Level world, BlockPos anchorPos, LivingEntity entity,
                                      BlockPos transparentBlock) {
         if (world == null || entity == null || entity.isDead()) return 0.0f;
         return cachedRaw(world, anchorPos.toCenterPos(), ANCHOR_POWER, entity, transparentBlock);
@@ -152,7 +152,7 @@ public final class ExplosionDamageUtil {
      * Сырой урон взрыва произвольной мощности из произвольной точки.
      * Кристалл бьёт с {@link #CRYSTAL_POWER}, якорь — с {@link #ANCHOR_POWER}.
      */
-    public static float getDamageRaw(World world, Vec3d center, float power, LivingEntity entity,
+    public static float getDamageRaw(Level world, Vec3 center, float power, LivingEntity entity,
                                      BlockPos transparentBlock) {
         if (world == null || entity == null || entity.isDead()) return 0.0f;
         return cachedRaw(world, center, power, entity, transparentBlock);
@@ -163,7 +163,7 @@ public final class ExplosionDamageUtil {
      * предварительной сортировки кандидатов перед точным расчётом —
      * {@link #getExposure} для этого не вызывается.
      */
-    public static float getDamageUpperBound(Vec3d center, float power, LivingEntity entity) {
+    public static float getDamageUpperBound(Vec3 center, float power, LivingEntity entity) {
         float radius = power * 2.0f;
         double d = Math.sqrt(entity.squaredDistanceTo(center)) / radius;
         if (d >= 2.0) return MIN_RAW_DAMAGE;
@@ -176,7 +176,7 @@ public final class ExplosionDamageUtil {
     // Ядро расчёта — 1-в-1 как на сервере
     // ──────────────────────────────────────────────────────
 
-    private static float calcRaw(World world, Vec3d center, float power, LivingEntity entity,
+    private static float calcRaw(Level world, Vec3 center, float power, LivingEntity entity,
                                  BlockPos transparentBlock) {
         float radius = power * 2.0f;
 
@@ -209,9 +209,9 @@ public final class ExplosionDamageUtil {
      * засчитывается только при {@code MISS}. Блок-источник исключением
      * <b>не</b> является — сервер тоже считает его перекрытием.
      */
-    private static float getExposure(World world, Vec3d explosionPos, LivingEntity entity,
+    private static float getExposure(Level world, Vec3 explosionPos, LivingEntity entity,
                                      BlockPos transparentBlock) {
-        Box box = entity.getBoundingBox();
+        AABB box = entity.getBoundingBox();
 
         double stepX = 1.0 / ((box.maxX - box.minX) * 2.0 + 1.0);
         double stepY = 1.0 / ((box.maxY - box.minY) * 2.0 + 1.0);
@@ -228,7 +228,7 @@ public final class ExplosionDamageUtil {
         for (double x = 0.0; x <= 1.0; x += stepX) {
             for (double y = 0.0; y <= 1.0; y += stepY) {
                 for (double z = 0.0; z <= 1.0; z += stepZ) {
-                    Vec3d sample = new Vec3d(
+                    Vec3 sample = new Vec3(
                             MathHelper.lerp(x, box.minX, box.maxX) + offsetX,
                             MathHelper.lerp(y, box.minY, box.maxY),
                             MathHelper.lerp(z, box.minZ, box.maxZ) + offsetZ);
@@ -273,7 +273,7 @@ public final class ExplosionDamageUtil {
      * Blast Protection: {@code getDamageAfterEnchantment} режет на
      * {@code min(level * 2, 20) / 25} — максимум 80%.
      */
-    private static float applyBlastProtection(World world, LivingEntity entity, float damage) {
+    private static float applyBlastProtection(Level world, LivingEntity entity, float damage) {
         Registry<Enchantment> registry = world.getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT);
         RegistryEntry<Enchantment> blast =
                 registry.getEntry(registry.getValueOrThrow(Enchantments.BLAST_PROTECTION));

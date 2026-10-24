@@ -18,25 +18,25 @@ import me.collective.util.AuraCoordination;
 import me.collective.util.InventoryUtil;
 import me.collective.util.RotationUtils;
 import me.collective.util.SwapManager;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.decoration.EndCrystalEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInteractEntityC2SPacket;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
+import net.minecraft.network.protocol.game.ServerboundInteractPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.core.Direction;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.ClipContext;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -171,7 +171,7 @@ public class CrystalAura extends Module {
     private int actionTimer;
 
     /** Точка наведения последнего запланированного действия (для удержания ротации). */
-    private Vec3d pendingAim;
+    private Vec3 pendingAim;
 
     /** Зацепленная клетка постановки: постоянная смена точки сбивает плавную ротацию. */
     private BlockPos stickyCell;
@@ -188,8 +188,8 @@ public class CrystalAura extends Module {
     private int supportWaitTicks;
 
     /** Боксы для визуализации текущего решения. */
-    private Box attackBox;
-    private Box placeBox;
+    private AABB attackBox;
+    private AABB placeBox;
 
     public CrystalAura() {
         super("CrystalAura", "Безопасная для Grim аура кристаллов Энда: автоматическая постановка и быстрый взрыв.", Category.COMBAT);
@@ -373,11 +373,11 @@ public class CrystalAura extends Module {
             if (!crystal.isAlive() || crystal.isRemoved()) continue;
             if (isRecentlyAttacked(crystal.getId())) continue;
 
-            Box box = crystal.getBoundingBox();
+            AABB box = crystal.getBoundingBox();
             double dist = GrimUtils.closestEyeDistanceSqTo(mc.player, box);
             if (dist > reachSq) continue;
 
-            Vec3d center = crystalCenter(crystal);
+            Vec3 center = crystalCenter(crystal);
             float targetDmg = target != null
                     ? ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, target)
                     : 0.0f;
@@ -403,7 +403,7 @@ public class CrystalAura extends Module {
 
         // Удар уходит только когда луч по отправленному углу уже пересекает
         // расширенный хитбокс кристалла; дубль наведения выше гонит доворот.
-        Box hitBox = crystal.getBoundingBox().expand(ENTITY_BOX_EXPAND);
+        AABB hitBox = crystal.getBoundingBox().expand(ENTITY_BOX_EXPAND);
         if (!aimAtEntityBox(hitBox)) {
             return;
         }
@@ -413,7 +413,7 @@ public class CrystalAura extends Module {
 
         mc.getNetworkHandler().sendPacket(
                 PlayerInteractEntityC2SPacket.attack(crystal, mc.player.isSneaking()));
-        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
 
         if (this.predict.getValue()) {
             crystal.discard();
@@ -438,8 +438,8 @@ public class CrystalAura extends Module {
     }
 
     /** Центр взрыва кристалла — позиция сущности (проверено по байткоду). */
-    private static Vec3d crystalCenter(EndCrystalEntity crystal) {
-        return new Vec3d(crystal.getX(), crystal.getY(), crystal.getZ());
+    private static Vec3 crystalCenter(EndCrystalEntity crystal) {
+        return new Vec3(crystal.getX(), crystal.getY(), crystal.getZ());
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -530,7 +530,7 @@ public class CrystalAura extends Module {
             if (!SwapManager.getInstance().hold(this, obsidian.slot(), SwapManager.Priority.PLACE, 2)) return;
         }
 
-        Hand hand = obsidian.getHand();
+        InteractionHand hand = obsidian.getHand();
         BlockHitResult finalHit = randomizeCursor(hit);
         int seq = GrimUtils.nextSequence();
         mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(hand, finalHit, seq));
@@ -587,7 +587,7 @@ public class CrystalAura extends Module {
                     }
 
                     // Симуляция серверного EndCrystalItem: бокс 1×2×1 пуст от сущностей.
-                    Box space = new Box(
+                    AABB space = new AABB(
                             cell.getX(), cell.getY(), cell.getZ(),
                             cell.getX() + 1.0, cell.getY() + 2.0, cell.getZ() + 1.0);
                     boolean occupied = false;
@@ -600,7 +600,7 @@ public class CrystalAura extends Module {
                     }
                     if (occupied) continue;
 
-                    Vec3d center = bottomCenter(cell);
+                    Vec3 center = bottomCenter(cell);
                     if (GrimUtils.closestEyeDistanceSqTo(mc.player, center) > reachSq) continue;
 
                     valid.add(cell);
@@ -629,7 +629,7 @@ public class CrystalAura extends Module {
         float bestScore = Float.NEGATIVE_INFINITY;
 
         for (BlockPos p : pool) {
-            Vec3d center = bottomCenter(p);
+            Vec3 center = bottomCenter(p);
             float targetDmg = ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, target);
             if (targetDmg < minDmg) continue;
             if (this.antiFriend.getValue() && isFriendDamaged(center)) continue;
@@ -678,7 +678,7 @@ public class CrystalAura extends Module {
         }
 
         if (pinned != null) {
-            Vec3d center = bottomCenter(pinned);
+            Vec3 center = bottomCenter(pinned);
             float score = ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, target) * 2.0f
                     - ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, mc.player);
             if (score >= bestScore * STICKY_KEEP_RATIO) return pinned;
@@ -708,7 +708,7 @@ public class CrystalAura extends Module {
 
         this.pendingAim = hit.getPos();
         applyAim(hit.getPos());
-        this.placeBox = new Box(
+        this.placeBox = new AABB(
                 cell.getX(), cell.getY(), cell.getZ(),
                 cell.getX() + 1.0, cell.getY() + 2.0, cell.getZ() + 1.0);
 
@@ -727,7 +727,7 @@ public class CrystalAura extends Module {
             }
         }
 
-        Hand hand = crystals.getHand();
+        InteractionHand hand = crystals.getHand();
         BlockHitResult finalHit = randomizeCursor(hit);
         int seq = GrimUtils.nextSequence();
         mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(hand, finalHit, seq));
@@ -746,15 +746,15 @@ public class CrystalAura extends Module {
      * GrimAnchorAura для физической поддержки placement-лучей.
      */
     private BlockHitResult findFaceHit(BlockPos pos, Direction face, double reach) {
-        Vec3d eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePos();
 
         if (!isFaceFacingEye(eye, pos, face)) return null;
 
-        Vec3d sample = faceCenter(pos, face);
-        Vec3d dir = sample.subtract(eye);
+        Vec3 sample = faceCenter(pos, face);
+        Vec3 dir = sample.subtract(eye);
         if (dir.lengthSquared() < 1.0E-6) return null;
 
-        Vec3d end = eye.add(dir.normalize().multiply(reach + 0.1));
+        Vec3 end = eye.add(dir.normalize().multiply(reach + 0.1));
 
         BlockHitResult clip = mc.world.raycast(new RaycastContext(
                 eye, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, mc.player));
@@ -768,7 +768,7 @@ public class CrystalAura extends Module {
     // Ротация и проверки прицела
     // ─────────────────────────────────────────────────────────────────
 
-    private void applyAim(Vec3d targetPos) {
+    private void applyAim(Vec3 targetPos) {
         this.aiming = true;
 
         float[] rot = RotationUtils.getRotationsTo(mc.player.getEyePos(), targetPos);
@@ -835,7 +835,7 @@ public class CrystalAura extends Module {
         if (mc.player == null || mc.world == null || expected == null) return false;
 
         RotationUtils rotUtils = RotationUtils.getInstance();
-        Vec3d eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePos();
 
         float yaw, pitch;
         if (this.rotationMode.getValue() == RotationMode.CLIENT) {
@@ -846,8 +846,8 @@ public class CrystalAura extends Module {
             pitch = rotUtils.getSentPitch();
         }
 
-        Vec3d look = RotationUtils.getRotationVector(pitch, yaw);
-        Vec3d end = eye.add(look.multiply(reach + 0.1));
+        Vec3 look = RotationUtils.getRotationVector(pitch, yaw);
+        Vec3 end = eye.add(look.multiply(reach + 0.1));
 
         // GrimAC валидирует интеракции через OUTLINE-форму блока.
         BlockHitResult clip = mc.world.raycast(new RaycastContext(
@@ -860,9 +860,9 @@ public class CrystalAura extends Module {
     }
 
     /** Проверка, что по отправленному углу луч пересекает хитбокс кристалла. */
-    private boolean aimAtEntityBox(Box hitBox) {
+    private boolean aimAtEntityBox(AABB hitBox) {
         double reach = this.attackRange.getValue();
-        Vec3d eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePos();
 
         if (GrimUtils.closestEyeDistanceSqTo(mc.player, hitBox) > reach * reach) return false;
 
@@ -876,8 +876,8 @@ public class CrystalAura extends Module {
             pitch = rotUtils.getSentPitch();
         }
 
-        Vec3d look = RotationUtils.getRotationVector(pitch, yaw);
-        Vec3d end = eye.add(look.multiply(reach + 0.2));
+        Vec3 look = RotationUtils.getRotationVector(pitch, yaw);
+        Vec3 end = eye.add(look.multiply(reach + 0.2));
         return hitBox.raycast(eye, end).isPresent();
     }
 
@@ -886,7 +886,7 @@ public class CrystalAura extends Module {
     // ─────────────────────────────────────────────────────────────────
 
     /** Гейт урона: минДмг / соотношение / фейсплейс / самоподрыв / друзья. */
-    private boolean damageAcceptable(Vec3d center, LivingEntity target, float targetDmg) {
+    private boolean damageAcceptable(Vec3 center, LivingEntity target, float targetDmg) {
         float selfDmg = ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, mc.player);
 
         boolean facePlace = isFacePlace(target);
@@ -912,12 +912,12 @@ public class CrystalAura extends Module {
         return isFacePlace(target) ? 0.0f : this.minDamage.getValue().floatValue();
     }
 
-    private boolean isFriendDamaged(Vec3d center) {
+    private boolean isFriendDamaged(Vec3 center) {
         float limit = this.friendDamageLimit.getValue().floatValue();
         if (limit <= 0.0f) return false;
 
         for (String name : FriendManager.INSTANCE.getFriends()) {
-            for (PlayerEntity player : mc.world.getPlayers()) {
+            for (Player player : mc.world.getPlayers()) {
                 if (!player.getName().getString().equals(name)) continue;
                 if (player == mc.player || !player.isAlive() || player.isDead()) continue;
 
@@ -958,7 +958,7 @@ public class CrystalAura extends Module {
         double bestValue = Double.MAX_VALUE;      // для DISTANCE/HEALTH — меньше, тем лучше
         float bestDamage = Float.NEGATIVE_INFINITY;
 
-        for (PlayerEntity player : mc.world.getPlayers()) {
+        for (Player player : mc.world.getPlayers()) {
             if (player == mc.player) continue;
             if (player.isSpectator() || player.isDead() || !player.isAlive()) continue;
             if (!this.targetCreative.getValue() && player.isCreative()) continue;
@@ -995,7 +995,7 @@ public class CrystalAura extends Module {
         if (best == null && this.targetMobs.getValue()) {
             for (Entity entity : mc.world.getEntities()) {
                 if (!(entity instanceof LivingEntity living)
-                        || living instanceof PlayerEntity
+                        || living instanceof Player
                         || !living.isAlive()
                         || living.isDead()) continue;
 
@@ -1044,7 +1044,7 @@ public class CrystalAura extends Module {
     // Геометрия и пакеты
     // ─────────────────────────────────────────────────────────────────
 
-    private boolean isFaceFacingEye(Vec3d eye, BlockPos pos, Direction face) {
+    private boolean isFaceFacingEye(Vec3 eye, BlockPos pos, Direction face) {
         return switch (face) {
             case DOWN -> eye.y < pos.getY();
             case UP -> eye.y > pos.getY() + 1.0;
@@ -1056,17 +1056,17 @@ public class CrystalAura extends Module {
     }
 
     /** Центр грани блока — фиксированная точка прицеливания. */
-    private Vec3d faceCenter(BlockPos pos, Direction face) {
+    private Vec3 faceCenter(BlockPos pos, Direction face) {
         double x = pos.getX();
         double y = pos.getY();
         double z = pos.getZ();
         return switch (face) {
-            case DOWN -> new Vec3d(x + 0.5, y, z + 0.5);
-            case UP -> new Vec3d(x + 0.5, y + 1.0, z + 0.5);
-            case NORTH -> new Vec3d(x + 0.5, y + 0.5, z);
-            case SOUTH -> new Vec3d(x + 0.5, y + 0.5, z + 1.0);
-            case WEST -> new Vec3d(x, y + 0.5, z + 0.5);
-            case EAST -> new Vec3d(x + 1.0, y + 0.5, z + 0.5);
+            case DOWN -> new Vec3(x + 0.5, y, z + 0.5);
+            case UP -> new Vec3(x + 0.5, y + 1.0, z + 0.5);
+            case NORTH -> new Vec3(x + 0.5, y + 0.5, z);
+            case SOUTH -> new Vec3(x + 0.5, y + 0.5, z + 1.0);
+            case WEST -> new Vec3(x, y + 0.5, z + 0.5);
+            case EAST -> new Vec3(x + 1.0, y + 0.5, z + 0.5);
         };
     }
 
@@ -1076,7 +1076,7 @@ public class CrystalAura extends Module {
      * и для атаки. Сбоку — когда верхняя не видна. Снизу — из-под опоры.
      */
     private Direction[] facePreferenceOrder(BlockPos support) {
-        Vec3d eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePos();
         Direction[] topFirst = {Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, Direction.DOWN};
         Direction[] bottomFirst = {Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, Direction.UP};
 
@@ -1086,8 +1086,8 @@ public class CrystalAura extends Module {
     }
 
     /** Точка, из которой сервер считает урон взрыва кристалла (низ клетки). */
-    private static Vec3d bottomCenter(BlockPos cell) {
-        return new Vec3d(cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5);
+    private static Vec3 bottomCenter(BlockPos cell) {
+        return new Vec3(cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5);
     }
 
     /**
@@ -1140,7 +1140,7 @@ public class CrystalAura extends Module {
             }
         }
 
-        return new BlockHitResult(new Vec3d(rx, ry, rz), face, blockPos, original.isInsideBlock());
+        return new BlockHitResult(new Vec3(rx, ry, rz), face, blockPos, original.isInsideBlock());
     }
 
     private static double jitter() {

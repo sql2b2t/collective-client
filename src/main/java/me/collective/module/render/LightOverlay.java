@@ -13,19 +13,19 @@ import me.collective.setting.IntegerSetting;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.ScaffoldingBlock;
-import net.minecraft.block.SlabBlock;
-import net.minecraft.block.SnowBlock;
-import net.minecraft.block.StairsBlock;
-import net.minecraft.block.TransparentBlock;
-import net.minecraft.block.enums.BlockHalf;
-import net.minecraft.block.enums.SlabType;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.LightType;
-import net.minecraft.world.debug.gizmo.GizmoDrawing;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ScaffoldingBlock;
+import net.minecraft.world.level.block.SlabBlock;
+import net.minecraft.world.level.block.SnowLayerBlock;
+import net.minecraft.world.level.block.StairBlock;
+import net.minecraft.world.level.block.TransparentBlock;
+import net.minecraft.world.level.block.state.properties.Half;
+import net.minecraft.world.level.block.state.properties.SlabType;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.LightLayer;
+import net.minecraft.gizmos.Gizmos;
 
 /**
  * LightOverlay: порт модуля light-overlay из Meteor Client.
@@ -137,7 +137,7 @@ public class LightOverlay extends Module {
             try (var scope = mc.worldRenderer.startDrawingGizmos()) {
                 int rgba = (c.getAlpha() & 0xFF) << 24 | (c.getRed() & 0xFF) << 16
                     | (c.getGreen() & 0xFF) << 8 | (c.getBlue() & 0xFF);
-                GizmoDrawing.line(new Vec3d(x1, y1, z1), new Vec3d(x2, y2, z2), rgba)
+                GizmoDrawing.line(new Vec3(x1, y1, z1), new Vec3(x2, y2, z2), rgba)
                     .ignoreOcclusion();
             } catch (Exception ignored) {
             }

@@ -1,6 +1,6 @@
 package me.collective.util.sort;
 
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
 
 /** Метка: «этот сундук — дом для такой-то категории». */
 public class ChestPin {

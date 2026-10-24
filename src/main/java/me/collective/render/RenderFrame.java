@@ -1,7 +1,7 @@
 package me.collective.render;
 
-import net.minecraft.client.render.Camera;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.Camera;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector2f;
 import org.joml.Vector4f;
@@ -17,7 +17,7 @@ import org.joml.Vector4f;
  */
 public final class RenderFrame {
     private static final Matrix4f VIEW_PROJ = new Matrix4f();
-    private static Vec3d cameraPos = Vec3d.ZERO;
+    private static Vec3 cameraPos = Vec3.ZERO;
     private static net.minecraft.client.render.Frustum frustum;
     private static boolean valid;
 
@@ -38,7 +38,7 @@ public final class RenderFrame {
         valid = true;
     }
 
-    public static boolean isVisible(net.minecraft.util.math.Box box) {
+    public static boolean isVisible(net.minecraft.util.math.AABB box) {
         if (box == null) return false;
         return frustum == null || frustum.isVisible(box);
     }
@@ -51,7 +51,7 @@ public final class RenderFrame {
         return VIEW_PROJ;
     }
 
-    public static Vec3d getCameraPos() {
+    public static Vec3 getCameraPos() {
         return cameraPos;
     }
 

@@ -1,7 +1,7 @@
 package me.collective.render;
 
 import me.collective.module.render.HandsShader;
-import net.minecraft.client.render.VertexConsumer;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 
 /**
  * Decorating {@link VertexConsumer} that overrides per-vertex colors with the

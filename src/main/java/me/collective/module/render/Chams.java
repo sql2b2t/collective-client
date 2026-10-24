@@ -13,16 +13,16 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.ColorSetting;
 import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityStatuses;
-import net.minecraft.entity.decoration.EndCrystalEntity;
-import net.minecraft.entity.mob.Monster;
-import net.minecraft.entity.passive.PassiveEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.network.packet.s2c.play.EntityStatusS2CPacket;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityEvent;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.AgeableMob;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.network.protocol.game.ClientboundEntityEventPacket;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
 
 import java.awt.Color;
 import java.util.Iterator;
@@ -126,7 +126,7 @@ public class Chams extends Module {
             if (isTotemPop || (isDeath && death.getValue())) {
                 if (mc.world == null) return;
                 Entity entity = packet.getEntity(mc.world);
-                if (entity instanceof PlayerEntity player) {
+                if (entity instanceof Player player) {
                     if (player == mc.player && self.getValue() == ChamsMode.OFF) {
                         return;
                     }
@@ -150,7 +150,7 @@ public class Chams extends Module {
     public void onRender3D(Render3DEvent event) {
         if (mc.world == null || mc.player == null) return;
 
-        Vec3d cameraPos = event.camera != null ? event.camera.getCameraPos() : mc.player.getEyePos();
+        Vec3 cameraPos = event.camera != null ? event.camera.getCameraPos() : mc.player.getEyePos();
         float tickDelta = event.tickDelta;
         long now = System.currentTimeMillis();
 
@@ -176,7 +176,7 @@ public class Chams extends Module {
             boolean ignoreDepth = xqz.getValue();
 
             // Smooth interpolated bounding box
-            Box box = getInterpolatedBox(entity, tickDelta);
+            AABB box = getInterpolatedBox(entity, tickDelta);
             Renderer3D.box(box, entityFill, entityOutline, shapeMode, ignoreDepth, lw);
 
             // Shine effect
@@ -214,7 +214,7 @@ public class Chams extends Module {
                 Color ghostLineColor = applyAlpha(popLine.getValue(), remaining);
 
                 double halfW = ghost.width * 0.5;
-                Box ghostBox = new Box(
+                AABB ghostBox = new AABB(
                     ghost.x - halfW,
                     ghost.y + upwardOffset,
                     ghost.z - halfW,
@@ -230,7 +230,7 @@ public class Chams extends Module {
                 if (animate.getValue()) {
                     double haloY = ghost.y + upwardOffset + ghost.height + 0.15;
                     double haloRadius = halfW * 0.7;
-                    Box haloBox = new Box(
+                    AABB haloBox = new AABB(
                         ghost.x - haloRadius,
                         haloY,
                         ghost.z - haloRadius,
@@ -248,7 +248,7 @@ public class Chams extends Module {
         if (entity == mc.player) {
             return self.getValue();
         }
-        if (entity instanceof PlayerEntity) {
+        if (entity instanceof Player) {
             return players.getValue();
         }
         if (entity instanceof EndCrystalEntity) {
@@ -277,7 +277,7 @@ public class Chams extends Module {
         Color baseFill;
         Color baseOutline;
 
-        if (friends.getValue() && entity instanceof PlayerEntity player && FriendManager.getInstance().isFriend(player)) {
+        if (friends.getValue() && entity instanceof Player player && FriendManager.getInstance().isFriend(player)) {
             // Friend highlight: vibrant cyan / emerald
             baseFill = new Color(43, 227, 165, 140);
             baseOutline = new Color(50, 255, 190, 255);
@@ -311,19 +311,19 @@ public class Chams extends Module {
         };
     }
 
-    private Box getInterpolatedBox(Entity entity, float tickDelta) {
+    private AABB getInterpolatedBox(Entity entity, float tickDelta) {
         double lerpX = MathHelper.lerp(tickDelta, entity.lastRenderX, entity.getX());
         double lerpY = MathHelper.lerp(tickDelta, entity.lastRenderY, entity.getY());
         double lerpZ = MathHelper.lerp(tickDelta, entity.lastRenderZ, entity.getZ());
         double halfW = entity.getWidth() * 0.5;
         double h = entity.getHeight();
-        return new Box(
+        return new AABB(
             lerpX - halfW, lerpY, lerpZ - halfW,
             lerpX + halfW, lerpY + h, lerpZ + halfW
         );
     }
 
-    private void renderShine(Box box, long now, float lw, boolean ignoreDepth) {
+    private void renderShine(AABB box, long now, float lw, boolean ignoreDepth) {
         float pulse = (float) ((Math.sin(now * 0.005 * speed.getValue()) + 1.0) * 0.5);
         float shineAlpha = pulse * (strength.getValue().floatValue() / 5.0f);
         Color sc = applyAlpha(shineColor.getValue(), shineAlpha);

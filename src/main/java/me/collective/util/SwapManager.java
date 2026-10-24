@@ -4,18 +4,18 @@ import me.collective.event.EventBus;
 import me.collective.event.EventHandler;
 import me.collective.event.events.PacketEvent;
 import me.collective.event.events.TickEvent;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.network.packet.Packet;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.packet.c2s.play.*;
-import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
-import net.minecraft.util.Hand;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.world.InteractionHand;
 
 /**
  * Арбитр захвата слота: один модуль держит предмет в руке сервера, остальные ждут.
  */
 public class SwapManager {
-    private static final MinecraftClient mc = MinecraftClient.getInstance();
+    private static final Minecraft mc = Minecraft.getInstance();
     private static SwapManager INSTANCE;
 
     private final InventoryManager inv = InventoryManager.getInstance();
@@ -56,7 +56,7 @@ public class SwapManager {
 
     public boolean hold(Object owner, int slot, int priority, boolean silent, int releaseDelay) {
         if (mc.player == null || mc.getNetworkHandler() == null) return false;
-        if (!PlayerInventory.isValidHotbarIndex(slot)) return false;
+        if (!Inventory.isValidHotbarIndex(slot)) return false;
 
         checkDrift();
 
@@ -117,7 +117,7 @@ public class SwapManager {
 
     public boolean pulse(Object owner, int slot, int priority, int ticks) {
         if (mc.player == null || mc.getNetworkHandler() == null) return false;
-        if (!PlayerInventory.isValidHotbarIndex(slot)) return false;
+        if (!Inventory.isValidHotbarIndex(slot)) return false;
 
         checkDrift();
 
@@ -259,7 +259,7 @@ public class SwapManager {
     private boolean usingMainHandItem() {
         return mc.player != null
             && mc.player.isUsingItem()
-            && mc.player.getActiveHand() == Hand.MAIN_HAND;
+            && mc.player.getActiveHand() == InteractionHand.MAIN_HAND;
     }
 
     @EventHandler(priority = 200)
@@ -311,7 +311,7 @@ public class SwapManager {
                 return;
             }
 
-            if (!PlayerInventory.isValidHotbarIndex(slot)) {
+            if (!Inventory.isValidHotbarIndex(slot)) {
                 clearSession();
                 return;
             }
@@ -328,7 +328,7 @@ public class SwapManager {
 
         if (mc.player == null || mc.getNetworkHandler() == null) return;
 
-        if (visible && PlayerInventory.isValidHotbarIndex(restore)) {
+        if (visible && Inventory.isValidHotbarIndex(restore)) {
             mc.player.getInventory().setSelectedSlot(restore);
             this.inv.setSlotForced(restore);
         } else {

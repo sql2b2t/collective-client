@@ -3,9 +3,9 @@ package me.collective.command.commands;
 import me.collective.command.ChatHelper;
 import me.collective.command.Command;
 import me.collective.command.CommandManager;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,8 +22,8 @@ public class HelpCommand extends Command {
             list.add(cmd.getName());
         }
 
-        MutableText msg = Text.literal("Commands (%d): ".formatted(list.size())).styled(s -> s.withColor(Formatting.GRAY))
-            .append(Text.literal(String.join(", ", list)).styled(s -> s.withColor(ChatHelper.getPrimaryTextColor())));
+        MutableText msg = Component.literal("Commands (%d): ".formatted(list.size())).styled(s -> s.withColor(ChatFormatting.GRAY))
+            .append(Component.literal(String.join(", ", list)).styled(s -> s.withColor(ChatHelper.getPrimaryTextColor())));
 
         ChatHelper.sendMessage(msg);
     }

@@ -8,10 +8,10 @@ import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.InventoryUtil;
-import net.minecraft.entity.decoration.EndCrystalEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Items;
-import net.minecraft.text.Text;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.chat.Component;
 
 public class AutoLog extends Module {
     public final NumberSetting health = add(new NumberSetting("Health", 8.0, 1.0, 36.0, 1.0));
@@ -62,7 +62,7 @@ public class AutoLog extends Module {
         // 4. Защита от врагов (AFK Log)
         if (playerNear.getValue()) {
             double rangeSq = playerRange.getValue() * playerRange.getValue();
-            for (PlayerEntity player : mc.world.getPlayers()) {
+            for (Player player : mc.world.getPlayers()) {
                 if (player == mc.player || player.isSpectator() || player.isCreative()) continue;
                 if (FriendManager.getInstance().isFriend(player)) continue;
 
@@ -78,7 +78,7 @@ public class AutoLog extends Module {
         setToggled(false);
         me.collective.module.misc.AutoReconnect.markAfkLogout();
         if (mc.getNetworkHandler() != null && mc.getNetworkHandler().getConnection() != null) {
-            mc.getNetworkHandler().getConnection().disconnect(Text.literal("§c[AutoLog] §f" + reason));
+            mc.getNetworkHandler().getConnection().disconnect(Component.literal("§c[AutoLog] §f" + reason));
         }
     }
 }

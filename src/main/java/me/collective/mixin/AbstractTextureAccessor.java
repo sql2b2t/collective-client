@@ -1,7 +1,7 @@
 package me.collective.mixin;
 
-import net.minecraft.client.gl.GpuSampler;
-import net.minecraft.client.texture.AbstractTexture;
+import com.mojang.blaze3d.textures.GpuSampler;
+import net.minecraft.client.renderer.texture.AbstractTexture;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 

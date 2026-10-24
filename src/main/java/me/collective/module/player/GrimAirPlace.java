@@ -10,17 +10,17 @@ import me.collective.setting.NumberSetting;
 import me.collective.util.GrimUtils;
 import me.collective.util.InventoryUtil;
 import me.collective.util.SwapManager;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.Item;
-import net.minecraft.item.SpawnEggItem;
-import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.SpawnEggItem;
+import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 
 /**
  * GrimAirPlace: ставит блок туда, куда смотрит прицел, без реальной опоры.
@@ -84,8 +84,8 @@ public class GrimAirPlace extends Module {
             mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
                 PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, new BlockPos(0, 0, 0), Direction.DOWN));
             mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(
-                Hand.MAIN_HAND, blockHit, GrimUtils.nextSequence()));
-            mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+                InteractionHand.MAIN_HAND, blockHit, GrimUtils.nextSequence()));
+            mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(InteractionHand.MAIN_HAND));
             mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
                 PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, new BlockPos(0, 0, 0), Direction.DOWN));
 

@@ -7,19 +7,19 @@ import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.ColorSetting;
 import me.collective.setting.EnumSetting;
-import net.minecraft.block.BlockState;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.ExperienceOrbEntity;
-import net.minecraft.entity.ItemEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ExperienceOrb;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -215,7 +215,7 @@ public class AutoWither extends Module {
     private boolean checkBlockForEntity(BlockPos pos) {
         List<Entity> entities = mc.world.getOtherEntities(
             mc.player,
-            new Box(pos),
+            new AABB(pos),
             e -> !(e instanceof ItemEntity || e instanceof ExperienceOrbEntity)
         );
         return entities.isEmpty();
@@ -233,9 +233,9 @@ public class AutoWither extends Module {
         if (slot == -1) return;
         mc.player.getInventory().selectedSlot = slot;
         mc.interactionManager.syncSelectedSlot();
-        mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, new BlockHitResult(Vec3d.ofCenter(pos), Direction.UP, pos, false));
+        mc.interactionManager.interactBlock(mc.player, InteractionHand.MAIN_HAND, new BlockHitResult(Vec3.ofCenter(pos), Direction.UP, pos, false));
         if (!swingHand.getValue()) return;
-        mc.player.swingHand(Hand.MAIN_HAND);
+        mc.player.swingHand(InteractionHand.MAIN_HAND);
     }
 
     private int findHotbarSlot(Item item) {
@@ -280,7 +280,7 @@ public class AutoWither extends Module {
 
     private void sendClientMessage(String msg) {
         if (mc.player != null) {
-            mc.player.sendMessage(net.minecraft.text.Text.literal("§7[§5AutoWither§7] §f" + msg), false);
+            mc.player.sendMessage(net.minecraft.text.Component.literal("§7[§5AutoWither§7] §f" + msg), false);
         }
     }
 

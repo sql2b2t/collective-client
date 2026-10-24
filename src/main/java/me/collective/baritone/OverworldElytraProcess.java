@@ -20,17 +20,17 @@ import me.collective.util.BaritoneHelper;
 import me.collective.module.ModuleManager;
 import me.collective.module.movement.Pitch40;
 import me.collective.util.InventoryUtil;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.FireworksComponent;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.component.Fireworks;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -81,7 +81,7 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
     private boolean isPitchDiving = true;
     private int fireworkCooldown = 0;
     private int takeoffTicks = 0;
-    private Vec3d lastTickPos = Vec3d.ZERO;
+    private Vec3 lastTickPos = Vec3.ZERO;
 
     public OverworldElytraProcess(IBaritone baritone) {
         this.baritone = baritone;
@@ -201,7 +201,7 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
             this.fireworkCooldown--;
         }
 
-        Vec3d playerPos = ctx.player().getEntityPos();
+        Vec3 playerPos = ctx.player().getEntityPos();
         double distSqToDest = playerPos.squaredDistanceTo(destination.getX() + 0.5, playerPos.y, destination.getZ() + 0.5);
 
         // Прибыли в пункт назначения
@@ -254,13 +254,13 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
             baritone.getInputOverrideHandler().setInputForceState(Input.JUMP, true);
         } else if (this.takeoffTicks > 2) {
             // 2. Отправка пакета раскрытия элитр
-            MinecraftClient mc = ctx.minecraft();
+            Minecraft mc = ctx.minecraft();
             if (mc.getNetworkHandler() != null) {
                 mc.getNetworkHandler().sendPacket(new ClientCommandC2SPacket(ctx.player(), ClientCommandC2SPacket.Mode.START_FALL_FLYING));
             }
             // 3. Запуск фейерверка вверх для разгона
             if (this.takeoffTicks > 4 && this.fireworkCooldown <= 0) {
-                lookTowards(new Vec3d(destination.getX() + 0.5, ctx.player().getY() + 50, destination.getZ() + 0.5), -70.0f);
+                lookTowards(new Vec3(destination.getX() + 0.5, ctx.player().getY() + 50, destination.getZ() + 0.5), -70.0f);
                 if (useFirework()) {
                     this.fireworkCooldown = 15;
                     this.state = State.CLIMBING;
@@ -289,7 +289,7 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
             return;
         }
 
-        lookTowards(new Vec3d(destination.getX() + 0.5, this.cruiseTargetY, destination.getZ() + 0.5), -55.0f);
+        lookTowards(new Vec3(destination.getX() + 0.5, this.cruiseTargetY, destination.getZ() + 0.5), -55.0f);
 
         double speed = getSpeedBPS();
         if (speed < (ecoMode ? 9.0 : 12.0) && this.fireworkCooldown <= 0) {
@@ -330,7 +330,7 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
         }
 
         float desiredPitch = this.isPitchDiving ? this.divePitch : this.climbPitch;
-        lookTowards(new Vec3d(destination.getX() + 0.5, this.destination.getY(), destination.getZ() + 0.5), desiredPitch);
+        lookTowards(new Vec3(destination.getX() + 0.5, this.destination.getY(), destination.getZ() + 0.5), desiredPitch);
 
         // Экстренный фейерверк при критическом падении скорости
         if (speed < (ecoMode ? 5.0 : 6.0) && this.fireworkCooldown <= 0) {
@@ -353,7 +353,7 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
             return;
         }
 
-        Vec3d destVec = new Vec3d(destination.getX() + 0.5, destination.getY() + 1.0, destination.getZ() + 0.5);
+        Vec3 destVec = new Vec3(destination.getX() + 0.5, destination.getY() + 1.0, destination.getZ() + 0.5);
         double distXZ = Math.sqrt(ctx.player().squaredDistanceTo(destVec.x, ctx.player().getY(), destVec.z));
 
         if (distXZ > 15.0) {
@@ -366,8 +366,8 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
         }
     }
 
-    private void lookTowards(Vec3d target, float targetPitch) {
-        Vec3d from = ctx.playerFeetAsVec().add(0, ctx.player().getStandingEyeHeight(), 0);
+    private void lookTowards(Vec3 target, float targetPitch) {
+        Vec3 from = ctx.playerFeetAsVec().add(0, ctx.player().getStandingEyeHeight(), 0);
         double dx = target.x - from.x;
         double dz = target.z - from.z;
         float yaw = (float) (MathHelper.atan2(dz, dx) * (180.0 / Math.PI)) - 90.0f;
@@ -375,7 +375,7 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
     }
 
     private double getSpeedBPS() {
-        Vec3d v = ctx.player().getVelocity();
+        Vec3 v = ctx.player().getVelocity();
         return Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z) * 20.0;
     }
 
@@ -385,14 +385,14 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
     }
 
     private boolean useFirework() {
-        MinecraftClient mc = ctx.minecraft();
+        Minecraft mc = ctx.minecraft();
         if (mc.player == null) return false;
 
         int fwSlot = -1;
         if (isFirework(mc.player.getMainHandStack())) {
             fwSlot = mc.player.getInventory().selectedSlot;
         } else if (isFirework(mc.player.getOffHandStack())) {
-            mc.interactionManager.interactItem(mc.player, Hand.OFF_HAND);
+            mc.interactionManager.interactItem(mc.player, InteractionHand.OFF_HAND);
             return true;
         } else {
             for (int i = 0; i < 9; i++) {
@@ -405,7 +405,7 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
 
         if (fwSlot != -1) {
             InventoryUtil.swap(fwSlot, true);
-            mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
+            mc.interactionManager.interactItem(mc.player, InteractionHand.MAIN_HAND);
             InventoryUtil.swapBack();
             return true;
         }
@@ -413,7 +413,7 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
         for (int i = 9; i < 36; i++) {
             if (isFirework(mc.player.getInventory().getStack(i))) {
                 InventoryUtil.swap(i, true);
-                mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
+                mc.interactionManager.interactItem(mc.player, InteractionHand.MAIN_HAND);
                 InventoryUtil.swapBack();
                 return true;
             }
@@ -432,8 +432,8 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
         this.visualPath.clear();
         if (destination == null || ctx.player() == null) return;
 
-        Vec3d start = ctx.player().getEntityPos();
-        Vec3d end = new Vec3d(destination.getX() + 0.5, destination.getY() + 0.5, destination.getZ() + 0.5);
+        Vec3 start = ctx.player().getEntityPos();
+        Vec3 end = new Vec3(destination.getX() + 0.5, destination.getY() + 0.5, destination.getZ() + 0.5);
 
         this.visualPath.add(new BetterBlockPos(start.x, start.y, start.z));
         this.visualPath.add(new BetterBlockPos(start.x, this.cruiseTargetY, start.z));

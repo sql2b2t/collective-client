@@ -4,8 +4,8 @@ import me.collective.category.Category;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.entity.Entity;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Порт EntityControl из ThunderHack.
@@ -50,12 +50,12 @@ public class EntityControl extends Module {
         }
 
         // Поворот входа на yaw игрока (ванильная movementInputToVelocity)
-        Vec3d input = new Vec3d(strafe, 0.0, forward).multiply(boost * 0.15);
+        Vec3 input = new Vec3(strafe, 0.0, forward).multiply(boost * 0.15);
         double yawRad = Math.toRadians(mc.player.getYaw());
         double cos = Math.cos(yawRad);
         double sin = Math.sin(yawRad);
 
-        Vec3d v = vehicle.getVelocity();
+        Vec3 v = vehicle.getVelocity();
         vehicle.setVelocity(
             v.x + input.x * cos - input.z * sin,
             v.y,

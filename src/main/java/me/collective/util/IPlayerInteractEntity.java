@@ -1,7 +1,7 @@
 package me.collective.util;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.network.packet.c2s.play.PlayerInteractEntityC2SPacket;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.network.protocol.game.ServerboundInteractPacket;
 
 public interface IPlayerInteractEntity {
     PlayerInteractEntityC2SPacket.InteractType collective$getType();

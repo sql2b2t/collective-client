@@ -7,10 +7,10 @@ import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInteractItemC2SPacket;
-import net.minecraft.util.Hand;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.protocol.game.ServerboundSwingPacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemPacket;
+import net.minecraft.world.InteractionHand;
 import org.lwjgl.glfw.GLFW;
 
 public class MiddleClickExtra extends Module {
@@ -30,7 +30,7 @@ public class MiddleClickExtra extends Module {
         boolean isPressed = GLFW.glfwGetMouseButton(mc.getWindow().getHandle(), GLFW.GLFW_MOUSE_BUTTON_MIDDLE) == GLFW.GLFW_PRESS;
 
         if (isPressed && !wasPressed) {
-            if (friend.getValue() && mc.crosshairTarget instanceof net.minecraft.util.hit.EntityHitResult hit && hit.getEntity() instanceof net.minecraft.entity.player.PlayerEntity player) {
+            if (friend.getValue() && mc.crosshairTarget instanceof net.minecraft.util.hit.EntityHitResult hit && hit.getEntity() instanceof net.minecraft.entity.player.Player player) {
                 String name = player.getName().getString();
                 if (me.collective.manager.FriendManager.getInstance().isFriend(name)) {
                     me.collective.manager.FriendManager.getInstance().removeFriend(name);
@@ -51,7 +51,7 @@ public class MiddleClickExtra extends Module {
         FindItemResult pearlResult = InventoryUtil.findInHotbarOrOffhand(Items.ENDER_PEARL);
         if (!pearlResult.found()) return;
 
-        Hand hand = pearlResult.getHand();
+        InteractionHand hand = pearlResult.getHand();
         int prevSlot = mc.player.getInventory().getSelectedSlot();
 
         if (!pearlResult.isOffhand()) {

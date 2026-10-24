@@ -1,13 +1,13 @@
 package me.collective.render;
 
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 
 public class ScissorUtil {
-    public static void enableScissor(DrawContext context, int x, int y, int width, int height) {
+    public static void enableScissor(GuiGraphics context, int x, int y, int width, int height) {
         context.enableScissor(x, y, x + width, y + height);
     }
 
-    public static void disableScissor(DrawContext context) {
+    public static void disableScissor(GuiGraphics context) {
         context.disableScissor();
     }
 }

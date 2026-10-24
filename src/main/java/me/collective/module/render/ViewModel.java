@@ -6,8 +6,8 @@ import me.collective.event.events.RenderHeldItemEvent;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.RotationAxis;
+import net.minecraft.world.InteractionHand;
+import com.mojang.math.Axis;
 
 public class ViewModel extends Module {
     public static ViewModel INSTANCE;
@@ -68,7 +68,7 @@ public class ViewModel extends Module {
     public void onRenderHeldItem(RenderHeldItemEvent event) {
         if (!isToggled() || event.getMatrices() == null) return;
 
-        boolean isMain = event.getHand() == Hand.MAIN_HAND;
+        boolean isMain = event.getHand() == InteractionHand.MAIN_HAND;
 
         float px = isMain ? posX.getFloatValue() : (syncHands.getValue() ? -posX.getFloatValue() : -offPosX.getFloatValue());
         float py = isMain ? posY.getFloatValue() : (syncHands.getValue() ? posY.getFloatValue() : offPosY.getFloatValue());

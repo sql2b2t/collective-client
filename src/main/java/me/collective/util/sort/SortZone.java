@@ -1,7 +1,7 @@
 package me.collective.util.sort;
 
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
 
 /**
  * Прямоугольная зона сортировки: две точки по диагонали задают рамку.
@@ -49,8 +49,8 @@ public class SortZone {
         return Math.max(z1, z2);
     }
 
-    public Box box(int worldMinY, int worldMaxY) {
-        return new Box(minX(), worldMinY, minZ(), maxX() + 1.0, worldMaxY + 1.0, maxZ() + 1.0);
+    public AABB box(int worldMinY, int worldMaxY) {
+        return new AABB(minX(), worldMinY, minZ(), maxX() + 1.0, worldMaxY + 1.0, maxZ() + 1.0);
     }
 
     /** Внутри ли блок по горизонтали. Высоту игнорируем: стеш выше — тот же стеш. */

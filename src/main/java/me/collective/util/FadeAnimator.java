@@ -1,6 +1,6 @@
 package me.collective.util;
 
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.Mth;
 
 public class FadeAnimator {
     private float alpha;

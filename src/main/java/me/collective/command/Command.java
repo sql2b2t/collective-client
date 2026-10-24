@@ -1,11 +1,11 @@
 package me.collective.command;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
 
 public abstract class Command {
-    protected final MinecraftClient mc = MinecraftClient.getInstance();
+    protected final Minecraft mc = Minecraft.getInstance();
     private final String name;
     private final String description;
     private final String syntax;

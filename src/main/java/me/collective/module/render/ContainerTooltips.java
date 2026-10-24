@@ -15,27 +15,27 @@ import me.collective.util.tracker.ContainerIndexRecorder;
 import me.collective.module.ModuleManager;
 import me.collective.event.events.TickEvent;
 import me.collective.event.events.PacketEvent;
-import net.minecraft.network.packet.s2c.play.InventoryS2CPacket;
-import net.minecraft.block.EnderChestBlock;
+import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket;
+import net.minecraft.world.level.block.EnderChestBlock;
 import me.collective.module.Module;
 import me.collective.category.Category;
 import me.collective.setting.Keybind;
 import me.collective.event.EventHandler;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.ChestBlock;
-import net.minecraft.block.ShulkerBoxBlock;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.tooltip.TooltipBackgroundRenderer;
-import net.minecraft.entity.decoration.ItemFrameEntity;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.ShulkerBoxBlock;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.inventory.tooltip.TooltipRenderUtil;
+import net.minecraft.world.entity.decoration.ItemFrame;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -212,7 +212,7 @@ public class ContainerTooltips extends Module {
         }
     }
 
-    public void onRender2D(DrawContext drawContext, float tickDelta) {
+    public void onRender2D(GuiGraphics drawContext, float tickDelta) {
         if (mc.player == null || mc.world == null) return;
 
         if (hideInScreens.get() && mc.currentScreen != null) {
@@ -305,7 +305,7 @@ public class ContainerTooltips extends Module {
         return null;
     }
 
-    private void renderTooltip(DrawContext context, TooltipData data) {
+    private void renderTooltip(GuiGraphics context, TooltipData data) {
         TextRenderer text = mc.textRenderer;
         int screenWidth = mc.getWindow().getScaledWidth();
         int screenHeight = mc.getWindow().getScaledHeight();
@@ -402,7 +402,7 @@ public class ContainerTooltips extends Module {
     }
 
     /** Иконка самого частого предмета внутри шалкера — видно, что за кит. */
-    private void drawShulkerBadge(DrawContext context, ItemStack stack, int x, int y) {
+    private void drawShulkerBadge(GuiGraphics context, ItemStack stack, int x, int y) {
         if (stack.isEmpty() || !(stack.getItem() instanceof BlockItem blockItem)
             || !(blockItem.getBlock() instanceof ShulkerBoxBlock)) return;
 

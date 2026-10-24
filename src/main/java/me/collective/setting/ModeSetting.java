@@ -71,4 +71,3 @@ public class ModeSetting extends Setting<String> {
         setValue(modes.get(prev));
     }
 }
-

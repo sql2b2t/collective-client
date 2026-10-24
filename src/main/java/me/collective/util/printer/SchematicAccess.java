@@ -5,9 +5,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.block.BlockState;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.BlockPos;
 
 /**
  * Доступ к данным Litematica через reflection (порт из BepHax NEW-SRC).
@@ -46,7 +46,7 @@ public final class SchematicAccess {
     private static Method rangeIsWithinMethod;            // LayerRange.isPositionWithinRange(BlockPos)
     private static Method getSchematicWorldMethod;        // SchematicWorldHandler.getSchematicWorld()
     private static Method materialCacheGetInstanceMethod; // MaterialCache.getInstance()
-    private static Method getRequiredItemMethod;          // MaterialCache.getRequiredBuildItemForState(BlockState, World, BlockPos)
+    private static Method getRequiredItemMethod;          // MaterialCache.getRequiredBuildItemForState(BlockState, Level, BlockPos)
     private static Method worldGetBlockStateMethod;       // lazy-кэш: getBlockState(BlockPos) от runtime-класса мира схемы
 
     private static boolean initAttempted;
@@ -229,7 +229,7 @@ public final class SchematicAccess {
         try {
             List<PrinterRegion> out = new ArrayList<>();
             for (Object box : boxes.values()) {
-                // Класс Box резолвим от live-объекта: какая версия litematica не важна.
+                // Класс AABB резолвим от live-объекта: какая версия litematica не важна.
                 Method getPos1 = resolveMethod(box.getClass(), "getPos1");
                 Method getPos2 = resolveMethod(box.getClass(), "getPos2");
                 if (getPos1 == null || getPos2 == null) {
@@ -267,7 +267,7 @@ public final class SchematicAccess {
                 return null;
             }
             // getBlockState резолвим от runtime-класса мира (litematica-мир реализует
-            // BlockView, а не обязательно World), метод кэшируем — класс стабилен.
+            // BlockView, а не обязательно Level), метод кэшируем — класс стабилен.
             if (worldGetBlockStateMethod == null) {
                 worldGetBlockStateMethod = resolveMethod(world.getClass(), "getBlockState", BlockPos.class);
                 if (worldGetBlockStateMethod == null) {

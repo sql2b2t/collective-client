@@ -1,6 +1,6 @@
 package me.collective.gui.alt;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.*;
 
@@ -14,7 +14,7 @@ import java.nio.FloatBuffer;
  */
 public final class GpuSdf {
 
-    private static final MinecraftClient mc = MinecraftClient.getInstance();
+    private static final Minecraft mc = Minecraft.getInstance();
 
     private static int program = -1;
     private static int uScale = -1;

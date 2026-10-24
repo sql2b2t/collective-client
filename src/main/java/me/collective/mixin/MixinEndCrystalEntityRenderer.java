@@ -1,12 +1,12 @@
 package me.collective.mixin;
 
 import me.collective.module.render.CrystalModifier;
-import net.minecraft.client.render.command.OrderedRenderCommandQueue;
-import net.minecraft.client.render.entity.EndCrystalEntityRenderer;
-import net.minecraft.client.render.entity.state.EndCrystalEntityRenderState;
-import net.minecraft.client.render.state.CameraRenderState;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.entity.decoration.EndCrystalEntity;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.entity.EndCrystalRenderer;
+import net.minecraft.client.renderer.entity.state.EndCrystalRenderState;
+import net.minecraft.client.renderer.state.CameraRenderState;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -17,10 +17,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class MixinEndCrystalEntityRenderer {
 
     @Inject(
-        method = "render(Lnet/minecraft/client/render/entity/state/EndCrystalEntityRenderState;Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;Lnet/minecraft/client/render/state/CameraRenderState;)V",
-        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/util/math/MatrixStack;scale(FFF)V", shift = At.Shift.AFTER)
+        method = "render(Lnet/minecraft/client/render/entity/state/EndCrystalEntityRenderState;Lnet/minecraft/client/util/math/PoseStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;Lnet/minecraft/client/render/state/CameraRenderState;)V",
+        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/util/math/PoseStack;scale(FFF)V", shift = At.Shift.AFTER)
     )
-    private void collective$onRenderScale(EndCrystalEntityRenderState state, MatrixStack matrices, OrderedRenderCommandQueue queue, CameraRenderState camera, CallbackInfo ci) {
+    private void collective$onRenderScale(EndCrystalEntityRenderState state, PoseStack matrices, OrderedRenderCommandQueue queue, CameraRenderState camera, CallbackInfo ci) {
         CrystalModifier modifier = CrystalModifier.INSTANCE;
         if (modifier != null && modifier.isToggled()) {
             float s = modifier.scale.getValue().floatValue();

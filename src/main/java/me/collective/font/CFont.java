@@ -1,13 +1,13 @@
 package me.collective.font;
 
 import me.collective.mixin.AbstractTextureAccessor;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.texture.GlTexture;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.gui.GuiGraphics;
+import com.mojang.blaze3d.opengl.GlTexture;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.resources.Identifier;
 import org.lwjgl.opengl.GL11;
 
 import javax.imageio.ImageIO;
@@ -146,7 +146,7 @@ public class CFont implements AutoCloseable {
     private synchronized boolean tryUploadTexture() {
         if (closed) return false;
         if (textureId != null) return true;
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc == null || mc.getTextureManager() == null || nativeImage == null) return false;
 
         try {
@@ -179,7 +179,7 @@ public class CFont implements AutoCloseable {
     public synchronized void close() {
         if (closed) return;
         closed = true;
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (textureId != null && client != null && client.getTextureManager() != null) {
             client.getTextureManager().destroyTexture(textureId);
         } else if (nativeTexture != null) {
@@ -207,12 +207,12 @@ public class CFont implements AutoCloseable {
         }
     }
 
-    public void drawString(DrawContext context, String text, float x, float y, int color) {
+    public void drawString(GuiGraphics context, String text, float x, float y, int color) {
         drawString(context, text, x, y, color, 1.0f);
     }
 
     /** Отрисовка с произвольным масштабом (k — множитель к базовому размеру). */
-    public void drawString(DrawContext context, String text, float x, float y, int color, float scale) {
+    public void drawString(GuiGraphics context, String text, float x, float y, int color, float scale) {
         if (text == null || text.isEmpty()) return;
         if (scale == 1.0f) {
             drawStringDefault(context, text, x, y, color, false);
@@ -221,18 +221,18 @@ public class CFont implements AutoCloseable {
         if (!ensureTexture()) {
             context.getMatrices().pushMatrix();
             context.getMatrices().scale(scale, scale);
-            context.drawText(MinecraftClient.getInstance().textRenderer, text, (int) Math.round(x / scale), (int) Math.round(y / scale), color, false);
+            context.drawText(Minecraft.getInstance().textRenderer, text, (int) Math.round(x / scale), (int) Math.round(y / scale), color, false);
             context.getMatrices().popMatrix();
             return;
         }
         drawStringInternal(context, text, x, y, color, false, scale);
     }
 
-    public void drawStringWithShadow(DrawContext context, String text, float x, float y, int color) {
+    public void drawStringWithShadow(GuiGraphics context, String text, float x, float y, int color) {
         drawStringWithShadow(context, text, x, y, color, 1.0f);
     }
 
-    public void drawStringWithShadow(DrawContext context, String text, float x, float y, int color, float scale) {
+    public void drawStringWithShadow(GuiGraphics context, String text, float x, float y, int color, float scale) {
         if (text == null || text.isEmpty()) return;
         if (scale == 1.0f) {
             drawStringDefaultWithShadow(context, text, x, y, color);
@@ -241,7 +241,7 @@ public class CFont implements AutoCloseable {
         if (!ensureTexture()) {
             context.getMatrices().pushMatrix();
             context.getMatrices().scale(scale, scale);
-            context.drawTextWithShadow(MinecraftClient.getInstance().textRenderer, text, (int) Math.round(x / scale), (int) Math.round(y / scale), color);
+            context.drawTextWithShadow(Minecraft.getInstance().textRenderer, text, (int) Math.round(x / scale), (int) Math.round(y / scale), color);
             context.getMatrices().popMatrix();
             return;
         }
@@ -249,9 +249,9 @@ public class CFont implements AutoCloseable {
         drawStringInternal(context, text, x, y, color, false, scale);
     }
 
-    private void drawStringDefault(DrawContext context, String text, float x, float y, int color, boolean shadow) {
+    private void drawStringDefault(GuiGraphics context, String text, float x, float y, int color, boolean shadow) {
         if (!ensureTexture()) {
-            MinecraftClient mcClient = MinecraftClient.getInstance();
+            Minecraft mcClient = Minecraft.getInstance();
             if (shadow) {
                 context.drawTextWithShadow(mcClient.textRenderer, text, (int) Math.round(x), (int) Math.round(y), color);
             } else {
@@ -267,20 +267,20 @@ public class CFont implements AutoCloseable {
         }
     }
 
-    private void drawStringDefaultWithShadow(DrawContext context, String text, float x, float y, int color) {
+    private void drawStringDefaultWithShadow(GuiGraphics context, String text, float x, float y, int color) {
         if (!ensureTexture()) {
-            context.drawTextWithShadow(MinecraftClient.getInstance().textRenderer, text, (int) Math.round(x), (int) Math.round(y), color);
+            context.drawTextWithShadow(Minecraft.getInstance().textRenderer, text, (int) Math.round(x), (int) Math.round(y), color);
             return;
         }
         drawStringInternal(context, text, x + 0.5f, y + 0.5f, color, true, 1.0f);
         drawStringInternal(context, text, x, y, color, false, 1.0f);
     }
 
-    private void drawStringInternal(DrawContext context, String text, float x, float y, int color, boolean isShadow) {
+    private void drawStringInternal(GuiGraphics context, String text, float x, float y, int color, boolean isShadow) {
         drawStringInternal(context, text, x, y, color, isShadow, 1.0f);
     }
 
-    private void drawStringInternal(DrawContext context, String text, float x, float y, int color, boolean isShadow, float scale) {
+    private void drawStringInternal(GuiGraphics context, String text, float x, float y, int color, boolean isShadow, float scale) {
         if (text == null || text.isEmpty()) return;
         if (textureId == null) return;
 

@@ -8,8 +8,8 @@ import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.InventoryUtil;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.s2c.play.WorldTimeUpdateS2CPacket;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.protocol.game.ClientboundSetTimePacket;
 
 /**
  * Порт AutoWalkHIG: идёт вперёд, стопается при лагах/падении/конце кирок и гапов.

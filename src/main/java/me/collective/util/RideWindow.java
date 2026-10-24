@@ -1,7 +1,7 @@
 package me.collective.util;
 
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Окно допустимого смещения при езде на элитре.
@@ -30,12 +30,12 @@ public final class RideWindow {
      *
      * @return точка смещения или {@code null}, если коридор вырожден
      */
-    public static Vec3d ride(Vec3d start, Vec3d look, Vec3d lastLook, float pitch, double gravity,
+    public static Vec3 ride(Vec3 start, Vec3 look, Vec3 lastLook, float pitch, double gravity,
                               double threshold, double anti, double yawAlignDeg, double pitchAlignDeg,
                               double cap) {
         double[] box = axisBox(look, lastLook, threshold, anti);
 
-        Vec3d predicted = predictGliding(start, look, pitch, gravity);
+        Vec3 predicted = predictGliding(start, look, pitch, gravity);
 
         // коридор смещается вместе с предсказанной позицией
         double[] w = {
@@ -47,27 +47,27 @@ public final class RideWindow {
             predicted.z + Math.max(0.0, box[5] - start.z)
         };
 
-        Vec3d heading = heading(look, predicted, w, yawAlignDeg, pitchAlignDeg, anti);
+        Vec3 heading = heading(look, predicted, w, yawAlignDeg, pitchAlignDeg, anti);
         double reach = reach(heading, w, anti);
 
         if (reach <= 1.0E-9) return null;
 
-        Vec3d ride = heading.multiply(Math.min(reach, cap));
+        Vec3 ride = heading.multiply(Math.min(reach, cap));
 
-        return new Vec3d(
+        return new Vec3(
             MathHelper.clamp(ride.x, w[0], w[3]),
             MathHelper.clamp(ride.y, w[1], w[4]),
             MathHelper.clamp(ride.z, w[2], w[5]));
     }
 
     /** Направление езды с поправкой на угловой допуск. */
-    private static Vec3d heading(Vec3d look, Vec3d predicted, double[] w, double yawAlignDeg,
+    private static Vec3 heading(Vec3 look, Vec3 predicted, double[] w, double yawAlignDeg,
                                  double pitchAlignDeg, double anti) {
         if (yawAlignDeg <= 1.0E-6 && pitchAlignDeg <= 1.0E-6) return look;
 
         boolean vertical = look.horizontalLength() < anti;
 
-        Vec3d corner = new Vec3d(
+        Vec3 corner = new Vec3(
             axisEdge(look.x, predicted.x, w[0], w[3], anti, vertical),
             axisEdge(look.y, 0.0, w[1], w[4], anti, true),
             axisEdge(look.z, predicted.z, w[2], w[5], anti, vertical));
@@ -89,11 +89,11 @@ public final class RideWindow {
         double pitch = lookPitch + MathHelper.clamp(cornerPitch - lookPitch,
             -pitchAlignDeg, pitchAlignDeg);
 
-        return Vec3d.fromPolar((float) pitch, (float) yaw);
+        return Vec3.fromPolar((float) pitch, (float) yaw);
     }
 
     /** До какой границы коридора доходит луч. */
-    private static double reach(Vec3d dir, double[] w, double anti) {
+    private static double reach(Vec3 dir, double[] w, double anti) {
         double reach = Double.MAX_VALUE;
 
         reach = Math.min(reach, axisReach(dir.x, w[0], w[3], anti));
@@ -119,7 +119,7 @@ public final class RideWindow {
     }
 
     /** Коридор допустимых направлений: грубый, по двум соседним взглядам. */
-    private static double[] axisBox(Vec3d look, Vec3d lastLook, double threshold, double a) {
+    private static double[] axisBox(Vec3 look, Vec3 lastLook, double threshold, double a) {
         double minX = Math.min(-a, look.x) + Math.min(-a, lastLook.x);
         double minY = Math.min(-a, look.y) + Math.min(-a, lastLook.y);
         double minZ = Math.min(-a, look.z) + Math.min(-a, lastLook.z);
@@ -139,7 +139,7 @@ public final class RideWindow {
     }
 
     /** Предсказание планера при планировании на элитре. */
-    public static Vec3d predictGliding(Vec3d old, Vec3d look, float pitchDeg, double gravity) {
+    public static Vec3 predictGliding(Vec3 old, Vec3 look, float pitchDeg, double gravity) {
         float pitchRad = pitchDeg * ((float) Math.PI / 180);
 
         double horizSqrt = Math.sqrt(look.x * look.x + look.z * look.z);
@@ -148,7 +148,7 @@ public final class RideWindow {
         double vertCos = Math.cos(pitchRad);
         vertCos = vertCos * vertCos * Math.min(1.0, look.length() / 0.4);
 
-        Vec3d v = old.add(0.0, gravity * (-1.0 + vertCos * 0.75), 0.0);
+        Vec3 v = old.add(0.0, gravity * (-1.0 + vertCos * 0.75), 0.0);
 
         // пикирование под углом добавляет горизонтальное движение
         if (v.y < 0.0 && horizSqrt > 0.0) {
@@ -172,8 +172,8 @@ public final class RideWindow {
     }
 
     /** Планирование с толчком от сервера. */
-    public static Vec3d vanillaGlide(Vec3d v, Vec3d look, float pitch, double gravity) {
-        Vec3d pushed = v.add(
+    public static Vec3 vanillaGlide(Vec3 v, Vec3 look, float pitch, double gravity) {
+        Vec3 pushed = v.add(
             look.x * 0.1 + (look.x * 1.5 - v.x) * 0.5,
             look.y * 0.1 + (look.y * 1.5 - v.y) * 0.5,
             look.z * 0.1 + (look.z * 1.5 - v.z) * 0.5);

@@ -16,8 +16,8 @@ import me.collective.setting.KeybindSetting;
 import me.collective.setting.SettingColorSetting;
 import me.collective.util.SettingColor;
 import me.collective.util.BaritoneHelper;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import org.lwjgl.glfw.GLFW;
 
 import java.awt.Color;
@@ -158,7 +158,7 @@ public class Excavator extends Module {
                 // Skip the fill while the camera is inside the area: while Baritone
                 // digs, the player usually stands inside it, and the translucent faces
                 // right in front of the camera wash out the whole screen in white.
-                Vec3d eye = mc.player != null ? mc.player.getEyePos() : null;
+                Vec3 eye = mc.player != null ? mc.player.getEyePos() : null;
                 boolean inside = eye != null
                         && eye.x >= minX && eye.x <= maxX
                         && eye.y >= minY && eye.y <= maxY

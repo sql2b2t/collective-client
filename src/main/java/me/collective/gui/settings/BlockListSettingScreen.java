@@ -1,12 +1,12 @@
 package me.collective.gui.settings;
 
 import me.collective.setting.BlockListSetting;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 
 /**
  * Порт BlockListSettingScreen из Meteor Client (через CollectionListSettingScreen):

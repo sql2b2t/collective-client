@@ -8,16 +8,16 @@ import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityPosition;
-import net.minecraft.entity.mob.ShulkerEntity;
-import net.minecraft.entity.vehicle.AbstractBoatEntity;
-import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
-import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
-import net.minecraft.network.packet.s2c.play.PositionFlag;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.PositionMoveRotation;
+import net.minecraft.world.entity.monster.Shulker;
+import net.minecraft.world.entity.vehicle.boat.AbstractBoat;
+import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.world.entity.Relative;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -138,7 +138,7 @@ public class ElytraProbe extends Module {
             return;
         }
 
-        Vec3d velocity = mc.player.getVelocity();
+        Vec3 velocity = mc.player.getVelocity();
         this.windowLikely = velocity.length() < 0.03;
 
         if (this.boatProbe.getValue()) {
@@ -211,10 +211,10 @@ public class ElytraProbe extends Module {
      * держит {@code lastHardCollidingLerpingEntity} три тика. Клиент делает ту же
      * геометрию по своим данным — индикатор приблизителен.
      */
-    private boolean isVehicleLenienceOpen(Vec3d velocity) {
+    private boolean isVehicleLenienceOpen(Vec3 velocity) {
         if (mc.world == null || mc.player == null) return false;
 
-        Box path = mc.player.getBoundingBox().stretch(velocity).expand(1.0);
+        AABB path = mc.player.getBoundingBox().stretch(velocity).expand(1.0);
 
         for (Entity entity : mc.world.getOtherEntities(mc.player, path.expand(4.0),
             e -> (e instanceof AbstractBoatEntity || e instanceof ShulkerEntity) && e.isAlive())) {
@@ -248,15 +248,15 @@ public class ElytraProbe extends Module {
 
         // Считаем на netty-треде, чат трогаем через mc.execute (как в GrimGlide).
         Set<PositionFlag> relatives = positionLook.relatives();
-        Vec3d change = positionLook.change().position();
-        Vec3d current = mc.player.getEntityPos();
-        Vec3d target = new Vec3d(
+        Vec3 change = positionLook.change().position();
+        Vec3 current = mc.player.getEntityPos();
+        Vec3 target = new Vec3(
             relatives.contains(PositionFlag.X) ? current.x + change.x : change.x,
             relatives.contains(PositionFlag.Y) ? current.y + change.y : change.y,
             relatives.contains(PositionFlag.Z) ? current.z + change.z : change.z);
 
         double distance = target.distanceTo(current);
-        Vec3d velocity = mc.player.getVelocity();
+        Vec3 velocity = mc.player.getVelocity();
         boolean skipNow = this.skipActive;
         int skipped = this.skippedPackets.get();
         boolean glide = mc.player.isGliding();

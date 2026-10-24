@@ -1,7 +1,7 @@
 package me.collective.event.events;
 
 import me.collective.event.CancellableEvent;
-import net.minecraft.network.packet.Packet;
+import net.minecraft.network.protocol.Packet;
 
 public class PacketEvent {
     public static class Send extends CancellableEvent {

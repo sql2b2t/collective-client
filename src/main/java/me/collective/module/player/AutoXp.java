@@ -8,11 +8,11 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.Enchantments;
-import net.minecraft.item.Items;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.util.Hand;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.item.Items;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.world.InteractionHand;
 
 /**
  * AutoXp: автоматически кидает бутылки опыта для починки брони с Починкой.
@@ -55,8 +55,8 @@ public class AutoXp extends Module {
         }
 
         InventoryUtil.swap(bottle.slot(), true);
-        mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
-        mc.player.swingHand(Hand.MAIN_HAND);
+        mc.interactionManager.interactItem(mc.player, InteractionHand.MAIN_HAND);
+        mc.player.swingHand(InteractionHand.MAIN_HAND);
         InventoryUtil.swapBack();
         timer = cooldown.getIntValue();
     }

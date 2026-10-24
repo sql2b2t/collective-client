@@ -1,27 +1,27 @@
 package me.collective.util;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.ShapeContext;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.Entity;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.screen.slot.SlotActionType;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Arrays;
 import java.util.List;
 
 public class PlacementUtils {
-    private static final MinecraftClient mc = MinecraftClient.getInstance();
+    private static final Minecraft mc = Minecraft.getInstance();
     private static final double REACH = 4.5;
 
     private static final List<Block> RESISTANT_BLOCKS = Arrays.asList(
@@ -67,14 +67,14 @@ public class PlacementUtils {
 
         if (!block.isOffhand() && !InventoryUtil.swap(block.slot(), false)) return false;
 
-        Hand hand = block.getHand();
+        InteractionHand hand = block.getHand();
         BlockState predicted = blockItem.getBlock().getDefaultState();
         BlockHitResult placeHit = hit;
 
         Runnable send = () -> {
             if (!placeHit.isInsideBlock()) {
                 AirPlaceExecutor.silentPlace(placeHit, pos, predicted, hand, swing);
-            } else if (hand == Hand.OFF_HAND) {
+            } else if (hand == InteractionHand.OFF_HAND) {
                 BlockHitResult wireHit = new BlockHitResult(placeHit.getPos(), placeHit.getSide(),
                     placeHit.getBlockPos(), false);
                 AirPlaceExecutor.silentPlace(wireHit, pos, predicted, hand, swing);
@@ -97,7 +97,7 @@ public class PlacementUtils {
     public static BlockHitResult getAirPlaceHit(BlockPos pos, double reach) {
         if (mc.player == null || mc.world == null) return null;
 
-        Vec3d eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePos();
 
         double minX = pos.getX();
         double minY = pos.getY();
@@ -114,37 +114,37 @@ public class PlacementUtils {
 
         for (Direction side : Direction.values()) {
             boolean visible;
-            Vec3d point;
+            Vec3 point;
 
             switch (side) {
                 case DOWN -> {
                     visible = eye.y < minY;
-                    point = new Vec3d(clamp(eye.x, minX + inset, maxX - inset), minY,
+                    point = new Vec3(clamp(eye.x, minX + inset, maxX - inset), minY,
                         clamp(eye.z, minZ + inset, maxZ - inset));
                 }
                 case UP -> {
                     visible = eye.y > maxY;
-                    point = new Vec3d(clamp(eye.x, minX + inset, maxX - inset), maxY,
+                    point = new Vec3(clamp(eye.x, minX + inset, maxX - inset), maxY,
                         clamp(eye.z, minZ + inset, maxZ - inset));
                 }
                 case NORTH -> {
                     visible = eye.z < minZ;
-                    point = new Vec3d(clamp(eye.x, minX + inset, maxX - inset),
+                    point = new Vec3(clamp(eye.x, minX + inset, maxX - inset),
                         clamp(eye.y, minY + inset, maxY - inset), minZ);
                 }
                 case SOUTH -> {
                     visible = eye.z > maxZ;
-                    point = new Vec3d(clamp(eye.x, minX + inset, maxX - inset),
+                    point = new Vec3(clamp(eye.x, minX + inset, maxX - inset),
                         clamp(eye.y, minY + inset, maxY - inset), maxZ);
                 }
                 case WEST -> {
                     visible = eye.x < minX;
-                    point = new Vec3d(minX, clamp(eye.y, minY + inset, maxY - inset),
+                    point = new Vec3(minX, clamp(eye.y, minY + inset, maxY - inset),
                         clamp(eye.z, minZ + inset, maxZ - inset));
                 }
                 case EAST -> {
                     visible = eye.x > maxX;
-                    point = new Vec3d(maxX, clamp(eye.y, minY + inset, maxY - inset),
+                    point = new Vec3(maxX, clamp(eye.y, minY + inset, maxY - inset),
                         clamp(eye.z, minZ + inset, maxZ - inset));
                 }
                 default -> {
@@ -172,7 +172,7 @@ public class PlacementUtils {
     public static BlockHitResult getSupportHit(BlockPos pos, double reach) {
         if (mc.player == null || mc.world == null) return null;
 
-        Vec3d eye = mc.player.getEyePos();
+        Vec3 eye = mc.player.getEyePos();
 
         BlockHitResult best = null;
         double bestDist = Double.MAX_VALUE;
@@ -185,9 +185,9 @@ public class PlacementUtils {
                 || state.getCollisionShape(mc.world, neighbor).isEmpty()) continue;
 
             Direction side = dir.getOpposite();
-            Vec3d normal = Vec3d.of(side.getVector());
+            Vec3 normal = Vec3.of(side.getVector());
 
-            boolean visible = eye.subtract(Vec3d.ofCenter(neighbor)).dotProduct(normal) > -0.05
+            boolean visible = eye.subtract(Vec3.ofCenter(neighbor)).dotProduct(normal) > -0.05
                 || (side.getAxis().isHorizontal() && eye.y >= neighbor.getY() + 0.85);
 
             if (!visible) continue;
@@ -212,7 +212,7 @@ public class PlacementUtils {
                 case EAST -> px = maxX;
             }
 
-            Vec3d hitVec = new Vec3d(px, py, pz);
+            Vec3 hitVec = new Vec3(px, py, pz);
             double dist = eye.squaredDistanceTo(hitVec);
             if (dist > reach * reach || dist >= bestDist) continue;
 
@@ -232,7 +232,7 @@ public class PlacementUtils {
             return false;
         }
 
-        Box checkBox = Box.from(Vec3d.ofCenter(pos));
+        AABB checkBox = AABB.from(Vec3.ofCenter(pos));
 
         for (Entity entity : mc.world.getOtherEntities(null, checkBox)) {
             if (entity.isSpectator() || !entity.isAlive()) continue;

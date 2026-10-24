@@ -1,9 +1,9 @@
 package me.collective.mixin;
 
 import me.collective.util.IPlayerInteractEntity;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.Entity;
-import net.minecraft.network.packet.c2s.play.PlayerInteractEntityC2SPacket;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.network.protocol.game.ServerboundInteractPacket;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -20,7 +20,7 @@ public abstract class MixinPlayerInteractEntityC2SPacket implements IPlayerInter
 
     @Override
     public Entity collective$getEntity() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         return mc.world != null ? mc.world.getEntityById(entityId) : null;
     }
 }

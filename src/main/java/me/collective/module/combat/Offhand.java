@@ -9,15 +9,15 @@ import me.collective.setting.EnumSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.RespawnAnchorBlock;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.decoration.EndCrystalEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
-import net.minecraft.registry.tag.ItemTags;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.RespawnAnchorBlock;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
 
 public class Offhand extends Module {
     public enum Mode {
@@ -131,7 +131,7 @@ public class Offhand extends Module {
 
         // Заряженный якорь поблизости (с кэшированием на 3 тика и сферическим радиусом)
         boolean anchorNear = false;
-        if (anchorCheck.getValue() && mc.world.getRegistryKey() != World.NETHER) {
+        if (anchorCheck.getValue() && mc.world.getRegistryKey() != Level.NETHER) {
             if (--anchorTimer <= 0) {
                 anchorTimer = 3;
                 cachedAnchorNear = false;

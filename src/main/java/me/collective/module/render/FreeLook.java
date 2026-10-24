@@ -3,9 +3,9 @@ package me.collective.module.render;
 import me.collective.category.Category;
 import me.collective.module.Module;
 import me.collective.setting.NumberSetting;
-import net.minecraft.client.option.Perspective;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.CameraType;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * FreeLook: удержание камеры по кругу вокруг игрока мышью.
@@ -60,10 +60,10 @@ public class FreeLook extends Module {
     }
 
     /** Точка, где должна висеть камера (за спиной по орбите). */
-    public Vec3d orbitPos(float tickProgress) {
+    public Vec3 orbitPos(float tickProgress) {
         float dist = this.distance.getFloatValue();
-        Vec3d eye = mc.player.getCameraPosVec(tickProgress);
-        Vec3d dir = Vec3d.fromPolar(this.orbitPitch, this.orbitYaw);
+        Vec3 eye = mc.player.getCameraPosVec(tickProgress);
+        Vec3 dir = Vec3.fromPolar(this.orbitPitch, this.orbitYaw);
         return eye.add(dir.multiply(-dist));
     }
 

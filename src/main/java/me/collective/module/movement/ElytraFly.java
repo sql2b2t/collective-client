@@ -6,9 +6,9 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
-import net.minecraft.item.Items;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Порт ElytraFly из Meteor Client (упрощённый Vanilla-режим).
@@ -31,8 +31,8 @@ public class ElytraFly extends Module {
     public void onUpdate() {
         if (mc.player == null || !mc.player.isGliding()) return;
 
-        Vec3d vel = mc.player.getVelocity();
-        Vec3d look = mc.player.getRotationVec(1.0f);
+        Vec3 vel = mc.player.getVelocity();
+        Vec3 look = mc.player.getRotationVec(1.0f);
 
         if (hover.getValue()) {
             mc.player.setVelocity(vel.x * 0.9, 0, vel.z * 0.9);
@@ -68,12 +68,12 @@ public class ElytraFly extends Module {
     private boolean useFirework() {
         FindItemResult hotbar = InventoryUtil.findInHotbarOrOffhand(Items.FIREWORK_ROCKET);
         if (hotbar.isOffhand()) {
-            mc.interactionManager.interactItem(mc.player, Hand.OFF_HAND);
+            mc.interactionManager.interactItem(mc.player, InteractionHand.OFF_HAND);
             return true;
         }
         if (hotbar.isHotbar()) {
             InventoryUtil.swap(hotbar.slot(), true);
-            mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
+            mc.interactionManager.interactItem(mc.player, InteractionHand.MAIN_HAND);
             InventoryUtil.swapBack();
             return true;
         }

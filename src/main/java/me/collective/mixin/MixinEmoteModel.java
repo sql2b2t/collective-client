@@ -1,8 +1,8 @@
 package me.collective.mixin;
 
 import me.collective.emotes.EmoteEngine;
-import net.minecraft.client.render.entity.model.BipedEntityModel;
-import net.minecraft.client.render.entity.state.BipedEntityRenderState;
+import net.minecraft.client.model.HumanoidModel;
+import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;

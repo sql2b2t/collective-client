@@ -2,11 +2,11 @@ package me.collective.font;
 
 import me.collective.module.ModuleManager;
 import me.collective.module.client.Fonts;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.OrderedText;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
-import net.minecraft.text.TextColor;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextColor;
 
 import java.util.Optional;
 
@@ -45,8 +45,8 @@ public final class FontScopes {
         return on(f -> f.inventory.getValue());
     }
 
-    /** Отрисовка Text кастомным шрифтом (тень опционально). */
-    public static void draw(DrawContext context, Text text, int x, int y, int color, boolean shadow) {
+    /** Отрисовка Component кастомным шрифтом (тень опционально). */
+    public static void draw(GuiGraphics context, Component text, int x, int y, int color, boolean shadow) {
         String s = ChatFontUtil.toSectionString(text);
         if (shadow) FontManager.INSTANCE.drawStringWithShadow(context, s, x, y, color);
         else FontManager.INSTANCE.drawString(context, s, x, y, color);

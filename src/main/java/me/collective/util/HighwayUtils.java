@@ -1,14 +1,14 @@
 package me.collective.util;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 
 /**
  * Направления относительно взгляда и определение хайвея (порт HIGUtils).
  */
 public final class HighwayUtils {
-    private static final MinecraftClient mc = MinecraftClient.getInstance();
+    private static final Minecraft mc = Minecraft.getInstance();
 
     private HighwayUtils() {
     }

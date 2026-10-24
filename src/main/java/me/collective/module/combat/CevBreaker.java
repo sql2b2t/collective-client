@@ -6,14 +6,14 @@ import me.collective.module.player.SpeedMine;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.manager.FriendManager;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.decoration.EndCrystalEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.text.Text;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Direction;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.core.Direction;
 
 /**
  * Порт CevBreaker из Meteor Client.
@@ -37,12 +37,12 @@ public class CevBreaker extends Module {
     public void onUpdate() {
         if (mc.player == null || mc.world == null || mc.interactionManager == null) return;
 
-        PlayerEntity target = getTarget();
+        Player target = getTarget();
         if (target == null) return;
 
         if (SpeedMine.INSTANCE != null && !SpeedMine.INSTANCE.isToggled()) {
             SpeedMine.INSTANCE.setToggled(true);
-            mc.player.sendMessage(Text.literal("§7[§dCevBreaker§7] §6Сам включил SpeedMine — её настройки (скорость/обход/дальность) теперь копают твои блоки и могут флагать Grim."), false);
+            mc.player.sendMessage(Component.literal("§7[§dCevBreaker§7] §6Сам включил SpeedMine — её настройки (скорость/обход/дальность) теперь копают твои блоки и могут флагать Grim."), false);
         }
 
         // Ломаем блок над головой цели
@@ -58,21 +58,21 @@ public class CevBreaker extends Module {
             delayTimer--;
             return;
         }
-        Box box = new Box(target.getBlockPos()).expand(crystalRange.getFloatValue());
+        AABB box = new AABB(target.getBlockPos()).expand(crystalRange.getFloatValue());
         for (Entity e : mc.world.getOtherEntities(mc.player, box)) {
             if (!(e instanceof EndCrystalEntity crystal)) continue;
             if (mc.player.distanceTo(crystal) > crystalRange.getFloatValue()) continue;
             mc.interactionManager.attackEntity(mc.player, crystal);
-            mc.player.swingHand(Hand.MAIN_HAND);
+            mc.player.swingHand(InteractionHand.MAIN_HAND);
             delayTimer = attackDelay.getIntValue();
             break;
         }
     }
 
-    private PlayerEntity getTarget() {
-        PlayerEntity best = null;
+    private Player getTarget() {
+        Player best = null;
         double bestDist = range.getFloatValue();
-        for (PlayerEntity p : mc.world.getPlayers()) {
+        for (Player p : mc.world.getPlayers()) {
             if (p == mc.player || !p.isAlive() || p.isSpectator() || p.isCreative()) continue;
             if (FriendManager.getInstance().isFriend(p)) continue;
             double d = mc.player.distanceTo(p);

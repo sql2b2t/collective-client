@@ -9,10 +9,10 @@ import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.InventoryUtil;
 import me.collective.util.Utils;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.Level;
 
 /**
  * Pitch40: утилита для питч-40 полёта — синхронизация границ высоты,
@@ -37,7 +37,7 @@ public class Pitch40 extends Module {
     private double peakY = 0.0;
     private double troughY = 0.0;
     private ElytraRecast elytraRecast = null;
-    private RegistryKey<World> lastDimension = null;
+    private RegistryKey<Level> lastDimension = null;
     private boolean waitingNoticeShown = false;
 
     public Pitch40() {
@@ -114,7 +114,7 @@ public class Pitch40 extends Module {
             this.recastToggledByUs = true;
         }
         this.driveBoost();
-        RegistryKey<World> currentDimension = mc.world.getRegistryKey();
+        RegistryKey<Level> currentDimension = mc.world.getRegistryKey();
         if (this.lastDimension != null && !this.lastDimension.equals(currentDimension)) {
             sendClientMessage("Измерение сменилось! Обновляю границы Pitch40.");
             this.lastDimension = currentDimension;
@@ -130,7 +130,7 @@ public class Pitch40 extends Module {
             }
             if (this.elytraSwapSlot != -1) {
                 InventoryUtil.swap(this.elytraSwapSlot, true);
-                mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
+                mc.interactionManager.interactItem(mc.player, InteractionHand.MAIN_HAND);
                 InventoryUtil.swapBack();
                 this.elytraSwapSlot = -1;
             }
@@ -162,7 +162,7 @@ public class Pitch40 extends Module {
     }
 
     private double getSpeedBPS() {
-        Vec3d velocity = mc.player.getVelocity();
+        Vec3 velocity = mc.player.getVelocity();
         double speedPerTick = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z);
         return speedPerTick * 20.0;
     }
@@ -194,7 +194,7 @@ public class Pitch40 extends Module {
 
     private void sendClientMessage(String msg) {
         if (mc.player != null) {
-            mc.player.sendMessage(net.minecraft.text.Text.literal("§7[§bPitch40§7] §f" + msg), false);
+            mc.player.sendMessage(net.minecraft.text.Component.literal("§7[§bPitch40§7] §f" + msg), false);
         }
     }
 }

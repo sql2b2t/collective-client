@@ -7,7 +7,7 @@ import me.collective.module.client.HUD;
 import me.collective.render.RenderUtil;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.EnumSetting;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -66,7 +66,7 @@ public class ModuleList extends HudModule {
     }
 
     @Override
-    public void render(DrawContext context, float delta) {
+    public void render(GuiGraphics context, float delta) {
         if (!isToggled()) return;
 
         List<Entry> activeModules = entries();

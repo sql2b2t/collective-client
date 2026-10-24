@@ -3,7 +3,7 @@ package me.collective.command.commands;
 import me.collective.command.ChatHelper;
 import me.collective.command.Command;
 import me.collective.scripting.ScriptManager;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 import java.awt.Desktop;
 import java.io.File;
@@ -25,21 +25,21 @@ public class ScriptCommand extends Command {
             Map<String, String> failures = manager.getFailures();
 
             if (files.isEmpty() && active.isEmpty()) {
-                ChatHelper.sendMessage(Text.literal("§7[§dCollective§7] В папке §fcollective/scripts/ §7нет скриптов."));
+                ChatHelper.sendMessage(Component.literal("§7[§dCollective§7] В папке §fcollective/scripts/ §7нет скриптов."));
                 return;
             }
 
-            ChatHelper.sendMessage(Text.literal("§7[§dCollective§7] Скрипты (Активно: §a" + active.size() + "§7):"));
+            ChatHelper.sendMessage(Component.literal("§7[§dCollective§7] Скрипты (Активно: §a" + active.size() + "§7):"));
             for (String fileName : files) {
                 boolean isActive = active.containsKey(fileName);
                 String status = isActive ? "§a[АКТИВЕН]§r" : "§c[ВЫКЛЮЧЕН]§r";
-                ChatHelper.sendMessage(Text.literal(" §8- " + status + " §e" + fileName));
+                ChatHelper.sendMessage(Component.literal(" §8- " + status + " §e" + fileName));
             }
 
             if (!failures.isEmpty()) {
-                ChatHelper.sendMessage(Text.literal("§7Ошибки загрузки:"));
+                ChatHelper.sendMessage(Component.literal("§7Ошибки загрузки:"));
                 for (Map.Entry<String, String> e : failures.entrySet()) {
-                    ChatHelper.sendMessage(Text.literal(" §8- §c✖ §e" + e.getKey() + " §7" + e.getValue()));
+                    ChatHelper.sendMessage(Component.literal(" §8- §c✖ §e" + e.getKey() + " §7" + e.getValue()));
                 }
             }
             return;
@@ -48,16 +48,16 @@ public class ScriptCommand extends Command {
         // Загрузка отдельного скрипта
         if (args[0].equalsIgnoreCase("load")) {
             if (args.length < 2) {
-                ChatHelper.sendMessage(Text.literal("§cИспользование: .scripts load <имя_скрипта>"));
+                ChatHelper.sendMessage(Component.literal("§cИспользование: .scripts load <имя_скрипта>"));
                 return;
             }
             String scriptName = args[1];
             boolean success = manager.loadScriptByName(scriptName);
             if (success) {
-                ChatHelper.sendMessage(Text.literal("§a[Collective] Скрипт §e" + scriptName + " §aуспешно загружен и активирован!"));
+                ChatHelper.sendMessage(Component.literal("§a[Collective] Скрипт §e" + scriptName + " §aуспешно загружен и активирован!"));
             } else {
                 String reason = manager.getFailures().getOrDefault(ScriptManager.normalizeScriptFileName(scriptName), "");
-                ChatHelper.sendMessage(Text.literal("§c[Collective] Не удалось найти или загрузить скрипт: §e" + scriptName
+                ChatHelper.sendMessage(Component.literal("§c[Collective] Не удалось найти или загрузить скрипт: §e" + scriptName
                         + (reason.isEmpty() ? "" : " §7(§c" + reason + "§7)")));
             }
             return;
@@ -66,15 +66,15 @@ public class ScriptCommand extends Command {
         // Выгрузка отдельного скрипта
         if (args[0].equalsIgnoreCase("unload")) {
             if (args.length < 2) {
-                ChatHelper.sendMessage(Text.literal("§cИспользование: .scripts unload <имя_скрипта>"));
+                ChatHelper.sendMessage(Component.literal("§cИспользование: .scripts unload <имя_скрипта>"));
                 return;
             }
             String scriptName = args[1];
             boolean success = manager.unloadScript(scriptName);
             if (success) {
-                ChatHelper.sendMessage(Text.literal("§a[Collective] Скрипт §e" + scriptName + " §aуспешно выгружен!"));
+                ChatHelper.sendMessage(Component.literal("§a[Collective] Скрипт §e" + scriptName + " §aуспешно выгружен!"));
             } else {
-                ChatHelper.sendMessage(Text.literal("§c[Collective] Активный скрипт не найден: §e" + scriptName));
+                ChatHelper.sendMessage(Component.literal("§c[Collective] Активный скрипт не найден: §e" + scriptName));
             }
             return;
         }
@@ -89,10 +89,10 @@ public class ScriptCommand extends Command {
         if (args[0].equalsIgnoreCase("examples") || args[0].equalsIgnoreCase("example")) {
             int written = manager.writeMissingExamples();
             if (written > 0) {
-                ChatHelper.sendMessage(Text.literal("§a[Collective] Создано файлов: §f" + written + "§a. Смотрите папку §fcollective/scripts/"));
-                ChatHelper.sendMessage(Text.literal("§7Подсказка: §b.scripts reload §7— подхватить новые примеры."));
+                ChatHelper.sendMessage(Component.literal("§a[Collective] Создано файлов: §f" + written + "§a. Смотрите папку §fcollective/scripts/"));
+                ChatHelper.sendMessage(Component.literal("§7Подсказка: §b.scripts reload §7— подхватить новые примеры."));
             } else {
-                ChatHelper.sendMessage(Text.literal("§7[Collective] Все примеры уже на месте."));
+                ChatHelper.sendMessage(Component.literal("§7[Collective] Все примеры уже на месте."));
             }
             return;
         }
@@ -104,16 +104,16 @@ public class ScriptCommand extends Command {
                 if (!folder.exists()) folder.mkdirs();
                 if (Desktop.isDesktopSupported()) {
                     Desktop.getDesktop().open(folder);
-                    ChatHelper.sendMessage(Text.literal("§7[§dCollective§7] Открыта папка скриптов: §f" + folder.getAbsolutePath()));
+                    ChatHelper.sendMessage(Component.literal("§7[§dCollective§7] Открыта папка скриптов: §f" + folder.getAbsolutePath()));
                 } else {
-                    ChatHelper.sendMessage(Text.literal("§7[§dCollective§7] Папка скриптов: §f" + folder.getAbsolutePath()));
+                    ChatHelper.sendMessage(Component.literal("§7[§dCollective§7] Папка скриптов: §f" + folder.getAbsolutePath()));
                 }
             } catch (Exception e) {
-                ChatHelper.sendMessage(Text.literal("§cОшибка открытия папки: " + e.getMessage()));
+                ChatHelper.sendMessage(Component.literal("§cОшибка открытия папки: " + e.getMessage()));
             }
             return;
         }
 
-        ChatHelper.sendMessage(Text.literal("§7Использование: §b.scripts <list | load <name> | unload <name> | reload | examples | folder>"));
+        ChatHelper.sendMessage(Component.literal("§7Использование: §b.scripts <list | load <name> | unload <name> | reload | examples | folder>"));
     }
 }

@@ -1,7 +1,7 @@
 package me.collective.mixin;
 
-import net.minecraft.client.render.GameRenderer;
-import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.renderer.GameRenderer;
+import com.mojang.blaze3d.vertex.PoseStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -17,7 +17,7 @@ public abstract class MixinGameRenderer {
      * (MixinHeldItemRenderer).
      */
     @Inject(method = "tiltViewWhenHurt", at = @At("HEAD"), cancellable = true)
-    private void collective$onTiltViewWhenHurt(MatrixStack matrices, float tickDelta, CallbackInfo ci) {
+    private void collective$onTiltViewWhenHurt(PoseStack matrices, float tickDelta, CallbackInfo ci) {
         me.collective.module.render.NoHurtCam noHurtCam = me.collective.module.render.NoHurtCam.INSTANCE;
         if (noHurtCam != null && noHurtCam.isToggled()) {
             ci.cancel();
@@ -35,4 +35,3 @@ public abstract class MixinGameRenderer {
         }
     }
 }
-

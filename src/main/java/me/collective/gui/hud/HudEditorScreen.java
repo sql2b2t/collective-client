@@ -9,11 +9,11 @@ import me.collective.module.hud.HudModule;
 import me.collective.module.render.Blur;
 import me.collective.render.BlurEngine;
 import me.collective.render.RenderUtil;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.text.Text;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
 import java.awt.Color;
@@ -53,7 +53,7 @@ public class HudEditorScreen extends Screen {
     private final Random random = new Random();
 
     public HudEditorScreen() {
-        super(Text.literal("HUD Editor"));
+        super(Component.literal("HUD Editor"));
         // Collective HUD Editor contains the Category.HUD panel at (85, 10)
         this.hudPanel = new Panel(Category.HUD, 85, 10, 92);
 
@@ -69,7 +69,7 @@ public class HudEditorScreen extends Screen {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         float screenW = width;
         float screenH = height;
         float cx = screenW / 2.0f;

@@ -8,14 +8,14 @@ import me.collective.command.CommandManager;
 import me.collective.module.Module;
 import me.collective.module.ModuleManager;
 import me.collective.setting.Setting;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.screen.ChatInputSuggestor;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.text.OrderedText;
-import net.minecraft.text.Style;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.components.CommandSuggestions;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.network.chat.Style;
+import net.minecraft.ChatFormatting;
+import net.minecraft.util.Mth;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -138,13 +138,13 @@ public abstract class MixinChatInputSuggestor {
                 if (syntax != null && !syntax.isEmpty()) {
                     this.messages.add(OrderedText.styledForwardsVisitedString(
                         syntax,
-                        Style.EMPTY.withColor(Formatting.GRAY)
+                        Style.EMPTY.withColor(ChatFormatting.GRAY)
                     ));
 
                     if (matchedCmd.getDescription() != null && !matchedCmd.getDescription().isEmpty()) {
                         this.messages.add(OrderedText.styledForwardsVisitedString(
                             "  " + matchedCmd.getDescription(),
-                            Style.EMPTY.withColor(Formatting.DARK_GRAY)
+                            Style.EMPTY.withColor(ChatFormatting.DARK_GRAY)
                         ));
                     }
 

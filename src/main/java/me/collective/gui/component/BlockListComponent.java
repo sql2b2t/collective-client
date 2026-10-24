@@ -7,8 +7,8 @@ import me.collective.gui.settings.BlockListSettingScreen;
 import me.collective.module.client.UI;
 import me.collective.render.SoundUtil;
 import me.collective.setting.BlockListSetting;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 
 /**
  * Modern BlockListComponent matching ClickGUI 2 pill button design.
@@ -27,7 +27,7 @@ public class BlockListComponent extends Component {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         if (!setting.isVisible()) return;
 
         boolean hov = isHovered(mouseX, mouseY);
@@ -57,7 +57,7 @@ public class BlockListComponent extends Component {
             if (UI.INSTANCE.sounds.getValue()) {
                 SoundUtil.playClick(1.0f, 1.0f);
             }
-            MinecraftClient.getInstance().setScreen(new BlockListSettingScreen(ClickGuiScreen.getInstance(), setting));
+            Minecraft.getInstance().setScreen(new BlockListSettingScreen(ClickGuiScreen.getInstance(), setting));
             return true;
         }
         return false;

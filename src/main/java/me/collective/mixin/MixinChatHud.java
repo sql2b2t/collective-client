@@ -1,8 +1,8 @@
 package me.collective.mixin;
 
 import me.collective.font.ChatFontUtil;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.OrderedText;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.util.FormattedCharSequence;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -18,7 +18,7 @@ public abstract class MixinChatHud {
 
     @Shadow
     @Final
-    private DrawContext context;
+    private GuiGraphics context;
 
     @Inject(
         method = "text(IFLnet/minecraft/text/OrderedText;)Z",

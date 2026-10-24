@@ -5,7 +5,7 @@ import me.collective.event.EventBus;
 import me.collective.event.EventHandler;
 import me.collective.event.events.TickEvent;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 import javax.script.*;
 import java.io.File;
@@ -144,7 +144,7 @@ public class ScriptManager {
         if (engine == null) {
             String available = describeAvailableEngines();
             System.err.println("[Collective-Scripting] No script engine found for extension: ." + ext + " Available: " + available);
-            ChatHelper.sendMessage(Text.literal("§c[Script] Нет движка для ." + ext + ". Доступно: " + (available.isEmpty() ? "пусто, пересобери мод с Kotlin" : available)));
+            ChatHelper.sendMessage(Component.literal("§c[Script] Нет движка для ." + ext + ". Доступно: " + (available.isEmpty() ? "пусто, пересобери мод с Kotlin" : available)));
             failedScripts.put(name, "нет движка для ." + ext);
             return false;
         }
@@ -178,7 +178,7 @@ public class ScriptManager {
             ctx.unregisterAll();
             failedScripts.put(name, summarize(e));
             System.err.println("[Collective-Scripting] Error executing script " + name + ": " + e.getMessage());
-            ChatHelper.sendMessage(Text.literal("§c[Script Error] " + name + ": §7" + summarize(e)));
+            ChatHelper.sendMessage(Component.literal("§c[Script Error] " + name + ": §7" + summarize(e)));
         } catch (Exception e) {
             ctx.unregisterAll();
             failedScripts.put(name, summarize(e));
@@ -286,7 +286,7 @@ public class ScriptManager {
         failedScripts.clear();
         loadAllScripts();
         int failed = failedScripts.size();
-        ChatHelper.sendMessage(Text.literal("§a[Collective-Scripting] Скрипты перезагружены! Активно: §f"
+        ChatHelper.sendMessage(Component.literal("§a[Collective-Scripting] Скрипты перезагружены! Активно: §f"
                 + activeContexts.size() + (failed > 0 ? " §7(§cошибок: " + failed + "§7)" : "")));
     }
 
@@ -471,7 +471,7 @@ public class ScriptManager {
 
             Что доступно в скрипте (глобальные имена):
               ctx            — контекст скрипта: ВСЕ действия через него (см. ниже)
-              mc, client     — MinecraftClient
+              mc, client     — Minecraft
               friends        — FriendManager (friends.isFriend("Nick"), friends.addFriend("Nick"))
               modules        — ModuleManager
               commands       — CommandManager

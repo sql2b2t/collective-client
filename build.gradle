@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.17.21'
+    id 'fabric-loom' version '1.18-SNAPSHOT'
     id 'java'
 }
 
@@ -25,12 +25,12 @@ repositories {
 
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
-    modImplementation "meteordevelopment:baritone:1.21.11-SNAPSHOT"
+    implementation "meteordevelopment:baritone:26.3-SNAPSHOT"
     implementation files("libs/nether-pathfinder-1.4.1.jar")
+    implementation "org.lwjgl:lwjgl-glfw:3.3.4"
 
     // MixinExtras 0.5.4 (в loader 0.19.2 у TLauncher) падает ClassCastException на @Redirect
     // при трансформации Minecraft — фикс там появился в 0.5.5; запекаем, loader выберет новейший
@@ -67,12 +67,12 @@ dependencies {
 
 java {
     withSourcesJar()
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
 }
 
 tasks.withType(JavaCompile).configureEach {
     it.options.encoding = 'UTF-8'
-    it.options.release = 21
+    it.options.release = 25
     it.options.compilerArgs += ['-nowarn','-Xlint:none','-Xmaxerrs','100000','-Xmaxwarns','0']
 }

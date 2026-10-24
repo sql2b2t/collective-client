@@ -4,10 +4,10 @@ import me.collective.command.ChatHelper;
 import me.collective.event.EventBus;
 import me.collective.event.EventHandler;
 import me.collective.event.events.PacketEvent;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.c2s.play.ClientTickEndC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ServerboundClientTickEndPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 
 /**
  * Диагностика исходящих dig-пакетов: помечает, был ли Look-пакет отправлен

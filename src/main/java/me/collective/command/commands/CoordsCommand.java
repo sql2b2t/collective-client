@@ -2,8 +2,8 @@ package me.collective.command.commands;
 
 import me.collective.command.ChatHelper;
 import me.collective.command.Command;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
 
 public class CoordsCommand extends Command {
     public CoordsCommand() {
@@ -18,7 +18,7 @@ public class CoordsCommand extends Command {
         int z = mc.player.getBlockZ();
         String coords = x + " " + y + " " + z;
         mc.keyboard.setClipboard(coords);
-        ChatHelper.sendMessage(Text.literal("Coordinates copied to clipboard: ").styled(s -> s.withColor(Formatting.GRAY))
-            .append(Text.literal(coords).styled(s -> s.withColor(Formatting.GREEN))));
+        ChatHelper.sendMessage(Component.literal("Coordinates copied to clipboard: ").styled(s -> s.withColor(ChatFormatting.GRAY))
+            .append(Component.literal(coords).styled(s -> s.withColor(ChatFormatting.GREEN))));
     }
 }
