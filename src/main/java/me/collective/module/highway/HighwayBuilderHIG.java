@@ -558,7 +558,7 @@ public class HighwayBuilderHIG extends Module {
         return started;
     }
 
-    private void sendAction(PlayerActionC2SPacket.Action action, BlockPos bp) {
+    void sendAction(PlayerActionC2SPacket.Action action, BlockPos bp) {
         if (mc.getNetworkHandler() != null) {
             Direction dir = getInteractDirection(bp);
             int seq = me.collective.util.GrimUtils.nextSequence();
@@ -1161,184 +1161,14 @@ public class HighwayBuilderHIG extends Module {
         },
 
         MineEnderChests {
-            private final MBlockPos pos = new MBlockPos();
-            private int minimumObsidian;
-            private boolean first;
-            private boolean primed;
-            private boolean stopTimerEnabled;
-            private int stopTimer;
-            private int moveTimer;
-            private int rebreakTimer;
-            private int timeout;
-
             @Override
             protected void start(HighwayBuilderHIG b) {
-                if (b.lastState != Center && b.lastState != ThrowOutTrash && b.lastState != PlaceEChestBlockade) {
-                    b.setState(Center);
-                    return;
-                } else if (b.lastState == Center) {
-                    b.setState(ThrowOutTrash);
-                    return;
-                } else if (b.lastState == ThrowOutTrash) {
-                    b.setState(PlaceEChestBlockade);
-                    return;
-                }
-
-                int emptySlots = 0;
-                for (int i = 0; i < 36; i++) {
-                    if (b.mc.player.getInventory().getStack(i).isEmpty()) emptySlots++;
-                }
-
-                if (emptySlots == 0) {
-                    b.error("No empty slots.");
-                    return;
-                }
-
-                int minimumSlots = Math.max(emptySlots - b.minEmpty.getIntValue(), 1);
-                minimumObsidian = minimumSlots * 64;
-                first = true;
-                moveTimer = timeout = 0;
-
-                stopTimerEnabled = false;
-                primed = false;
+                HighwayMineEnderChests.INSTANCE.start(b);
             }
 
             @Override
             protected void tick(HighwayBuilderHIG b) {
-                if (stopTimerEnabled) {
-                    if (stopTimer > 0) stopTimer--;
-                    else b.setState(MineEChestBlockade);
-
-                    return;
-                }
-
-                HorizontalDirection dir = b.dir.diagonal ? b.dir.rotateLeft().rotateLeftSkipOne() : b.dir.opposite();
-                pos.set(b.mc.player).offset(dir);
-
-                if (moveTimer > 0) {
-                    b.rotateTo(dir.yaw, b.mc.player.getPitch());
-                    b.inFwd = moveTimer > 2;
-
-                    moveTimer--;
-                    return;
-                }
-
-                int obsidianCount = 0;
-
-                for (Entity entity : b.mc.world.getOtherEntities(b.mc.player,
-                    new Box(pos.x, pos.y, pos.z, pos.x + 1, pos.y + 2, pos.z + 1))) {
-                    if (entity instanceof ItemEntity itemEntity && itemEntity.getStack().getItem() == Items.OBSIDIAN) {
-                        obsidianCount += itemEntity.getStack().getCount();
-                    }
-                }
-
-                for (int i = 0; i < 36; i++) {
-                    ItemStack itemStack = b.mc.player.getInventory().getStack(i);
-                    if (itemStack.getItem() == Items.OBSIDIAN) obsidianCount += itemStack.getCount();
-                }
-
-                if (obsidianCount >= minimumObsidian) {
-                    stopTimerEnabled = true;
-                    stopTimer = 12;
-                    return;
-                }
-
-                BlockPos bp = pos.getBlockPos();
-                BlockState blockState = b.mc.world.getBlockState(bp);
-
-                if (blockState.getBlock() == Blocks.ENDER_CHEST) {
-                    if (b.mc.currentScreen instanceof GenericContainerScreen screen) {
-                        if (screen.getScreenHandler().syncId != b.containerId) return;
-
-                        b.mc.setScreen(null);
-                    }
-
-                    if (!EChestMemory.isKnown()) {
-                        Direction interactDir = getInteractDirection(bp);
-                        Vec3d hitVec = new Vec3d(bp.getX() + 0.5 + interactDir.getOffsetX() * 0.45,
-                            bp.getY() + 0.5 + interactDir.getOffsetY() * 0.45,
-                            bp.getZ() + 0.5 + interactDir.getOffsetZ() * 0.45);
-                        if (b.rotation.getValue().place) {
-                            float[] yp = b.lookAt(b.mc.player.getEyePos(), hitVec);
-                            b.rotateTo(yp[0], yp[1]);
-                        }
-                        b.mc.interactionManager.interactBlock(b.mc.player, Hand.MAIN_HAND,
-                            new BlockHitResult(hitVec, interactDir, bp, false));
-                        return;
-                    }
-
-                    if (first) {
-                        moveTimer = 8;
-                        first = false;
-                        return;
-                    }
-
-                    int slot = b.findAndMoveBestToolToHotbar(blockState, true);
-                    if (slot == -1) {
-                        b.error("Cannot find pickaxe without silk touch to mine ender chests.");
-                        return;
-                    }
-
-                    InventoryUtil.swap(slot);
-
-                    if (b.rebreakEchests.getValue() && primed) {
-                        timeout++;
-                        if (timeout > 60) {
-                            primed = false;
-                            timeout = 0;
-                            return;
-                        }
-
-                        if (rebreakTimer > 0) {
-                            rebreakTimer--;
-                            return;
-                        }
-
-                        rebreakTimer = b.rebreakTimer.getIntValue();
-
-                        if (b.rotation.getValue().mine) {
-                            float[] yp = b.lookAt(bp);
-                            b.rotateTo(yp[0], yp[1]);
-                        }
-                        b.sendAction(PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK, bp);
-                    } else {
-                        if (b.rotation.getValue().mine) {
-                            float[] yp = b.lookAt(bp);
-                            b.rotateTo(yp[0], yp[1]);
-                        }
-                        b.breakBlockAt(bp);
-                    }
-                } else {
-                    int slot = b.findAndMoveToHotbar(stack -> stack.getItem() == Items.ENDER_CHEST);
-                    if (slot == -1 || b.countItem(stack -> stack.getItem() == Items.ENDER_CHEST) <= b.saveEchests.getIntValue()) {
-                        stopTimerEnabled = true;
-                        stopTimer = 12;
-                        return;
-                    }
-
-                    if (b.countItem(stack -> stack.isIn(ItemTags.PICKAXES)) <= b.savePickaxes.getIntValue()) {
-                        if (b.searchEnderChest.getValue() || b.searchShulkers.getValue()) {
-                            b.restockTask.setPickaxes();
-                        }
-                    }
-
-                    if (!first) primed = true;
-
-                    Direction placeDir = getInteractDirection(bp);
-                    Vec3d hitVec = new Vec3d(bp.getX() + 0.5 + placeDir.getOffsetX() * 0.45,
-                        bp.getY() + 0.5 + placeDir.getOffsetY() * 0.45,
-                        bp.getZ() + 0.5 + placeDir.getOffsetZ() * 0.45);
-                    BlockHitResult hit = new BlockHitResult(hitVec, placeDir, bp, false);
-                    InventoryUtil.swap(slot);
-                    if (b.rotation.getValue().place) {
-                        float[] yp = b.lookAt(b.mc.player.getEyePos(), hitVec);
-                        b.rotateTo(yp[0], yp[1]);
-                    }
-                    b.mc.interactionManager.interactBlock(b.mc.player, Hand.MAIN_HAND, hit);
-                    b.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
-                    InventoryUtil.swapBack();
-                    timeout = 0;
-                }
+                HighwayMineEnderChests.INSTANCE.tick(b);
             }
         },
 
