@@ -177,7 +177,7 @@ public class SpeedMine extends Module {
         .defaultValue(false)
         .visible(() -> this.modeConfig.get() == SpeedmineMode.PACKET)
         .build());
-    private final Setting<Swap> swapConfig = this.sgGeneral.add(new EnumSetting.Builder<Swap>()
+    final Setting<Swap> swapConfig = this.sgGeneral.add(new EnumSetting.Builder<Swap>()
         .name("авто-смена")
         .description("Сменять слот на лучший инструмент после завершения майнинга.")
         .defaultValue(Swap.SILENT)
@@ -324,7 +324,7 @@ public class SpeedMine extends Module {
     private double delayBalanceMirror;
     private double breakBalanceMirror;
     private boolean effMirrorInit;
-    private int grimAttrEffLevel;
+    int grimAttrEffLevel;
     private int pendingEffLevel = -1;
     private long effChangeMs;
     private BlockPos instaGracePos;
@@ -1349,43 +1349,15 @@ public class SpeedMine extends Module {
     }
 
     public float calcBlockBreakingDelta(BlockState state, BlockPos pos) {
-        if (state.isAir()) {
-            return 0.0F;
-        }
-
-        if (this.swapConfig.get() == Swap.OFF) {
-            return state.calcBlockBreakingDelta(this.mc.player, this.mc.world, pos);
-        }
-
-        float f = state.getHardness(this.mc.world, pos);
-        if (f == -1.0F) {
-            return 0.0F;
-        }
-
-        int i = this.canHarvest(state) ? 30 : 100;
-        return this.getBlockBreakingSpeed(state) / f / i;
+        return SpeedMineMath.calcBlockBreakingDelta(this, state, pos);
     }
 
     private float serverHeldBreakingDelta(BlockState state, BlockPos pos) {
-        float hardness = state.getHardness(this.mc.world, pos);
-        if (hardness == -1.0F) {
-            return 0.0F;
-        }
-
-        ItemStack stack = this.mc.player.getInventory().getStack(SwapManager.getInstance().getServerSlot());
-        int i = this.canStackHarvest(stack, state) ? 30 : 100;
-        return this.stackBreakingSpeed(stack, state, this.effLevel(stack)) / hardness / i;
+        return SpeedMineMath.serverHeldBreakingDelta(this, state, pos);
     }
 
     private float grimSampledBreakingDelta(BlockState state, BlockPos pos) {
-        float hardness = state.getHardness(this.mc.world, pos);
-        if (hardness == -1.0F) {
-            return 0.0F;
-        }
-
-        ItemStack stack = this.mc.player.getInventory().getStack(SwapManager.getInstance().getServerSlot());
-        int i = this.canStackHarvest(stack, state) ? 30 : 100;
-        return this.stackBreakingSpeed(stack, state, this.grimAttrEffLevel) / hardness / i;
+        return SpeedMineMath.grimSampledBreakingDelta(this, state, pos);
     }
 
     private void updateGrimEffMirror() {
@@ -1421,68 +1393,19 @@ public class SpeedMine extends Module {
     }
 
     private int effLevel(ItemStack stack) {
-        if (stack.isEmpty()) {
-            return 0;
-        }
-
-        ItemEnchantmentsComponent enchants = stack.getEnchantments();
-        for (RegistryEntry<Enchantment> entry : enchants.getEnchantments()) {
-            if (entry.matchesKey(Enchantments.EFFICIENCY)) {
-                return enchants.getLevel(entry);
-            }
-        }
-
-        return 0;
+        return SpeedMineMath.effLevel(stack);
     }
 
     private float getBlockBreakingSpeed(BlockState block) {
-        int tool = this.getBestTool(block);
-        return this.stackBreakingSpeed(this.mc.player.getInventory().getStack(tool), block);
+        return SpeedMineMath.getBlockBreakingSpeed(this, block);
     }
 
     private float stackBreakingSpeed(ItemStack stack, BlockState block) {
-        return this.stackBreakingSpeed(stack, block, this.effLevel(stack));
-    }
-
-    private float stackBreakingSpeed(ItemStack stack, BlockState block, int efficiency) {
-        float f = stack.getMiningSpeedMultiplier(block);
-        if (f > 1.0F && efficiency > 0 && !stack.isEmpty()) {
-            f += efficiency * efficiency + 1;
-        }
-
-        if (StatusEffectUtil.hasHaste(this.mc.player)) {
-            f *= 1.0F + (StatusEffectUtil.getHasteAmplifier(this.mc.player) + 1) * 0.2F;
-        }
-
-        if (this.mc.player.hasStatusEffect(StatusEffects.MINING_FATIGUE)) {
-            float g = switch (this.mc.player.getStatusEffect(StatusEffects.MINING_FATIGUE).getAmplifier()) {
-                case 0 -> 0.3F;
-                case 1 -> 0.09F;
-                case 2 -> 0.0027F;
-                default -> 8.1E-4F;
-            };
-            f *= g;
-        }
-
-        f *= (float) this.mc.player.getAttributeValue(EntityAttributes.BLOCK_BREAK_SPEED);
-        if (this.mc.player.isSubmergedIn(FluidTags.WATER)) {
-            f *= (float) this.mc.player.getAttributeValue(EntityAttributes.SUBMERGED_MINING_SPEED);
-        }
-
-        if (!this.mc.player.isOnGround()) {
-            f /= 5.0F;
-        }
-
-        return f;
+        return SpeedMineMath.stackBreakingSpeed(stack, block);
     }
 
     private boolean canHarvest(BlockState state) {
-        if (state.isToolRequired()) {
-            int tool = this.getBestTool(state);
-            return this.mc.player.getInventory().getStack(tool).isSuitableFor(state);
-        } else {
-            return true;
-        }
+        return SpeedMineMath.canHarvest(this, state);
     }
 
     private int referenceSlot() {
@@ -1490,32 +1413,15 @@ public class SpeedMine extends Module {
     }
 
     private int getBestTool(BlockState state) {
-        int bestSlot = this.bestToolSlot(state);
-        return bestSlot == -1 ? this.referenceSlot() : bestSlot;
+        return SpeedMineMath.getBestTool(this, state);
     }
 
     private int bestToolSlot(BlockState state) {
-        ItemStack held = this.mc.player.getInventory().getStack(this.referenceSlot());
-        float bestSpeed = held.getMiningSpeedMultiplier(state);
-        boolean bestHarvest = this.canStackHarvest(held, state);
-        int bestSlot = -1;
-
-        for (int i = 0; i < 9; i++) {
-            ItemStack stack = this.mc.player.getInventory().getStack(i);
-            float speed = stack.getMiningSpeedMultiplier(state);
-            boolean harvest = this.canStackHarvest(stack, state);
-            if (harvest && !bestHarvest || harvest == bestHarvest && speed > bestSpeed) {
-                bestHarvest = harvest;
-                bestSpeed = speed;
-                bestSlot = i;
-            }
-        }
-
-        return bestSlot;
+        return SpeedMineMath.bestToolSlot(this, state);
     }
 
     private boolean canStackHarvest(ItemStack stack, BlockState state) {
-        return !state.isToolRequired() || stack.isSuitableFor(state);
+        return SpeedMineMath.canStackHarvest(stack, state);
     }
 
     private PlayerEntity getClosestEnemy() {
