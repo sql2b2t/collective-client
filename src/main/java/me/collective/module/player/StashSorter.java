@@ -164,7 +164,7 @@ public class StashSorter extends Module {
         .max(600)
         .build());
 
-    private final Setting<Integer> settleDelay = sgTiming.add(new IntSetting.Builder()
+    final Setting<Integer> settleDelay = sgTiming.add(new IntSetting.Builder()
         .name("задержка-успокоения")
         .description("Сколько тиков постоять неподвижно перед кликом по сундуку.")
         .defaultValue(2)
@@ -196,7 +196,7 @@ public class StashSorter extends Module {
         .max(27)
         .build());
 
-    private final Setting<Integer> turnSpeed = sgTiming.add(new IntSetting.Builder()
+    final Setting<Integer> turnSpeed = sgTiming.add(new IntSetting.Builder()
         .name("скорость-поворота")
         .description("На сколько градусов доворачивается взгляд за тик. 0 — мгновенно.")
         .defaultValue(45)
@@ -264,8 +264,8 @@ public class StashSorter extends Module {
     private int timer;
     private int openRetries;
     private boolean menuSettled;
-    private int settleTicks;
-    private int alignTicks;
+    int settleTicks;
+    int alignTicks;
 
     private long startTime;
     private int pass = 1;
@@ -1391,94 +1391,26 @@ public class StashSorter extends Module {
     //  Открытие сундука
     // ------------------------------------------------------------------
 
-    private OpenStep stepOpen(BlockPos canonicalPos) {
-        BlockHitResult hit = nav().openHit(canonicalPos);
-        if (hit == null) return OpenStep.NO_ANGLE;
-
-        if (!movementSettled()) {
-            alignTicks = 0;
-            return OpenStep.WAITING;
-        }
-
-        if (!turnTowards(hit.getPos())) {
-            alignTicks = 0;
-            return OpenStep.WAITING;
-        }
-
-        if (alignTicks++ < AIM_HOLD_TICKS) return OpenStep.WAITING;
-
-        mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
-        mc.player.swingHand(Hand.MAIN_HAND);
-        return OpenStep.CLICKED;
-    }
-
-    /** Кликать можно только когда Baritone стоит и клюши отпущены. */
-    private boolean movementSettled() {
-        releaseMovement();
-        if (settleTicks++ < settleDelay.get()) return false;
-        return true;
-    }
-
-    private void releaseMovement() {
-        nav().stop();
-        mc.options.forwardKey.setPressed(false);
-        mc.options.backKey.setPressed(false);
-        mc.options.leftKey.setPressed(false);
-        mc.options.rightKey.setPressed(false);
-        mc.options.jumpKey.setPressed(false);
-        mc.options.sneakKey.setPressed(false);
-        mc.options.sprintKey.setPressed(false);
-    }
-
-    /** Доворачивает взгляд на точку и говорит, попал ли. */
-    private boolean turnTowards(Vec3d point) {
-        Vec3d eye = mc.player.getEyePos();
-        double dx = point.x - eye.x;
-        double dy = point.y - eye.y;
-        double dz = point.z - eye.z;
-        double horizontal = Math.sqrt(dx * dx + dz * dz);
-        float targetYaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
-        float targetPitch = (float) -Math.toDegrees(Math.atan2(dy, horizontal));
-
-        float maxStep = turnSpeed.get();
-        if (maxStep <= 0) {
-            mc.player.setYaw(targetYaw);
-            mc.player.setHeadYaw(targetYaw);
-            mc.player.setPitch(MathHelper.clamp(targetPitch, -90.0F, 90.0F));
-            return true;
-        }
-
-        float dYaw = MathHelper.wrapDegrees(targetYaw - mc.player.getYaw());
-        float dPitch = targetPitch - mc.player.getPitch();
-
-        float yaw = mc.player.getYaw() + MathHelper.clamp(dYaw, -maxStep, maxStep);
-        mc.player.setYaw(yaw);
-        mc.player.setHeadYaw(yaw);
-        mc.player.setPitch(MathHelper.clamp(mc.player.getPitch() + MathHelper.clamp(dPitch, -maxStep, maxStep), -90.0F, 90.0F));
-
-        return Math.abs(dYaw) <= AIM_EPSILON && Math.abs(dPitch) <= AIM_EPSILON;
+    private StashSorter.OpenStep stepOpen(BlockPos canonicalPos) {
+        return StashSorterAccess.stepOpen(this, canonicalPos);
     }
 
     @Nullable
     private GenericContainerScreenHandler openContainerMenu() {
-        if (!(mc.currentScreen instanceof HandledScreen)) return null;
-        return mc.player.currentScreenHandler instanceof GenericContainerScreenHandler menu ? menu : null;
+        return StashSorterAccess.openContainerMenu(this);
     }
 
     private boolean wrongMenuOpen() {
-        return mc.currentScreen instanceof HandledScreen
-            && mc.player.currentScreenHandler != mc.player.playerScreenHandler
-            && !(mc.player.currentScreenHandler instanceof GenericContainerScreenHandler);
+        return StashSorterAccess.wrongMenuOpen(this);
     }
 
     private boolean containerGone(BlockPos pos) {
-        return mc.world.isPosLoaded(pos) && !ContainerGeometry.isContainerBlock(mc.world.getBlockState(pos));
+        return StashSorterAccess.containerGone(this, pos);
     }
 
     /** Индекс слота инвентаря в номере слотов экрана: у контейнера сверху, у игрока снизу. */
     private static int invIndexToMenuId(GenericContainerScreenHandler menu, int invIndex) {
-        int rows = menu.getRows();
-        return rows * 9 + (invIndex < 9 ? invIndex + 27 : invIndex - 9);
+        return StashSorterAccess.invIndexToMenuId(menu, invIndex);
     }
 
     /**
@@ -1486,10 +1418,7 @@ public class StashSorter extends Module {
      * protected, поэтому закрываем экран — он сам отправит пакет закрытия.
      */
     private void closeOpenContainer() {
-        if (mc.player == null || mc.currentScreen == null) return;
-        boolean serverContainer = mc.player.currentScreenHandler != mc.player.playerScreenHandler;
-        boolean containerScreen = mc.currentScreen instanceof HandledScreen && !(mc.currentScreen instanceof InventoryScreen);
-        if (serverContainer || containerScreen) mc.currentScreen.close();
+        StashSorterAccess.closeOpenContainer(this);
     }
 
     /** Перезаписывает запись индекса тем, что прямо сейчас в сундуке. */
@@ -1526,7 +1455,7 @@ public class StashSorter extends Module {
         return mc.world == null ? "unknown" : mc.world.getRegistryKey().getValue().toString();
     }
 
-    private ChestNavigator nav() {
+    ChestNavigator nav() {
         if (nav == null) nav = new ChestNavigator();
         return nav;
     }
@@ -1826,7 +1755,7 @@ public class StashSorter extends Module {
         }
     }
 
-    private enum OpenStep {
+    enum OpenStep {
         WAITING,
         CLICKED,
         NO_ANGLE
