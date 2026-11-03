@@ -1157,7 +1157,7 @@ public class StashSorter extends Module {
         return StashSorterRouting.maxStackOfSig(sig);
     }
 
-    private boolean inArea(List<SortZone> areas, BlockPos raw, BlockPos canonical) {
+    boolean inArea(List<SortZone> areas, BlockPos raw, BlockPos canonical) {
         if (containsAny(areas, raw) || containsAny(areas, canonical)) return true;
         BlockPos other = ContainerGeometry.otherHalf(mc.world, canonical);
         return other != null && containsAny(areas, other);
@@ -1178,98 +1178,19 @@ public class StashSorter extends Module {
     // ------------------------------------------------------------------
 
     private Map<String, List<BlockPos>> buildPinMap(String dim) {
-        Map<String, List<BlockPos>> out = new LinkedHashMap<>();
-        Set<BlockPos> seen = new HashSet<>();
-        for (var p : store().pinsFor(dim)) {
-            BlockPos canonical = ContainerGeometry.canonical(mc.world, p.pos());
-            if (seen.add(canonical)) out.computeIfAbsent(p.groupKey, k -> new ArrayList<>()).add(canonical);
-        }
-        return out;
+        return StashSorterPlanning.buildPinMap(this, dim);
     }
 
     private List<SortPlanner.ContainerSnapshot> buildSnapshots(String dim, Set<String> pinnedKeys) {
-        ChestTrackerDataV2 data = ChestTrackerDataManager.getData();
-        List<SortZone> areas = sourceZones();
-        if (areas.isEmpty()) return List.of();
-
-        Map<BlockPos, SortPlanner.ContainerSnapshot> byCanonical = new HashMap<>();
-        Map<BlockPos, Long> newest = new HashMap<>();
-
-        for (TrackedContainer tc : data.getAllContainers(dim)) {
-            String type = tc.getContainerType();
-            if (!"chest".equals(type) && !"copper_chest".equals(type) && !"barrel".equals(type)) continue;
-
-            BlockPos raw = tc.getPosition();
-            BlockPos canonical = ContainerGeometry.canonical(mc.world, raw);
-            if (!inArea(areas, raw, canonical)) continue;
-
-            Long prev = newest.get(canonical);
-            if (prev != null && prev >= tc.getLastUpdated()) continue;
-            newest.put(canonical, tc.getLastUpdated());
-
-            Map<String, Integer> sigs = new HashMap<>();
-            for (Map.Entry<String, Integer> e : tc.getTopLevelSignatureCounts().entrySet()) {
-                boolean shulker = SortGroupKey.isShulkerGroup(e.getKey());
-                if (shulker && !moveShulkers.get()) continue;
-                if (!shulker && looseItems.get() == LooseItems.IGNORE) continue;
-                sigs.merge(e.getKey(), e.getValue(), Integer::sum);
-            }
-
-            int used = tc.getUsedStacks();
-            if (used == 0 && !tc.getTopLevelSignatureCounts().isEmpty()) used = 1;
-
-            byCanonical.put(canonical, new SortPlanner.ContainerSnapshot(
-                canonical, type, slotCountOf(canonical, type, used), used, sigs));
-        }
-
-        // Сводим мелкие категории в крупные — планировщик считает уже свёрнутые
-        Map<String, Integer> totals = new HashMap<>();
-        for (SortPlanner.ContainerSnapshot c : byCanonical.values()) {
-            for (Map.Entry<String, Integer> e : c.sigCounts().entrySet()) {
-                totals.merge(e.getKey(), e.getValue(), Integer::sum);
-            }
-        }
-
-        Map<String, String> collapse = new HashMap<>();
-        for (String key : totals.keySet()) collapse.put(key, collapseKey(key, totals, pinnedKeys));
-        keyCollapse = collapse;
-
-        List<SortPlanner.ContainerSnapshot> out = new ArrayList<>(byCanonical.size());
-        for (SortPlanner.ContainerSnapshot c : byCanonical.values()) {
-            Map<String, Integer> sigs = new HashMap<>();
-            for (Map.Entry<String, Integer> e : c.sigCounts().entrySet()) {
-                String group = collapse.get(e.getKey());
-                sigs.merge(group, groupAmount(e.getKey(), group, e.getValue()), Integer::sum);
-            }
-            out.add(new SortPlanner.ContainerSnapshot(c.pos(), c.type(), c.estSlots(), c.usedSlots(), sigs));
-        }
-
-        return out;
-    }
-
-    /** В смешанном сундуке считаем стопки, а не предметы — иначе 64 блока «съедят» целый сундук. */
-    private int groupAmount(String key, String group, int count) {
-        return StashSorterRouting.groupAmount(key, group, count);
-    }
-
-    private String collapseKey(String key, Map<String, Integer> totals, Set<String> pinnedKeys) {
-        return StashSorterRouting.collapseKey(this, key, totals, pinnedKeys);
+        return StashSorterPlanning.buildSnapshots(this, dim, pinnedKeys);
     }
 
     private List<SortPlanner.ContainerSnapshot> withProbeSnapshots(List<SortPlanner.ContainerSnapshot> indexed, List<BlockPos> unknown) {
-        if (unknown.isEmpty()) return indexed;
-
-        List<SortPlanner.ContainerSnapshot> out = new ArrayList<>(indexed.size() + unknown.size());
-        out.addAll(indexed);
-        for (BlockPos p : unknown) {
-            String type = containerTypeAt(p);
-            out.add(new SortPlanner.ContainerSnapshot(p, type, slotCountOf(p, type, 0), 0, Map.of()));
-        }
-        return out;
+        return StashSorterPlanning.withProbeSnapshots(this, indexed, unknown);
     }
 
     private int slotCountOf(BlockPos canonical, String type, int used) {
-        return ContainerGeometry.slotCount(mc.world, canonical, type, used);
+        return StashSorterPlanning.slotCountOf(canonical, type, used);
     }
 
     // ------------------------------------------------------------------
@@ -1332,7 +1253,7 @@ public class StashSorter extends Module {
         data.trackContainer(key, dim, containerTypeAt(key), contents);
     }
 
-    private String containerTypeAt(BlockPos pos) {
+    String containerTypeAt(BlockPos pos) {
         return mc.world.getBlockState(pos).getBlock() instanceof BarrelBlock ? "barrel" : "chest";
     }
 
@@ -1353,7 +1274,7 @@ public class StashSorter extends Module {
         return worldStore;
     }
 
-    private List<SortZone> sourceZones() {
+    List<SortZone> sourceZones() {
         return store().sourceZones(dimension());
     }
 
