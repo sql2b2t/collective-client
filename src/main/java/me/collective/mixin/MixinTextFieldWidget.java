@@ -10,6 +10,8 @@ import net.minecraft.text.Text;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Шрифт Fonts для строки ввода (чат, команды, поиск).
@@ -20,6 +22,8 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 @Mixin(TextFieldWidget.class)
 public abstract class MixinTextFieldWidget {
 
+    private static final Logger LOG = LoggerFactory.getLogger(MixinTextFieldWidget.class);
+
     private static long lastLog = 0L;
 
     private static boolean useCustomFont() {
@@ -28,7 +32,9 @@ public abstract class MixinTextFieldWidget {
         long now = System.currentTimeMillis();
         if (now - lastLog > 5000) {
             lastLog = now;
-            System.out.println("[TextField-Debug] useCustom=" + on);
+            // Heartbeat-диагностика: в stdout она спамила каждые 5 секунд,
+            // на уровне debug видна только при явной диагностике.
+            LOG.debug("[TextField-Debug] useCustom={}", on);
         }
         return on;
     }

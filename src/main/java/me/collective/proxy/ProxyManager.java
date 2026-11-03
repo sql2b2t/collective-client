@@ -12,11 +12,17 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Список прокси и активное подключение. Файл collective/proxies.json.
  * activeIndex < 0 — прямое подключение без прокси.
  */
 public class ProxyManager {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ProxyManager.class);
+
     public static final ProxyManager INSTANCE = new ProxyManager();
 
     private final Path proxiesFile;
@@ -68,7 +74,7 @@ public class ProxyManager {
                 enabled = root.get("enabled").getAsBoolean();
             }
         } catch (Exception e) {
-            System.err.println("[Collective-Proxy] Load failed: " + e.getMessage());
+            LOG.error("[Collective-Proxy] Load failed: " + e.getMessage());
         }
     }
 
@@ -91,7 +97,7 @@ public class ProxyManager {
             me.collective.util.AtomicFileWriter.write(proxiesFile, gson.toJson(root));
             return true;
         } catch (Exception e) {
-            System.err.println("[Collective-Proxy] Save failed: " + e.getMessage());
+            LOG.error("[Collective-Proxy] Save failed: " + e.getMessage());
             return false;
         }
     }

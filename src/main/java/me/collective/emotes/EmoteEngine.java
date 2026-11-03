@@ -19,11 +19,17 @@ import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Движок эмоутов: проигрывание, тайминг, наложение поз на модель,
  * сдвиг тела. Анимирует ТОЛЬКО локального игрока.
  */
 public final class EmoteEngine {
+
+    private static final Logger LOG = LoggerFactory.getLogger(EmoteEngine.class);
+
     private static final MinecraftClient mc = MinecraftClient.getInstance();
     private static final float DEG = (float) Math.PI / 180.0F;
 
@@ -82,7 +88,7 @@ public final class EmoteEngine {
     }
 
     private static void log(String msg) {
-        if (debug()) System.out.println("[Emotes] " + msg);
+        if (debug()) LOG.info("[Emotes] " + msg);
     }
 
     public static void mapState(Object state, UUID uuid) {

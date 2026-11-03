@@ -58,12 +58,18 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * HTTP-сервер Model Context Protocol для AI-агентов.
  * Статeless-транспорт (streamable HTTP без SSE): каждый POST — один JSON-RPC обмен.
  * Все обращения к состоянию игры выполняются в игровом потоке (callSync).
  */
 public class McpServer {
+
+    private static final Logger LOG = LoggerFactory.getLogger(McpServer.class);
+
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String SERVER_VERSION = "1.1.0";
     private static final List<String> SUPPORTED_PROTOCOLS = List.of("2025-06-18", "2025-03-26", "2024-11-05");
@@ -107,7 +113,7 @@ public class McpServer {
                 this.server = s;
                 this.port = candidate;
                 this.running = true;
-                System.out.println("[Collective-MCP] Server listening on http://127.0.0.1:" + candidate + "/mcp");
+                LOG.info("[Collective-MCP] Server listening on http://127.0.0.1:" + candidate + "/mcp");
                 return;
             } catch (IOException e) {
                 lastError = e;
@@ -128,7 +134,7 @@ public class McpServer {
             executor.shutdownNow();
             executor = null;
         }
-        System.out.println("[Collective-MCP] Server stopped.");
+        LOG.info("[Collective-MCP] Server stopped.");
     }
 
     public boolean isRunning() {

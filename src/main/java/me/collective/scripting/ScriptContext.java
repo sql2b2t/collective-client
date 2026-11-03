@@ -20,7 +20,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class ScriptContext {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ScriptContext.class);
+
     /** Сколько ошибок допускается от одного источника (модуль/таймер), прежде чем он будет остановлен. */
     public static final int MAX_ERRORS = 5;
 
@@ -183,7 +189,7 @@ public class ScriptContext {
         }
 
         if (count <= MAX_ERRORS) {
-            System.err.println("[Collective-Scripting] " + scriptName + " (" + source + ") error #" + count + ": "
+            LOG.error("[Collective-Scripting] " + scriptName + " (" + source + ") error #" + count + ": "
                     + (error == null ? "unknown error" : error.toString()));
             if (error != null) {
                 error.printStackTrace();
@@ -281,7 +287,7 @@ public class ScriptContext {
     }
 
     public void log(Object msg) {
-        System.out.println("[" + scriptName + "] " + String.valueOf(msg));
+        LOG.info("[" + scriptName + "] " + String.valueOf(msg));
     }
 
     // --- Cleanup & Lifecycle ---

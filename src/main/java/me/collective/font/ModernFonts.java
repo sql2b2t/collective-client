@@ -3,12 +3,18 @@ package me.collective.font;
 import java.awt.Font;
 import java.io.InputStream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Shared high-DPI TrueType font set for modern Glassmorphism GUIs
  * (AltManagerScreen). Prevents duplicate atlas rasterization
  * and texture allocation.
  */
 public final class ModernFonts {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ModernFonts.class);
+
 
     public static CFont fontTitle;
     public static CFont fontTabs;
@@ -43,7 +49,7 @@ public final class ModernFonts {
             initialized = true;
         }
         long elapsedMs = (System.nanoTime() - start) / 1_000_000L;
-        System.out.println("[Collective] ModernFonts initialized in " + elapsedMs + " ms");
+        LOG.info("[Collective] ModernFonts initialized in " + elapsedMs + " ms");
     }
 
     private static Font loadRawFont(String filename, int style) {

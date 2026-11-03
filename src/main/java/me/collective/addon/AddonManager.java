@@ -18,7 +18,13 @@ import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class AddonManager {
+
+    private static final Logger LOG = LoggerFactory.getLogger(AddonManager.class);
+
     public static final AddonManager INSTANCE = new AddonManager();
 
     private final List<CollectiveAddon> addons = new ArrayList<>();
@@ -65,16 +71,16 @@ public class AddonManager {
                 addon.initMetadata(meta.getName(), meta.getVersion().getFriendlyString(), author, meta.getDescription(), website);
 
                 if (findAddonByName(addon.getName()) != null) {
-                    System.out.println("[Collective] Аддон '" + addon.getName() + "' уже загружен — пропускаю дубликат (fabric entrypoint)");
+                    LOG.info("[Collective] Аддон '" + addon.getName() + "' уже загружен — пропускаю дубликат (fabric entrypoint)");
                     continue;
                 }
 
                 addon.onInitialize();
                 addons.add(addon);
-                System.out.println("[Collective] Loaded Fabric entrypoint addon: " + addon.getName() + " v" + addon.getVersion());
+                LOG.info("[Collective] Loaded Fabric entrypoint addon: " + addon.getName() + " v" + addon.getVersion());
             } catch (Throwable t) {
                 recordFailure("fabric:" + meta.getName(), summarize(t));
-                System.err.println("[Collective] Failed to load Fabric addon " + meta.getName() + ": " + t);
+                LOG.error("[Collective] Failed to load Fabric addon " + meta.getName() + ": " + t);
                 t.printStackTrace();
             }
         }
@@ -142,7 +148,7 @@ public class AddonManager {
                     CollectiveAddon addon = (CollectiveAddon) target.getDeclaredConstructor().newInstance();
 
                     if (findAddonByName(addon.getName()) != null) {
-                        System.out.println("[Collective] Аддон '" + addon.getName() + "' уже загружен — пропускаю дубликат из " + jarName);
+                        LOG.info("[Collective] Аддон '" + addon.getName() + "' уже загружен — пропускаю дубликат из " + jarName);
                         continue;
                     }
 
@@ -157,17 +163,17 @@ public class AddonManager {
                     addons.add(addon);
                     dynamicLoaders.put(addon, loader);
                     anyLoaded = true;
-                    System.out.println("[Collective] Loaded dynamic addon from JAR: " + addon.getName() + " v" + addon.getVersion() + " (" + jarName + ")");
+                    LOG.info("[Collective] Loaded dynamic addon from JAR: " + addon.getName() + " v" + addon.getVersion() + " (" + jarName + ")");
                 } catch (Throwable t) {
                     errors.add(target.getSimpleName() + ": " + summarize(t));
-                    System.err.println("[Collective] Failed to init addon class " + target.getSimpleName() + " from " + jarName + ": " + t);
+                    LOG.error("[Collective] Failed to init addon class " + target.getSimpleName() + " from " + jarName + ": " + t);
                 }
             }
 
             if (anyLoaded) {
                 loadFailures.remove(jarName);
                 if (!errors.isEmpty()) {
-                    System.err.println("[Collective] Часть классов из " + jarName + " не загрузилась: " + String.join("; ", errors));
+                    LOG.error("[Collective] Часть классов из " + jarName + " не загрузилась: " + String.join("; ", errors));
                 }
                 return true;
             }
@@ -182,7 +188,7 @@ public class AddonManager {
                 } catch (Exception ignored) {}
             }
             recordFailure(jarName, summarize(t));
-            System.err.println("[Collective] Failed to load jar addon " + jarName + ": " + t);
+            LOG.error("[Collective] Failed to load jar addon " + jarName + ": " + t);
             return false;
         }
     }
@@ -197,7 +203,7 @@ public class AddonManager {
         try {
             addon.onShutdown();
         } catch (Throwable t) {
-            System.err.println("[Collective] Ошибка выгрузки аддона " + addon.getName() + ": " + t);
+            LOG.error("[Collective] Ошибка выгрузки аддона " + addon.getName() + ": " + t);
         }
         addons.remove(addon);
 
@@ -207,7 +213,7 @@ public class AddonManager {
                 loader.close();
             } catch (Exception ignored) {}
         }
-        System.out.println("[Collective] Unloaded addon: " + addon.getName());
+        LOG.info("[Collective] Unloaded addon: " + addon.getName());
         return true;
     }
 
@@ -350,7 +356,7 @@ public class AddonManager {
             Path example = addonsFolder.resolve("ExampleAddon.java.example");
             if (!Files.exists(example)) Files.writeString(example, EXAMPLE_ADDON_SOURCE);
         } catch (Exception e) {
-            System.err.println("[Collective] Не удалось создать документацию аддонов: " + e);
+            LOG.error("[Collective] Не удалось создать документацию аддонов: " + e);
         }
     }
 
@@ -419,12 +425,12 @@ public class AddonManager {
                 @Override
                 public void onInitialize() {
                     registerModule(new ExampleModule());
-                    System.out.println("[ExampleAddon] Загружен!");
+                    LOG.info("[ExampleAddon] Загружен!");
                 }
 
                 @Override
                 public void onShutdown() {
-                    System.out.println("[ExampleAddon] Выгружен!");
+                    LOG.info("[ExampleAddon] Выгружен!");
                     super.onShutdown();
                 }
 

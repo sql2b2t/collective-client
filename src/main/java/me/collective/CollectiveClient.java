@@ -13,6 +13,8 @@ public class CollectiveClient implements ClientModInitializer {
     public static final String MOD_ID = "collective";
     public static final String MOD_NAME = "Collective Client";
 
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(CollectiveClient.class);
+
     /**
      * Версия читается из fabric.mod.json, а не хардкодится: раньше константа
      * «1.1» отстала от реальной версии мода и расходилась с метаданными.
@@ -37,7 +39,7 @@ public class CollectiveClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        System.out.println("[" + MOD_NAME + "] Initializing for Minecraft 1.21.11...");
+        LOG.info("[{}] Initializing for Minecraft 1.21.11...", MOD_NAME);
 
         // Initialize ModuleManager
         ModuleManager moduleManager = ModuleManager.INSTANCE;
@@ -162,20 +164,19 @@ public class CollectiveClient implements ClientModInitializer {
             me.collective.addon.AddonManager.getInstance().init();
             me.collective.scripting.ScriptManager.getInstance().init();
         } catch (Throwable t) {
-            System.err.println("[Collective] Error initializing Addons/Scripts: " + t.getMessage());
-            t.printStackTrace();
+            LOG.error("[Collective] Error initializing Addons/Scripts: {}", t.getMessage(), t);
         }
 
         // Load saved config (modules, settings, HUD, friends, prefix)
         try {
             if (me.collective.config.ConfigManager.getInstance().loadDefault()) {
-                System.out.println("[Collective] Config loaded: default.json");
+                LOG.info("[Collective] Config loaded: default.json");
             }
         } catch (Throwable t) {
-            System.err.println("[Collective] Error loading config: " + t.getMessage());
+            LOG.error("[Collective] Error loading config: {}", t.getMessage(), t);
         }
 
-        System.out.println("[" + MOD_NAME + "] Initialized successfully!");
+        LOG.info("[{}] Initialized successfully!", MOD_NAME);
     }
 
     public static void onKeyPressed(int key) {

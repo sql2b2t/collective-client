@@ -14,7 +14,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class ScriptManager {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ScriptManager.class);
+
     public static final ScriptManager INSTANCE = new ScriptManager();
 
     // Публичные мосты для биндингов print/log.
@@ -66,7 +72,7 @@ public class ScriptManager {
         try {
             EventBus.INSTANCE.subscribe(this);
         } catch (Throwable t) {
-            System.err.println("[Collective-Scripting] Failed to subscribe tick handler: " + t);
+            LOG.error("[Collective-Scripting] Failed to subscribe tick handler: " + t);
         }
     }
 
@@ -76,7 +82,7 @@ public class ScriptManager {
             try {
                 ctx.tickTasks();
             } catch (Throwable t) {
-                System.err.println("[Collective-Scripting] Timer tick failed in " + ctx.scriptName + ": " + t);
+                LOG.error("[Collective-Scripting] Timer tick failed in " + ctx.scriptName + ": " + t);
             }
         }
     }
@@ -99,7 +105,7 @@ public class ScriptManager {
                 Files.writeString(marker, "Примеры v2 созданы. Удалите этот файл, чтобы недостающие примеры дозаписывались при запуске.");
             }
         } catch (Exception e) {
-            System.err.println("[Collective-Scripting] Failed to write examples: " + e);
+            LOG.error("[Collective-Scripting] Failed to write examples: " + e);
         }
         return written;
     }
@@ -143,7 +149,7 @@ public class ScriptManager {
         ScriptEngine engine = getEngineForExtension(ext);
         if (engine == null) {
             String available = describeAvailableEngines();
-            System.err.println("[Collective-Scripting] No script engine found for extension: ." + ext + " Available: " + available);
+            LOG.error("[Collective-Scripting] No script engine found for extension: ." + ext + " Available: " + available);
             ChatHelper.sendMessage(Text.literal("§c[Script] Нет движка для ." + ext + ". Доступно: " + (available.isEmpty() ? "пусто, пересобери мод с Kotlin" : available)));
             failedScripts.put(name, "нет движка для ." + ext);
             return false;
@@ -171,18 +177,18 @@ public class ScriptManager {
             engine.eval(code, bindings);
             activeContexts.put(name, ctx);
             failedScripts.remove(name);
-            System.out.println("[Collective-Scripting] Loaded script: " + name);
+            LOG.info("[Collective-Scripting] Loaded script: " + name);
             return true;
         } catch (ScriptException e) {
             // Скрипт мог успеть зарегистрировать модули/команды до ошибки — чистим
             ctx.unregisterAll();
             failedScripts.put(name, summarize(e));
-            System.err.println("[Collective-Scripting] Error executing script " + name + ": " + e.getMessage());
+            LOG.error("[Collective-Scripting] Error executing script " + name + ": " + e.getMessage());
             ChatHelper.sendMessage(Text.literal("§c[Script Error] " + name + ": §7" + summarize(e)));
         } catch (Exception e) {
             ctx.unregisterAll();
             failedScripts.put(name, summarize(e));
-            System.err.println("[Collective-Scripting] Failed to read script " + name + ": " + e.getMessage());
+            LOG.error("[Collective-Scripting] Failed to read script " + name + ": " + e.getMessage());
         }
         return false;
     }
@@ -228,7 +234,7 @@ public class ScriptManager {
                 ScriptEngine direct = fac.getScriptEngine();
                 if (direct != null) return direct;
             } catch (Throwable t) {
-                System.err.println("[Collective-Scripting] Direct Kotlin factory failed: " + t);
+                LOG.error("[Collective-Scripting] Direct Kotlin factory failed: " + t);
             }
         }
 
@@ -268,7 +274,7 @@ public class ScriptManager {
         ScriptContext ctx = activeContexts.remove(cleanName);
         if (ctx != null) {
             ctx.unregisterAll();
-            System.out.println("[Collective-Scripting] Unloaded script: " + cleanName);
+            LOG.info("[Collective-Scripting] Unloaded script: " + cleanName);
             return true;
         }
         return false;
@@ -354,7 +360,7 @@ public class ScriptManager {
             failedScripts.remove(file.getName());
             return true;
         } catch (Exception e) {
-            System.err.println("[Collective-Scripting] Failed to delete script " + file.getName() + ": " + e);
+            LOG.error("[Collective-Scripting] Failed to delete script " + file.getName() + ": " + e);
             return false;
         }
     }

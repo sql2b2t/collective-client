@@ -15,7 +15,13 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import org.joml.Vector3f;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public final class EmoteData {
+
+    private static final Logger LOG = LoggerFactory.getLogger(EmoteData.class);
+
     private final Map<String, BoneTracks> bones;
     private final float duration;
     private final float loopStart;
@@ -75,7 +81,7 @@ public final class EmoteData {
             if (anim == null) {
                 // Имя не совпало (напр. sit) — берём первую анимацию файла
                 var keys = new ArrayList<>(allAnims.keySet());
-                System.out.println("[Emotes] anim '" + animName + "' not found in " + emote.file()
+                LOG.info("[Emotes] anim '" + animName + "' not found in " + emote.file()
                     + ", available=" + keys + ", fallback=" + (keys.isEmpty() ? "none" : keys.get(0)));
                 if (keys.isEmpty()) return new EmoteData(Map.of(), 0.05f, 0.0f, 0.05f, true);
                 anim = allAnims.getAsJsonObject(keys.get(0));

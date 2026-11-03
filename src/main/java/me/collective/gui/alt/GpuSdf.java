@@ -6,6 +6,9 @@ import org.lwjgl.opengl.*;
 
 import java.nio.FloatBuffer;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Modern GPU-accelerated Signed Distance Field (SDF) renderer using OpenGL shaders.
  * Evaluates mathematical geometry directly in physical screen pixels with sub-pixel
@@ -13,6 +16,9 @@ import java.nio.FloatBuffer;
  * circles, and borders with zero GUI scale quantization or pixelation artifacts.
  */
 public final class GpuSdf {
+
+    private static final Logger LOG = LoggerFactory.getLogger(GpuSdf.class);
+
 
     private static final MinecraftClient mc = MinecraftClient.getInstance();
 
@@ -100,7 +106,7 @@ public final class GpuSdf {
             GL20.glShaderSource(vert, VERTEX_SHADER);
             GL20.glCompileShader(vert);
             if (GL20.glGetShaderi(vert, GL20.GL_COMPILE_STATUS) == 0) {
-                System.err.println("GpuSdf vert compile failed: " + GL20.glGetShaderInfoLog(vert));
+                LOG.error("GpuSdf vert compile failed: " + GL20.glGetShaderInfoLog(vert));
                 failed = true;
                 return;
             }
@@ -109,7 +115,7 @@ public final class GpuSdf {
             GL20.glShaderSource(frag, FRAGMENT_SHADER);
             GL20.glCompileShader(frag);
             if (GL20.glGetShaderi(frag, GL20.GL_COMPILE_STATUS) == 0) {
-                System.err.println("GpuSdf frag compile failed: " + GL20.glGetShaderInfoLog(frag));
+                LOG.error("GpuSdf frag compile failed: " + GL20.glGetShaderInfoLog(frag));
                 failed = true;
                 return;
             }
@@ -120,7 +126,7 @@ public final class GpuSdf {
             GL20.glBindAttribLocation(program, 0, "aPos");
             GL20.glLinkProgram(program);
             if (GL20.glGetProgrami(program, GL20.GL_LINK_STATUS) == 0) {
-                System.err.println("GpuSdf link failed: " + GL20.glGetProgramInfoLog(program));
+                LOG.error("GpuSdf link failed: " + GL20.glGetProgramInfoLog(program));
                 failed = true;
                 return;
             }
