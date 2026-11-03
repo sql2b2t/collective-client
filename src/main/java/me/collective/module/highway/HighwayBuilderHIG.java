@@ -694,7 +694,7 @@ public class HighwayBuilderHIG extends Module {
         }
     }
 
-    private void place(HighwayBuilderHIG b, MBPIterator it, int slot, State nextState) {
+    void place(HighwayBuilderHIG b, MBPIterator it, int slot, State nextState) {
         boolean placed = false;
         boolean finishedPlacing = false;
 
@@ -741,7 +741,7 @@ public class HighwayBuilderHIG extends Module {
         return HighwayInventory.findAndMoveBestToolToHotbar(this, blockState, noSilkTouch);
     }
 
-    private int findBlocksToPlace() {
+    int findBlocksToPlace() {
         int slot = findAndMoveToHotbar(stack -> stack.getItem() instanceof BlockItem blockItem && blocksToPlace.getValue().contains(blockItem.getBlock()));
 
         if (slot == -1) {
@@ -759,7 +759,7 @@ public class HighwayBuilderHIG extends Module {
         return slot;
     }
 
-    private int findBlocksToPlacePrioritizeTrash() {
+    int findBlocksToPlacePrioritizeTrash() {
         int slot = findAndMoveToHotbar(stack -> {
             if (!(stack.getItem() instanceof BlockItem)) return false;
             return trashItems.getValue().contains(stack.getItem());
@@ -1032,102 +1032,84 @@ public class HighwayBuilderHIG extends Module {
         MineFront {
             @Override
             protected void start(HighwayBuilderHIG b) {
-                b.mine(b, b.blockPosProvider.getFront(), true, Forward, this);
+                HighwayMinePlaceStates.mineFront(b);
             }
 
             @Override
             protected void tick(HighwayBuilderHIG b) {
-                b.mine(b, b.blockPosProvider.getFront(), true, Forward, this);
+                HighwayMinePlaceStates.mineFront(b);
             }
         },
 
         MineFloor {
             @Override
             protected void start(HighwayBuilderHIG b) {
-                b.mine(b, b.blockPosProvider.getFloor(), false, Forward, this);
+                HighwayMinePlaceStates.mineFloor(b);
             }
 
             @Override
             protected void tick(HighwayBuilderHIG b) {
-                b.mine(b, b.blockPosProvider.getFloor(), false, Forward, this);
+                HighwayMinePlaceStates.mineFloor(b);
             }
         },
 
         MineRailings {
             @Override
             protected void start(HighwayBuilderHIG b) {
-                b.mine(b, b.blockPosProvider.getRailings(0), false, Forward, this);
+                HighwayMinePlaceStates.mineRailings(b);
             }
 
             @Override
             protected void tick(HighwayBuilderHIG b) {
-                b.mine(b, b.blockPosProvider.getRailings(0), false, Forward, this);
+                HighwayMinePlaceStates.mineRailings(b);
             }
         },
 
         MineAboveRailings {
             @Override
             protected void start(HighwayBuilderHIG b) {
-                b.mine(b, b.blockPosProvider.getRailings(1), true, Forward, this);
+                HighwayMinePlaceStates.mineAboveRailings(b);
             }
 
             @Override
             protected void tick(HighwayBuilderHIG b) {
-                b.mine(b, b.blockPosProvider.getRailings(1), true, Forward, this);
+                HighwayMinePlaceStates.mineAboveRailings(b);
             }
         },
 
         PlaceCornerBlock {
             @Override
             protected void start(HighwayBuilderHIG b) {
-                int slot = b.findBlocksToPlacePrioritizeTrash();
-                if (slot == -1) return;
-
-                b.place(b, b.blockPosProvider.getRailings(-1), slot, Forward);
+                HighwayMinePlaceStates.placeCornerBlock(b);
             }
 
             @Override
             protected void tick(HighwayBuilderHIG b) {
-                int slot = b.findBlocksToPlacePrioritizeTrash();
-                if (slot == -1) return;
-
-                b.place(b, b.blockPosProvider.getRailings(-1), slot, Forward);
+                HighwayMinePlaceStates.placeCornerBlock(b);
             }
         },
 
         PlaceRailings {
             @Override
             protected void start(HighwayBuilderHIG b) {
-                int slot = b.findBlocksToPlace();
-                if (slot == -1) return;
-
-                b.place(b, b.blockPosProvider.getRailings(0), slot, Forward);
+                HighwayMinePlaceStates.placeRailings(b);
             }
 
             @Override
             protected void tick(HighwayBuilderHIG b) {
-                int slot = b.findBlocksToPlace();
-                if (slot == -1) return;
-
-                b.place(b, b.blockPosProvider.getRailings(0), slot, Forward);
+                HighwayMinePlaceStates.placeRailings(b);
             }
         },
 
         PlaceFloor {
             @Override
             protected void start(HighwayBuilderHIG b) {
-                int slot = b.findBlocksToPlace();
-                if (slot == -1) return;
-
-                b.place(b, b.blockPosProvider.getFloor(), slot, Forward);
+                HighwayMinePlaceStates.placeFloor(b);
             }
 
             @Override
             protected void tick(HighwayBuilderHIG b) {
-                int slot = b.findBlocksToPlace();
-                if (slot == -1) return;
-
-                b.place(b, b.blockPosProvider.getFloor(), slot, Forward);
+                HighwayMinePlaceStates.placeFloor(b);
             }
         },
 
@@ -1146,17 +1128,14 @@ public class HighwayBuilderHIG extends Module {
         PlaceEChestBlockade {
             @Override
             protected void tick(HighwayBuilderHIG b) {
-                int slot = b.findBlocksToPlacePrioritizeTrash();
-                if (slot == -1) return;
-
-                b.place(b, b.blockPosProvider.getBlockade(false, b.blockadeType.getValue()), slot, MineEnderChests);
+                HighwayMinePlaceStates.placeEChestBlockade(b);
             }
         },
 
         MineEChestBlockade {
             @Override
             protected void tick(HighwayBuilderHIG b) {
-                b.mine(b, b.blockPosProvider.getBlockade(true, b.blockadeType.getValue()), true, Center, Forward);
+                HighwayMinePlaceStates.mineEChestBlockade(b);
             }
         },
 
