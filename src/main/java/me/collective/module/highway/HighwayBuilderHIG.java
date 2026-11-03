@@ -222,7 +222,7 @@ public class HighwayBuilderHIG extends Module {
     private int breakTimer;
     private int count;
     private int containerId;
-    private final RestockTask restockTask = new RestockTask(this);
+    final RestockTask restockTask = new RestockTask(this);
     private final ArrayList<EndCrystalEntity> ignoreCrystals = new ArrayList<>();
     public boolean drawingBow;
     public DoubleMineBlock normalMining;
@@ -722,36 +722,7 @@ public class HighwayBuilderHIG extends Module {
     }
 
     private int findHotbarSlot(boolean replaceTools) {
-        int thrashSlot = -1;
-        int slotsWithBlocks = 0;
-        int slotWithLeastBlocks = -1;
-        int slotWithLeastBlocksCount = Integer.MAX_VALUE;
-
-        for (int i = 0; i < 9; i++) {
-            ItemStack itemStack = mc.player.getInventory().getStack(i);
-
-            if (itemStack.isEmpty()) return i;
-
-            if (replaceTools && HighwayInventory.isToolLike(itemStack)) return i;
-
-            if (trashItems.getValue().contains(itemStack.getItem())) thrashSlot = i;
-
-            if (itemStack.getItem() instanceof BlockItem blockItem && (blocksToPlace.getValue().contains(blockItem.getBlock()) || blocksToPlace.getValue().contains(Blocks.OBSIDIAN) && blockItem == Items.ENDER_CHEST)) {
-                slotsWithBlocks++;
-
-                if (itemStack.getCount() < slotWithLeastBlocksCount) {
-                    slotWithLeastBlocksCount = itemStack.getCount();
-                    slotWithLeastBlocks = i;
-                }
-            }
-        }
-
-        if (thrashSlot != -1) return thrashSlot;
-
-        if (slotsWithBlocks > 0) return slotWithLeastBlocks;
-
-        error("No empty space in hotbar.");
-        return -1;
+        return HighwayInventory.findHotbarSlot(this, replaceTools);
     }
 
     private boolean hasItem(Predicate<ItemStack> predicate) {
@@ -763,60 +734,11 @@ public class HighwayBuilderHIG extends Module {
     }
 
     private int findAndMoveToHotbar(Predicate<ItemStack> predicate) {
-        int slot = HighwayInventory.findSlot(predicate, true);
-        if (slot != -1) return slot;
-
-        int hotbarSlot = findHotbarSlot(false);
-        if (hotbarSlot == -1) return -1;
-
-        slot = HighwayInventory.findSlot(predicate, false);
-        if (slot == -1) return -1;
-
-        movePairToHotbar(slot, hotbarSlot);
-
-        return hotbarSlot;
+        return HighwayInventory.findAndMoveToHotbar(this, predicate);
     }
 
     private int findAndMoveBestToolToHotbar(BlockState blockState, boolean noSilkTouch) {
-        if (mc.player.isCreative()) return mc.player.getInventory().selectedSlot;
-
-        double bestScore = -1;
-        int bestSlot = -1;
-
-        for (int i = 0; i < 36; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
-            double score = HighwayInventory.toolScore(this, stack, blockState, noSilkTouch);
-            if (score > bestScore) {
-                bestScore = score;
-                bestSlot = i;
-            }
-        }
-
-        if (bestSlot == -1) return mc.player.getInventory().selectedSlot;
-
-        ItemStack bestStack = mc.player.getInventory().getStack(bestSlot);
-        if (bestStack.isIn(ItemTags.PICKAXES)) {
-            int count = countItem(stack -> stack.isIn(ItemTags.PICKAXES));
-
-            if (count <= savePickaxes.getIntValue() && !(restockTask.pickaxes && bestStack.getMaxDamage() - bestStack.getDamage() > (bestStack.getMaxDamage() * (breakDurability.getValue() / 100.0)))) {
-                if (!restockTask.pickaxes && (searchEnderChest.getValue() || searchShulkers.getValue())) {
-                    restockTask.setPickaxes();
-                } else {
-                    error("Found less than the minimum amount of pickaxes required: " + count + "/" + (savePickaxes.getIntValue() + 1));
-                }
-
-                return -1;
-            }
-        }
-
-        if (bestSlot < 9) return bestSlot;
-
-        int hotbarSlot = findHotbarSlot(true);
-        if (hotbarSlot == -1) return -1;
-
-        movePairToHotbar(bestSlot, hotbarSlot);
-
-        return hotbarSlot;
+        return HighwayInventory.findAndMoveBestToolToHotbar(this, blockState, noSilkTouch);
     }
 
     private int findBlocksToPlace() {
@@ -844,20 +766,6 @@ public class HighwayBuilderHIG extends Module {
         });
 
         return slot != -1 ? slot : findBlocksToPlace();
-    }
-
-    /** PICKUP-пара: слот инвентаря -> слот хотбара с возвратом вытесненного предмета в исходный слот. */
-    private void movePairToHotbar(int fromInv, int toHotbar) {
-        if (mc.player == null || mc.interactionManager == null) return;
-        int from = fromInv < 9 ? 36 + fromInv : fromInv;
-        int to = 36 + toHotbar;
-        if (from == to) return;
-        int syncId = mc.player.currentScreenHandler.syncId;
-        mc.interactionManager.clickSlot(syncId, from, 0, SlotActionType.PICKUP, mc.player);
-        mc.interactionManager.clickSlot(syncId, to, 0, SlotActionType.PICKUP, mc.player);
-        if (!mc.player.currentScreenHandler.getCursorStack().isEmpty()) {
-            mc.interactionManager.clickSlot(syncId, from, 0, SlotActionType.PICKUP, mc.player);
-        }
     }
 
     private void quickMove(int containerSlot) {
@@ -2673,7 +2581,7 @@ public class HighwayBuilderHIG extends Module {
         }
     }
 
-    private class RestockTask {
+    class RestockTask {
         public boolean materials;
         public boolean pickaxes;
         public boolean food;
