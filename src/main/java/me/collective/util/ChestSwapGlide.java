@@ -15,7 +15,6 @@ import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.projectile.FireworkRocketEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.c2s.common.CommonPongC2SPacket;
 import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerInteractItemC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
@@ -23,7 +22,6 @@ import net.minecraft.network.packet.s2c.common.CommonPingS2CPacket;
 import net.minecraft.network.packet.s2c.play.EntityTrackerUpdateS2CPacket;
 import net.minecraft.network.packet.s2c.play.InventoryS2CPacket;
 import net.minecraft.network.packet.s2c.play.PlayerActionResponseS2CPacket;
-import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import org.lwjgl.glfw.GLFW;
@@ -32,7 +30,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
@@ -83,7 +80,6 @@ public class ChestSwapGlide {
     private static volatile ChestSwapGlide instance;
 
     /** Все живые экземпляры: нужны для логирования телепортов у всех сразу. */
-    private static final List<ChestSwapGlide> watchers = new CopyOnWriteArrayList<>();
 
     private static boolean startAwaitsMove;
 
@@ -91,9 +87,7 @@ public class ChestSwapGlide {
     private static final AtomicReference<Object> clearHolder = new AtomicReference<>();
 
     /** Подтверждения, которые копятся до разрешения. */
-    private static final ArrayDeque<Integer> heldPongs = new ArrayDeque<>();
 
-    private static int lastPongSent = Integer.MIN_VALUE;
 
     private final Module owner;
     private final IntSupplier intervalTicks;
@@ -172,7 +166,6 @@ public class ChestSwapGlide {
         this.intervalTicks = intervalTicks;
         this.flightContext = flightContext;
 
-        watchers.add(this);
     }
 
     public boolean isEngaged() {
@@ -447,20 +440,6 @@ public class ChestSwapGlide {
     }
 
     /** Догоняет пакет движения с текущим углом после старта планирования. */
-    public static void afterSendPosition() {
-        if (!startAwaitsMove || MinecraftClient.getInstance().player == null
-            || MinecraftClient.getInstance().getNetworkHandler() == null) {
-            return;
-        }
-
-        startAwaitsMove = false;
-
-        RotationUtils rot = RotationUtils.getInstance();
-
-        MinecraftClient.getInstance().getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.LookAndOnGround(
-            rot.getSentYaw(), rot.getSentPitch(),
-            MinecraftClient.getInstance().player.isOnGround(), MinecraftClient.getInstance().player.horizontalCollision));
-    }
 
     /** Исчез ли один из наших фейерверков. */
     private boolean trackFireworks() {
@@ -527,19 +506,9 @@ public class ChestSwapGlide {
         }
 
         return String.format(
-            "engaged, %s, last burst %d ticks ago, %s, %d pongs held, ground %s%s%s",
-            worn, this.preTick - this.burstTick, hold, heldPongs.size(), this.groundState,
+            "engaged, %s, last burst %d ticks ago, %s, ground %s%s%s",
+            worn, this.preTick - this.burstTick, hold, this.groundState,
             this.exposed ? ", exposed" : "", this.finishing ? ", handing back" : "");
-    }
-
-    /**
-     * Разбор телепорта: сервер откатил игрока — значит увидел не то состояние.
-     * Счётчики телепортов/сетбэков доступны как индикатор проблем с glide.
-     */
-    private void logTeleport(PlayerPositionLookS2CPacket packet) {
-        this.teleports++;
-
-        if (packet.teleportId() < 0) this.grimSetbacks++;
     }
 
     private boolean engage() {
@@ -674,7 +643,6 @@ public class ChestSwapGlide {
 
         int held = this.holdTicks;
 
-        flushHeldPongs();
         this.holdActive = false;
         this.clearHeld = false;
         this.exposed = false;
@@ -715,7 +683,6 @@ public class ChestSwapGlide {
         this.exposedTicks = 0;
         this.rocketBurstDue = false;
 
-        flushHeldPongs();
 
         if (this.clearHeld) {
             this.clearHeld = false;
@@ -808,113 +775,11 @@ public class ChestSwapGlide {
     public static void releaseClearHold(Object holder) {
         if (clearHolder.get() != holder) return;
 
-        flushHeldPongs();
         clearHolder.compareAndSet(holder, null);
     }
 
     public static boolean ownsClearHold(Object holder) {
         return clearHolder.get() == holder;
-    }
-
-    /** Отложить ответ на ping, пока держится клир. */
-    public static boolean keepPong(Object holder, int id) {
-        if (clearHolder.get() != holder) return false;
-
-        heldPongs.addLast(id);
-        return true;
-    }
-
-    /** Отправить всё накопленное. */
-    public static void flushHeldPongs() {
-        if (heldPongs.isEmpty()) return;
-
-        if (MinecraftClient.getInstance().getNetworkHandler() == null) {
-            heldPongs.clear();
-            return;
-        }
-
-        while (!heldPongs.isEmpty()) {
-            int id = heldPongs.pollFirst();
-
-            MinecraftClient.getInstance().getNetworkHandler().sendPacket(new CommonPongC2SPacket(id));
-            lastPongSent = id;
-        }
-    }
-
-    public static void onPongSent(int id) {
-        flushHeldPongs();
-        lastPongSent = id;
-    }
-
-    public static int lastPongSent() {
-        return lastPongSent;
-    }
-
-    public static boolean onPingMainThread(int id) {
-        ChestSwapGlide swap = instance;
-        return swap != null && swap.holdPong(id);
-    }
-
-    private boolean holdPong(int id) {
-        return this.holdActive && keepPong(this, id);
-    }
-
-    public static void beforeTeleportApplied(PlayerPositionLookS2CPacket packet) {
-        for (ChestSwapGlide watcher : watchers) {
-            if (!watcher.owner.isActive()) continue;
-
-            watcher.logTeleport(packet);
-        }
-
-        ChestSwapGlide swap = instance;
-        if (swap != null) swap.onTeleport();
-    }
-
-    /** Телепорт означает, что сервер увидел игрока без элитры. */
-    private void onTeleport() {
-        flushHeldPongs();
-
-        if (!this.clearHeld || this.exposed) return;
-
-        this.exposures++;
-        this.holdActive = false;
-        this.outTick = -1;
-        this.exposed = true;
-        this.exposedTicks = 0;
-    }
-
-    /** Сервер подтвердил смену слота — клир можно удерживать. */
-    public static boolean onGlideClearApplied() {
-        ChestSwapGlide swap = instance;
-        if (swap == null || !swap.holdActive) return false;
-
-        swap.clearHeld = true;
-
-        // клир пришёл раньше собственного пинга — значит, сервер уже всё видел
-        if (!swap.exposed && swap.holdPingId != NO_PING && swap.holdPingId == lastPongSent) {
-            swap.exposures++;
-            swap.exposed = true;
-            swap.exposedTicks = 0;
-        }
-
-        return true;
-    }
-
-    public static boolean holdsGlideClear() {
-        ChestSwapGlide swap = instance;
-        return swap != null && swap.holdActive;
-    }
-
-    /** Подмена состояния клавиши прыжка: сервер не должен видеть прыжок. */
-    public static Boolean jumpKeyOverride() {
-        if (readingRawJump) return null;
-
-        ChestSwapGlide swap = instance;
-        if (swap == null) return null;
-
-        if (swap.jumpThisTick) return Boolean.TRUE;
-
-        return swap.engaged ? Boolean.FALSE : null;
     }
 
     public static boolean rawJumpDown() {
