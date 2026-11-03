@@ -140,7 +140,7 @@ public class SpeedMine extends Module {
         .sliderRange(0, 10)
         .visible(() -> this.modeConfig.get() == SpeedmineMode.PACKET)
         .build());
-    private final Setting<GrimBypass> grimBypassConfig = this.sgGeneral.add(new EnumSetting.Builder<GrimBypass>()
+    final Setting<GrimBypass> grimBypassConfig = this.sgGeneral.add(new EnumSetting.Builder<GrimBypass>()
         .name("grim-обход")
         .description("Отправляет холостое копание выше предела постройки (сервер его отбрасывает, Grim читает как воздух), из-за чего предсказанное время разрушения у Grim схлопывается и разрушение под ним перестаёт накапливаться. AUTO тратит один такой только когда тайминг иначе был бы отменён — цена: один флаг AirLiquidBreak за обойдённый блок. Нужен для скорости ниже 1.0 и для двойного-разрушения по блокам класса обсидиана.")
         .defaultValue(GrimBypass.ALWAYS)
@@ -303,26 +303,12 @@ public class SpeedMine extends Module {
     private static final int SECONDARY_GRACE_TICKS = 20;
     private static final int REBREAK_EATEN_TICKS = 20;
     private static final int REBREAK_AIM_PARK_TICKS = 60;
-    private static final double GRIM_FLAG_MS = 1000.0;
-    private static final double BREAK_BUDGET_MS = 800.0;
-    private static final double DELAY_BUDGET_MS = 700.0;
-    private static final long GRIM_START_GAP_MS = 275L;
-    private static final long GRIM_START_FULL_MS = 300L;
-    private static final double GRIM_BREAK_SLACK_MS = 25.0;
-    private static final int BYPASS_Y_OFFSET = 955;
-    private static final int BYPASS_Y_MAX = 2000;
-    private static final int MAX_BYPASS_DIGS_PER_SECOND = 40;
 
     MiningData activeMine;
     MiningData secondaryMine;
     final ArrayDeque<MiningData> pending = new ArrayDeque<>();
     private int destroyDelayTicks;
     private BlockPos lastStartPos;
-    private long lastFinishMs;
-    private long grimStartMs;
-    private boolean grimSampleIsAir;
-    private double delayBalanceMirror;
-    private double breakBalanceMirror;
     private boolean effMirrorInit;
     int grimAttrEffLevel;
     private int pendingEffLevel = -1;
@@ -357,7 +343,6 @@ public class SpeedMine extends Module {
     private static final long AUTO_MINE_DELAY_MS = 250L;
     private static final long ANTI_CRAWL_DELAY_MS = 100L;
     private final ArrayDeque<Long> digPacketTimes = new ArrayDeque<>();
-    private final ArrayDeque<Long> bypassPacketTimes = new ArrayDeque<>();
 
     public static SpeedMine INSTANCE;
 
@@ -443,15 +428,10 @@ public class SpeedMine extends Module {
 
     private void resetGrimMirrors() {
         this.lastStartPos = null;
-        this.lastFinishMs = 0L;
-        this.grimStartMs = 0L;
-        this.grimSampleIsAir = false;
+        this.grimTiming.reset();
         this.lastDigSequence = 0;
         this.rebreakAckSequence = 0;
         this.lastAckedSequence = 0;
-        this.delayBalanceMirror = 0.0;
-        this.breakBalanceMirror = 0.0;
-        this.bypassPacketTimes.clear();
         this.effMirrorInit = false;
         this.grimAttrEffLevel = 0;
         this.pendingEffLevel = -1;
@@ -671,7 +651,7 @@ public class SpeedMine extends Module {
 
     private void noteRebreakAir() {
         this.rebreakAirSeen = true;
-        this.grimSampleIsAir = true;
+        this.grimTiming.grimSampleIsAir = true;
         this.rebreakSolidTicks = 0;
     }
 
@@ -830,7 +810,7 @@ public class SpeedMine extends Module {
                     if (this.grimBypassConfig.get() == GrimBypass.ALWAYS
                         && data.damage + delta < finishAt
                         && this.sinceFinish() >= 275L
-                        && this.delayBalanceMirror > 400.0
+                        && this.grimTiming.delayBalanceMirror > 400.0
                         && this.bypassBudgetAvailable()
                         && this.canSendDigNow()) {
                         this.sendBypassStart(data.pos);
@@ -959,86 +939,43 @@ public class SpeedMine extends Module {
     }
 
     private long sinceFinish() {
-        return this.lastFinishMs == 0L ? Long.MAX_VALUE : System.currentTimeMillis() - this.lastFinishMs;
+        return this.grimTiming.sinceFinish();
     }
 
     private void noteStartSent(boolean airSample) {
-        long since = this.sinceFinish();
-        if (since >= 275L) {
-            this.delayBalanceMirror *= 0.9;
-        } else {
-            this.delayBalanceMirror = Math.min(1000.0, this.delayBalanceMirror + (300L - since));
-        }
-
-        this.grimStartMs = System.currentTimeMillis();
-        this.grimSampleIsAir = airSample;
+        this.grimTiming.noteStartSent(this, airSample);
     }
 
     private void noteFinishSent(double predictedMs) {
-        long now = System.currentTimeMillis();
-        double predicted = this.grimSampleIsAir ? 0.0 : predictedMs;
-        double real = this.grimStartMs == 0L ? 0.0 : now - this.grimStartMs;
-        this.breakBalanceMirror = MathHelper.clamp(this.breakBalanceMirror, -1000.0, 1000.0);
-        double diff = predicted - real;
-        if (diff < 25.0) {
-            this.breakBalanceMirror *= 0.9;
-        } else {
-            this.breakBalanceMirror += diff;
-        }
-
-        this.lastFinishMs = now;
-        this.grimStartMs = now;
+        this.grimTiming.noteFinishSent(predictedMs);
     }
 
     private boolean startBudgetOk() {
-        long since = this.sinceFinish();
-        return since >= 275L ? true : this.delayBalanceMirror + (300L - since) <= 700.0;
+        return this.grimTiming.startBudgetOk();
     }
 
     private boolean finishBudgetOk(double predictedMs) {
-        if (this.grimSampleIsAir) {
-            return true;
-        }
-
-        double diff = predictedMs - (this.grimStartMs == 0L ? 0L : System.currentTimeMillis() - this.grimStartMs);
-        return diff < 25.0 ? true : this.breakBalanceMirror + diff <= 800.0;
+        return this.grimTiming.finishBudgetOk(predictedMs);
     }
 
     private double grimPredictedMs(MiningData data) {
-        return this.grimPredictedFromDelta(data.grimMaxDelta);
+        return SpeedMineGrimTiming.grimPredictedMs(data);
     }
 
     private double grimPredictedFromDelta(float delta) {
-        return delta <= 0.0F ? 1000.0 : Math.ceil(1.0 / Math.min(1.0F, delta)) * 50.0;
+        return SpeedMineGrimTiming.grimPredictedFromDelta(delta);
     }
 
     private void sendBypassStart(BlockPos pos) {
-        int y = Math.min(2000, pos.getY() + 955);
-        this.bypassPacketTimes.addLast(System.currentTimeMillis());
-        this.sendDig(PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, new BlockPos(pos.getX(), y, pos.getZ()), Direction.DOWN);
-        this.noteStartSent(true);
+        this.grimTiming.sendBypassStart(this, pos);
     }
 
     private boolean bypassBudgetAvailable() {
-        long now = System.currentTimeMillis();
-
-        while (!this.bypassPacketTimes.isEmpty() && now - this.bypassPacketTimes.peekFirst() > 1000L) {
-            this.bypassPacketTimes.pollFirst();
-        }
-
-        return this.bypassPacketTimes.size() < 40;
+        return this.grimTiming.bypassBudgetAvailable();
     }
 
     private boolean shouldBypass(double predictedMs) {
-        if (this.grimBypassConfig.get() != GrimBypass.OFF && !this.grimSampleIsAir) {
-            if (this.sinceFinish() < 275L) {
-                return false;
-            } else {
-                return !this.bypassBudgetAvailable() ? false : this.grimBypassConfig.get() == GrimBypass.ALWAYS || !this.finishBudgetOk(predictedMs);
-            }
-        } else {
-            return false;
-        }
+        return this.grimTiming.shouldBypass(this, predictedMs);
     }
 
     private boolean canSendDigNow() {
@@ -1139,6 +1076,7 @@ public class SpeedMine extends Module {
     }
 
     private final SpeedMineRenderer renderer = new SpeedMineRenderer();
+    private final SpeedMineGrimTiming grimTiming = new SpeedMineGrimTiming();
 
     public boolean canDelegateMining() {
         return this.isActive() && this.modeConfig.get() == SpeedmineMode.PACKET;
@@ -1229,7 +1167,7 @@ public class SpeedMine extends Module {
         }
     }
 
-    private void sendDig(PlayerActionC2SPacket.Action action, BlockPos pos, Direction direction) {
+    void sendDig(PlayerActionC2SPacket.Action action, BlockPos pos, Direction direction) {
         this.digPacketTimes.addLast(System.currentTimeMillis());
         if (action == PlayerActionC2SPacket.Action.ABORT_DESTROY_BLOCK) {
             this.mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(action, pos, direction));
@@ -1570,7 +1508,7 @@ public class SpeedMine extends Module {
         private int heldTicks;
         private int ticksMined;
         private long startMs;
-        private float grimMaxDelta;
+        float grimMaxDelta;
         private boolean fastStart;
         private int graceTicks;
         private float swapPoint;
