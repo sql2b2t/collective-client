@@ -122,7 +122,7 @@ public class StashSorter extends Module {
         .sliderRange(1, 256)
         .build());
 
-    private final Setting<Integer> reservedHotbarSlots = sgGeneral.add(new IntSetting.Builder()
+    final Setting<Integer> reservedHotbarSlots = sgGeneral.add(new IntSetting.Builder()
         .name("занято-хотбара")
         .description("Сколько первых слотов хотбара не трогать. Туда кладут то, что нужно оставить при себе.")
         .defaultValue(1)
@@ -274,26 +274,26 @@ public class StashSorter extends Module {
     private int chestsSwept;
     private int stacksMoved;
     private int shulkersMoved;
-    private int jobIdx;
+    int jobIdx;
     private int depositLastCount = -1;
     private boolean keepSlotsCaptured;
     private PauseReason pauseReason = PauseReason.MANUAL;
 
-    private List<SortPlanner.SweepJob> jobs = new ArrayList<>();
-    @Nullable private SortPlanner.SweepJob currentJob;
-    @Nullable private BlockPos currentDest;
-    @Nullable private String currentRouteKey;
+    List<SortPlanner.SweepJob> jobs = new ArrayList<>();
+    @Nullable SortPlanner.SweepJob currentJob;
+    @Nullable BlockPos currentDest;
+    @Nullable String currentRouteKey;
 
     Map<String, List<BlockPos>> sigTargets = Map.of();
     Map<String, String> keyCollapse = Map.of();
-    private final Set<BlockPos> markedFull = new HashSet<>();
-    private final Set<Integer> keepSlots = new HashSet<>();
-    private final Set<String> deadRoutes = new HashSet<>();
-    private final Map<String, BlockPos> overflowChests = new HashMap<>();
+    final Set<BlockPos> markedFull = new HashSet<>();
+    final Set<Integer> keepSlots = new HashSet<>();
+    final Set<String> deadRoutes = new HashSet<>();
+    final Map<String, BlockPos> overflowChests = new HashMap<>();
     final Map<String, String> overflowRoutes = new HashMap<>();
-    private final Map<BlockPos, Integer> knownFree = new HashMap<>();
-    private final Set<BlockPos> emptyClaims = new HashSet<>();
-    private final List<BlockPos> spareEmpties = new ArrayList<>();
+    final Map<BlockPos, Integer> knownFree = new HashMap<>();
+    final Set<BlockPos> emptyClaims = new HashSet<>();
+    final List<BlockPos> spareEmpties = new ArrayList<>();
 
     /** Причина пропуска -> сколько раз встретилась. Печатается сводкой в конце. */
     private final Map<String, Integer> pendingNotes = new LinkedHashMap<>();
@@ -975,7 +975,7 @@ public class StashSorter extends Module {
      * режиме «только итог» текст не пишется — вместо него копится счётчик,
      * и всё накопленное показывается одной строкой в конце прогона.
      */
-    private void note(String reason, String detail) {
+    void note(String reason, String detail) {
         if (verbosity.get() == Verbosity.ПОДРОБНО) {
             warning("Пропуск: " + reason + " — " + detail + ".");
             return;
@@ -1023,43 +1023,13 @@ public class StashSorter extends Module {
     // ------------------------------------------------------------------
 
     private List<Integer> computeWithdrawSlots(GenericContainerScreenHandler menu) {
-        int containerSlots = menu.getRows() * 9;
-        List<Integer> out = new ArrayList<>();
-
-        for (int i = 0; i < containerSlots; i++) {
-            ItemStack s = menu.slots.get(i).getStack();
-            if (s.isEmpty()) continue;
-
-            String key = routeKeyOf(s, false);
-            if (key == null || deadRoutes.contains(key)) continue;
-
-            List<BlockPos> targets = sigTargets.get(key);
-            if (targets == null) continue;
-            // Из домашнего сундука ничего не берём — он и так свой
-            if (targets.contains(currentJob == null ? null : currentJob.pos())) continue;
-            if (destFor(key) == null && currentJob != null
-                && currentJob.pos().equals(overflowChests.get(SortGroupKey.overflowKey(key)))) continue;
-
-            out.add(i);
-        }
-
-        return out;
+        return StashSorterCargo.computeWithdrawSlots(this, menu);
     }
 
     /** Что игрок сейчас несёт, сгруппированное по маршрутам. */
     private Map<String, List<Integer>> cargoScan() {
-        Map<String, List<Integer>> out = new TreeMap<>();
-        if (mc.player == null) return out;
-
-        for (int i : cargoSlots()) {
-            ItemStack s = mc.player.getInventory().getStack(i);
-            if (s.isEmpty()) continue;
-            String key = routeKeyOf(s, true);
-            if (key != null && !deadRoutes.contains(key)) out.computeIfAbsent(key, k -> new ArrayList<>()).add(i);
-        }
-        return out;
+        return StashSorterCargo.cargoScan(this);
     }
-
     /**
      * Куда едет эта стопка. Мелкие категории сводим в общую, если так настроено,
      * а если дома нет — в «переполненное», иначе вещи останутся в инвентаре.
@@ -1079,87 +1049,41 @@ public class StashSorter extends Module {
 
     /** Слоты инвентаря, которые можно использовать как переноску. */
     private List<Integer> cargoSlots() {
-        List<Integer> out = new ArrayList<>(36);
-        for (int i = reservedHotbarSlots.get(); i < 36; i++) {
-            if (!keepSlots.contains(i)) out.add(i);
-        }
-        return out;
+        return StashSorterCargo.cargoSlots(this);
     }
 
     private int ferryFreeSlots() {
-        int free = 0;
-        for (int i : cargoSlots()) if (mc.player.getInventory().getStack(i).isEmpty()) free++;
-        return free;
+        return StashSorterCargo.ferryFreeSlots(this);
     }
 
     private List<Integer> depositSlots() {
-        List<Integer> out = new ArrayList<>();
-        for (Map.Entry<String, List<Integer>> e : cargoScan().entrySet()) {
-            List<BlockPos> targets = sigTargets.get(e.getKey());
-            if (e.getKey().equals(currentRouteKey) || (targets != null && targets.contains(currentDest))) {
-                out.addAll(e.getValue());
-            }
-        }
-        return out;
+        return StashSorterCargo.depositSlots(this);
     }
 
     private static int freeSlotsIn(GenericContainerScreenHandler menu) {
-        int free = 0;
-        int containerSlots = menu.getRows() * 9;
-        for (int i = 0; i < containerSlots; i++) if (menu.slots.get(i).getStack().isEmpty()) free++;
-        return free;
+        return StashSorterCargo.freeSlotsIn(menu);
     }
 
     private void noteIfEmptied(GenericContainerScreenHandler menu, BlockPos pos) {
-        int containerSlots = menu.getRows() * 9;
-        for (int i = 0; i < containerSlots; i++) {
-            if (!menu.slots.get(i).getStack().isEmpty()) return;
-        }
-
-        knownFree.put(pos, containerSlots);
-        if (markedFull.contains(pos) || emptyClaims.contains(pos) || spareEmpties.contains(pos)) return;
-        for (List<BlockPos> targets : sigTargets.values()) if (targets.contains(pos)) return;
-
-        spareEmpties.add(pos);
+        StashSorterCargo.noteIfEmptied(this, menu, pos);
     }
 
     private void markFull(@Nullable BlockPos pos) {
-        if (pos == null || mc.world == null) return;
-        markedFull.add(pos);
-        BlockPos other = ContainerGeometry.otherHalf(mc.world, pos);
-        if (other != null) markedFull.add(other);
+        StashSorterCargo.markFull(this, pos);
     }
 
     private void claimEmpty(@Nullable BlockPos pos) {
-        if (pos == null || mc.world == null) return;
-        emptyClaims.add(pos);
-        BlockPos other = ContainerGeometry.otherHalf(mc.world, pos);
-        if (other != null) emptyClaims.add(other);
+        StashSorterCargo.claimEmpty(this, pos);
     }
 
     @Nullable
     private BlockPos destFor(String routeKey) {
-        List<BlockPos> targets = sigTargets.get(routeKey);
-        if (targets == null) return null;
-        for (BlockPos t : targets) if (!markedFull.contains(t)) return t;
-        return null;
+        return StashSorterCargo.destFor(this, routeKey);
     }
 
     @Nullable
     private BlockPos huntEmptyChest(String routeKey) {
-        for (BlockPos p : unknownContainers()) {
-            if (!markedFull.contains(p) && !emptyClaims.contains(p)) {
-                claimEmpty(p);
-                return p;
-            }
-        }
-        for (BlockPos p : spareEmpties) {
-            if (!markedFull.contains(p) && !emptyClaims.contains(p)) {
-                claimEmpty(p);
-                return p;
-            }
-        }
-        return null;
+        return StashSorterCargo.huntEmptyChest(this, routeKey);
     }
 
     /**
@@ -1168,55 +1092,16 @@ public class StashSorter extends Module {
      */
     @Nullable
     private BlockPos assignOverflowChest(String overflowKey) {
-        BlockPos existing = overflowChests.get(overflowKey);
-        if (existing != null && !markedFull.contains(existing)) return existing;
-
-        Set<BlockPos> owned = new HashSet<>();
-        for (List<BlockPos> ts : sigTargets.values()) owned.addAll(ts);
-
-        Set<BlockPos> queued = new HashSet<>();
-        for (int i = jobIdx; i < jobs.size(); i++) queued.add(jobs.get(i).pos());
-
-        Set<BlockPos> pinned = new HashSet<>();
-        for (var pin : store().pinsFor(dimension())) pinned.add(ContainerGeometry.canonical(mc.world, pin.pos()));
-
-        BlockPos best = pickOverflowChest(owned, queued, pinned, true);
-        if (best == null) best = pickOverflowChest(owned, queued, pinned, false);
-        if (best == null) return null;
-
-        overflowChests.put(overflowKey, best);
-        sigTargets.computeIfAbsent(overflowKey, k -> new ArrayList<>()).add(best);
-        note("аварийный дом для «" + SortGroupKey.friendlyName(overflowKey) + "»", best.toShortString());
-        return best;
+        return StashSorterCargo.assignOverflowChest(this, overflowKey);
     }
 
     @Nullable
     private BlockPos pickOverflowChest(Set<BlockPos> owned, Set<BlockPos> queued, Set<BlockPos> pinned, boolean skipOwned) {
-        BlockPos me = mc.player.getBlockPos();
-        BlockPos best = null;
-        int bestFree = 0;
-        double bestDist = Double.MAX_VALUE;
-
-        for (Map.Entry<BlockPos, Integer> e : knownFree.entrySet()) {
-            BlockPos pos = e.getKey();
-            int free = e.getValue();
-            if (free <= 0 || markedFull.contains(pos) || pinned.contains(pos)
-                || queued.contains(pos) || emptyClaims.contains(pos)) continue;
-            if (skipOwned && owned.contains(pos)) continue;
-
-            double dist = me.getSquaredDistance(pos);
-            // Сначала самый пустой, при равенстве — ближайший
-            if (free > bestFree || (free == bestFree && (dist < bestDist || (dist == bestDist && best != null && pos.compareTo(best) < 0)))) {
-                best = pos;
-                bestFree = free;
-                bestDist = dist;
-            }
-        }
-        return best;
+        return StashSorterCargo.pickOverflowChest(this, owned, queued, pinned, skipOwned);
     }
 
     /** Сундуки в зоне, которых нет в индексе: содержимое неизвестно. */
-    private List<BlockPos> unknownContainers() {
+    List<BlockPos> unknownContainers() {
         long now = System.currentTimeMillis();
         String dim = dimension();
         if (now - unknownCacheTime < 5000L && dim.equals(unknownCacheDim)) return unknownCache;
@@ -1451,7 +1336,7 @@ public class StashSorter extends Module {
         return mc.world.getBlockState(pos).getBlock() instanceof BarrelBlock ? "barrel" : "chest";
     }
 
-    private String dimension() {
+    String dimension() {
         return mc.world == null ? "unknown" : mc.world.getRegistryKey().getValue().toString();
     }
 
@@ -1460,7 +1345,7 @@ public class StashSorter extends Module {
         return nav;
     }
 
-    private SorterWorldStore store() {
+    SorterWorldStore store() {
         if (worldStore == null) {
             worldStore = new SorterWorldStore();
             worldStore.load();
