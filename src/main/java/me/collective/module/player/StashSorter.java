@@ -92,19 +92,19 @@ public class StashSorter extends Module {
     private final SettingGroup sgTiming = settings.createGroup("Тайминги");
     private final SettingGroup sgSafety = settings.createGroup("Безопасность");
 
-    private final Setting<Boolean> moveShulkers = sgGeneral.add(new BoolSetting.Builder()
+    final Setting<Boolean> moveShulkers = sgGeneral.add(new BoolSetting.Builder()
         .name("перемещать-шалкеры")
         .description("Сортировать и шалкеры, и рассыпанные предметы.")
         .defaultValue(true)
         .build());
 
-    private final Setting<LooseItems> looseItems = sgGeneral.add(new EnumSetting.Builder<LooseItems>()
+    final Setting<LooseItems> looseItems = sgGeneral.add(new EnumSetting.Builder<LooseItems>()
         .name("рассыпанные-предметы")
         .description("Что делать с предметами, которые лежат россыпью, а не в шалкере.")
         .defaultValue(LooseItems.MIXED_CHEST)
         .build());
 
-    private final Setting<Integer> minShulkersForOwnChest = sgGeneral.add(new IntSetting.Builder()
+    final Setting<Integer> minShulkersForOwnChest = sgGeneral.add(new IntSetting.Builder()
         .name("мин-шалкеров-для-своего")
         .description("Сколько шалкеров одной категории нужно, чтобы выделить им отдельный сундук. Меньше — в общий.")
         .defaultValue(4)
@@ -284,13 +284,13 @@ public class StashSorter extends Module {
     @Nullable private BlockPos currentDest;
     @Nullable private String currentRouteKey;
 
-    private Map<String, List<BlockPos>> sigTargets = Map.of();
-    private Map<String, String> keyCollapse = Map.of();
+    Map<String, List<BlockPos>> sigTargets = Map.of();
+    Map<String, String> keyCollapse = Map.of();
     private final Set<BlockPos> markedFull = new HashSet<>();
     private final Set<Integer> keepSlots = new HashSet<>();
     private final Set<String> deadRoutes = new HashSet<>();
     private final Map<String, BlockPos> overflowChests = new HashMap<>();
-    private final Map<String, String> overflowRoutes = new HashMap<>();
+    final Map<String, String> overflowRoutes = new HashMap<>();
     private final Map<BlockPos, Integer> knownFree = new HashMap<>();
     private final Set<BlockPos> emptyClaims = new HashSet<>();
     private final List<BlockPos> spareEmpties = new ArrayList<>();
@@ -1066,35 +1066,15 @@ public class StashSorter extends Module {
      */
     @Nullable
     private String routeKeyOf(ItemStack s, boolean allowOverflow) {
-        boolean shulker = ContainerGeometry.isShulkerItem(s);
-        if (shulker && !moveShulkers.get()) return null;
-        if (!shulker && looseItems.get() == LooseItems.IGNORE) return null;
-
-        String key = SortGroupKey.of(s);
-        if (sigTargets.containsKey(key)) return allowOverflow ? overflowRoutes.getOrDefault(key, key) : key;
-
-        String fallback = groupOf(key);
-        if (!fallback.equals(key) && sigTargets.containsKey(fallback)) {
-            return allowOverflow ? overflowRoutes.getOrDefault(fallback, fallback) : fallback;
-        }
-        return allowOverflow ? SortGroupKey.overflowKey(key) : null;
+        return StashSorterRouting.routeKeyOf(this, s, allowOverflow);
     }
 
     private String groupOf(String key) {
-        String mapped = keyCollapse.get(key);
-        if (mapped != null) return mapped;
-        return looseItems.get() == LooseItems.MIXED_CHEST && !key.isEmpty() && !SortGroupKey.isShulkerGroup(key)
-            ? SortGroupKey.MIXED_ITEMS
-            : SortGroupKey.fallbackKey(key);
+        return StashSorterRouting.groupOf(this, key);
     }
 
     private boolean matchesRoute(String key, String routeKey) {
-        if (key.equals(routeKey)) return true;
-        if (SortGroupKey.OVERFLOW_SHULKERS.equals(routeKey)) return SortGroupKey.isShulkerGroup(key);
-        if (SortGroupKey.MIXED_ITEMS.equals(routeKey) || SortGroupKey.OVERFLOW_ITEMS.equals(routeKey)) {
-            return !key.isEmpty() && !SortGroupKey.isShulkerGroup(key);
-        }
-        return routeKey.equals(groupOf(key));
+        return StashSorterRouting.matchesRoute(this, key, routeKey);
     }
 
     /** Слоты инвентаря, которые можно использовать как переноску. */
@@ -1289,12 +1269,7 @@ public class StashSorter extends Module {
     }
 
     private int maxStackOfSig(String sig) {
-        if (SortGroupKey.isShulkerKey(sig) || SortGroupKey.MIXED_ITEMS.equals(sig)) return 1;
-        String id = SortGroupKey.looseItemId(sig);
-        Identifier ident = Identifier.tryParse(id);
-        return ident != null && Registries.ITEM.containsId(ident)
-            ? new ItemStack((ItemConvertible) Registries.ITEM.get(ident)).getMaxCount()
-            : 64;
+        return StashSorterRouting.maxStackOfSig(sig);
     }
 
     private boolean inArea(List<SortZone> areas, BlockPos raw, BlockPos canonical) {
@@ -1389,22 +1364,11 @@ public class StashSorter extends Module {
 
     /** В смешанном сундуке считаем стопки, а не предметы — иначе 64 блока «съедят» целый сундук. */
     private int groupAmount(String key, String group, int count) {
-        if (!SortGroupKey.MIXED_ITEMS.equals(group)) return count;
-        int maxStack = Math.max(1, maxStackOfSig(key));
-        return Math.max(1, (count + maxStack - 1) / maxStack);
+        return StashSorterRouting.groupAmount(key, group, count);
     }
 
     private String collapseKey(String key, Map<String, Integer> totals, Set<String> pinnedKeys) {
-        if (pinnedKeys.contains(key)) return key;
-
-        if (SortGroupKey.isShulkerKey(key)) {
-            boolean bucket = SortGroupKey.EMPTY_SHULKERS.equals(key) || SortGroupKey.KIT_SHULKERS.equals(key)
-                || SortGroupKey.MISC_SHULKERS.equals(key);
-            if (bucket) return key;
-            return totals.getOrDefault(key, 0) < minShulkersForOwnChest.get() ? SortGroupKey.fallbackKey(key) : key;
-        }
-        if (SortGroupKey.isShulkerGroup(key)) return key;
-        return looseItems.get() == LooseItems.MIXED_CHEST ? SortGroupKey.MIXED_ITEMS : key;
+        return StashSorterRouting.collapseKey(this, key, totals, pinnedKeys);
     }
 
     private List<SortPlanner.ContainerSnapshot> withProbeSnapshots(List<SortPlanner.ContainerSnapshot> indexed, List<BlockPos> unknown) {
