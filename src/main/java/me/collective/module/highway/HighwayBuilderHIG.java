@@ -9,7 +9,6 @@ import me.collective.module.Module;
 import me.collective.module.ModuleManager;
 import me.collective.module.movement.Speed;
 import me.collective.module.player.AutoEat;
-import me.collective.render.Renderer3D;
 import me.collective.render.ShapeMode;
 import me.collective.setting.BlockListSetting;
 import me.collective.setting.BooleanSetting;
@@ -75,11 +74,9 @@ import java.awt.Color;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
 
@@ -207,9 +204,10 @@ public class HighwayBuilderHIG extends Module {
     private HorizontalDirection leftDir;
     private HorizontalDirection rightDir;
 
-    private State state;
+    // state / blockPosProvider / suspended читает HighwayRenderer — package-private
+    State state;
     private State lastState;
-    private IBlockPosProvider blockPosProvider;
+    IBlockPosProvider blockPosProvider;
 
     public Vec3d start;
     public int blocksBroken;
@@ -218,7 +216,7 @@ public class HighwayBuilderHIG extends Module {
     private boolean displayInfo;
     private boolean warned;
     private boolean sentLagMessage;
-    private boolean suspended = true;
+    boolean suspended = true;
     private boolean inventory = true;
     private int placeTimer;
     private int breakTimer;
@@ -230,9 +228,7 @@ public class HighwayBuilderHIG extends Module {
     public DoubleMineBlock normalMining;
     public DoubleMineBlock packetMining;
 
-    private final MBlockPos posRender2 = new MBlockPos();
     private final MBlockPos posRender3 = new MBlockPos();
-    private final Map<BlockPos, Long> placedFx = new HashMap<>();
 
     private long lastTickMs = 0L;
     private float tickRate = 20f;
@@ -386,81 +382,12 @@ public class HighwayBuilderHIG extends Module {
 
     @EventHandler
     public void onRender2D(net.minecraft.client.gui.DrawContext context, float delta) {
-        if (!isToggled() || suspended || !renderMine.getValue()) return;
-        if (normalMining != null) normalMining.renderLetter(context);
-        if (packetMining != null) packetMining.renderLetter(context);
+        HighwayRenderer.render2D(this, context);
     }
 
     @EventHandler
     private void onRender3D(Render3DEvent event) {
-        if (!isToggled() || mc.player == null || mc.world == null) return;
-        if (suspended || blockPosProvider == null) return;
-
-        if (renderMine.getValue()) {
-            render(blockPosProvider.getFront(), pos -> canMine(pos, true), true);
-            if (floor.getValue() == Floor.Replace)
-                render(blockPosProvider.getFloor(), pos -> canMine(pos, false), true);
-            if (railings.getValue())
-                render(blockPosProvider.getRailings(0), pos -> canMine(pos, false), true);
-            if (mineAboveRailings.getValue())
-                render(blockPosProvider.getRailings(1), pos -> canMine(pos, true), true);
-            if (state == State.MineEChestBlockade)
-                render(blockPosProvider.getBlockade(true, blockadeType.getValue()), pos -> canMine(pos, true), true);
-        }
-
-        if (renderPlace.getValue()) {
-            render(blockPosProvider.getLiquids(), pos -> canPlace(pos, true), false);
-
-            if (railings.getValue()) {
-                render(blockPosProvider.getRailings(0), pos -> canPlace(pos, false), false);
-
-                if (cornerBlock.getValue()) {
-                    render(blockPosProvider.getRailings(-1), mBlockPos -> {
-                        boolean valid = false;
-                        for (MBlockPos pos : blockPosProvider.getRailings(0)) {
-                            if (!blocksToPlace.getValue().contains(pos.getState().getBlock())
-                                && pos.add(0, -1, 0).equals(mBlockPos)) {
-                                valid = true;
-                                break;
-                            }
-                        }
-                        return valid && canPlace(mBlockPos, false);
-                    }, false);
-                }
-            }
-
-            render(blockPosProvider.getFloor(), pos -> canPlace(pos, false), false);
-            if (state == State.PlaceEChestBlockade)
-                render(blockPosProvider.getBlockade(false, blockadeType.getValue()), pos -> canPlace(pos, false), false);
-        }
-
-        long now = System.currentTimeMillis();
-        placedFx.entrySet().removeIf(e -> now - e.getValue() > 4000L);
-        Color sideBase = renderPlaceSideColor.getValue();
-        Color lineBase = renderPlaceLineColor.getValue();
-        for (Map.Entry<BlockPos, Long> e : new ArrayList<>(placedFx.entrySet())) {
-            float age = Math.max(0f, Math.min(1f, (now - e.getValue()) / 4000f));
-            int alpha = (int) (lineBase.getAlpha() * (1f - age));
-            if (alpha <= 4) continue;
-            BlockPos pos = e.getKey();
-            Renderer3D.box(new Box(pos),
-                new Color(sideBase.getRed(), sideBase.getGreen(), sideBase.getBlue(), (int) (sideBase.getAlpha() * (1f - age))),
-                new Color(lineBase.getRed(), lineBase.getGreen(), lineBase.getBlue(), alpha),
-                renderPlaceShape.getValue(), true);
-        }
-    }
-
-    private void render(MBPIterator it, Predicate<MBlockPos> predicate, boolean mine) {
-        Color sideColor = mine ? renderMineSideColor.getValue() : renderPlaceSideColor.getValue();
-        Color lineColor = mine ? renderMineLineColor.getValue() : renderPlaceLineColor.getValue();
-        ShapeMode shapeMode = mine ? renderMineShape.getValue() : renderPlaceShape.getValue();
-
-        for (MBlockPos pos : it) {
-            posRender2.set(pos);
-            if (predicate.test(posRender2)) {
-                Renderer3D.box(posRender2.getBlockPos(), sideColor, lineColor, shapeMode, 0);
-            }
-        }
+        HighwayRenderer.render3D(this, event);
     }
 
     private void updateVariables() {
@@ -498,7 +425,7 @@ public class HighwayBuilderHIG extends Module {
         };
     }
 
-    private boolean canMine(MBlockPos pos, boolean mineBlocksToPlace) {
+    boolean canMine(MBlockPos pos, boolean mineBlocksToPlace) {
         BlockState state = pos.getState();
         return canBreak(pos.getBlockPos(), state)
             && (mineBlocksToPlace || !blocksToPlace.getValue().contains(state.getBlock()));
@@ -515,7 +442,7 @@ public class HighwayBuilderHIG extends Module {
         return mc.world.getBlockState(pos).calcBlockBreakingDelta(mc.player, mc.world, pos) >= 1.0F;
     }
 
-    private boolean canPlace(MBlockPos pos, boolean liquids) {
+    boolean canPlace(MBlockPos pos, boolean liquids) {
         if (mc.player == null) return false;
         BlockPos bp = pos.getBlockPos();
         double dx = bp.getX() + 0.5 - mc.player.getEyePos().x;
@@ -781,7 +708,7 @@ public class HighwayBuilderHIG extends Module {
             if (b.placeBlock(pos.getBlockPos(), slot)) {
                 placed = true;
                 b.blocksPlaced++;
-                b.placedFx.put(pos.getBlockPos(), System.currentTimeMillis());
+                HighwayRenderer.notePlacement(pos.getBlockPos());
                 b.placeTimer = b.placeDelay.getIntValue();
 
                 b.count++;
@@ -1045,7 +972,7 @@ public class HighwayBuilderHIG extends Module {
         return dx * dx + dy * dy + dz * dz;
     }
 
-    private enum State {
+    enum State {
         Center {
             @Override
             protected void start(HighwayBuilderHIG b) {
@@ -1216,7 +1143,7 @@ public class HighwayBuilderHIG extends Module {
                 }
 
                 if (b.placeBlock(pos, slot)) {
-                    b.placedFx.put(pos.toImmutable(), System.currentTimeMillis());
+                    HighwayRenderer.notePlacement(pos.toImmutable());
                     b.placeTimer = b.placeDelay.getIntValue();
                 }
             }
@@ -2092,7 +2019,7 @@ public class HighwayBuilderHIG extends Module {
         protected abstract void tick(HighwayBuilderHIG b);
     }
 
-    private interface MBPIterator extends Iterator<MBlockPos>, Iterable<MBlockPos> {
+    interface MBPIterator extends Iterator<MBlockPos>, Iterable<MBlockPos> {
         void save();
 
         void restore();
@@ -2157,7 +2084,7 @@ public class HighwayBuilderHIG extends Module {
         }
     }
 
-    private interface IBlockPosProvider {
+    interface IBlockPosProvider {
         MBPIterator getFront();
 
         MBPIterator getFloor();
