@@ -21,7 +21,7 @@ public class ChestSwap extends Module {
     public final BooleanSetting closeScreen = add(new BooleanSetting("CloseScreen", true));
 
     public ChestSwap() {
-        super("ChestSwap", "Instantly swaps between a chestplate and an elytra.", Category.PLAYER);
+        super("ChestSwap", "Мгновенно меняет нагрудник на элитры и обратно по нажатию клавиши.", Category.PLAYER);
     }
 
     @Override

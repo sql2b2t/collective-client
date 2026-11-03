@@ -81,7 +81,7 @@ public class CrystalAura extends Module {
     private static final double CURSOR_JITTER = 0.30;
 
     /** Через сколько миллисекунд кристалл считается снова атакуемым. */
-    private static final long ATTACKED_TTL_MS = 600L;
+    private static final long ATTACKED_TTL_MS = 150L;
 
     /** Сколько тиков держим цель, пока она примерно так же выгодна. */
     private static final int TARGET_HOLD_TICKS = 8;
@@ -111,6 +111,19 @@ public class CrystalAura extends Module {
     public enum TargetMode {
         DAMAGE, DISTANCE, HEALTH
     }
+
+    public enum Preset {
+        CUSTOM,
+        GRIM_2B2T,
+        GRIM_SAFE,
+        VANILLA_FAST
+    }
+
+    // ── Пресеты и удобство настройки ─────────────────────────────────
+    public final EnumSetting<Preset> preset             = add(new EnumSetting<>("Preset", Preset.GRIM_2B2T));
+    public final BooleanSetting pauseOnEat              = add(new BooleanSetting("PauseOnEat", true));
+    public final BooleanSetting pauseOnMine             = add(new BooleanSetting("PauseOnMine", false));
+    public final BooleanSetting antiSuicide             = add(new BooleanSetting("AntiSuicide", true));
 
     // ── Ротация ──────────────────────────────────────────────────────
     public final EnumSetting<RotationMode> rotationMode = add(new EnumSetting<>("Rotation", RotationMode.SILENT));
@@ -143,10 +156,12 @@ public class CrystalAura extends Module {
     public final NumberSetting damageRatio              = add(new NumberSetting("DamageRatio", 2.0, 1.0, 5.0, 0.1));
     public final BooleanSetting safety                  = add(new BooleanSetting("Safety", true));
 
-    // ── Прочее ───────────────────────────────────────────────────────
+    public final BooleanSetting fastCycle               = add(new BooleanSetting("FastCycle", true));
     public final BooleanSetting autoSupport             = add(new BooleanSetting("AutoSupport", false));
-    public final BooleanSetting predict                 = add(new BooleanSetting("Predict", false));
+    public final BooleanSetting predict                 = add(new BooleanSetting("Predict", true));
     public final BooleanSetting render                  = add(new BooleanSetting("Render", true));
+
+    private Preset lastAppliedPreset = null;
 
     private Entity currentTarget;
     private int targetHoldTicks;
@@ -177,7 +192,7 @@ public class CrystalAura extends Module {
     private Box placeBox;
 
     public CrystalAura() {
-        super("CrystalAura", "Grim-safe End Crystal aura: automatic crystal placement and burst breaking.", Category.COMBAT);
+        super("CrystalAura", "Безопасная для Grim аура кристаллов Энда: автоматическая постановка и быстрый взрыв.", Category.COMBAT);
     }
 
     @Override
@@ -222,7 +237,71 @@ public class CrystalAura extends Module {
         if (!this.aiming) RotationUtils.getInstance().release(this);
     }
 
+    private void applyPreset() {
+        Preset current = preset.getValue();
+        if (current == Preset.CUSTOM || current == lastAppliedPreset) return;
+        lastAppliedPreset = current;
+
+        switch (current) {
+            case GRIM_2B2T -> {
+                breakDelay.setValue(0.0);
+                placeDelay.setValue(0.0);
+                fastCycle.setValue(true);
+                predict.setValue(true);
+                rotationMode.setValue(RotationMode.SILENT);
+                turnSpeed.setValue(180.0);
+                smoothness.setValue(0.0);
+                placeReach.setValue(4.2);
+                attackRange.setValue(3.0);
+                minDamage.setValue(3.5);
+                maxSelfDamage.setValue(8.0);
+            }
+            case GRIM_SAFE -> {
+                breakDelay.setValue(1.0);
+                placeDelay.setValue(1.0);
+                fastCycle.setValue(false);
+                predict.setValue(false);
+                rotationMode.setValue(RotationMode.SILENT);
+                turnSpeed.setValue(90.0);
+                smoothness.setValue(0.40);
+                placeReach.setValue(4.0);
+                attackRange.setValue(2.8);
+                minDamage.setValue(4.0);
+                maxSelfDamage.setValue(6.0);
+            }
+            case VANILLA_FAST -> {
+                breakDelay.setValue(0.0);
+                placeDelay.setValue(0.0);
+                fastCycle.setValue(true);
+                predict.setValue(true);
+                turnSpeed.setValue(180.0);
+                smoothness.setValue(0.0);
+                placeReach.setValue(4.5);
+                attackRange.setValue(3.0);
+                minDamage.setValue(2.0);
+                maxSelfDamage.setValue(10.0);
+            }
+            case CUSTOM -> {}
+        }
+    }
+
+    @Override
+    public String getInfoString() {
+        return preset.getValue() != Preset.CUSTOM ? preset.getValue().name() : "CUSTOM";
+    }
+
     private void tickAura() {
+        applyPreset();
+
+        if (this.pauseOnEat.getValue() && mc.player.isUsingItem()) {
+            cancelAction();
+            return;
+        }
+
+        if (this.pauseOnMine.getValue() && mc.interactionManager != null && mc.interactionManager.isBreakingBlock()) {
+            cancelAction();
+            return;
+        }
         if (this.actionTimer > 0) {
             this.actionTimer--;
             // Во время кулдауна продолжаем наводиться. Слот тика нужен
@@ -246,22 +325,26 @@ public class CrystalAura extends Module {
             return;
         }
 
+        EndCrystalEntity crystal = bestAttackableCrystal();
+        if (crystal == null && !InventoryUtil.findInHotbarOrOffhand(Items.END_CRYSTAL).found()) {
+            cancelAction();
+            return;
+        }
+
         // Синхронизация с другими боевыми аурами (GrimAnchorAura): в тике
         // действует одна, иначе две одновременно перезаписывают серверный
-        // угол и сбивают друг другу проверки прицела. Отказ слота наведение
-        // не отменяет — доворот доживёт до своего следующего тика.
+        // угол и сбивают друг другу проверки прицела.
         this.aiming = true;
         if (!AuraCoordination.claim(this, mc.world.getTime())) return;
 
         // 1. Атака существующего кристалла — самый быстрый путь урона.
-        //    Не проваливаемся к постановке в тот же тик: прицелы разные,
-        //    каждая смена точки обнуляет ход ротации.
-        EndCrystalEntity crystal = bestAttackableCrystal();
         this.placeBox = crystal != null ? null : this.placeBox;
         if (crystal != null) {
             this.attackBox = crystal.getBoundingBox();
             handleAttack(crystal);
-            return;
+            if (!this.fastCycle.getValue() || this.actionTimer > 0) {
+                return;
+            }
         }
 
         // 2. Постановка нового кристалла (в т.ч. опоры под него).
@@ -325,15 +408,16 @@ public class CrystalAura extends Module {
             return;
         }
 
-        if (SwapManager.getInstance().isActionConflictTick()) return;
-
         RotationUtils rot = RotationUtils.getInstance();
-        rot.flushServerRotation();
         rot.keepWireFresh();
 
         mc.getNetworkHandler().sendPacket(
                 PlayerInteractEntityC2SPacket.attack(crystal, mc.player.isSneaking()));
         mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+
+        if (this.predict.getValue()) {
+            crystal.discard();
+        }
 
         this.attackedCrystals.put(crystal.getId(), System.currentTimeMillis());
         this.actionTimer = this.breakDelay.getValue().intValue();
@@ -410,7 +494,7 @@ public class CrystalAura extends Module {
             return;
         }
 
-        FindItemResult obsidian = InventoryUtil.findInHotbar(Items.OBSIDIAN);
+        FindItemResult obsidian = InventoryUtil.findInHotbarOrOffhand(Items.OBSIDIAN);
         if (!obsidian.found()) {
             this.pendingSupportCell = null;
             cancelAction();
@@ -442,12 +526,15 @@ public class CrystalAura extends Module {
         if (!isAimedViaSentRot(hit, this.placeReach.getValue())) return;
         if (SwapManager.getInstance().isActionConflictTick()) return;
 
-        if (!SwapManager.getInstance().hold(this, obsidian.slot(), SwapManager.Priority.PLACE, 2)) return;
+        if (!obsidian.isOffhand()) {
+            if (!SwapManager.getInstance().hold(this, obsidian.slot(), SwapManager.Priority.PLACE, 2)) return;
+        }
 
+        Hand hand = obsidian.getHand();
         BlockHitResult finalHit = randomizeCursor(hit);
         int seq = GrimUtils.nextSequence();
-        mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, finalHit, seq));
-        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+        mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(hand, finalHit, seq));
+        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
 
         if (this.predict.getValue() && isFaceFacingEye(mc.player.getEyePos(), under, Direction.UP)) {
             mc.world.setBlockState(supportCell, Blocks.OBSIDIAN.getDefaultState());
@@ -503,7 +590,15 @@ public class CrystalAura extends Module {
                     Box space = new Box(
                             cell.getX(), cell.getY(), cell.getZ(),
                             cell.getX() + 1.0, cell.getY() + 2.0, cell.getZ() + 1.0);
-                    if (!mc.world.getOtherEntities(null, space).isEmpty()) continue;
+                    boolean occupied = false;
+                    for (Entity e : mc.world.getOtherEntities(null, space)) {
+                        if (e instanceof EndCrystalEntity cr && (isRecentlyAttacked(cr.getId()) || cr.isRemoved())) {
+                            continue;
+                        }
+                        occupied = true;
+                        break;
+                    }
+                    if (occupied) continue;
 
                     Vec3d center = bottomCenter(cell);
                     if (GrimUtils.closestEyeDistanceSqTo(mc.player, center) > reachSq) continue;
@@ -541,6 +636,10 @@ public class CrystalAura extends Module {
 
             float selfDmg = ExplosionDamageUtil.getDamage(mc.world, center, ExplosionDamageUtil.CRYSTAL_POWER, mc.player);
             if (selfDmg > maxSelf) continue;
+            if (this.antiSuicide.getValue()) {
+                float totalHp = mc.player.getHealth() + mc.player.getAbsorptionAmount();
+                if (selfDmg >= totalHp - 0.5f) continue;
+            }
             if (selfDmg > 0.5f && targetDmg / selfDmg < ratio) continue;
 
             if (this.smartPlacement.getValue()) {
@@ -614,19 +713,25 @@ public class CrystalAura extends Module {
                 cell.getX() + 1.0, cell.getY() + 2.0, cell.getZ() + 1.0);
 
         if (!isAimedViaSentRot(hit, this.placeReach.getValue())) return;
-        if (SwapManager.getInstance().isActionConflictTick()) return;
 
-        FindItemResult crystals = InventoryUtil.findInHotbar(Items.END_CRYSTAL);
+        FindItemResult crystals = InventoryUtil.findInHotbarOrOffhand(Items.END_CRYSTAL);
         if (!crystals.found()) {
             cancelAction();
             return;
         }
-        if (!SwapManager.getInstance().hold(this, crystals.slot(), SwapManager.Priority.CRYSTAL, 2)) return;
 
+        if (!crystals.isOffhand()) {
+            if (SwapManager.getInstance().getServerSlot() != crystals.slot()) {
+                if (SwapManager.getInstance().isActionConflictTick()) return;
+                if (!SwapManager.getInstance().hold(this, crystals.slot(), SwapManager.Priority.CRYSTAL, 2)) return;
+            }
+        }
+
+        Hand hand = crystals.getHand();
         BlockHitResult finalHit = randomizeCursor(hit);
         int seq = GrimUtils.nextSequence();
-        mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, finalHit, seq));
-        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+        mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(hand, finalHit, seq));
+        mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
 
         this.actionTimer = this.placeDelay.getValue().intValue();
         cancelAction();
@@ -714,6 +819,8 @@ public class CrystalAura extends Module {
             RotationUtils rotUtils = RotationUtils.getInstance();
             if (mode == RotationMode.BOTH) {
                 rotUtils.setRotationFullInstant(this, ROTATION_PRIORITY, mc.player.getYaw(), mc.player.getPitch());
+            } else if (maxSpeed >= 180.0 && smooth <= 0.0) {
+                rotUtils.setRotationInstant(this, ROTATION_PRIORITY, rot[0], rot[1], this.syncMovement.getValue());
             } else {
                 rotUtils.setRotationSmooth(this, ROTATION_PRIORITY, rot[0], rot[1], maxSpeed, this.syncMovement.getValue());
             }
@@ -790,6 +897,7 @@ public class CrystalAura extends Module {
 
         if (selfDmg > this.maxSelfDamage.getValue().floatValue()) return false;
         if (this.antiFriend.getValue() && isFriendDamaged(center)) return false;
+        if (this.antiSuicide.getValue() && (mc.player.getHealth() + mc.player.getAbsorptionAmount()) <= selfDmg + 0.5f) return false;
         if (this.safety.getValue() && !selfDamageSurvivable(selfDmg)) return false;
 
         return true;
@@ -825,13 +933,18 @@ public class CrystalAura extends Module {
 
     /** Тотем в руках или здоровья хватит пережить самоурон. */
     private boolean selfDamageSurvivable(float selfDmg) {
+        float totalHp = mc.player.getHealth() + mc.player.getAbsorptionAmount();
+        if (this.antiSuicide.getValue() && selfDmg >= totalHp - 0.5f) {
+            return false;
+        }
+
         if (selfDmg <= 6.0f) return true;
 
         boolean hasTotem = mc.player.getMainHandStack().isOf(Items.TOTEM_OF_UNDYING)
                 || mc.player.getOffHandStack().isOf(Items.TOTEM_OF_UNDYING);
         if (hasTotem) return true;
 
-        return (mc.player.getHealth() + mc.player.getAbsorptionAmount()) > selfDmg;
+        return totalHp > selfDmg;
     }
 
     // ─────────────────────────────────────────────────────────────────

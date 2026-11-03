@@ -18,8 +18,10 @@ import me.collective.util.sort.SorterWorldStore;
 import me.collective.util.tracker.ChestTrackerDataManager;
 import me.collective.util.tracker.ChestTrackerDataV2;
 import me.collective.util.tracker.TrackedContainer;
+import me.collective.event.events.PacketEvent;
 import me.collective.event.events.Render3DEvent;
 import me.collective.event.events.TickEvent;
+import me.collective.manager.FriendManager;
 import me.collective.render.ShapeMode;
 import me.collective.module.Module;
 import me.collective.category.Category;
@@ -249,6 +251,13 @@ public class StashSorter extends Module {
         .build());
 
     // --- состояние прогона ---
+    private long lastPacketTime = System.currentTimeMillis();
+
+    @EventHandler
+    private void onPacketReceive(PacketEvent.Receive event) {
+        lastPacketTime = System.currentTimeMillis();
+    }
+
     private SortState state = SortState.IDLE;
     private SortState lastState = SortState.IDLE;
     private int stateTicks;
@@ -388,7 +397,7 @@ public class StashSorter extends Module {
         }
 
         // При лагах кликаем не туда: лучше постоять
-        if (pauseOnLag.get() && false) return;
+        if (pauseOnLag.get() && System.currentTimeMillis() - lastPacketTime > 1500L) return;
 
         if (state != lastState) {
             lastState = state;
@@ -1468,6 +1477,13 @@ public class StashSorter extends Module {
         float targetPitch = (float) -Math.toDegrees(Math.atan2(dy, horizontal));
 
         float maxStep = turnSpeed.get();
+        if (maxStep <= 0) {
+            mc.player.setYaw(targetYaw);
+            mc.player.setHeadYaw(targetYaw);
+            mc.player.setPitch(MathHelper.clamp(targetPitch, -90.0F, 90.0F));
+            return true;
+        }
+
         float dYaw = MathHelper.wrapDegrees(targetYaw - mc.player.getYaw());
         float dPitch = targetPitch - mc.player.getPitch();
 
@@ -1571,6 +1587,7 @@ public class StashSorter extends Module {
         if (mc.player == null || mc.world == null) return false;
         for (PlayerEntity player : mc.world.getPlayers()) {
             if (player == mc.player || player.isSpectator()) continue;
+            if (FriendManager.INSTANCE.isFriend(player.getNameForScoreboard())) continue;
             if (player.squaredDistanceTo(mc.player) < 64) return true;
         }
         return false;

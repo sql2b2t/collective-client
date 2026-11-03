@@ -21,7 +21,7 @@ public class Bps extends HudModule {
     public final BooleanSetting showTitle = add(new BooleanSetting("Title", true));
 
     public Bps() {
-        super("BPS", "Displays your current movement speed in blocks per second.", 4, 360);
+        super("BPS", "Отображает текущую скорость движения игрока в блоках в секунду (BPS).", 4, 360);
     }
 
     @Override

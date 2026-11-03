@@ -88,8 +88,7 @@ public class ProxyManager {
                 o.addProperty("pass", p.pass());
                 arr.add(o);
             }
-            root.add("proxies", arr);
-            Files.writeString(proxiesFile, gson.toJson(root), StandardCharsets.UTF_8);
+            me.collective.util.AtomicFileWriter.write(proxiesFile, gson.toJson(root));
             return true;
         } catch (Exception e) {
             System.err.println("[Collective-Proxy] Save failed: " + e.getMessage());

@@ -10,7 +10,7 @@ import java.util.Collection;
 
 public class Effects extends HudModule {
     public Effects() {
-        super("Effects", "Displays active potion effects.", 4, 150);
+        super("Effects", "Отображает список активных эффектов зелий и их длительность.", 4, 150);
     }
 
     @Override

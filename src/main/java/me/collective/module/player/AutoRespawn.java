@@ -7,7 +7,7 @@ import me.collective.module.Module;
 
 public class AutoRespawn extends Module {
     public AutoRespawn() {
-        super("AutoRespawn", "Instantly respawns upon death.", Category.PLAYER);
+        super("AutoRespawn", "Мгновенно возрождает игрока после смерти.", Category.PLAYER);
     }
 
     @EventHandler

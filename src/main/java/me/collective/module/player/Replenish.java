@@ -193,6 +193,7 @@ public class Replenish extends Module {
     private int delayTicks;
     private final Map<Integer, Integer> lastStackSizes = new HashMap<>();
     private final Map<Integer, String> hotbarItemNames = new HashMap<>();
+    private final Map<Integer, ItemStack> trackedSlotStacks = new HashMap<>();
 
     public static Replenish INSTANCE;
 
@@ -206,6 +207,7 @@ public class Replenish extends Module {
         this.delayTicks = 0;
         this.lastStackSizes.clear();
         this.hotbarItemNames.clear();
+        this.trackedSlotStacks.clear();
     }
 
     @Override
@@ -239,10 +241,21 @@ public class Replenish extends Module {
         for (int slot = 0; slot < 9 && refillsThisTick < this.maxRefillsPerTick.get(); slot++) {
             ItemStack stack = this.mc.player.getInventory().getStack(slot);
             if (stack.isEmpty()) {
+                ItemStack lastStack = this.trackedSlotStacks.get(slot);
+                if (lastStack != null && !lastStack.isEmpty() && shouldRefill(lastStack)) {
+                    int sourceSlot = findSourceSlot(lastStack);
+                    if (sourceSlot != -1) {
+                        InvUtils.move().from(sourceSlot).to(slot);
+                        refillsThisTick++;
+                        continue;
+                    }
+                }
                 this.hotbarItemNames.remove(slot);
+                this.trackedSlotStacks.remove(slot);
                 continue;
             }
 
+            this.trackedSlotStacks.put(slot, stack.copy());
             if (!shouldRefill(stack)) continue;
 
             int count = stack.getCount();
@@ -347,7 +360,7 @@ public class Replenish extends Module {
         for (int i = 9; i < 36; i++) {
             ItemStack stack = this.mc.player.getInventory().getStack(i);
             if (stack.isEmpty() || !canStack(targetStack, stack)) continue;
-            if (this.maintainTool.get() && isTool(targetStack.getItem()) && stack.getItem().getClass() != targetStack.getItem().getClass()) continue;
+            if (this.maintainTool.get() && isTool(targetStack.getItem()) && stack.getItem() != targetStack.getItem()) continue;
 
             if (this.stackPreference.get() == StackPreference.По_порядку) return i;
             if (fullStacks) {
@@ -365,8 +378,9 @@ public class Replenish extends Module {
     }
 
     private boolean canStack(ItemStack a, ItemStack b) {
-        // Vanilla only merges identical components; ignoring names cannot change that.
-        return a.getMaxCount() > 1 && ItemStack.areItemsAndComponentsEqual(a, b);
+        if (a.getItem() != b.getItem()) return false;
+        if (a.getMaxCount() == 1) return true;
+        return ItemStack.areItemsAndComponentsEqual(a, b);
     }
 
     /** Константы по-русски — EnumSetting показывает toString(). */

@@ -38,6 +38,9 @@ public class HighwayTools extends Module {
     public final NumberSetting radius = add(new NumberSetting("AxisRadius", 3, 0, 15, 1));
     public final BooleanSetting pickToggle = add(new BooleanSetting("PickToggle", true));
     public final BooleanSetting keepY = add(new BooleanSetting("KeepY", true));
+    public final BooleanSetting autoWalk = add(new BooleanSetting("AutoWalk", true));
+    public final BooleanSetting autoCenter = add(new BooleanSetting("AutoCenter", true));
+    public final BooleanSetting freeLook = add(new BooleanSetting("FreeLook", false));
 
     private final List<Class<? extends Module>> commonClasses = List.of(
         AutoLog.class,
@@ -57,17 +60,30 @@ public class HighwayTools extends Module {
     private double originXZRatio;
 
     public HighwayTools() {
-        super("HighwayTools", "Digs, builds and repairs highways automatically.", Category.HIGHWAY);
+        super("HighwayTools", "Автоматически копает, мостит и ремонтирует хайвеи.", Category.HIGHWAY);
     }
+
+    private final java.util.Set<Class<? extends Module>> activatedModules = new java.util.HashSet<>();
 
     @Override
     public void onEnable() {
         if (mc.player == null || mc.world == null) return;
 
         originX = Math.abs(mc.player.getX());
-        originY = Math.abs(mc.player.getY());
+        originY = mc.player.getY();
         originZ = Math.abs(mc.player.getZ());
         originXZRatio = Math.abs(originX - originZ);
+        activatedModules.clear();
+
+        if (freeLook.getValue()) {
+            enable(me.collective.module.render.FreeLook.class);
+        }
+        if (autoCenter.getValue()) {
+            enable(AutoCenter.class);
+        }
+        if (autoWalk.getValue()) {
+            enable(AutoWalkHIG.class);
+        }
 
         switch (mode.getValue()) {
             case HighwayBuilding -> {
@@ -81,25 +97,21 @@ public class HighwayTools extends Module {
             }
             case NegNegDigging -> {
                 enable(NegNegBorer.class);
-                enable(AutoCenter.class);
                 enableAll(commonClasses);
                 enableAll(diggingClasses);
             }
             case NegPosDigging -> {
                 enable(NegPosBorer.class);
-                enable(AutoCenter.class);
                 enableAll(commonClasses);
                 enableAll(diggingClasses);
             }
             case PosNegDigging -> {
                 enable(PosNegBorer.class);
-                enable(AutoCenter.class);
                 enableAll(commonClasses);
                 enableAll(diggingClasses);
             }
             case PosPosDigging -> {
                 enable(PosPosBorer.class);
-                enable(AutoCenter.class);
                 enableAll(commonClasses);
                 enableAll(diggingClasses);
             }
@@ -108,41 +120,11 @@ public class HighwayTools extends Module {
 
     @Override
     public void onDisable() {
-        switch (mode.getValue()) {
-            case HighwayBuilding -> {
-                disableIfOn(HighwayBuilderHIG.class);
-                disableAll(commonClasses);
-            }
-            case AxisDigging, RingRoadDigging -> {
-                disableIfOn(AxisBorer.class);
-                disableAll(commonClasses);
-                disableAll(diggingClasses);
-            }
-            case NegNegDigging -> {
-                disableIfOn(NegNegBorer.class);
-                disableIfOn(AutoCenter.class);
-                disableAll(commonClasses);
-                disableAll(diggingClasses);
-            }
-            case NegPosDigging -> {
-                disableIfOn(NegPosBorer.class);
-                disableIfOn(AutoCenter.class);
-                disableAll(commonClasses);
-                disableAll(diggingClasses);
-            }
-            case PosNegDigging -> {
-                disableIfOn(PosNegBorer.class);
-                disableIfOn(AutoCenter.class);
-                disableAll(commonClasses);
-                disableAll(diggingClasses);
-            }
-            case PosPosDigging -> {
-                disableIfOn(PosPosBorer.class);
-                disableIfOn(AutoCenter.class);
-                disableAll(commonClasses);
-                disableAll(diggingClasses);
-            }
+        for (Class<? extends Module> clazz : activatedModules) {
+            Module m = ModuleManager.INSTANCE.getModule(clazz);
+            if (m != null && m.isToggled()) m.setToggled(false);
         }
+        activatedModules.clear();
     }
 
     @EventHandler
@@ -176,12 +158,15 @@ public class HighwayTools extends Module {
         }
     }
 
-    private static void enable(Class<? extends Module> clazz) {
+    private void enable(Class<? extends Module> clazz) {
         Module m = ModuleManager.INSTANCE.getModule(clazz);
-        if (m != null && !m.isToggled()) m.setToggled(true);
+        if (m != null && !m.isToggled()) {
+            m.setToggled(true);
+            activatedModules.add(clazz);
+        }
     }
 
-    private static void enableAll(List<Class<? extends Module>> classes) {
+    private void enableAll(List<Class<? extends Module>> classes) {
         for (Class<? extends Module> clazz : classes) enable(clazz);
     }
 

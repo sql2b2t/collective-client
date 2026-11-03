@@ -53,7 +53,7 @@ public class Excavator extends Module {
     private BetterBlockPos start, end;
 
     public Excavator() {
-        super("Excavator", "Excavate a selection area using Baritone.", Category.PLAYER);
+        super("Excavator", "Выкапывает выбранную область с помощью Baritone.", Category.PLAYER);
     }
 
     @Override

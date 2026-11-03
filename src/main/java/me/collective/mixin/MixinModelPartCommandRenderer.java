@@ -15,6 +15,6 @@ public class MixinModelPartCommandRenderer {
 
     @WrapOperation(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/VertexConsumerProvider$Immediate;getBuffer(Lnet/minecraft/client/render/RenderLayer;)Lnet/minecraft/client/render/VertexConsumer;"))
     public VertexConsumer collective$shadeModelParts(VertexConsumerProvider.Immediate consumers, RenderLayer layer, Operation<VertexConsumer> original) {
-        return HandsShader.decorate(original.call(consumers, layer));
+        return HandsShader.decorateArm(original.call(consumers, layer));
     }
 }

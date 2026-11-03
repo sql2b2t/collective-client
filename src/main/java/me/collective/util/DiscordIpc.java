@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.net.StandardProtocolFamily;
 import java.net.UnixDomainSocketAddress;
 import java.nio.ByteBuffer;
@@ -14,14 +16,25 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DiscordIpc implements AutoCloseable {
+    private static final Logger LOG = LoggerFactory.getLogger(DiscordIpc.class);
+
     // Discord Application ID for Minecraft: Java Edition (displays "Minecraft: Java Edition")
     private static final String CLIENT_ID = "1410791091501928458";
     public static final String DEFAULT_ICON = "https://raw.githubusercontent.com/anvres56/b2xy/main/collective_icon.png";
     private static final int OP_HANDSHAKE = 0;
     private static final int OP_FRAME = 1;
     private static final int OP_CLOSE = 2;
+
+    /** Разумный потолок кадра IPC: легитимные кадры Discord на порядки меньше. */
+    private static final int MAX_FRAME_BYTES = 64 * 1024;
+    /** Таймаут на подключение к пайпу: зависший Discord не должен вешать поток. */
+    private static final int CONNECT_TIMEOUT_MS = 5_000;
 
     private SocketChannel unixChannel;
     private RandomAccessFile winPipe;
@@ -50,7 +63,11 @@ public class DiscordIpc implements AutoCloseable {
                     this.connected = true;
                     return true;
                 }
-            } catch (Exception ignored) {
+                // Handshake не сошёлся, но канал уже открыт: обязательно гасим,
+                // иначе следующая итерация перезапишет поля с утёкшим дескриптором.
+                close();
+            } catch (Exception e) {
+                LOG.debug("Discord IPC: windows pipe {} failed", i, e);
                 close();
             }
         }
@@ -79,16 +96,20 @@ public class DiscordIpc implements AutoCloseable {
                 if (!candidate.exists()) continue;
 
                 try {
-                    UnixDomainSocketAddress address = UnixDomainSocketAddress.of(candidate.toPath());
+                    SocketAddress address = UnixDomainSocketAddress.of(candidate.toPath());
                     this.unixChannel = SocketChannel.open(StandardProtocolFamily.UNIX);
-                    this.unixChannel.connect(address);
+                    // Блокирующий connect без таймаута вешает поток навсегда,
+                    // если Discord завис, не принимая соединения.
+                    this.unixChannel.socket().connect(address, CONNECT_TIMEOUT_MS);
                     this.inStream = Channels.newInputStream(this.unixChannel);
                     this.outStream = Channels.newOutputStream(this.unixChannel);
                     if (sendHandshake()) {
                         this.connected = true;
                         return true;
                     }
-                } catch (Exception ignored) {
+                    close();
+                } catch (Exception e) {
+                    LOG.debug("Discord IPC: {} failed", candidate, e);
                     close();
                 }
             }
@@ -107,12 +128,17 @@ public class DiscordIpc implements AutoCloseable {
                 ByteBuffer buf = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN);
                 int op = buf.getInt();
                 int len = buf.getInt();
+                if (len < 0 || len > MAX_FRAME_BYTES) {
+                    LOG.debug("Discord IPC: handshake frame length out of range: {}", len);
+                    return false;
+                }
                 if (len > 0) {
                     readFully(len);
                 }
                 return op == OP_FRAME;
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            LOG.debug("Discord IPC: handshake failed", e);
         }
         return false;
     }
@@ -163,6 +189,10 @@ public class DiscordIpc implements AutoCloseable {
                 ByteBuffer buf = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN);
                 buf.getInt(); // op
                 int len = buf.getInt();
+                if (len < 0 || len > MAX_FRAME_BYTES) {
+                    // Повреждённый пайп не должен превращаться в аллокацию на 2 ГБ.
+                    throw new IllegalStateException("Discord IPC frame length out of range: " + len);
+                }
                 if (len > 0) {
                     readFully(len);
                 }

@@ -562,61 +562,10 @@ public class RotationUtils {
      * «поворот → удар».
      */
     public void flushServerRotation() {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.player == null || mc.getNetworkHandler() == null) return;
-
-        boolean rotating = isRotating() || isWireFresh();
-        float yaw;
-        float pitch;
-        if (rotating) {
-            yaw = getSentYaw();
-            pitch = getSentPitch();
-        } else {
-            // Модули с прямой камерой (клиентский режим) двигают взгляд
-            // напрямую, без захвата RotationUtils.
-            yaw = mc.player.getYaw();
-            pitch = mc.player.getPitch();
-        }
-
-        // Сервер уже видел этот угол — дублирующий пакет не нужен.
-        if (Math.abs(MathHelper.wrapDegrees(yaw - this.serverYaw)) < 0.01f
-            && Math.abs(pitch - this.serverPitch) < 0.01f) {
-            return;
-        }
-
-        mc.getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.LookAndOnGround(
-            yaw, pitch, mc.player.isOnGround(), mc.player.horizontalCollision));
-    }
-
-    /**
-     * Страховка порядка «поворот → взаимодействие» на уровне проводки:
-     * перед ударом или interact досылаем актуальный взгляд, если сервер его
-     * ещё не видел. Работает для всех модулей, в том числе тех, что наводятся
-     * напрямую камерой и не вызывают flushServerRotation сами.
-     */
-    @EventHandler(priority = -100)
-    public void onPacketSendLookGuard(PacketEvent.Send event) {
-        if (event.isCancelled()) return;
-        // Ваниль-паритет: пока ни один модуль не держит тихую ротацию, досылать
-        // Look перед действием нельзя — клиент уходит с обычным тик-пакетом, и
-        // ванильный клиент никогда не шлёт Look прямо перед криком/копанием.
-        if (!this.isRotating() && !this.isWireFresh()) return;
-
-        Packet<?> packet = event.packet;
-
-        boolean needsLook;
-        if (packet instanceof net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket) {
-            needsLook = true;
-        } else if (packet instanceof net.minecraft.network.packet.c2s.play.PlayerInteractEntityC2SPacket) {
-            needsLook = true;
-        } else if (packet instanceof net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket action) {
-            needsLook = action.getAction()
-                == net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket.Action.START_DESTROY_BLOCK;
-        } else {
-            needsLook = false;
-        }
-
-        if (needsLook) flushServerRotation();
+        // No-op: не отсылаем внеочередные пакеты поворота перед действиями.
+        // Серверный угол уже уходит в sendMovementPackets() текущего/прошлого тика;
+        // досылка LookAndOnGround перед атакой/интерактом триггерит у GrimAC PacketOrderO,
+        // TickTimer (packets=2) и AimDuplicateLook.
     }
 
     public boolean isAligned(double eps) {
@@ -683,66 +632,61 @@ public class RotationUtils {
         return scaled ? 2 * Math.round(delta / 90.0f) : Math.round(delta / 45.0f);
     }
 
+    public boolean isSyncMovement() {
+        return this.syncMovement;
+    }
+
     public Float getMoveYaw() {
         if (MinecraftClient.getInstance().player == null || !isRotating()) return null;
         if (this.offsetK != null) return null;
-        if (this.syncMovement) return this.currentYaw;
-
-        return this.currentYaw + getInputSteps() * 45.0f;
+        return this.currentYaw;
     }
 
-    /** Пересобирает ввод под серверный угол, чтобы движение считалось верно. */
+    /** Пересобирает ввод под серверный угол, чтобы движение считалось точно и без флагов. */
     public PlayerInput rotateDeclaredInput(PlayerInput in) {
-        int k = getInputSteps();
-        if (k == 0) return in;
+        if (MinecraftClient.getInstance().player == null || !isRotating()) return in;
+        if (this.syncMovement) return in;
 
         int s = (in.left() ? 1 : 0) - (in.right() ? 1 : 0);
         int f = (in.forward() ? 1 : 0) - (in.backward() ? 1 : 0);
         if (s == 0 && f == 0) return in;
 
-        int idx = 0;
-        for (int i = 0; i < 8; i++) {
-            int ds = (INPUT_DIRS[i][2] ? 1 : 0) - (INPUT_DIRS[i][3] ? 1 : 0);
-            int df = (INPUT_DIRS[i][0] ? 1 : 0) - (INPUT_DIRS[i][1] ? 1 : 0);
-            if (ds != s || df != f) continue;
+        float cameraYaw = MinecraftClient.getInstance().player.getYaw();
+        float serverYaw = this.currentYaw;
+        float delta = MathHelper.wrapDegrees(cameraYaw - serverYaw);
+        double phi = Math.toRadians(delta);
 
-            idx = i;
-            break;
+        double sIdeal = s * Math.cos(phi) - f * Math.sin(phi);
+        double fIdeal = s * Math.sin(phi) + f * Math.cos(phi);
+
+        int bestS = 0;
+        int bestF = 0;
+        double bestScore = -Double.MAX_VALUE;
+
+        for (int ds = -1; ds <= 1; ds++) {
+            for (int df = -1; df <= 1; df++) {
+                if (ds == 0 && df == 0) continue;
+                double len = (ds != 0 && df != 0) ? 1.4142135623730951 : 1.0;
+                double score = (ds * sIdeal + df * fIdeal) / len;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestS = ds;
+                    bestF = df;
+                }
+            }
         }
 
-        boolean[] d = INPUT_DIRS[Math.floorMod(idx + k, 8)];
-        boolean canSprint = d[0] && in.sprint();
-        return new PlayerInput(d[0], d[1], d[2], d[3], in.jump(), in.sneak(), canSprint);
+        boolean canSprint = in.sprint() && bestF > 0;
+        return new PlayerInput(bestF > 0, bestF < 0, bestS > 0, bestS < 0, in.jump(), in.sneak(), canSprint);
     }
 
-    /**
-     * Поправка скорости под диагональ.
-     *
-     * <p>В ванилле по диагонали игрок чуть быстрее; при подмене направления на
-     * угол, кратный 45 градусам, это перестаёт совпадать, поэтому скорость
-     * подравнивается.
-     */
     public float getMoveSpeedScale() {
-        if (MinecraftClient.getInstance().player == null || this.offsetK != null || this.syncMovement) return 1.0f;
-        if (this.finalYaw == null && this.finalPitch == null) return 1.0f;
-
-        int k = getInputSteps();
-        if ((k & 1) == 0) return 1.0f;
-
-        PlayerInput in = MinecraftClient.getInstance().player.input.playerInput;
-
-        int s = (in.left() ? 1 : 0) - (in.right() ? 1 : 0);
-        int f = (in.forward() ? 1 : 0) - (in.backward() ? 1 : 0);
-        if (s == 0 && f == 0) return 1.0f;
-
-        boolean realDiagonal = s != 0 && f != 0;
-        return realDiagonal ? 0.98f : 1.0204082f;
+        return 1.0f;
     }
 
     public boolean isSprintBlocked() {
         if (MinecraftClient.getInstance().player == null || this.offsetK != null || this.syncMovement) return false;
         if (this.finalYaw == null && this.finalPitch == null) return false;
-        if (getInputSteps() == 0) return false;
 
         return !rotateDeclaredInput(MinecraftClient.getInstance().player.input.playerInput).forward();
     }

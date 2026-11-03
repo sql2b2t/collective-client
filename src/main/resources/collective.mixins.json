@@ -56,8 +56,12 @@
     "ScreenAccessor",
     "MixinTitleScreen",
     "MixinMultiplayerScreen",
-    "MixinClientPlayNetworkHandler"
+    "MixinClientPlayNetworkHandler",
+    "MixinWorld",
+    "MixinFogRenderer",
+    "MixinEndCrystalEntityRenderer"
   ],
+
   "injectors": {
     "defaultRequire": 1
   }

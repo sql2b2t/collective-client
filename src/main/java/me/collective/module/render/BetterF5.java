@@ -39,7 +39,7 @@ public class BetterF5 extends Module {
     private boolean positionModified;
 
     public BetterF5() {
-        super("BetterF5", "Smooth camera control for third-person perspective.", Category.RENDER);
+        super("BetterF5", "Плавное управление камерой от третьего лица.", Category.RENDER);
         INSTANCE = this;
     }
 

@@ -1,38 +1,84 @@
 package me.collective.gui.component;
 
-import me.collective.font.FontManager;
+import me.collective.gui.alt.SmoothGfx;
+import me.collective.gui.ClickGuiTheme;
 import me.collective.module.client.UI;
-import me.collective.render.RenderUtil;
 import me.collective.render.SoundUtil;
+import me.collective.setting.Keybind;
 import me.collective.setting.KeybindSetting;
+import me.collective.setting.Setting;
 import net.minecraft.client.gui.DrawContext;
 import org.lwjgl.glfw.GLFW;
 
-import java.awt.Color;
-
+/**
+ * Modern KeybindComponent matching ClickGUI 2 pill badge styling.
+ */
 public class KeybindComponent extends Component {
-    private final KeybindSetting setting;
+    private final Setting<?> setting;
     private boolean binding;
 
-    public KeybindComponent(KeybindSetting setting, float x, float y, float width, float height) {
-        super(x, y, width, height);
+    public KeybindComponent(Setting<?> setting, float x, float y, float width, float height) {
+        super(x, y, width, 16f);
         this.setting = setting;
     }
 
     @Override
+    public float getHeight() {
+        return 16f;
+    }
+
+    private String getKeyName() {
+        if (setting instanceof KeybindSetting ks) {
+            return ks.getKeyName();
+        }
+        if (setting.getValue() instanceof Keybind kb) {
+            return formatKey(kb.getKey(), kb.isButton());
+        }
+        return "None";
+    }
+
+    private static String formatKey(int key, boolean isButton) {
+        return KeybindSetting.formatKey(key, isButton);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void setKey(int key, boolean isButton) {
+        if (setting instanceof KeybindSetting ks) {
+            ks.setValue(isButton ? -100 - key : key);
+        } else if (setting.getValue() instanceof Keybind) {
+            ((Setting<Keybind>) setting).setValue(new Keybind(key, isButton));
+        }
+    }
+
+    @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        RenderUtil.drawRect(context, x, y, x + width, y + height, UI.INSTANCE.bgColor.getValue());
+        if (!setting.isVisible()) return;
 
-        String keyName = binding ? "..." : setting.getKeyName().toUpperCase();
-        String text = setting.getName() + ": " + keyName;
+        boolean hov = isHovered(mouseX, mouseY);
+        if (hov) {
+            SmoothGfx.fillRounded(context, x + 2f, y, width - 4f, height, 3f, 0x12FFFFFF);
+        }
 
-        int col = binding ? Color.YELLOW.getRGB() : UI.INSTANCE.textColor.getValue().getRGB();
-        float fs = FontManager.settingsScale();
-        FontManager.INSTANCE.drawStringWithShadowScaled(context, text, x + 4, y + (height - FontManager.INSTANCE.getFontHeightScaled(fs)) / 2f + 0.5f, col, fs);
+        // Setting Name on the left
+        ClickGuiTheme.badge().drawString(context, setting.getName(), x + 6f, y + 3.5f, ClickGuiTheme.TEXT_PRIMARY);
+
+        // Modern Pill on the right
+        String keyName = getKeyName().toUpperCase();
+        String bindText = binding ? "..." : (!keyName.equalsIgnoreCase("NONE") && !keyName.equalsIgnoreCase("UNKNOWN") ? keyName : "Bind");
+        float bW = ClickGuiTheme.badge().getStringWidth(bindText) + 8f;
+        float bX = x + width - bW - 6f;
+        float bY = y + 2f;
+        boolean pillHov = mouseX >= bX && mouseX <= bX + bW && mouseY >= bY && mouseY <= bY + 12f;
+
+        int bg = binding ? ClickGuiTheme.getAccentBg() : (pillHov ? 0x28FFFFFF : 0x16FFFFFF);
+        int stroke = binding ? ClickGuiTheme.getAccentColor() : 0x20FFFFFF;
+        SmoothGfx.fillAndStroke(context, bX, bY, bW, 12f, 3f, bg, stroke, 1.0f);
+        ClickGuiTheme.badge().drawString(context, bindText, bX + 4f, bY + 2f, binding ? ClickGuiTheme.getAccentColor() : ClickGuiTheme.TEXT_PRIMARY);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (!setting.isVisible()) return false;
         if (isHovered(mouseX, mouseY)) {
             if (!binding) {
                 if (button == 0) {
@@ -41,10 +87,16 @@ public class KeybindComponent extends Component {
                         SoundUtil.playClick(1.0f, 1.0f);
                     }
                     return true;
+                } else if (button == 1) { // Right click clears bind
+                    setKey(GLFW.GLFW_KEY_UNKNOWN, false);
+                    this.binding = false;
+                    if (UI.INSTANCE.sounds.getValue()) {
+                        SoundUtil.playClick(1.0f, 0.8f);
+                    }
+                    return true;
                 }
             } else {
-                // If clicked while binding, bind that mouse button! (button 0 = LMB, button 1 = RMB, etc.)
-                setting.setValue(-100 - button);
+                setKey(button, true);
                 this.binding = false;
                 if (UI.INSTANCE.sounds.getValue()) {
                     SoundUtil.playClick(1.0f, 1.0f);
@@ -59,11 +111,14 @@ public class KeybindComponent extends Component {
     public boolean keyPressed(int key) {
         if (binding) {
             if (key == GLFW.GLFW_KEY_ESCAPE || key == GLFW.GLFW_KEY_DELETE || key == GLFW.GLFW_KEY_BACKSPACE) {
-                setting.setValue(GLFW.GLFW_KEY_UNKNOWN);
+                setKey(GLFW.GLFW_KEY_UNKNOWN, false);
             } else {
-                setting.setValue(key);
+                setKey(key, false);
             }
             this.binding = false;
+            if (UI.INSTANCE.sounds.getValue()) {
+                SoundUtil.playClick(1.0f, 1.2f);
+            }
             return true;
         }
         return false;

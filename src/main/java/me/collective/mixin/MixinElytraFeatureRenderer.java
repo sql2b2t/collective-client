@@ -18,7 +18,9 @@ public abstract class MixinElytraFeatureRenderer {
     private void collective$hideOwnWings(MatrixStack matrices, OrderedRenderCommandQueue queue, int light,
         BipedEntityRenderState state, float tickDelta, float tickProgress, CallbackInfo ci) {
         if (ElytraBounce.lookLikeFalling() && MinecraftClient.getInstance().player != null) {
-            ci.cancel();
+            if (me.collective.emotes.EmoteEngine.isLocal(state)) {
+                ci.cancel();
+            }
         }
     }
 }

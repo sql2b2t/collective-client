@@ -13,7 +13,9 @@ import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
 import java.util.stream.StreamSupport;
 
 public class AutoCity extends Module {
@@ -23,7 +25,7 @@ public class AutoCity extends Module {
     private BlockPos cityPos = null;
 
     public AutoCity() {
-        super("AutoCity", "Automatically mines your opponent's surround blocks to allow crystal face-placing.", Category.COMBAT);
+        super("AutoCity", "Автоматически копает блоки сурраунда вокруг цели для установки кристаллов в лицо.", Category.COMBAT);
     }
 
     @Override
@@ -62,28 +64,42 @@ public class AutoCity extends Module {
 
         double maxReachSq = breakRange.getValue() * breakRange.getValue();
 
+        List<BlockPos> candidates = new ArrayList<>();
         for (Direction side : sides) {
             BlockPos pos = targetPos.offset(side);
             if (mc.player.squaredDistanceTo(pos.toCenterPos()) > maxReachSq) continue;
-
             BlockState state = mc.world.getBlockState(pos);
             if (isBlastResistant(state)) {
-                cityPos = pos;
-                mc.player.sendMessage(Text.literal("§7[§cAutoCity§7] §aMining city block at: §e" + pos.toShortString()), false);
+                candidates.add(pos);
+            }
+        }
 
-                if (SpeedMine.INSTANCE != null) {
-                    if (!SpeedMine.INSTANCE.isToggled()) {
-                        SpeedMine.INSTANCE.setToggled(true);
-                        mc.player.sendMessage(Text.literal("§7[§cAutoCity§7] §6Сам включил SpeedMine — её настройки (скорость/обход/дальность) теперь копают твои блоки и могут флагать Grim."), false);
-                    }
-                    SpeedMine.INSTANCE.mineBlock(cityPos, Direction.UP);
+        // Приоритет блокам, над которыми воздух (чтобы сразу поставить кристалл)
+        candidates.sort((a, b) -> {
+            boolean aAir = mc.world.getBlockState(a.up()).isAir();
+            boolean bAir = mc.world.getBlockState(b.up()).isAir();
+            if (aAir != bAir) return aAir ? -1 : 1;
+            return Double.compare(mc.player.squaredDistanceTo(a.toCenterPos()), mc.player.squaredDistanceTo(b.toCenterPos()));
+        });
+
+        if (!candidates.isEmpty()) {
+            BlockPos pos = candidates.get(0);
+            cityPos = pos;
+            mc.player.sendMessage(Text.literal("§7[§cAutoCity§7] §aMining city block at: §e" + pos.toShortString()), false);
+
+            if (SpeedMine.INSTANCE != null) {
+                if (!SpeedMine.INSTANCE.isToggled()) {
+                    SpeedMine.INSTANCE.setToggled(true);
+                    mc.player.sendMessage(Text.literal("§7[§cAutoCity§7] §6Сам включил SpeedMine — её настройки (скорость/обход/дальность) теперь копают твои блоки и могут флагать Grim."), false);
                 }
-                break;
+                SpeedMine.INSTANCE.mineBlock(cityPos, Direction.UP);
             }
         }
     }
 
     private boolean isBlastResistant(BlockState state) {
-        return state.isOf(Blocks.OBSIDIAN) || state.isOf(Blocks.CRYING_OBSIDIAN) || state.isOf(Blocks.NETHERITE_BLOCK) || state.isOf(Blocks.RESPAWN_ANCHOR);
+        return state.isOf(Blocks.OBSIDIAN) || state.isOf(Blocks.CRYING_OBSIDIAN)
+            || state.isOf(Blocks.NETHERITE_BLOCK) || state.isOf(Blocks.RESPAWN_ANCHOR)
+            || state.isOf(Blocks.ENDER_CHEST);
     }
 }

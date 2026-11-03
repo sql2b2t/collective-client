@@ -13,7 +13,7 @@ public class Welcomer extends HudModule {
     public final StringSetting text = add(new StringSetting("CustomText", ""));
 
     public Welcomer() {
-        super("Welcomer", "Displays a welcoming message.", 300, 4);
+        super("Welcomer", "Отображает приветственное сообщение на экране.", 300, 4);
     }
 
     @Override

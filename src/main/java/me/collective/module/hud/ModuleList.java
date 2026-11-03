@@ -24,7 +24,7 @@ public class ModuleList extends HudModule {
     public final EnumSetting<SortMode> sort = add(new EnumSetting<>("Sort", SortMode.LENGTH));
 
     public ModuleList() {
-        super("ModuleList", "Displays active client modules.", 4, 30);
+        super("ModuleList", "Отображает список включённых модулей чита (Arraylist).", 4, 30);
     }
 
     /** Строка списка: ширина посчитана один раз на пересборку, а не на каждый кадр. */

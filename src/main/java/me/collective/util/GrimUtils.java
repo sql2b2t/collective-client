@@ -6,6 +6,7 @@ import net.minecraft.entity.EntityPose;
 import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.PlayerInput;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 
@@ -50,6 +51,10 @@ public final class GrimUtils {
         return new double[]{standing, sneaking, swimming};
     }
 
+    public static double closestEyeDistanceSqTo(PlayerEntity player, BlockPos pos) {
+        return closestEyeDistanceSqTo(player, Vec3d.ofCenter(pos));
+    }
+
     public static double closestEyeDistanceSqTo(PlayerEntity player, Vec3d target) {
         Vec3d base = player.getEntityPos();
         double best = Double.MAX_VALUE;
@@ -91,9 +96,10 @@ public final class GrimUtils {
     public static int nextSequence() {
         if (mc.world == null) return 0;
 
-        PendingUpdateManager manager = mc.world.getPendingUpdateManager();
-        int seq = manager.incrementSequence().getSequence();
-        manager.close();
-        return seq;
+        // try-with-resources: иначе исключение из incrementSequence() утекает
+        // менеджер вместе с его счётчиком последовательности.
+        try (PendingUpdateManager manager = mc.world.getPendingUpdateManager()) {
+            return manager.incrementSequence().getSequence();
+        }
     }
 }

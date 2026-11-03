@@ -41,7 +41,7 @@ public class AxisViewer extends Module {
     public final ColorSetting endColor = add(new ColorSetting("EndColor", new Color(225, 25, 25, 255)));
 
     public AxisViewer() {
-        super("AxisViewer", "Displays world axes.", Category.HIGHWAY);
+        super("AxisViewer", "Отображает мировые оси координат X, Y и Z.", Category.HIGHWAY);
     }
 
     @EventHandler

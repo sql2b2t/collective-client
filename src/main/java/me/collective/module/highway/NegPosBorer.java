@@ -6,7 +6,7 @@ import net.minecraft.util.math.BlockPos;
 
 public class NegPosBorer extends BorerModule {
     public NegPosBorer() {
-        super("NegPosBorer", "Digs -X +Z highway.", 1, 2, -2, 2);
+        super("NegPosBorer", "Копает диагональный хайвей в направлении -X +Z.", 1, 2, -2, 2);
     }
 
     @Override

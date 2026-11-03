@@ -23,4 +23,16 @@ public abstract class MixinGameRenderer {
             ci.cancel();
         }
     }
+
+    @Inject(method = "getFov", at = @At("RETURN"), cancellable = true)
+    private void collective$onGetFov(net.minecraft.client.render.Camera camera, float tickDelta, boolean changingFov, org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Float> cir) {
+        me.collective.module.render.Zoom zoom = me.collective.module.render.Zoom.INSTANCE;
+        if (zoom != null) {
+            float modified = zoom.modifyFov(cir.getReturnValueF(), tickDelta);
+            if (modified != cir.getReturnValueF()) {
+                cir.setReturnValue(modified);
+            }
+        }
+    }
 }
+

@@ -12,8 +12,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class EventBus {
     public static final EventBus INSTANCE = new EventBus();
+
+    private static final Logger LOG = LoggerFactory.getLogger(EventBus.class);
 
     public static class Listener {
         public final Object target;
@@ -63,6 +68,9 @@ public class EventBus {
                 BiConsumer<Object, Object> consumer = (BiConsumer<Object, Object>) site.getTarget().invokeExact();
                 return consumer;
             } catch (Throwable t) {
+                // Не критично: остаёмся на рефлексии, но причину фиксируем.
+                LOG.debug("LambdaMetafactory invoker failed for {}.{}, falling back to reflection",
+                        method.getDeclaringClass().getSimpleName(), method.getName(), t);
                 return null;
             }
         }
@@ -72,9 +80,13 @@ public class EventBus {
                 if (this.invoker != null) this.invoker.accept(this.target, event);
                 else this.method.invoke(this.target, event);
             } catch (InvocationTargetException e) {
-                e.getCause().printStackTrace();
+                LOG.warn("Event listener {}#{} failed on {}",
+                        target.getClass().getSimpleName(), method.getName(), event.getClass().getSimpleName(),
+                        e.getCause());
             } catch (Throwable t) {
-                t.printStackTrace();
+                LOG.warn("Event listener {}#{} failed on {}",
+                        target.getClass().getSimpleName(), method.getName(), event.getClass().getSimpleName(),
+                        t);
             }
         }
     }
@@ -131,13 +143,22 @@ public class EventBus {
         }
     }
 
+    /**
+     * Рассылает событие слушателям. Обходится вся иерархия класса события
+     * вверх до Object, поэтому слушатель, подписанный на базовый класс
+     * (например, общий тип группы событий), тоже получает доставку.
+     * На данный момент все подписки используют точные классы — путь по
+     * иерархии просто сокращается до первого шага.
+     */
     public void post(Object event) {
         if (event == null) return;
 
-        List<Listener> listeners = listenersMap.get(event.getClass());
-        if (listeners != null) {
-            for (Listener listener : listeners) {
-                listener.invoke(event);
+        for (Class<?> type = event.getClass(); type != null && type != Object.class; type = type.getSuperclass()) {
+            List<Listener> listeners = listenersMap.get(type);
+            if (listeners != null) {
+                for (Listener listener : listeners) {
+                    listener.invoke(event);
+                }
             }
         }
     }

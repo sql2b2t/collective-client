@@ -59,7 +59,7 @@ public class AutoWither extends Module {
                 ItemStack stack = mc.player.getInventory().getStack(i);
                 if (stack.isEmpty()) continue;
 
-                if (stack.getItem() == Items.SOUL_SAND) {
+                if (stack.getItem() == Items.SOUL_SAND || stack.getItem() == Items.SOUL_SOIL) {
                     soulSandCount += stack.getCount();
                 } else if (stack.getItem() == Items.WITHER_SKELETON_SKULL) {
                     skullCount += stack.getCount();
@@ -222,7 +222,9 @@ public class AutoWither extends Module {
     }
 
     private void placeSoulBlock(BlockPos pos) {
-        Item soulBlock = hasSoulSandHotbar() ? Items.SOUL_SAND : Items.SOUL_SOIL;
+        int sandSlot = findHotbarSlot(Items.SOUL_SAND);
+        int soilSlot = findHotbarSlot(Items.SOUL_SOIL);
+        Item soulBlock = sandSlot != -1 ? Items.SOUL_SAND : (soilSlot != -1 ? Items.SOUL_SOIL : Items.SOUL_SAND);
         placeBlock(pos, soulBlock);
     }
 

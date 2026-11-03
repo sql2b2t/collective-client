@@ -22,7 +22,7 @@ public class AutoLog extends Module {
     public final NumberSetting playerRange = add(new NumberSetting("PlayerRange", 15.0, 5.0, 64.0, 1.0));
 
     public AutoLog() {
-        super("AutoLog", "Automatically disconnects from the server to save your life and gear on 2b2t.", Category.COMBAT);
+        super("AutoLog", "Автоматически выходит с сервера при критическом здоровье или опасности, спасая вещи.", Category.COMBAT);
     }
 
     @EventHandler
@@ -76,6 +76,7 @@ public class AutoLog extends Module {
 
     private void disconnect(String reason) {
         setToggled(false);
+        me.collective.module.misc.AutoReconnect.markAfkLogout();
         if (mc.getNetworkHandler() != null && mc.getNetworkHandler().getConnection() != null) {
             mc.getNetworkHandler().getConnection().disconnect(Text.literal("§c[AutoLog] §f" + reason));
         }

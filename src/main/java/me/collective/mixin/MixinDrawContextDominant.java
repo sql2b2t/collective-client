@@ -41,31 +41,38 @@ public abstract class MixinDrawContextDominant {
         }
 
         if (!module.majorityActive()) return;
-        if (module.dominantEntries().isEmpty()) return;
+        if (stack == null || stack.isEmpty()) return;
 
-        for (DominantStacks.Entry entry : module.dominantEntries()) {
-            if (entry.container() != stack || entry.dominant() == null) continue;
-            if (entry.dominant().isEmpty()) continue;
+        ItemStack dominant = DominantStacks.getDominant(stack);
+        if (dominant == null || dominant.isEmpty()) return;
 
-            drawDistorted(entry.dominant(), x, y);
-            return;
-        }
+        renderDominantItem(dominant, x, y, module.getMajorityMode(), module.getMajorityPosition());
     }
 
-    /** Иконка доминирующего предмета с искажением оригинала. */
-    private void drawDistorted(ItemStack stack, int x, int y) {
+    /**
+     * Отрисовывает доминирующий предмет поверх контейнера (шаposition/мешка).
+     */
+    private void renderDominantItem(ItemStack dominant, int x, int y, Tooltips.MajorityMode mode, Tooltips.MajorityPosition position) {
         DrawContext context = (DrawContext) (Object) this;
 
-        var matrices = context.getMatrices();
+        if (mode == Tooltips.MajorityMode.FULL) {
+            context.drawItem(dominant, x, y);
+        } else {
+            // Миниатюра 10×10 (scale = 10/16 = 0.625)
+            var matrices = context.getMatrices();
+            matrices.pushMatrix();
 
-        matrices.pushMatrix();
-        // тот же сдвиг, что давали хуки на translate в оригинале
-        matrices.translate(x + 3.5f, y - 4.0f);
-        // тот же масштаб; отрицательный Y зеркалит иконку по вертикали
-        matrices.scale(10.0f, -10.0f);
+            if (position == Tooltips.MajorityPosition.CENTER) {
+                // По центру слота
+                matrices.translate(x + 3.0f, y + 3.0f);
+            } else {
+                // В правом верхнем углу слота
+                matrices.translate(x + 6.0f, y + 0.5f);
+            }
 
-        context.drawItem(stack, 0, 0);
-
-        matrices.popMatrix();
+            matrices.scale(0.625f, 0.625f);
+            context.drawItem(dominant, 0, 0);
+            matrices.popMatrix();
+        }
     }
 }

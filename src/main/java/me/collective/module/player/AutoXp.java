@@ -4,6 +4,7 @@ import me.collective.category.Category;
 import me.collective.event.EventHandler;
 import me.collective.event.events.TickEvent;
 import me.collective.module.Module;
+import me.collective.setting.BooleanSetting;
 import me.collective.setting.NumberSetting;
 import me.collective.util.FindItemResult;
 import me.collective.util.InventoryUtil;
@@ -22,6 +23,7 @@ public class AutoXp extends Module {
     public final NumberSetting durabilityThreshold = add(new NumberSetting("DurabilityThreshold", 70, 1, 99, 1));
     public final NumberSetting keepLevel = add(new NumberSetting("KeepLevel", 0, 0, 100, 1));
     public final NumberSetting cooldown = add(new NumberSetting("Cooldown", 8, 1, 40, 1));
+    public final BooleanSetting lookDown = add(new BooleanSetting("LookDown", true));
 
     private int timer = 0;
 
@@ -37,13 +39,20 @@ public class AutoXp extends Module {
     @EventHandler
     private void onTick(TickEvent.Pre event) {
         if (mc.player == null || mc.world == null) return;
-        if (timer-- > 0) return;
+        if (timer > 0) {
+            timer--;
+            return;
+        }
         if (mc.player.experienceLevel < keepLevel.getIntValue()) return;
 
         FindItemResult bottle = InventoryUtil.findInHotbar(Items.EXPERIENCE_BOTTLE);
         if (!bottle.found()) return;
 
         if (!needsMending()) return;
+
+        if (lookDown.getValue()) {
+            me.collective.util.RotationUtils.setServerRotation(mc.player.getYaw(), 90.0f);
+        }
 
         InventoryUtil.swap(bottle.slot(), true);
         mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);

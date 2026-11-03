@@ -238,7 +238,7 @@ public class HighwayBuilderHIG extends Module {
     private float tickRate = 20f;
 
     public HighwayBuilderHIG() {
-        super("HighwayBuilderHIG", "Automatically builds highways.", Category.HIGHWAY);
+        super("HighwayBuilderHIG", "Автоматически строит дорожное полотно хайвеев.", Category.HIGHWAY);
         INSTANCE = this;
     }
 
@@ -565,6 +565,24 @@ public class HighwayBuilderHIG extends Module {
         rotateTo(yp[0], yp[1]);
     }
 
+    public static Direction getInteractDirection(BlockPos pos) {
+        if (mc.player == null) return Direction.UP;
+        Vec3d eyePos = mc.player.getEyePos();
+        Vec3d posVec = Vec3d.ofCenter(pos);
+        Direction bestDir = Direction.UP;
+        double bestDot = -Double.MAX_VALUE;
+
+        for (Direction dir : Direction.values()) {
+            Vec3d dirVec = Vec3d.of(dir.getVector());
+            double dot = eyePos.subtract(posVec).normalize().dotProduct(dirVec);
+            if (dot > bestDot) {
+                bestDot = dot;
+                bestDir = dir;
+            }
+        }
+        return bestDir;
+    }
+
     /** Ставит блок с опорой на соседний цельный блок. */
     private boolean placeBlock(BlockPos pos, int hotbarSlot) {
         if (mc.player == null || mc.world == null || mc.interactionManager == null) return false;
@@ -577,9 +595,11 @@ public class HighwayBuilderHIG extends Module {
                 return false;
             }
             Direction side = dir.getOpposite();
-            Vec3d hitVec = new Vec3d(neighbor.getX() + 0.5 + side.getOffsetX() * 0.5,
-                neighbor.getY() + 0.5 + side.getOffsetY() * 0.5,
-                neighbor.getZ() + 0.5 + side.getOffsetZ() * 0.5);
+            Vec3d hitVec = new Vec3d(neighbor.getX() + 0.5 + side.getOffsetX() * 0.45,
+                neighbor.getY() + 0.5 + side.getOffsetY() * 0.45,
+                neighbor.getZ() + 0.5 + side.getOffsetZ() * 0.45);
+
+            if (me.collective.util.GrimUtils.closestEyeDistanceSqTo(mc.player, hitVec) > 18.0) continue;
 
             InventoryUtil.swap(hotbarSlot, true);
             if (rotation.getValue().place) {
@@ -599,8 +619,12 @@ public class HighwayBuilderHIG extends Module {
 
     private boolean breakBlockAt(BlockPos bp) {
         if (mc.player == null || mc.interactionManager == null) return false;
-        if (rotation.getValue().mine) rotateTo(bp);
-        boolean started = mc.interactionManager.attackBlock(bp, Direction.UP);
+        Direction dir = getInteractDirection(bp);
+        if (rotation.getValue().mine) {
+            float[] yp = lookAt(bp);
+            rotateTo(yp[0], yp[1]);
+        }
+        boolean started = mc.interactionManager.attackBlock(bp, dir);
         if (mc.getNetworkHandler() != null) {
             mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
         }
@@ -609,7 +633,9 @@ public class HighwayBuilderHIG extends Module {
 
     private void sendAction(PlayerActionC2SPacket.Action action, BlockPos bp) {
         if (mc.getNetworkHandler() != null) {
-            mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(action, bp, Direction.UP));
+            Direction dir = getInteractDirection(bp);
+            int seq = me.collective.util.GrimUtils.nextSequence();
+            mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(action, bp, dir, seq));
         }
     }
 
@@ -838,7 +864,6 @@ public class HighwayBuilderHIG extends Module {
         if (slot == -1) return -1;
 
         movePairToHotbar(slot, hotbarSlot);
-        dropCursor();
 
         return hotbarSlot;
     }
@@ -881,7 +906,6 @@ public class HighwayBuilderHIG extends Module {
         if (hotbarSlot == -1) return -1;
 
         movePairToHotbar(bestSlot, hotbarSlot);
-        dropCursor();
 
         return hotbarSlot;
     }
@@ -955,7 +979,7 @@ public class HighwayBuilderHIG extends Module {
         return slot != -1 ? slot : findBlocksToPlace();
     }
 
-    /** PICKUP-пара: слот инвентаря -> слот хотбара. */
+    /** PICKUP-пара: слот инвентаря -> слот хотбара с возвратом вытесненного предмета в исходный слот. */
     private void movePairToHotbar(int fromInv, int toHotbar) {
         if (mc.player == null || mc.interactionManager == null) return;
         int from = fromInv < 9 ? 36 + fromInv : fromInv;
@@ -964,6 +988,9 @@ public class HighwayBuilderHIG extends Module {
         int syncId = mc.player.currentScreenHandler.syncId;
         mc.interactionManager.clickSlot(syncId, from, 0, SlotActionType.PICKUP, mc.player);
         mc.interactionManager.clickSlot(syncId, to, 0, SlotActionType.PICKUP, mc.player);
+        if (!mc.player.currentScreenHandler.getCursorStack().isEmpty()) {
+            mc.interactionManager.clickSlot(syncId, from, 0, SlotActionType.PICKUP, mc.player);
+        }
     }
 
     private void quickMove(int containerSlot) {
@@ -1531,12 +1558,16 @@ public class HighwayBuilderHIG extends Module {
                     }
 
                     if (!EChestMemory.isKnown()) {
+                        Direction interactDir = getInteractDirection(bp);
+                        Vec3d hitVec = new Vec3d(bp.getX() + 0.5 + interactDir.getOffsetX() * 0.45,
+                            bp.getY() + 0.5 + interactDir.getOffsetY() * 0.45,
+                            bp.getZ() + 0.5 + interactDir.getOffsetZ() * 0.45);
                         if (b.rotation.getValue().place) {
-                            float[] yp = b.lookAt(bp);
+                            float[] yp = b.lookAt(b.mc.player.getEyePos(), hitVec);
                             b.rotateTo(yp[0], yp[1]);
                         }
                         b.mc.interactionManager.interactBlock(b.mc.player, Hand.MAIN_HAND,
-                            new BlockHitResult(new Vec3d(bp.getX() + 0.5, bp.getY() + 0.5, bp.getZ() + 0.5), Direction.UP, bp, false));
+                            new BlockHitResult(hitVec, interactDir, bp, false));
                         return;
                     }
 
@@ -1597,10 +1628,14 @@ public class HighwayBuilderHIG extends Module {
 
                     if (!first) primed = true;
 
-                    BlockHitResult hit = new BlockHitResult(new Vec3d(bp.getX() + 0.5, bp.getY() + 0.5, bp.getZ() + 0.5), Direction.UP, bp, false);
+                    Direction placeDir = getInteractDirection(bp);
+                    Vec3d hitVec = new Vec3d(bp.getX() + 0.5 + placeDir.getOffsetX() * 0.45,
+                        bp.getY() + 0.5 + placeDir.getOffsetY() * 0.45,
+                        bp.getZ() + 0.5 + placeDir.getOffsetZ() * 0.45);
+                    BlockHitResult hit = new BlockHitResult(hitVec, placeDir, bp, false);
                     InventoryUtil.swap(slot);
                     if (b.rotation.getValue().place) {
-                        float[] yp = b.lookAt(bp);
+                        float[] yp = b.lookAt(b.mc.player.getEyePos(), hitVec);
                         b.rotateTo(yp[0], yp[1]);
                     }
                     b.mc.interactionManager.interactBlock(b.mc.player, Hand.MAIN_HAND, hit);
@@ -1888,14 +1923,18 @@ public class HighwayBuilderHIG extends Module {
                         b.rotateTo(yp[0], yp[1]);
                     }
                     b.breakBlockAt(bp);
-                } else {
+                    Direction dir = getInteractDirection(bp);
+                    Vec3d hitVec = new Vec3d(bp.getX() + 0.5 + dir.getOffsetX() * 0.45,
+                        bp.getY() + 0.5 + dir.getOffsetY() * 0.45,
+                        bp.getZ() + 0.5 + dir.getOffsetZ() * 0.45);
+                    InventoryUtil.swap(slot);
                     if (b.rotation.getValue().place) {
-                        float[] yp = b.lookAt(bp);
+                        float[] yp = b.lookAt(b.mc.player.getEyePos(), hitVec);
                         b.rotateTo(yp[0], yp[1]);
                     }
                     b.mc.interactionManager.interactBlock(b.mc.player, Hand.MAIN_HAND,
-                        new BlockHitResult(new Vec3d(bp.getX() + 0.5, bp.getY() + 0.5, bp.getZ() + 0.5), Direction.UP, bp, false));
-                    InventoryUtil.swap(slot);
+                        new BlockHitResult(hitVec, dir, bp, false));
+                    b.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
                     delayTimer = b.inventoryDelay.getIntValue();
                 }
             }
@@ -2700,8 +2739,11 @@ public class HighwayBuilderHIG extends Module {
 
         public DoubleMineBlock startDestroying() {
             if (b.mc.getNetworkHandler() != null) {
+                Direction dir = getInteractDirection(this.blockPos);
+                int seq = me.collective.util.GrimUtils.nextSequence();
                 b.mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
-                    PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, this.blockPos, Direction.UP));
+                    PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, this.blockPos, dir, seq));
+                b.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
             }
             normalStartTime = b.mc.player.age;
             return this;
@@ -2709,8 +2751,15 @@ public class HighwayBuilderHIG extends Module {
 
         public DoubleMineBlock stopDestroying() {
             if (b.mc.getNetworkHandler() != null) {
+                Direction dir = getInteractDirection(this.blockPos);
+                int seq = me.collective.util.GrimUtils.nextSequence();
+                if (b.rotation.getValue().mine) {
+                    float[] yp = b.lookAt(this.blockPos);
+                    b.rotateTo(yp[0], yp[1]);
+                }
                 b.mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
-                    PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK, this.blockPos, Direction.UP));
+                    PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK, this.blockPos, dir, seq));
+                b.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
             }
             return this;
         }
@@ -2722,7 +2771,7 @@ public class HighwayBuilderHIG extends Module {
         }
 
         public boolean isReady() {
-            return progress() >= (b.fastBreak.getValue() ? 0.7 : 1.0);
+            return progress() >= 1.0;
         }
 
         public boolean shouldRemove() {

@@ -4,6 +4,7 @@ import me.collective.gui.ContainerPreviewScreen;
 import me.collective.setting.Setting;
 import me.collective.setting.SettingGroup;
 import me.collective.setting.BoolSetting;
+import me.collective.setting.EnumSetting;
 
 import me.collective.module.tooltips.ContainerContents;
 import me.collective.module.tooltips.ContainerTooltipComponent;
@@ -77,10 +78,32 @@ public class Tooltips extends Module {
             .defaultValue(true)
             .build());
 
+    public enum MajorityMode {
+        MINI, FULL
+    }
+
+    public enum MajorityPosition {
+        TOP_RIGHT, CENTER
+    }
+
     private final Setting<Boolean> majorityItem = sgMain.add(new BoolSetting.Builder()
             .name("majorityItem")
             .description("Подменять иконку шилкера в слоте доминирующим предметом.")
-            .defaultValue(false)
+            .defaultValue(true)
+            .build());
+
+    private final Setting<MajorityMode> majorityMode = sgMain.add(new EnumSetting.Builder<MajorityMode>()
+            .name("majorityMode")
+            .description("Режим отображения: миниатюра (Mini) или полная замена (Full).")
+            .defaultValue(MajorityMode.MINI)
+            .visible(() -> majorityItem.get())
+            .build());
+
+    private final Setting<MajorityPosition> majorityPos = sgMain.add(new EnumSetting.Builder<MajorityPosition>()
+            .name("majorityPosition")
+            .description("Позиция миниатюры: правый верхний угол (TopRight) или центр (Center).")
+            .defaultValue(MajorityPosition.TOP_RIGHT)
+            .visible(() -> majorityItem.get() && majorityMode.get() == MajorityMode.MINI)
             .build());
 
     private final Setting<Boolean> keepText = sgMain.add(new BoolSetting.Builder()
@@ -182,6 +205,14 @@ public class Tooltips extends Module {
     /** Активен ли режим подмены иконок. */
     public boolean majorityActive() {
         return majorityItem.get() && isActive();
+    }
+
+    public MajorityMode getMajorityMode() {
+        return majorityMode != null ? majorityMode.get() : MajorityMode.MINI;
+    }
+
+    public MajorityPosition getMajorityPosition() {
+        return majorityPos != null ? majorityPos.get() : MajorityPosition.TOP_RIGHT;
     }
 
     // ── Сборка тултипа ──

@@ -5,3 +5,6 @@ run/
 *.iml
 .vscode/
 bin/
+logs/
+tests/
+*.class

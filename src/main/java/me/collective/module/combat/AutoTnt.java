@@ -101,16 +101,29 @@ public class AutoTnt extends Module {
                 originalSlot = mc.player.getInventory().selectedSlot;
             }
 
-            FindItemResult flint = InventoryUtil.findInHotbar(Items.FLINT_AND_STEEL);
-            flintSlot = flint.slot();
-            if (flintSlot == -1 || flintSlot == 40) {
-                sendClientMessage("§cЗажигалка не найдена в хотбаре!");
+            FindItemResult flint = InventoryUtil.findInHotbarOrOffhand(Items.FLINT_AND_STEEL, Items.FIRE_CHARGE);
+            if (!flint.found()) {
+                sendClientMessage("§cЗажигалка или огненный заряд не найдены!");
                 ignitePos = null;
                 originalSlot = -1;
                 flintSlot = -1;
                 return;
             }
 
+            if (flint.isOffhand()) {
+                igniting = true;
+                Vec3d hitVec = Vec3d.ofCenter(ignitePos);
+                BlockHitResult hit = new BlockHitResult(hitVec, Direction.UP, ignitePos, false);
+                mc.interactionManager.interactBlock(mc.player, Hand.OFF_HAND, hit);
+                mc.player.swingHand(Hand.OFF_HAND);
+                ignitePos = null;
+                flintSlot = -1;
+                originalSlot = -1;
+                igniting = false;
+                return;
+            }
+
+            flintSlot = flint.slot();
             mc.player.getInventory().selectedSlot = flintSlot;
             if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
             return;
@@ -154,31 +167,36 @@ public class AutoTnt extends Module {
 
         ignitionQueue.addAll(updated);
 
-        FindItemResult flint = InventoryUtil.findInHotbar(Items.FLINT_AND_STEEL);
-        int flintSlotFound = flint.slot();
-        if (flintSlotFound == -1 || flintSlotFound == 40) {
-            sendClientMessage("§cЗажигалка не найдена в хотбаре!");
+        FindItemResult flint = InventoryUtil.findInHotbarOrOffhand(Items.FLINT_AND_STEEL, Items.FIRE_CHARGE);
+        if (!flint.found()) {
+            sendClientMessage("§cЗажигалка или огненный заряд не найдены!");
             readyList.clear();
             ignitionQueue.clear();
             return;
         }
-        for (IgnitionTask task : readyList) igniteNow(task.pos(), flintSlotFound);
+        for (IgnitionTask task : readyList) igniteNow(task.pos(), flint);
     }
 
-    private void igniteNow(BlockPos pos, int flint) {
+    private void igniteNow(BlockPos pos, FindItemResult flint) {
         if (mc.player.getEyePos().distanceTo(Vec3d.ofCenter(pos)) > reach.getValue()) return;
         igniting = true;
-        int prevSlot = mc.player.getInventory().selectedSlot;
-        mc.player.getInventory().selectedSlot = flint;
-        if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
-
         Vec3d hitVec = Vec3d.ofCenter(pos);
         BlockHitResult hit = new BlockHitResult(hitVec, Direction.UP, pos, false);
-        mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
-        mc.player.swingHand(Hand.MAIN_HAND);
 
-        mc.player.getInventory().selectedSlot = prevSlot;
-        if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
+        if (flint.isOffhand()) {
+            mc.interactionManager.interactBlock(mc.player, Hand.OFF_HAND, hit);
+            mc.player.swingHand(Hand.OFF_HAND);
+        } else {
+            int prevSlot = mc.player.getInventory().selectedSlot;
+            mc.player.getInventory().selectedSlot = flint.slot();
+            if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
+
+            mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
+            mc.player.swingHand(Hand.MAIN_HAND);
+
+            mc.player.getInventory().selectedSlot = prevSlot;
+            if (mc.interactionManager != null) mc.interactionManager.syncSelectedSlot();
+        }
         igniting = false;
     }
 

@@ -1,11 +1,14 @@
 package me.collective.module;
 
 import me.collective.category.Category;
+import me.collective.event.EventBus;
 import me.collective.setting.KeybindSetting;
 import me.collective.setting.Setting;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import org.lwjgl.glfw.GLFW;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,6 +16,8 @@ import java.util.List;
 public abstract class Module {
     protected static final MinecraftClient mc = MinecraftClient.getInstance();
     public static final MinecraftClient client = mc;
+
+    private static final Logger LOG = LoggerFactory.getLogger(Module.class);
 
     private final String name;
     private final String description;
@@ -67,11 +72,11 @@ public abstract class Module {
         if (this.toggled != toggled) {
             this.toggled = toggled;
             if (toggled) {
-                me.collective.event.EventBus.INSTANCE.subscribe(this);
+                EventBus.INSTANCE.subscribe(this);
                 onEnable();
                 onActivate();
             } else {
-                me.collective.event.EventBus.INSTANCE.unsubscribe(this);
+                EventBus.INSTANCE.unsubscribe(this);
                 onDisable();
                 onDeactivate();
             }
@@ -80,7 +85,10 @@ public abstract class Module {
             }
             try {
                 me.collective.config.ConfigManager.getInstance().markDirty();
-            } catch (Throwable ignored) {
+            } catch (Throwable t) {
+                // Конфиг-менеджер — самостоятельный сервис: его сбой не должен
+                // ломать переключение модуля, но причина обязана остаться в логе.
+                LOG.warn("markDirty failed after toggling {}", getName(), t);
             }
         }
     }
@@ -112,9 +120,7 @@ public abstract class Module {
 
     public void info(String msg) {
         me.collective.command.ChatHelper.sendMessage(net.minecraft.text.Text.literal("§7[§b" + getName() + "§7] §f" + msg));
-    }
-
-    public void info(String format, Object... args) {
+    }    public void info(String format, Object... args) {
         info(String.format(format, args));
     }
 

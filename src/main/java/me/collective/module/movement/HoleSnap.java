@@ -125,6 +125,13 @@ public class HoleSnap extends Module {
     private void onMove(PlayerMoveEvent event) {
         if (!this.active || this.target == null || mc.player == null) return;
 
+        double hDistSq = (this.target.x - mc.player.getX()) * (this.target.x - mc.player.getX())
+                + (this.target.z - mc.player.getZ()) * (this.target.z - mc.player.getZ());
+        if (hDistSq < 0.08 && mc.player.getY() > this.target.y && !mc.player.isOnGround()) {
+            event.movement = new Vec3d(0, Math.min(event.movement.y, -0.4), 0);
+            return;
+        }
+
         Vec3d delta = this.target.subtract(playerPos());
         double length = delta.length();
         if (length < 1.0E-4) return;
@@ -144,7 +151,7 @@ public class HoleSnap extends Module {
     }
 
     private boolean blocked() {
-        if (mc.player.isInSneakingPose() || mc.player.isSpectator() || mc.player.isGliding()) return true;
+        if (mc.player.isSpectator() || mc.player.isGliding()) return true;
 
         double limit = this.maxPitch.getValue();
         if (limit != 0.0 && mc.player.getPitch() < limit) return true;

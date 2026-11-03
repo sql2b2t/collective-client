@@ -21,7 +21,7 @@ public class Notifications extends Module {
     public final NumberSetting delay = add(new NumberSetting("Delay", 0.0, 0.0, 5.0, 0.1));
 
     public Notifications() {
-        super("Notifications", "Lets you know about what's going on in chat.", Category.CLIENT);
+        super("Notifications", "Всплывающие уведомления о событиях, модулях и сообщениях.", Category.CLIENT);
         INSTANCE = this;
         setToggled(true);
     }

@@ -51,6 +51,7 @@ public class Search extends Module {
     private static final Set<Block> STORAGE = Set.of(
         Blocks.CHEST, Blocks.TRAPPED_CHEST, Blocks.BARREL,
         Blocks.ENDER_CHEST, Blocks.HOPPER, Blocks.FURNACE,
+        Blocks.DISPENSER, Blocks.DROPPER, Blocks.CRAFTER,
         Blocks.SHULKER_BOX, Blocks.WHITE_SHULKER_BOX, Blocks.ORANGE_SHULKER_BOX,
         Blocks.MAGENTA_SHULKER_BOX, Blocks.LIGHT_BLUE_SHULKER_BOX, Blocks.YELLOW_SHULKER_BOX,
         Blocks.LIME_SHULKER_BOX, Blocks.PINK_SHULKER_BOX, Blocks.GRAY_SHULKER_BOX,

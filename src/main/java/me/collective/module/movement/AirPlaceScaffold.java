@@ -345,17 +345,14 @@ public class AirPlaceScaffold extends Module {
 
         BlockHitResult wire = new BlockHitResult(hit.getPos(), hit.getSide(), pos, false);
 
-        connection.sendPacket(new PlayerActionC2SPacket(
-            PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, BlockPos.ORIGIN, Direction.DOWN));
         connection.sendPacket(new PlayerInteractBlockC2SPacket(hand, wire, GrimUtils.nextSequence()));
         connection.sendPacket(new HandSwingC2SPacket(hand));
-        connection.sendPacket(new PlayerActionC2SPacket(
-            PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, BlockPos.ORIGIN, Direction.DOWN));
 
         if (predicted != null) {
             mc.world.setBlockState(pos, predicted, 11);
         }
     }
+
 
     private BlockState predictedState(FindItemResult item) {
         ItemStack stack = item.isOffhand()
@@ -413,8 +410,9 @@ public class AirPlaceScaffold extends Module {
         if (t < 0.0 || t > REACH) return false;
 
         Vec3d intersection = eye.add(ray.multiply(t));
-        return intersection.squaredDistanceTo(planePoint) <= 0.25 * 0.25;
+        return intersection.squaredDistanceTo(planePoint) <= 0.65 * 0.65;
     }
+
 
     private double eyeCenterDistanceSq(BlockPos pos) {
         return mc.player.getEyePos().squaredDistanceTo(

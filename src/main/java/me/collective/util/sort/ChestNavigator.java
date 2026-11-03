@@ -300,7 +300,7 @@ public final class ChestNavigator {
     @Nullable
     private static BlockHitResult trace(Vec3d eye, BlockPos pos) {
         VoxelShape shape = net.minecraft.client.MinecraftClient.getInstance().world.getBlockState(pos).getOutlineShape(net.minecraft.client.MinecraftClient.getInstance().world, pos);
-        Box box = shape.isEmpty() ? new Box(pos) : shape.getBoundingBox();
+        Box box = shape.isEmpty() ? new Box(pos) : shape.getBoundingBox().offset(pos);
         Vec3d aim = new Vec3d(clamp(eye.x, box.minX, box.maxX), clamp(eye.y, box.minY, box.maxY), clamp(eye.z, box.minZ, box.maxZ));
         Vec3d dir = aim.subtract(eye);
         double len = dir.length();

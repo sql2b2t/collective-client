@@ -8,16 +8,22 @@ import me.collective.setting.BooleanSetting;
 
 public class Sprint extends Module {
     public final BooleanSetting omni = add(new BooleanSetting("Omni", false));
+    public final BooleanSetting grimSafe = add(new BooleanSetting("GrimSafe", true));
 
     public Sprint() {
-        super("Sprint", "Automatically sprints whenever you are moving.", Category.MOVEMENT);
+        super("Sprint", "Автоматический спринт при любом движении игрока.", Category.MOVEMENT);
     }
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
         if (mc.player == null) return;
+        if (mc.player.isSneaking() || mc.player.getHungerManager().getFoodLevel() <= 6) return;
 
-        if (omni.getValue()) {
+        if (grimSafe.getValue()) {
+            if (mc.player.input.hasForwardMovement() && !mc.player.horizontalCollision) {
+                mc.player.setSprinting(true);
+            }
+        } else if (omni.getValue()) {
             if (mc.player.input.hasForwardMovement() || Math.abs(mc.player.input.getMovementInput().x) > 0) {
                 mc.player.setSprinting(true);
             }

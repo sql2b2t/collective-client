@@ -72,7 +72,7 @@ void main() {
     vec4 overlay = texture(u_Overlay, v_TexCoord * vec2(1.0, -1.0));
 
     if (center.a != 0.0) {
-        if (u_ShapeMode == 0.0 || overlay.a == 0.0) discard;
+        if (u_ShapeMode == 0.0 || (u_Image && overlay.a == 0.0)) discard;
         if (decorator()) {
             center = vec4(u_FillColor.rgb, u_DotsAlpha);
         } else if (u_Image) {
@@ -109,5 +109,6 @@ void main() {
         }
     }
 
+    if (center.a == 0.0) discard;
     color = center;
 }

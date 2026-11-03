@@ -24,6 +24,13 @@ public class EnumSetting<T extends Enum<T>> extends Setting<T> {
         setValue(values[next]);
     }
 
+    public void cycleReverse() {
+        int index = getValue().ordinal();
+        int prev = (index - 1 + values.length) % values.length;
+        setValue(values[prev]);
+    }
+
+
     public boolean setByName(String name) {
         for (T val : values) {
             if (val.name().equalsIgnoreCase(name)) {

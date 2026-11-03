@@ -21,7 +21,7 @@ public class Colors extends Module {
     }
 
     public Colors() {
-        super("Colors", "Manages the client's global color system and theme.", Category.CLIENT);
+        super("Colors", "Глобальная цветовая палитра и темы оформления интерфейса клиента.", Category.CLIENT);
         INSTANCE = this;
         setToggled(true);
 

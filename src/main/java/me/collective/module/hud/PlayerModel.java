@@ -11,7 +11,7 @@ public class PlayerModel extends HudModule {
     public final NumberSetting size = add(new NumberSetting("Size", 30, 15, 60, 1));
 
     public PlayerModel() {
-        super("PlayerModel", "Displays a 3D model of your player on HUD.", 20, 200);
+        super("PlayerModel", "Отображает 3D-модель вашего персонажа на экране.", 20, 200);
         this.width = 40;
         this.height = 70;
     }

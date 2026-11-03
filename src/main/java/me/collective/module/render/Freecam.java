@@ -23,7 +23,7 @@ public class Freecam extends Module {
     private float prevPitch = 0f;
 
     public Freecam() {
-        super("Freecam", "Detaches the camera from your player allowing free noclip exploration.", Category.RENDER);
+        super("Freecam", "Отсоединяет камеру от игрока для свободного полёта сквозь стены.", Category.RENDER);
         INSTANCE = this;
     }
 

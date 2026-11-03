@@ -47,13 +47,13 @@ public abstract class CollectiveAddon {
     public void onShutdown() {
         // Автоматически очищаем зарегистрированные модули и команды при выгрузке аддона
         for (Module m : registeredModules) {
-            if (m.isToggled()) m.setToggled(false);
-            ModuleManager.INSTANCE.getModules().remove(m);
+            // unregister снимает с регистрации, выключает модуль и отписывает его от EventBus
+            ModuleManager.INSTANCE.unregister(m);
         }
         registeredModules.clear();
 
         for (Command c : registeredCommands) {
-            CommandManager.INSTANCE.getCommands().remove(c);
+            CommandManager.INSTANCE.unregister(c);
         }
         registeredCommands.clear();
 

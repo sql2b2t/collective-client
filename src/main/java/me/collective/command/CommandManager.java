@@ -12,8 +12,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class CommandManager {
     public static final CommandManager INSTANCE = new CommandManager();
+
+    private static final Logger LOG = LoggerFactory.getLogger(CommandManager.class);
 
     private final List<Command> commands = new ArrayList<>();
     private String prefix = ".";
@@ -24,7 +29,8 @@ public class CommandManager {
         register(new PrefixCommand());
         register(new HelpCommand());
         register(new CoordsCommand());
-        register(new CenterCommand());        register(new PitchCommand());
+        register(new CenterCommand());
+        register(new PitchCommand());
         register(new YawCommand());
         register(new DrawnCommand());
         register(new SayCommand());
@@ -40,10 +46,16 @@ public class CommandManager {
         register(new McpCommand());
         register(new HudImageCommand());
         register(new ConfigCommand());
+        register(new FriendCommand());
     }
 
     public void register(Command command) {
         commands.add(command);
+    }
+
+    /** Снимает команду с регистрации (аддоны, перезагрузка скриптов). */
+    public void unregister(Command command) {
+        commands.remove(command);
     }
 
     public List<Command> getCommands() {
@@ -88,8 +100,8 @@ public class CommandManager {
             try {
                 cmd.execute(args);
             } catch (Throwable t) {
-                // Команда обязана никогда не ронять клиент: сваливаем в чат.
-                t.printStackTrace();
+                // Команда обязана никогда не ронять клиент: сваливаем в чат и лог.
+                LOG.warn("Command {} failed", cmd.getName(), t);
                 ChatHelper.sendMessage(Text.literal("Ошибка команды: " + t).styled(s -> s.withColor(Formatting.RED)));
             }
             return true;

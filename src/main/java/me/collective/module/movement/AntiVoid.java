@@ -77,10 +77,13 @@ public class AntiVoid extends Module {
         if (mc.options != null) mc.options.jumpKey.setPressed(false);
     }
 
+    private final BlockPos.Mutable voidCheckPos = new BlockPos.Mutable();
+
     private boolean isOverVoid() {
         BlockPos pos = mc.player.getBlockPos();
         for (int y = pos.getY(); y > mc.world.getBottomY() - 10; y--) {
-            if (!mc.world.getBlockState(new BlockPos(pos.getX(), y, pos.getZ())).isAir()) return false;
+            voidCheckPos.set(pos.getX(), y, pos.getZ());
+            if (!mc.world.getBlockState(voidCheckPos).isAir()) return false;
         }
         return true;
     }

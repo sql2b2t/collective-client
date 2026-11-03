@@ -31,7 +31,7 @@ public class AfkLogout extends Module {
     public final BooleanSetting autoToggle = add(new BooleanSetting("AutoToggle", true));
 
     public AfkLogout() {
-        super("AfkLogout", "Logs out when you reach certain coords. Useful for afk travelling.", Category.MISC);
+        super("AfkLogout", "Автоматически выходит из игры при достижении заданных координат в пути.", Category.MISC);
     }
 
     @EventHandler
@@ -41,8 +41,8 @@ public class AfkLogout extends Module {
         if (xCoordsMatch() && zCoordsMatch() && dimensionMatches()) {
             if (autoToggle.getValue()) setToggled(false);
             AutoReconnect.markAfkLogout();
-            if (mc.getNetworkHandler() != null) {
-                mc.getNetworkHandler().onDisconnect(new DisconnectS2CPacket(Text.literal("[AfkLogout] Arrived at destination.")));
+            if (mc.getNetworkHandler() != null && mc.getNetworkHandler().getConnection() != null) {
+                mc.getNetworkHandler().getConnection().disconnect(Text.literal("[AfkLogout] Arrived at destination."));
             }
         }
     }

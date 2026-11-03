@@ -12,7 +12,7 @@ public class Fullbright extends Module {
     private StatusEffectInstance ownedEffect;
 
     public Fullbright() {
-        super("Fullbright", "Grants client-side night vision for maximum visibility in dark areas.", Category.RENDER);
+        super("Fullbright", "Делает всё вокруг максимально ярким, убирая тени и темноту.", Category.RENDER);
     }
 
     @Override
@@ -44,8 +44,8 @@ public class Fullbright extends Module {
         }
         if (owner == null) return;
         StatusEffectInstance current = owner.getStatusEffect(StatusEffects.NIGHT_VISION);
-        if (current == null) {
-            StatusEffectInstance effect = new StatusEffectInstance(StatusEffects.NIGHT_VISION, 1000, 0, false, false, false);
+        if (current == null || (current == ownedEffect && current.getDuration() < 1000)) {
+            StatusEffectInstance effect = new StatusEffectInstance(StatusEffects.NIGHT_VISION, 10000, 0, false, false, false);
             owner.addStatusEffect(effect);
             ownedEffect = owner.getStatusEffect(StatusEffects.NIGHT_VISION);
         } else if (current != ownedEffect || current.shouldShowIcon() || current.shouldShowParticles()) {

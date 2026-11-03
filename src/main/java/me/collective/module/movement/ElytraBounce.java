@@ -92,7 +92,7 @@ public class ElytraBounce extends Module {
     private static final int ROTATION_PRIORITY = 45;
 
     public ElytraBounce() {
-        super("ElytraBounce", "High-speed Elytra bounce flight with automatic pitch, obstacle passing, and bounce timing.", Category.MOVEMENT);
+        super("ElytraBounce", "Скоростной баунс-полёт на элитрах с автоматическим углом наклона и таймингами отскока.", Category.MOVEMENT);
         INSTANCE = this;
     }
 

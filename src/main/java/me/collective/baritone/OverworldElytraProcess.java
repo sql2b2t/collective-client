@@ -17,7 +17,7 @@ import baritone.api.utils.input.Input;
 import baritone.utils.PathRenderer;
 import me.collective.command.ChatHelper;
 import me.collective.util.BaritoneHelper;
-import me.collective.module.ModuleManager;
+import me.collective.util.GrimUtils;import me.collective.module.ModuleManager;
 import me.collective.module.movement.Pitch40;
 import me.collective.util.InventoryUtil;
 import net.minecraft.client.MinecraftClient;
@@ -410,13 +410,19 @@ public class OverworldElytraProcess implements AbstractGameEventListener, IBarit
             return true;
         }
 
-        for (int i = 9; i < 36; i++) {
-            if (isFirework(mc.player.getInventory().getStack(i))) {
-                InventoryUtil.swap(i, true);
-                mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
-                InventoryUtil.swapBack();
-                return true;
-            }
+        // Ракеты из основного инвентаря: InventoryUtil.swap() работает только с
+        // хотбаром (слоты 0-8), для 9+ она — no-op, и в руку ушло бы то, что там
+        // лежало. Доставляем ракету в текущий слот кликом инвентаря, как в Utils.firework().
+        for (int i = 9; i < mc.player.getInventory().main.size(); i++) {
+            if (!isFirework(mc.player.getInventory().getStack(i))) continue;
+            if (!GrimUtils.inventoryClickClean()) return false;
+
+            int selectedSlot = mc.player.getInventory().selectedSlot;
+            InventoryUtil.move().from(i).to(selectedSlot);
+            mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
+            // Возвращаем остаток ракет (или прежний предмет) обратно на место.
+            InventoryUtil.move().from(selectedSlot).to(i);
+            return true;
         }
 
         return false;

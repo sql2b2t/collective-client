@@ -1,8 +1,8 @@
 package me.collective.gui.component;
 
-import me.collective.font.FontManager;
+import me.collective.gui.alt.SmoothGfx;
+import me.collective.gui.ClickGuiTheme;
 import me.collective.module.client.UI;
-import me.collective.render.RenderUtil;
 import me.collective.render.SoundUtil;
 import me.collective.setting.BooleanSetting;
 import me.collective.setting.ChoiceSetting;
@@ -12,8 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Компонент для ChoiceSetting: заголовок группы + раскрывающийся список
- * тумблеров (ЛКМ/ПКМ по заголовку раскрывает).
+ * Modern ChoiceComponent matching ClickGUI 2 styling.
+ * Click header to expand/collapse group of modern boolean switches.
  */
 public class ChoiceComponent extends Component {
     private final ChoiceSetting setting;
@@ -21,53 +21,66 @@ public class ChoiceComponent extends Component {
     private boolean open;
 
     public ChoiceComponent(ChoiceSetting setting, float x, float y, float width, float height) {
-        super(x, y, width, height);
+        super(x, y, width, 16f);
         this.setting = setting;
         for (BooleanSetting opt : setting.getOptions()) {
-            options.add(new BooleanComponent(opt, x, y, width, 11));
-        }
-    }
-
-    @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        if (!setting.isVisible()) return;
-
-        RenderUtil.drawRect(context, x, y, x + width, y + 11, UI.INSTANCE.bgColor.getValue());
-
-        long enabled = setting.getOptions().stream().filter(s -> s.getValue()).count();
-        String text = setting.getName() + " [" + enabled + "/" + setting.getOptions().size() + "]" + (open ? " -" : " +");
-        float fs = FontManager.settingsScale();
-        FontManager.INSTANCE.drawStringWithShadowScaled(context, text, x + 4, y + (11 - FontManager.INSTANCE.getFontHeightScaled(fs)) / 2f + 0.5f, UI.INSTANCE.textColor.getValue(), fs);
-
-        if (open) {
-            float curY = y + 11;
-            for (BooleanComponent c : options) {
-                c.setX(x + 6);
-                c.setY(curY);
-                c.setWidth(width - 6);
-                c.render(context, mouseX, mouseY, delta);
-                curY += 11;
-            }
+            options.add(new BooleanComponent(opt, x, y, width, 16f));
         }
     }
 
     @Override
     public float getHeight() {
         if (open) {
-            return 11 + (options.size() * 11);
+            return 16f + (options.size() * 16f);
         }
-        return 11;
+        return 16f;
+    }
+
+    @Override
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        if (!setting.isVisible()) return;
+
+        boolean hov = isHovered(mouseX, mouseY);
+        if (hov) {
+            SmoothGfx.fillRounded(context, x + 2f, y, width - 4f, 16f, 3f, 0x12FFFFFF);
+        }
+
+        // Setting Name on the left
+        ClickGuiTheme.badge().drawString(context, setting.getName(), x + 6f, y + 3.5f, ClickGuiTheme.TEXT_PRIMARY);
+
+        // Group status badge on the right [enabled/total] >
+        long enabled = setting.getOptions().stream().filter(BooleanSetting::getValue).count();
+        String badgeText = "[" + enabled + "/" + setting.getOptions().size() + "] " + (open ? "v" : ">");
+        float bW = ClickGuiTheme.badge().getStringWidth(badgeText) + 8f;
+        float bX = x + width - bW - 6f;
+        float bY = y + 2f;
+        boolean badgeHov = mouseX >= bX && mouseX <= bX + bW && mouseY >= bY && mouseY <= bY + 12f;
+
+        SmoothGfx.fillAndStroke(context, bX, bY, bW, 12f, 3f, badgeHov ? 0x28FFFFFF : 0x16FFFFFF, 0x20FFFFFF, 1.0f);
+        ClickGuiTheme.badge().drawString(context, badgeText, bX + 4f, bY + 2f, open ? ClickGuiTheme.getAccentColor() : ClickGuiTheme.TEXT_MUTED);
+
+        if (open) {
+            float curY = y + 16f;
+            for (BooleanComponent c : options) {
+                c.setX(x + 4f);
+                c.setY(curY);
+                c.setWidth(width - 4f);
+                c.render(context, mouseX, mouseY, delta);
+                curY += c.getHeight();
+            }
+        }
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (!setting.isVisible()) return false;
 
-        if (mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + 11) {
+        // Header click (y to y + 16)
+        if (mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + 16f) {
             if (button == 0 || button == 1) {
                 open = !open;
                 if (UI.INSTANCE.sounds.getValue()) {
-                    SoundUtil.playClick(1.0f, 1.2f);
+                    SoundUtil.playClick(1.0f, open ? 1.2f : 0.9f);
                 }
                 return true;
             }

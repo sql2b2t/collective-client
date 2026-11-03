@@ -1,98 +1,119 @@
 package me.collective.gui.component;
 
-import me.collective.font.FontManager;
+import me.collective.gui.alt.SmoothGfx;
+import me.collective.gui.ClickGuiTheme;
 import me.collective.module.client.Colors;
 import me.collective.module.client.UI;
-import me.collective.render.RenderUtil;
 import me.collective.render.SoundUtil;
 import me.collective.setting.ColorSetting;
 import net.minecraft.client.gui.DrawContext;
 
 import java.awt.Color;
 
+/**
+ * Modern ColorComponent matching ClickGUI 2 styling with rounded color swatch and sliders.
+ */
 public class ColorComponent extends Component {
     private final ColorSetting setting;
     private boolean open;
     private int draggingSlider = -1; // 0=Red, 1=Green, 2=Blue, 3=Alpha
 
     public ColorComponent(ColorSetting setting, float x, float y, float width, float height) {
-        super(x, y, width, height);
+        super(x, y, width, 16f);
         this.setting = setting;
+    }
+
+    @Override
+    public float getHeight() {
+        return open ? (16f + 3f + 5 * 14f + 3f) : 16f;
     }
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         if (!setting.isVisible()) return;
 
-        // Process slider dragging
         if (open && draggingSlider >= 0) {
             updateSlider(draggingSlider, mouseX);
         }
 
-        // Main setting bar (height 11)
-        RenderUtil.drawRect(context, x, y, x + width, y + 11, UI.INSTANCE.bgColor.getValue());
-        float fs = FontManager.settingsScale();
-        int fh = FontManager.INSTANCE.getFontHeightScaled(fs);
-        FontManager.INSTANCE.drawStringWithShadowScaled(context, setting.getName(), x + 4, y + (11 - fh) / 2f + 0.5f, UI.INSTANCE.textColor.getValue(), fs);
+        boolean hov = isHovered(mouseX, mouseY);
+        if (hov) {
+            SmoothGfx.fillRounded(context, x + 2f, y, width - 4f, 16f, 3f, 0x12FFFFFF);
+        }
 
-        // Color preview box
-        float boxX1 = x + width - 13;
-        float boxX2 = x + width - 3;
-        float boxY1 = y + 2;
-        float boxY2 = y + 9;
-        RenderUtil.drawRect(context, boxX1, boxY1, boxX2, boxY2, setting.getColor());
-        RenderUtil.drawOutline(context, boxX1, boxY1, boxX2 - boxX1, boxY2 - boxY1, 1, 0xFF404045);
+        // Setting Name on the left
+        ClickGuiTheme.badge().drawString(context, setting.getName(), x + 6f, y + 3.5f, ClickGuiTheme.TEXT_PRIMARY);
+
+        // Color Swatch on the right
+        float boxSize = 10f;
+        float boxX = x + width - boxSize - 6f;
+        float boxY = y + 3f;
+        SmoothGfx.fillAndStroke(context, boxX, boxY, boxSize, boxSize, 2.5f, setting.getColor().getRGB(), 0x33FFFFFF, 1.0f);
 
         if (open) {
-            float rowY = y + 11;
+            float listY = y + 16f + 2f;
+            float listH = 5 * 14f + 2f;
+            float listX = x + 3f;
+            float listW = width - 6f;
+
+            // Card container
+            SmoothGfx.fillAndStroke(context, listX, listY, listW, listH, 3.5f, 0xE00C121C, 0x28FFFFFF, 1.0f);
+
             Color cur = setting.getValue();
+            float curRowY = listY + 2f;
 
             // Row 1: Rainbow & Sync buttons
-            RenderUtil.drawRect(context, x + 2, rowY, x + width - 2, rowY + 11, UI.INSTANCE.bgColor.getValue());
-            float halfW = (width - 4) / 2f;
+            float halfW = (listW - 6f) / 2f;
+            boolean rbHov = mouseX >= listX + 2f && mouseX <= listX + 2f + halfW && mouseY >= curRowY && mouseY <= curRowY + 12f;
+            int rbBg = setting.isRainbow() ? ClickGuiTheme.getAccentBg() : (rbHov ? 0x24FFFFFF : 0x14FFFFFF);
+            int rbStroke = setting.isRainbow() ? ClickGuiTheme.getAccentColor() : 0x20FFFFFF;
+            SmoothGfx.fillAndStroke(context, listX + 2f, curRowY, halfW, 12f, 2.5f, rbBg, rbStroke, 1.0f);
+            ClickGuiTheme.badge().drawString(context, "Rainbow", listX + 5f, curRowY + 2f, setting.isRainbow() ? ClickGuiTheme.getAccentColor() : ClickGuiTheme.TEXT_MUTED);
 
-            // Rainbow toggle
-            String rbText = "Rainbow: " + (setting.isRainbow() ? "ON" : "OFF");
-            int rbCol = setting.isRainbow() ? UI.INSTANCE.color.getValue().getRGB() : UI.INSTANCE.textColor.getValue().getRGB();
-            FontManager.INSTANCE.drawStringWithShadowScaled(context, rbText, x + 4, rowY + (11 - fh) / 2f + 0.5f, rbCol, fs);
-
-            // Sync toggle
             if (Colors.INSTANCE != null && setting != Colors.INSTANCE.themeColor) {
-                String syncText = "Sync: " + (setting.isSync() ? "ON" : "OFF");
-                int syncCol = setting.isSync() ? UI.INSTANCE.color.getValue().getRGB() : UI.INSTANCE.textColor.getValue().getRGB();
-                FontManager.INSTANCE.drawStringWithShadowScaled(context, syncText, x + 2 + halfW + 2, rowY + (11 - fh) / 2f + 0.5f, syncCol, fs);
+                float syncX = listX + 4f + halfW;
+                boolean syncHov = mouseX >= syncX && mouseX <= syncX + halfW && mouseY >= curRowY && mouseY <= curRowY + 12f;
+                int syncBg = setting.isSync() ? ClickGuiTheme.getAccentBg() : (syncHov ? 0x24FFFFFF : 0x14FFFFFF);
+                int syncStroke = setting.isSync() ? ClickGuiTheme.getAccentColor() : 0x20FFFFFF;
+                SmoothGfx.fillAndStroke(context, syncX, curRowY, halfW, 12f, 2.5f, syncBg, syncStroke, 1.0f);
+                ClickGuiTheme.badge().drawString(context, "Sync", syncX + 5f, curRowY + 2f, setting.isSync() ? ClickGuiTheme.getAccentColor() : ClickGuiTheme.TEXT_MUTED);
             }
-            rowY += 11;
+            curRowY += 14f;
 
-            // Row 2: Red slider
-            renderSlider(context, rowY, "Red: " + cur.getRed(), cur.getRed() / 255f, new Color(220, 60, 60, 200));
-            rowY += 11;
-
-            // Row 3: Green slider
-            renderSlider(context, rowY, "Green: " + cur.getGreen(), cur.getGreen() / 255f, new Color(60, 200, 60, 200));
-            rowY += 11;
-
-            // Row 4: Blue slider
-            renderSlider(context, rowY, "Blue: " + cur.getBlue(), cur.getBlue() / 255f, new Color(60, 100, 240, 200));
-            rowY += 11;
-
-            // Row 5: Alpha slider
-            renderSlider(context, rowY, "Alpha: " + cur.getAlpha(), cur.getAlpha() / 255f, new Color(180, 180, 180, 200));
+            // Rows 2..5: Red, Green, Blue, Alpha
+            renderSliderRow(context, listX + 2f, curRowY, listW - 4f, "R: " + cur.getRed(), cur.getRed() / 255f, 0xFFE04040);
+            curRowY += 14f;
+            renderSliderRow(context, listX + 2f, curRowY, listW - 4f, "G: " + cur.getGreen(), cur.getGreen() / 255f, 0xFF40D040);
+            curRowY += 14f;
+            renderSliderRow(context, listX + 2f, curRowY, listW - 4f, "B: " + cur.getBlue(), cur.getBlue() / 255f, 0xFF4080F0);
+            curRowY += 14f;
+            renderSliderRow(context, listX + 2f, curRowY, listW - 4f, "A: " + cur.getAlpha(), cur.getAlpha() / 255f, 0xFFCCCCCC);
         }
     }
 
-    private void renderSlider(DrawContext context, float sY, String label, float percent, Color barColor) {
-        RenderUtil.drawRect(context, x + 2, sY, x + width - 2, sY + 11, UI.INSTANCE.bgColor.getValue());
-        float barW = Math.max(0, Math.min(width - 6, (width - 6) * percent));
-        RenderUtil.drawRect(context, x + 3, sY + 1, x + 3 + barW, sY + 10, barColor);
-        float fs = FontManager.settingsScale();
-        FontManager.INSTANCE.drawStringWithShadowScaled(context, label, x + 5, sY + (11 - FontManager.INSTANCE.getFontHeightScaled(fs)) / 2f + 0.5f, UI.INSTANCE.textColor.getValue(), fs);
+    private void renderSliderRow(DrawContext context, float rx, float ry, float rw, String label, float pct, int barColor) {
+        ClickGuiTheme.badge().drawString(context, label, rx + 2f, ry + 2f, ClickGuiTheme.TEXT_MUTED);
+
+        float trackX = rx + 36f;
+        float trackW = rw - 38f;
+        float trackY = ry + 4.5f;
+        float trackH = 3.5f;
+
+        SmoothGfx.fillRounded(context, trackX, trackY, trackW, trackH, 1.75f, 0x22FFFFFF);
+        if (pct > 0.01f) {
+            SmoothGfx.fillRounded(context, trackX, trackY, trackW * pct, trackH, 1.75f, barColor);
+        }
+        float knobX = trackX + trackW * pct;
+        SmoothGfx.circle(context, knobX, trackY + 1.75f, 3.0f, ClickGuiTheme.TEXT_PRIMARY);
     }
 
     private void updateSlider(int sliderIdx, double mouseX) {
-        double diff = mouseX - (x + 3);
-        double total = width - 6;
-        float percent = (float) Math.max(0.0, Math.min(1.0, diff / total));
+        float listX = x + 3f;
+        float listW = width - 6f;
+        float trackX = listX + 2f + 36f;
+        float trackW = (listW - 4f) - 38f;
+
+        float percent = (float) Math.max(0.0, Math.min(1.0, (mouseX - trackX) / trackW));
         int val = Math.round(percent * 255);
 
         switch (sliderIdx) {
@@ -104,58 +125,50 @@ public class ColorComponent extends Component {
     }
 
     @Override
-    public float getHeight() {
-        return open ? 11 + 11 * 5 : 11;
-    }
-
-    @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (!setting.isVisible()) return false;
 
-        // Header click
-        if (mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + 11) {
-            if (button == 0) {
-                open = !open;
-                if (UI.INSTANCE.sounds.getValue()) {
-                    SoundUtil.playClick(1.0f, open ? 1.2f : 0.9f);
-                }
-                return true;
-            } else if (button == 1) {
-                open = !open;
-                if (UI.INSTANCE.sounds.getValue()) {
-                    SoundUtil.playClick(1.0f, 1.2f);
-                }
-                return true;
+        // Header click (y to y + 16)
+        if (mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + 16f) {
+            open = !open;
+            if (UI.INSTANCE.sounds.getValue()) {
+                SoundUtil.playClick(1.0f, open ? 1.2f : 0.9f);
             }
+            return true;
         }
 
         if (open) {
-            float rowY = y + 11;
+            float listY = y + 16f + 2f;
+            float listX = x + 3f;
+            float listW = width - 6f;
+            float curRowY = listY + 2f;
+
             // Row 1: Rainbow & Sync buttons
-            if (mouseY >= rowY && mouseY < rowY + 11 && mouseX >= x && mouseX <= x + width) {
-                float halfW = (width - 4) / 2f;
-                if (mouseX < x + 2 + halfW) {
+            if (mouseY >= curRowY && mouseY <= curRowY + 12f) {
+                float halfW = (listW - 6f) / 2f;
+                if (mouseX >= listX + 2f && mouseX <= listX + 2f + halfW) {
                     setting.setRainbow(!setting.isRainbow());
-                } else if (Colors.INSTANCE != null && setting != Colors.INSTANCE.themeColor) {
+                    if (UI.INSTANCE.sounds.getValue()) SoundUtil.playClick(1.0f, 1.0f);
+                    return true;
+                } else if (Colors.INSTANCE != null && setting != Colors.INSTANCE.themeColor && mouseX >= listX + 4f + halfW && mouseX <= listX + 4f + halfW * 2f) {
                     setting.setSync(!setting.isSync());
+                    if (UI.INSTANCE.sounds.getValue()) SoundUtil.playClick(1.0f, 1.0f);
+                    return true;
                 }
-                if (UI.INSTANCE.sounds.getValue()) {
-                    SoundUtil.playClick(1.0f, 1.0f);
-                }
-                return true;
             }
-            rowY += 11;
+            curRowY += 14f;
 
             // Rows 2..5: Red, Green, Blue, Alpha
             for (int i = 0; i < 4; i++) {
-                if (mouseY >= rowY && mouseY < rowY + 11 && mouseX >= x && mouseX <= x + width) {
+                if (mouseY >= curRowY && mouseY <= curRowY + 13f && mouseX >= listX && mouseX <= listX + listW) {
                     if (button == 0) {
                         draggingSlider = i;
                         updateSlider(i, mouseX);
+                        if (UI.INSTANCE.sounds.getValue()) SoundUtil.playClick(1.0f, 1.1f);
                         return true;
                     }
                 }
-                rowY += 11;
+                curRowY += 14f;
             }
         }
 

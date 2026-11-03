@@ -62,32 +62,49 @@ public class UI extends Module {
     public final NumberSetting volume = add(new NumberSetting("Volume", 1.0, 0.1, 2.0, 0.1));
 
     // Collective signature pastel lavender & translucent obsidian glass
-    public final ColorSetting color = add(new ColorSetting("Color", new Color(189, 153, 255, 115)));
-    public final ColorSetting bgColor = add(new ColorSetting("BgColor", new Color(2, 0, 8, 119)));
-    public final ColorSetting bgButton = add(new ColorSetting("BgButton", new Color(159, 128, 219, 42)));
-    public final ColorSetting bgEnabled = add(new ColorSetting("BgEnabled", new Color(189, 153, 255, 115)));
+    public final ColorSetting color = add(new ColorSetting("Color", new Color(189, 153, 255, 95)));
+    public final ColorSetting bgColor = add(new ColorSetting("BgColor", new Color(2, 0, 8, 85)));
+    public final ColorSetting bgButton = add(new ColorSetting("BgButton", new Color(159, 128, 219, 28)));
+    public final ColorSetting bgEnabled = add(new ColorSetting("BgEnabled", new Color(189, 153, 255, 85)));
     public final ColorSetting textColor = add(new ColorSetting("TextColor", new Color(249, 244, 255, 255)));
     public final ColorSetting enabledColor = add(new ColorSetting("EnabledColor", new Color(221, 201, 255, 255)));
     public final ColorSetting tint = add(new ColorSetting("Tint", new Color(96, 62, 77, 37)));
     public final ColorSetting gradientColor = add(new ColorSetting("GradientColor", new Color(194, 162, 252, 34)));
 
     public UI() {
-        super("UI", "Displays the client's click GUI.", Category.CLIENT, GLFW.GLFW_KEY_RIGHT_SHIFT);
+        super("UI", "Настройки меню чита: блюр, звуки, цвета и оформление интерфейса.", Category.CLIENT, GLFW.GLFW_KEY_RIGHT_SHIFT);
         INSTANCE = this;
     }
 
+    private boolean pendingOpen = false;
+
     @Override
     public void onEnable() {
-        if (mc.currentScreen == null) {
-            mc.setScreen(ClickGuiScreen.getInstance());
+        if (mc == null) {
+            setToggled(false);
+            return;
         }
+        openGui();
+    }
+
+    public void openGui() {
+        if (mc == null) return;
+        mc.execute(() -> {
+            if (mc.currentScreen == null) {
+                mc.setScreen(ClickGuiScreen.getInstance());
+            }
+        });
+    }
+
+    public void onClientTick() {
     }
 
     @Override
     public void onDisable() {
-        if (mc.currentScreen instanceof ClickGuiScreen
-                || mc.currentScreen instanceof me.collective.gui.hud.HudEditorScreen) {
-            mc.setScreen(null);
+        if (mc != null && (mc.currentScreen instanceof ClickGuiScreen
+                || mc.currentScreen instanceof me.collective.gui.hud.HudEditorScreen)) {
+            mc.execute(() -> mc.setScreen(null));
         }
     }
+
 }

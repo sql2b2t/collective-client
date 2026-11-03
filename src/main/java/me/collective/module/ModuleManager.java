@@ -14,13 +14,22 @@ import me.collective.module.misc.*;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ModuleManager {
     public static final ModuleManager INSTANCE = new ModuleManager();
 
+    private static final Logger LOG = LoggerFactory.getLogger(ModuleManager.class);
+
     private final List<Module> modules = new ArrayList<>();
     private final List<HudModule> hudModules = new ArrayList<>();
+    /** Модули, чей падающий onUpdate уже предупреждал в лог — не спамим 20 раз в секунду. */
+    private final Set<Class<?>> warnedUpdateFailures = ConcurrentHashMap.newKeySet();
 
     public ModuleManager() {
         // Client Modules
@@ -39,6 +48,7 @@ public class ModuleManager {
         // Combat Modules
         register(new GrimAnchorAura());
         register(new CrystalAura());
+        register(new CrystalOptimizer());
         register(new Criticals());
         register(new Offhand());
         register(new Surround());
@@ -58,6 +68,7 @@ public class ModuleManager {
         register(new HitBox());
         register(new Reach());
         register(new TNTAura());
+        register(new Velocity());
 
         // Movement Modules
         register(new AirPlaceScaffold());
@@ -160,6 +171,14 @@ public class ModuleManager {
         register(new BlockESP());
         register(new ItemESP());
         register(new Tracers());
+        register(new Chams());
+        register(new Trajectories());
+        register(new BreakProgress());
+        register(new VoidESP());
+        register(new Breadcrumbs());
+        register(new Zoom());
+        register(new Ambience());
+        register(new CrystalModifier());
 
         // Misc Modules
         register(new AntiBot());
@@ -184,7 +203,6 @@ public class ModuleManager {
         register(new TextRadar());
         register(new Welcomer());
         register(new Lag());
-        register(new Graph());
         register(new Chat());
         register(new Music());
         register(new Crypto());
@@ -208,7 +226,8 @@ public class ModuleManager {
         try {
             me.collective.event.EventBus.INSTANCE.unsubscribe(module);
             module.setToggled(false);
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
+            LOG.warn("Failed to cleanly unregister module {}", module.getName(), t);
         }
     }
 
@@ -264,7 +283,15 @@ public class ModuleManager {
             if (m.isToggled()) {
                 try {
                     m.onUpdate();
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    // Модуль не должен уронить тик клиента. Первый сбой — warn,
+                    // повторные — debug, иначе сломанный модуль заспамит лог.
+                    if (warnedUpdateFailures.add(m.getClass())) {
+                        LOG.warn("Module {} onUpdate failed: {}", m.getName(), e.toString(), e);
+                    } else {
+                        LOG.debug("Module {} onUpdate failed again", m.getName(), e);
+                    }
+                }
             }
         }
     }

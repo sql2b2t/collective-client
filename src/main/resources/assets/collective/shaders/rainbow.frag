@@ -48,7 +48,7 @@ void main() {
     vec4 overlay = texture(u_Overlay, v_TexCoord * vec2(1.0, -1.0));
 
     if (s.a == 1.0) {
-        if (u_Fill.a == 0.0 || overlay.a == 0.0) discard;
+        if (u_Fill.a == 0.0 || (u_Image && overlay.a == 0.0)) discard;
         vec4 fillColor = u_Fill;
         if (u_Fill_Offset != 0.0) {
             vec2 strength = (v_TexCoord * 3.0 * vec2(-u_Fill_Strength, u_Fill_Strength));
@@ -111,5 +111,9 @@ void main() {
         } else {
             discard;
         }
+    } else {
+        discard;
     }
+
+    if (color.a == 0.0) discard;
 }

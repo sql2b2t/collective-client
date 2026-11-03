@@ -31,7 +31,7 @@ public class HotbarManager extends Module {
     private int waitTicks;
 
     public HotbarManager() {
-        super("HotbarManager", "Automatically move items to your hotbar.", Category.HIGHWAY);
+        super("HotbarManager", "Автоматически перемещает нужные предметы и блоки в хотбар.", Category.HIGHWAY);
         for (int i = 0; i < 9; i++) {
             slotSettings.add(add(new StringSetting("Slot" + (i + 1), i == 0 ? "minecraft:diamond_pickaxe" : "")));
         }
@@ -80,19 +80,11 @@ public class HotbarManager extends Module {
         if (highestSlot == 8 && toggle.getValue()) setToggled(false);
     }
 
-    /** Тройной клик PICKUP: слот инвентаря -> слот хотбара. */
+    /** Безопасный SWAP в 1 пакет: идентичен нажатию хоткей-цифры в инвентаре. */
     private void moveClick(int fromInv, int toHotbar) {
         int from = fromInv < 9 ? 36 + fromInv : fromInv;
-        int to = 36 + toHotbar;
-        if (from == to) return;
         int syncId = mc.player.currentScreenHandler.syncId;
-        // (1) подняли новый предмет, (2) положили в хотбар — если слот был
-        // занят, прежний предмет оказался в курсоре — (3) возвращаем его в
-        // освободившийся слот. Без третьего клика Replace с занятым слотом
-        // оставляет предмет в курсоре и ломает все дальнейшие клики.
-        mc.interactionManager.clickSlot(syncId, from, 0, SlotActionType.PICKUP, mc.player);
-        mc.interactionManager.clickSlot(syncId, to, 0, SlotActionType.PICKUP, mc.player);
-        mc.interactionManager.clickSlot(syncId, from, 0, SlotActionType.PICKUP, mc.player);
+        mc.interactionManager.clickSlot(syncId, from, toHotbar, SlotActionType.SWAP, mc.player);
     }
 
     private static Item parseItem(String raw) {

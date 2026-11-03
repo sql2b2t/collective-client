@@ -18,11 +18,12 @@ public class AutoArmor extends Module {
     public final NumberSetting delay = add(new NumberSetting("Delay", 1.0, 0.0, 5.0, 1.0));
     public final BooleanSetting preferBlastProt = add(new BooleanSetting("PreferBlastProt", true));
     public final BooleanSetting saveDurability = add(new BooleanSetting("SaveDurability", true));
+    public final BooleanSetting elytraProtect = add(new BooleanSetting("ElytraProtect", true));
 
     private int delayTimer = 0;
 
     public AutoArmor() {
-        super("AutoArmor", "Automatically equips the strongest armor with enchantment scoring for 2b2t.", Category.COMBAT);
+        super("AutoArmor", "Автоматически надевает лучшую броню с оценкой прочности и зачарований.", Category.COMBAT);
     }
 
     @EventHandler
@@ -43,6 +44,12 @@ public class AutoArmor extends Module {
             int screenSlot = screenSlots[i];
 
             ItemStack current = mc.player.getEquippedStack(slot);
+            if (slot == EquipmentSlot.CHEST && elytraProtect.getValue()) {
+                if (current.contains(DataComponentTypes.GLIDER) || mc.player.isGliding()) {
+                    continue;
+                }
+            }
+
             int bestInvSlot = -1;
             int bestScore = getScore(current);
 

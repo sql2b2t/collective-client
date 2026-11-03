@@ -98,14 +98,10 @@ public final class PlacementSolver {
         Vec3d eye = MinecraftClient.getInstance().player.getEyePos();
         double reachSq = reach * reach;
         if (allowFace) {
-            BlockState ws = MinecraftClient.getInstance().world.getBlockState(target);
-            if (!ws.isAir() && !clickTriggersAction(ws.getBlock())) {
-                Solution self = solveFaces(target, desired, stack, eye, reachSq, target, false);
-                if (self != null) {
-                    return self;
-                }
-            }
-
+            // Раньше здесь был попыток-клик по граням самого target:
+            // клик по грани target ставит блок в target.offset(face), а simulate()
+            // требует placement ровно в target — ветка была детерминированно null,
+            // но тратила до 6×25 raycast'ов на каждый вызов solve().
             Solution real = solveAgainstFace(target, desired, stack, eye, reachSq);
             if (real != null) {
                 return real;

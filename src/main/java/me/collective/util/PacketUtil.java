@@ -8,7 +8,14 @@ import java.util.Set;
 import java.util.WeakHashMap;
 
 public class PacketUtil {
-    private static final Set<Packet<?>> SILENT_PACKETS = Collections.newSetFromMap(new WeakHashMap<>());
+    /**
+     * Weak-семантика обязательна: пакет, для которого не вызвали
+     * checkAndRemoveSilent, не должен копиться вечно. Доступ идёт из разных
+     * потоков (клиентский тик и netty), поэтому обычный WeakHashMap обёрнут
+     * в synchronized-обёртку: цена копеечная, целостность множества гарантирована.
+     */
+    private static final Set<Packet<?>> SILENT_PACKETS =
+            Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
 
     public static void sendSilently(Packet<?> packet) {
         SILENT_PACKETS.add(packet);

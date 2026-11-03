@@ -20,7 +20,7 @@ public class AntiCheat extends Module {
     }
 
     public AntiCheat() {
-        super("AntiCheat", "Manages the client's behavior on different anti-cheats.", Category.CLIENT);
+        super("AntiCheat", "Управление глобальными профилями и настройками под разные античиты.", Category.CLIENT);
         INSTANCE = this;
     }
 

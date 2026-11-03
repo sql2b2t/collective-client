@@ -1,66 +1,65 @@
 package me.collective.gui.component;
 
-import me.collective.font.FontManager;
 import me.collective.gui.ClickGuiScreen;
+import me.collective.gui.alt.SmoothGfx;
+import me.collective.gui.ClickGuiTheme;
 import me.collective.gui.settings.BlockListSettingScreen;
 import me.collective.module.client.UI;
-import me.collective.render.RenderUtil;
+import me.collective.render.SoundUtil;
 import me.collective.setting.BlockListSetting;
-import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.MinecraftClient;
-
-import java.awt.Color;
+import net.minecraft.client.gui.DrawContext;
 
 /**
- * Настройка BlockListSetting в панели модуля — компактная строка, по клику
- * открывает полноэкранный пикер блоков ({@link BlockListSettingScreen}) —
- * порт Meteor: нечёткий поиск и две колонки — все блоки / выбранные.
+ * Modern BlockListComponent matching ClickGUI 2 pill button design.
  */
 public class BlockListComponent extends Component {
-    private static final float HEADER_H = 11f;
-
     private final BlockListSetting setting;
-    private String lastName = "";
 
     public BlockListComponent(BlockListSetting setting, float x, float y, float width, float height) {
-        super(x, y, width, height);
+        super(x, y, width, 16f);
         this.setting = setting;
     }
 
     @Override
+    public float getHeight() {
+        return 16f;
+    }
+
+    @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        if (lastName.isEmpty()) lastName = setting.getName();
-        this.height = HEADER_H;
+        if (!setting.isVisible()) return;
 
-        float fs = FontManager.settingsScale();
-        int fh = FontManager.INSTANCE.getFontHeightScaled(fs);
-        Color bg = UI.INSTANCE.bgColor.getValue();
-        Color text = UI.INSTANCE.textColor.getValue();
-        Color accent = UI.INSTANCE.color.getValue();
+        boolean hov = isHovered(mouseX, mouseY);
+        if (hov) {
+            SmoothGfx.fillRounded(context, x + 2f, y, width - 4f, height, 3f, 0x12FFFFFF);
+        }
 
-        boolean hover = isHovered(mouseX, mouseY);
-        RenderUtil.drawRect(context, x, y, x + width, y + HEADER_H, bg);
+        // Setting Name on the left
+        ClickGuiTheme.badge().drawString(context, setting.getName(), x + 6f, y + 3.5f, ClickGuiTheme.TEXT_PRIMARY);
 
-        String label = lastName + " [" + setting.getValue().size() + "]";
-        FontManager.INSTANCE.drawStringWithShadowScaled(context, label, x + 4,
-                y + (HEADER_H - fh) / 2f + 0.5f, hover ? accent : text, fs);
+        // Pill Button on the right
+        int count = setting.getValue() != null ? setting.getValue().size() : 0;
+        String btnText = "Blocks (" + count + ")";
+        float bW = ClickGuiTheme.badge().getStringWidth(btnText) + 8f;
+        float bX = x + width - bW - 6f;
+        float bY = y + 2f;
+        boolean btnHov = mouseX >= bX && mouseX <= bX + bW && mouseY >= bY && mouseY <= bY + 12f;
 
-        String gear = ">";
-        float gw = FontManager.INSTANCE.getStringWidthScaled(gear, fs);
-        FontManager.INSTANCE.drawStringWithShadowScaled(context, gear, x + width - 4 - gw,
-                y + (HEADER_H - fh) / 2f + 0.5f,
-                hover ? accent : new Color(150, 150, 156), fs);
+        SmoothGfx.fillAndStroke(context, bX, bY, bW, 12f, 3f, btnHov ? 0x28FFFFFF : 0x16FFFFFF, 0x20FFFFFF, 1.0f);
+        ClickGuiTheme.badge().drawString(context, btnText, bX + 4f, bY + 2f, ClickGuiTheme.getAccentColor());
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button != 0) return false;
-        if (!isHovered(mouseX, mouseY)) return false;
-
-        if (UI.INSTANCE.sounds.getValue()) {
-            me.collective.render.SoundUtil.playClick(1.0f, 1.2f);
+        if (!setting.isVisible()) return false;
+        if (button == 0 && isHovered(mouseX, mouseY)) {
+            if (UI.INSTANCE.sounds.getValue()) {
+                SoundUtil.playClick(1.0f, 1.0f);
+            }
+            MinecraftClient.getInstance().setScreen(new BlockListSettingScreen(ClickGuiScreen.getInstance(), setting));
+            return true;
         }
-        MinecraftClient.getInstance().setScreen(new BlockListSettingScreen(ClickGuiScreen.getInstance(), setting));
-        return true;
+        return false;
     }
 }

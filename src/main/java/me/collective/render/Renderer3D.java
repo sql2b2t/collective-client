@@ -77,6 +77,11 @@ public class Renderer3D {
 
     private static void drawBoxRaw(double x1, double y1, double z1, double x2, double y2, double z2,
                                    Color fill, Color line, ShapeMode shapeMode, boolean ignoreOcclusion) {
+        drawBoxRaw(x1, y1, z1, x2, y2, z2, fill, line, shapeMode, ignoreOcclusion, 1.5f);
+    }
+
+    private static void drawBoxRaw(double x1, double y1, double z1, double x2, double y2, double z2,
+                                   Color fill, Color line, ShapeMode shapeMode, boolean ignoreOcclusion, float lineWidth) {
         double minX = Math.min(x1, x2);
         double minY = Math.min(y1, y2);
         double minZ = Math.min(z1, z2);
@@ -87,15 +92,16 @@ public class Renderer3D {
 
         int fillRgba = fill != null ? rgba(fill) : 0;
         int lineRgba = line != null ? rgba(line) : 0;
+        float lw = Math.max(0.1f, lineWidth);
 
         if (shapeMode == ShapeMode.Both && fill != null && line != null) {
-            var vis = GizmoDrawing.box(box, DrawStyle.filledAndStroked(fillRgba, 1.5f, lineRgba));
+            var vis = GizmoDrawing.box(box, DrawStyle.filledAndStroked(fillRgba, lw, lineRgba));
             if (ignoreOcclusion) vis.ignoreOcclusion();
         } else if ((shapeMode == ShapeMode.Sides || shapeMode == ShapeMode.Both) && fill != null) {
             var vis = GizmoDrawing.box(box, DrawStyle.filled(fillRgba));
             if (ignoreOcclusion) vis.ignoreOcclusion();
         } else if ((shapeMode == ShapeMode.Lines || shapeMode == ShapeMode.Both) && line != null) {
-            var vis = GizmoDrawing.box(box, DrawStyle.stroked(lineRgba, 1.5f));
+            var vis = GizmoDrawing.box(box, DrawStyle.stroked(lineRgba, lw));
             if (ignoreOcclusion) vis.ignoreOcclusion();
         }
     }
@@ -126,6 +132,20 @@ public class Renderer3D {
     public static void box(Box box, Color fill, Color line, ShapeMode shapeMode, boolean ignoreOcclusion) {
         if (box == null) return;
         box(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ, fill, line, shapeMode, ignoreOcclusion);
+    }
+
+    public static void box(Box box, Color fill, Color line, ShapeMode shapeMode, boolean ignoreOcclusion, float lineWidth) {
+        if (box == null) return;
+        if (frameScope != null) {
+            drawBoxRaw(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ, fill, line, shapeMode, ignoreOcclusion, lineWidth);
+            return;
+        }
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.worldRenderer == null) return;
+        try (var scope = mc.worldRenderer.startDrawingGizmos()) {
+            drawBoxRaw(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ, fill, line, shapeMode, ignoreOcclusion, lineWidth);
+        } catch (Exception ignored) {
+        }
     }
 
     public static void line(double x1, double y1, double z1, double x2, double y2, double z2, Object color) {

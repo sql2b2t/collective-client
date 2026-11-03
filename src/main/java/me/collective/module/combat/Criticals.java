@@ -16,15 +16,15 @@ import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 
 public class Criticals extends Module {
     public enum Mode {
-        PACKET, JUMP, MINI_JUMP
+        PACKET, GRIM, JUMP, MINI_JUMP
     }
 
-    public final EnumSetting<Mode> mode = add(new EnumSetting<>("Mode", Mode.PACKET));
+    public final EnumSetting<Mode> mode = add(new EnumSetting<>("Mode", Mode.GRIM));
     public final BooleanSetting mace = add(new BooleanSetting("MaceSmash", true));
     public final NumberSetting extraHeight = add(new NumberSetting("ExtraHeight", 0.0, 0.0, 10.0, 0.5));
 
     public Criticals() {
-        super("Criticals", "Always perform critical hits when attacking targets.", Category.COMBAT);
+        super("Criticals", "Всегда наносит критические удары при атаке целей.", Category.COMBAT);
     }
 
     @EventHandler
@@ -50,6 +50,11 @@ public class Criticals extends Module {
                     case PACKET -> {
                         sendPos(0.0625);
                         sendPos(0.0);
+                    }
+                    case GRIM -> {
+                        if (mc.player.isOnGround()) {
+                            mc.player.jump();
+                        }
                     }
                     case JUMP -> {
                         mc.player.jump();

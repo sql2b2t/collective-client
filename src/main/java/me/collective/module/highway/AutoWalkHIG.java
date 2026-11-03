@@ -29,13 +29,13 @@ public class AutoWalkHIG extends Module {
     private float tickRate = 20f;
 
     public AutoWalkHIG() {
-        super("AutoWalkHIG", "Automatically walks forward (optimized for highway digging).", Category.HIGHWAY);
+        super("AutoWalkHIG", "Автоматически идёт вперёд (оптимизировано для копания хайвеев).", Category.HIGHWAY);
     }
 
     @Override
     public void onEnable() {
         if (mc.player == null) return;
-        originY = Math.abs(mc.player.getY());
+        originY = mc.player.getY();
         sentLagMessage = false;
         lastTickMs = 0L;
         tickRate = 20f;
@@ -52,7 +52,7 @@ public class AutoWalkHIG extends Module {
         long now = System.currentTimeMillis();
         if (lastTickMs > 0) {
             float delta = Math.max(1, now - lastTickMs);
-            tickRate = Math.max(0f, Math.min(20f, tickRate * 0.9f + (1000f / delta) * 0.1f));
+            tickRate = Math.max(0f, Math.min(20f, tickRate * 0.9f + (20000f / delta) * 0.1f));
         }
         lastTickMs = now;
     }
@@ -105,7 +105,8 @@ public class AutoWalkHIG extends Module {
         }
 
         if (gapToggle.getValue()) {
-            boolean hasGap = InventoryUtil.find(stack -> stack.isOf(Items.ENCHANTED_GOLDEN_APPLE)).found();
+            boolean hasGap = InventoryUtil.find(stack ->
+                stack.isOf(Items.ENCHANTED_GOLDEN_APPLE) || stack.isOf(Items.GOLDEN_APPLE)).found();
             if (!hasGap) {
                 error("No gap found, disabling.");
                 setToggled(false);

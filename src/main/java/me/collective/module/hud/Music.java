@@ -8,6 +8,7 @@ import java.awt.Color;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -20,7 +21,7 @@ public class Music extends HudModule {
     private Thread pollerThread;
 
     public Music() {
-        super("Music", "Displays currently playing music.", 4, 360);
+        super("Music", "Отображает название текущего играющего музыкального трека.", 4, 360);
     }
 
     @Override
@@ -91,7 +92,9 @@ public class Music extends HudModule {
                     out.append(line).append("\n");
                 }
             }
-            proc.waitFor();
+            if (!proc.waitFor(800, TimeUnit.MILLISECONDS)) {
+                proc.destroyForcibly();
+            }
 
             Matcher mNames = DBUS_NAME_PATTERN.matcher(out.toString());
             while (mNames.find()) {
@@ -107,7 +110,9 @@ public class Music extends HudModule {
                         metaOut.append(line).append("\n");
                     }
                 }
-                metaProc.waitFor();
+                if (!metaProc.waitFor(800, TimeUnit.MILLISECONDS)) {
+                    metaProc.destroyForcibly();
+                }
 
                 String metaStr = metaOut.toString();
                 Matcher mTitle = TITLE_PATTERN.matcher(metaStr);
@@ -144,7 +149,9 @@ public class Music extends HudModule {
                     }
                 }
             }
-            proc.waitFor();
+            if (!proc.waitFor(1200, TimeUnit.MILLISECONDS)) {
+                proc.destroyForcibly();
+            }
             return title;
         } catch (Exception ignored) {
         }

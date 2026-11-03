@@ -14,6 +14,7 @@ public abstract class MixinPlayerEntity {
     private void collective$lookLikeFalling(CallbackInfo ci) {
         PlayerEntity self = (PlayerEntity) (Object) this;
         if (!ElytraBounce.lookLikeFalling()) return;
+        if (self != net.minecraft.client.MinecraftClient.getInstance().player) return;
         if (!self.isGliding()) return;
 
         self.setPose(EntityPose.STANDING);

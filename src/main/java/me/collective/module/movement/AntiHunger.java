@@ -16,6 +16,7 @@ import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
 public class AntiHunger extends Module {
     public final BooleanSetting spoofSprint = add(new BooleanSetting("Подмена спринта", true));
     public final BooleanSetting spoofJump = add(new BooleanSetting("Подмена прыжка", false));
+    public final BooleanSetting grimSafe = add(new BooleanSetting("GrimSafe", true));
 
     public AntiHunger() {
         super("AntiHunger", "Меньше расход голода при беге и прыжках.", Category.MOVEMENT);
@@ -26,6 +27,9 @@ public class AntiHunger extends Module {
         if (!(event.packet instanceof ClientCommandC2SPacket cmd)) return;
         if (spoofSprint.getValue() && (cmd.getMode() == ClientCommandC2SPacket.Mode.START_SPRINTING
             || cmd.getMode() == ClientCommandC2SPacket.Mode.STOP_SPRINTING)) {
+            if (grimSafe.getValue() && mc.player != null && !mc.player.isGliding() && mc.player.getVehicle() == null) {
+                return;
+            }
             event.cancel();
         }
         if (spoofJump.getValue() && (cmd.getMode() == ClientCommandC2SPacket.Mode.START_RIDING_JUMP

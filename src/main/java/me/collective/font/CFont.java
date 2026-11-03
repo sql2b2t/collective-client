@@ -123,9 +123,15 @@ public class CFont implements AutoCloseable {
         g.dispose();
 
         try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ImageIO.write(image, "png", baos);
-            this.nativeImage = NativeImage.read(baos.toByteArray());
+            NativeImage nativeImg = new NativeImage(imgSize, imgSize, false);
+            int[] pixels = ((java.awt.image.DataBufferInt) image.getRaster().getDataBuffer()).getData();
+            for (int y = 0; y < imgSize; y++) {
+                int rowOffset = y * imgSize;
+                for (int x = 0; x < imgSize; x++) {
+                    nativeImg.setColorArgb(x, y, pixels[rowOffset + x]);
+                }
+            }
+            this.nativeImage = nativeImg;
             tryUploadTexture();
         } catch (Exception e) {
             e.printStackTrace();

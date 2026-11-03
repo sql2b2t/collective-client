@@ -16,7 +16,7 @@ public class Discord extends Module {
     private long startTime;
 
     public Discord() {
-        super("Discord", "Displays Collective client as your Discord activity.", Category.CLIENT);
+        super("Discord", "Отображает статус игры в Discord Rich Presence.", Category.CLIENT);
         INSTANCE = this;
     }
 

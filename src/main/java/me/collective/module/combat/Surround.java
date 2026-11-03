@@ -44,7 +44,7 @@ public class Surround extends Module {
     private int delayTimer = 0;
 
     public Surround() {
-        super("Surround", "Surrounds your feet with blast-resistant blocks to protect against crystals on GrimAC/2b2t.", Category.COMBAT);
+        super("Surround", "Окружает ноги взрывоустойчивыми блоками для защиты от кристаллов.", Category.COMBAT);
     }
 
     @Override
@@ -72,7 +72,7 @@ public class Surround extends Module {
             return;
         }
 
-        FindItemResult obsidian = InventoryUtil.findInHotbar(Items.OBSIDIAN, Items.CRYING_OBSIDIAN, Items.NETHERITE_BLOCK, Items.RESPAWN_ANCHOR);
+        FindItemResult obsidian = InventoryUtil.findInHotbarOrOffhand(Items.OBSIDIAN, Items.CRYING_OBSIDIAN, Items.NETHERITE_BLOCK, Items.RESPAWN_ANCHOR);
         if (!obsidian.found()) {
             RotationUtils.getInstance().release(this);
             return;
@@ -128,10 +128,10 @@ public class Surround extends Module {
             if (!mc.world.getBlockState(pos).isReplaceable()) continue;
 
             // Не ставим, если хитбокс игрока пересекает блок
-            Box blockBox = new Box(pos);
+            Box blockBox = new Box(pos).contract(0.01);
             if (mc.player.getBoundingBox().intersects(blockBox)) continue;
 
-            if (placeBlock(pos, obsidian.slot())) {
+            if (placeBlock(pos, obsidian)) {
                 placed++;
             }
         }
@@ -143,7 +143,7 @@ public class Surround extends Module {
         }
     }
 
-    private boolean placeBlock(BlockPos pos, int slot) {
+    private boolean placeBlock(BlockPos pos, FindItemResult obsidian) {
         if (mc.player == null || mc.world == null) return false;
 
         // Поиск твёрдого соседа для клика (GrimAC требует валидную опору)
@@ -188,24 +188,26 @@ public class Surround extends Module {
             RotationUtils.getInstance().keepWireFresh();
         }
 
-        // Безопасный свап через SwapManager
-        if (!SwapManager.getInstance().hold(this, slot, SwapManager.Priority.PLACE, 2)) {
-            return false;
+        Hand hand = obsidian.getHand();
+        if (!obsidian.isOffhand()) {
+            if (!SwapManager.getInstance().hold(this, obsidian.slot(), SwapManager.Priority.PLACE, 2)) {
+                return false;
+            }
         }
 
         if (neighborPos != null && placeSide != null) {
             mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(
-                Hand.MAIN_HAND, hitResult, GrimUtils.nextSequence()
+                hand, hitResult, GrimUtils.nextSequence()
             ));
-            mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+            mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
         } else {
             mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
                 PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, BlockPos.ORIGIN, Direction.DOWN
             ));
             mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(
-                Hand.MAIN_HAND, hitResult, GrimUtils.nextSequence()
+                hand, hitResult, GrimUtils.nextSequence()
             ));
-            mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+            mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
             mc.getNetworkHandler().sendPacket(new PlayerActionC2SPacket(
                 PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, BlockPos.ORIGIN, Direction.DOWN
             ));

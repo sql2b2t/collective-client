@@ -18,6 +18,7 @@ import org.joml.Vector4f;
 public final class RenderFrame {
     private static final Matrix4f VIEW_PROJ = new Matrix4f();
     private static Vec3d cameraPos = Vec3d.ZERO;
+    private static net.minecraft.client.render.Frustum frustum;
     private static boolean valid;
 
     private RenderFrame() {
@@ -28,11 +29,30 @@ public final class RenderFrame {
         if (camera == null || positionMatrix == null || projectionMatrix == null) return;
         VIEW_PROJ.set(projectionMatrix).mul(positionMatrix);
         cameraPos = camera.getCameraPos();
+        try {
+            frustum = new net.minecraft.client.render.Frustum(positionMatrix, projectionMatrix);
+            frustum.setPosition(cameraPos.x, cameraPos.y, cameraPos.z);
+        } catch (Throwable ignored) {
+            frustum = null;
+        }
         valid = true;
+    }
+
+    public static boolean isVisible(net.minecraft.util.math.Box box) {
+        if (box == null) return false;
+        return frustum == null || frustum.isVisible(box);
     }
 
     public static boolean isValid() {
         return valid;
+    }
+
+    public static Matrix4f getViewProj() {
+        return VIEW_PROJ;
+    }
+
+    public static Vec3d getCameraPos() {
+        return cameraPos;
     }
 
     /**

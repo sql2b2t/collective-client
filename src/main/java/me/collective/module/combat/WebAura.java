@@ -41,7 +41,7 @@ public class WebAura extends Module {
         PlayerEntity target = getTarget();
         if (target == null) return;
 
-        FindItemResult web = InventoryUtil.findInHotbar(Items.COBWEB);
+        FindItemResult web = InventoryUtil.findInHotbarOrOffhand(Items.COBWEB);
         if (!web.found()) return;
 
         BlockPos feet = target.getBlockPos();

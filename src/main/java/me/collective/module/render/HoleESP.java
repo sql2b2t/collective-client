@@ -141,7 +141,8 @@ public class HoleESP extends Module {
     private boolean isSafe(BlockPos pos) {
         BlockState state = mc.world.getBlockState(pos);
         return state.isOf(Blocks.BEDROCK) || state.isOf(Blocks.OBSIDIAN)
-            || state.isOf(Blocks.CRYING_OBSIDIAN) || state.isOf(Blocks.ANVIL);
+            || state.isOf(Blocks.CRYING_OBSIDIAN) || state.isOf(Blocks.ANVIL)
+            || state.isOf(Blocks.RESPAWN_ANCHOR) || state.isOf(Blocks.NETHERITE_BLOCK);
     }
 
     private boolean isSolid(BlockPos pos) {

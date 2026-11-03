@@ -62,7 +62,7 @@ public class GrimGlide extends Module {
     private Vec3d lastPos;
 
     public GrimGlide() {
-        super("GrimGlide", "Elytra hover using GrimAC flight uncertainty. Requires pre-1.18.2 protocol for buffer.", Category.MOVEMENT);
+        super("GrimGlide", "Зависание на элитре с использованием погрешности физики GrimAC.", Category.MOVEMENT);
     }
 
     @Override
