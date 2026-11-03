@@ -12,6 +12,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -117,5 +118,118 @@ final class StashSorterPlanning {
 
     static int slotCountOf(BlockPos canonical, String type, int used) {
         return ContainerGeometry.slotCount(mc.world, canonical, type, used);
+    }
+
+    /**
+     * Фаза PLAN: очистка маршрутных карт, захват занятых слотов, сборка
+     * снимков и плана консолидации, резервирование «сундуков без записи».
+     * Единственный писатель полей jobs/sigTargets/knownFree на этом этапе.
+     */
+    static void handlePlan(StashSorter b) {
+        String dim = b.dimension();
+        b.markedFull.clear();
+        b.deadRoutes.clear();
+        b.overflowChests.clear();
+        b.overflowRoutes.clear();
+
+        // Слоты, которые игрок занял до сортировки, не трогаем
+        if (!b.keepSlotsCaptured) {
+            b.keepSlotsCaptured = true;
+            if (!b.depositInventoryFirst.get()) {
+                for (int i = b.reservedHotbarSlots.get(); i < 36; i++) {
+                    if (!mc.player.getInventory().getStack(i).isEmpty()) b.keepSlots.add(i);
+                }
+            }
+        }
+
+        Map<String, List<BlockPos>> pins = buildPinMap(b, dim);
+        List<SortPlanner.ContainerSnapshot> snapshots = buildSnapshots(b, dim, pins.keySet());
+        BlockPos origin = mc.player.getBlockPos();
+        List<BlockPos> unknown = b.unknownContainers();
+
+        if (snapshots.isEmpty()) {
+            if (unknown.isEmpty()) {
+                b.warning("В зоне нет сундуков (ни в индексе, ни в чанках). Включи «ContainerIndex» или открой сундуки.");
+                b.toggle();
+                return;
+            }
+            b.info("В индексе сундуков нет, но найдено " + unknown.size() + " сундуков в зоне. Провожу сканирование...");
+            b.jobs = new ArrayList<>();
+            for (BlockPos p : unknown) {
+                b.jobs.add(new SortPlanner.SweepJob(p, null));
+            }
+            b.jobIdx = 0;
+            b.sigTargets = new LinkedHashMap<>();
+            b.emptyClaims.clear();
+            b.spareEmpties.clear();
+            b.knownFree.clear();
+            for (BlockPos p : unknown) b.knownFree.put(p, slotCountOf(p, b.containerTypeAt(p), 0));
+            b.state = StashSorter.SortState.SELECT_JOB;
+            return;
+        }
+
+        b.knownFree.clear();
+        for (SortPlanner.ContainerSnapshot c : snapshots) {
+            b.knownFree.put(c.pos(), Math.max(0, c.estSlots() - c.usedSlots()));
+        }
+        for (BlockPos p : unknown) b.knownFree.put(p, slotCountOf(p, b.containerTypeAt(p), 0));
+
+        SortPlanner.Plan plan = SortPlanner.planConsolidation(
+            withProbeSnapshots(b, snapshots, unknown), 1, origin, StashSorterRouting::maxStackOfSig, pins,
+            b.minItemsForOwnChest.get(), unknown);
+
+        for (String w : plan.warnings()) {
+            if (b.verbosity.get() == StashSorter.Verbosity.ПОДРОБНО) b.warning(w);
+            else b.note("предупреждение плана", w);
+        }
+
+        b.jobs = new ArrayList<>(plan.jobs());
+        if (b.verifyEveryChest.get() && b.pass == 1) {
+            // Первый проход — осмотр всего: так расхождения индекса всплывают сразу
+            b.jobs = new ArrayList<>();
+            List<SortPlanner.ContainerSnapshot> ordered = new ArrayList<>(snapshots);
+            ordered.sort(Comparator.<SortPlanner.ContainerSnapshot>comparingDouble(c -> origin.getSquaredDistance(c.pos()))
+                .thenComparing(SortPlanner.ContainerSnapshot::pos));
+            for (SortPlanner.ContainerSnapshot c : ordered) {
+                if (c.usedSlots() > 0) b.jobs.add(new SortPlanner.SweepJob(c.pos(), null));
+            }
+        }
+        // Если есть сундуки без записи, добавляем их для обязательного осмотра и индексации
+        for (BlockPos p : unknown) {
+            boolean already = false;
+            for (SortPlanner.SweepJob j : b.jobs) {
+                if (j.pos().equals(p)) { already = true; break; }
+            }
+            if (!already) b.jobs.add(new SortPlanner.SweepJob(p, null));
+        }
+
+        b.jobIdx = 0;
+
+        b.sigTargets = new LinkedHashMap<>();
+        for (Map.Entry<String, List<BlockPos>> e : plan.sigTargets().entrySet()) {
+            b.sigTargets.put(e.getKey(), new ArrayList<>(e.getValue()));
+        }
+
+        b.emptyClaims.clear();
+        b.emptyClaims.addAll(plan.claimedEmpties());
+
+        Set<BlockPos> pinnedPos = new HashSet<>();
+        for (List<BlockPos> ps : pins.values()) pinnedPos.addAll(ps);
+
+        int emptyIndexed = 0;
+        for (SortPlanner.ContainerSnapshot c : snapshots) {
+            if (c.usedSlots() == 0 && !pinnedPos.contains(c.pos())) {
+                emptyIndexed++;
+                if (!plan.claimedEmpties().contains(c.pos())) b.spareEmpties.add(c.pos());
+            }
+        }
+        b.spareEmpties.sort(Comparator.comparingDouble((BlockPos p) -> origin.getSquaredDistance(p)).thenComparing(p -> p));
+
+        b.info("План готов" + (b.pass > 1 ? " (проход " + b.pass + ")" : "") + ": сундуков в зоне "
+            + snapshots.size() + " (пустых " + emptyIndexed
+            + (unknown.isEmpty() ? "" : ", без записи " + unknown.size()) + "), к разбору " + b.jobs.size()
+            + (plan.claimedEmpties().isEmpty() ? "" : ", занято новых сундуков " + plan.claimedEmpties().size()) + ".");
+
+        b.state = b.depositInventoryFirst.get() ? StashSorter.SortState.SELECT_DEST : StashSorter.SortState.SELECT_JOB;
     }
 }

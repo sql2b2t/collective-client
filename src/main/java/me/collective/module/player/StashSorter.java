@@ -113,7 +113,7 @@ public class StashSorter extends Module {
         .sliderRange(1, 32)
         .build());
 
-    private final Setting<Integer> minItemsForOwnChest = sgGeneral.add(new IntSetting.Builder()
+    final Setting<Integer> minItemsForOwnChest = sgGeneral.add(new IntSetting.Builder()
         .name("мин-предметов-для-своего")
         .description("Сколько предметов одной категории нужно, чтобы выделить им отдельный сундук.")
         .defaultValue(32)
@@ -130,13 +130,13 @@ public class StashSorter extends Module {
         .max(8)
         .build());
 
-    private final Setting<Boolean> depositInventoryFirst = sgGeneral.add(new BoolSetting.Builder()
+    final Setting<Boolean> depositInventoryFirst = sgGeneral.add(new BoolSetting.Builder()
         .name("сначала-выложить-инвентарь")
         .description("Сначала разложить то, что уже лежит в инвентаре, и только потом начать сбор.")
         .defaultValue(true)
         .build());
 
-    private final Setting<Boolean> verifyEveryChest = sgGeneral.add(new BoolSetting.Builder()
+    final Setting<Boolean> verifyEveryChest = sgGeneral.add(new BoolSetting.Builder()
         .name("проверять-каждый-сундук")
         .description("Первый проход открывает все сундуки зоны подряд, даже если план их не тронул. Надёжнее, но дольше.")
         .defaultValue(false)
@@ -204,7 +204,7 @@ public class StashSorter extends Module {
         .max(180)
         .build());
 
-    private final Setting<Verbosity> verbosity = sgGeneral.add(new EnumSetting.Builder<Verbosity>()
+    final Setting<Verbosity> verbosity = sgGeneral.add(new EnumSetting.Builder<Verbosity>()
         .name("подробность")
         .description("Сколько писать в чат. «Только итог» молчит на каждом сундуке "
             + "и в конце показывает сводку пропусков — иначе на большом стеше "
@@ -258,7 +258,7 @@ public class StashSorter extends Module {
         lastPacketTime = System.currentTimeMillis();
     }
 
-    private SortState state = SortState.IDLE;
+    SortState state = SortState.IDLE;
     private SortState lastState = SortState.IDLE;
     private int stateTicks;
     private int timer;
@@ -268,7 +268,7 @@ public class StashSorter extends Module {
     int alignTicks;
 
     private long startTime;
-    private int pass = 1;
+    int pass = 1;
     private int movedAtPassStart;
     private int sweptAtPassStart;
     private int chestsSwept;
@@ -276,7 +276,7 @@ public class StashSorter extends Module {
     private int shulkersMoved;
     int jobIdx;
     private int depositLastCount = -1;
-    private boolean keepSlotsCaptured;
+    boolean keepSlotsCaptured;
     private PauseReason pauseReason = PauseReason.MANUAL;
 
     List<SortPlanner.SweepJob> jobs = new ArrayList<>();
@@ -456,111 +456,7 @@ public class StashSorter extends Module {
     // ------------------------------------------------------------------
 
     private void handlePlan() {
-        String dim = dimension();
-        markedFull.clear();
-        deadRoutes.clear();
-        overflowChests.clear();
-        overflowRoutes.clear();
-
-        // Слоты, которые игрок занял до сортировки, не трогаем
-        if (!keepSlotsCaptured) {
-            keepSlotsCaptured = true;
-            if (!depositInventoryFirst.get()) {
-                for (int i = reservedHotbarSlots.get(); i < 36; i++) {
-                    if (!mc.player.getInventory().getStack(i).isEmpty()) keepSlots.add(i);
-                }
-            }
-        }
-
-        Map<String, List<BlockPos>> pins = buildPinMap(dim);
-        List<SortPlanner.ContainerSnapshot> snapshots = buildSnapshots(dim, pins.keySet());
-        BlockPos origin = mc.player.getBlockPos();
-        List<BlockPos> unknown = unknownContainers();
-
-        if (snapshots.isEmpty()) {
-            if (unknown.isEmpty()) {
-                warning("В зоне нет сундуков (ни в индексе, ни в чанках). Включи «ContainerIndex» или открой сундуки.");
-                toggle();
-                return;
-            }
-            info("В индексе сундуков нет, но найдено " + unknown.size() + " сундуков в зоне. Провожу сканирование...");
-            jobs = new ArrayList<>();
-            for (BlockPos p : unknown) {
-                jobs.add(new SortPlanner.SweepJob(p, null));
-            }
-            jobIdx = 0;
-            sigTargets = new LinkedHashMap<>();
-            emptyClaims.clear();
-            spareEmpties.clear();
-            knownFree.clear();
-            for (BlockPos p : unknown) knownFree.put(p, slotCountOf(p, containerTypeAt(p), 0));
-            state = SortState.SELECT_JOB;
-            return;
-        }
-
-        knownFree.clear();
-        for (SortPlanner.ContainerSnapshot c : snapshots) {
-            knownFree.put(c.pos(), Math.max(0, c.estSlots() - c.usedSlots()));
-        }
-        for (BlockPos p : unknown) knownFree.put(p, slotCountOf(p, containerTypeAt(p), 0));
-
-        SortPlanner.Plan plan = SortPlanner.planConsolidation(
-            withProbeSnapshots(snapshots, unknown), 1, origin, this::maxStackOfSig, pins,
-            minItemsForOwnChest.get(), unknown);
-
-        for (String w : plan.warnings()) {
-            if (verbosity.get() == Verbosity.ПОДРОБНО) warning(w);
-            else note("предупреждение плана", w);
-        }
-
-        jobs = new ArrayList<>(plan.jobs());
-        if (verifyEveryChest.get() && pass == 1) {
-            // Первый проход — осмотр всего: так расхождения индекса всплывают сразу
-            jobs = new ArrayList<>();
-            List<SortPlanner.ContainerSnapshot> ordered = new ArrayList<>(snapshots);
-            ordered.sort(Comparator.<SortPlanner.ContainerSnapshot>comparingDouble(c -> origin.getSquaredDistance(c.pos()))
-                .thenComparing(SortPlanner.ContainerSnapshot::pos));
-            for (SortPlanner.ContainerSnapshot c : ordered) {
-                if (c.usedSlots() > 0) jobs.add(new SortPlanner.SweepJob(c.pos(), null));
-            }
-        }
-        // Если есть сундуки без записи, добавляем их для обязательного осмотра и индексации
-        for (BlockPos p : unknown) {
-            boolean already = false;
-            for (SortPlanner.SweepJob j : jobs) {
-                if (j.pos().equals(p)) { already = true; break; }
-            }
-            if (!already) jobs.add(new SortPlanner.SweepJob(p, null));
-        }
-
-        jobIdx = 0;
-
-        sigTargets = new LinkedHashMap<>();
-        for (Map.Entry<String, List<BlockPos>> e : plan.sigTargets().entrySet()) {
-            sigTargets.put(e.getKey(), new ArrayList<>(e.getValue()));
-        }
-
-        emptyClaims.clear();
-        emptyClaims.addAll(plan.claimedEmpties());
-
-        Set<BlockPos> pinnedPos = new HashSet<>();
-        for (List<BlockPos> ps : pins.values()) pinnedPos.addAll(ps);
-
-        int emptyIndexed = 0;
-        for (SortPlanner.ContainerSnapshot c : snapshots) {
-            if (c.usedSlots() == 0 && !pinnedPos.contains(c.pos())) {
-                emptyIndexed++;
-                if (!plan.claimedEmpties().contains(c.pos())) spareEmpties.add(c.pos());
-            }
-        }
-        spareEmpties.sort(Comparator.comparingDouble((BlockPos p) -> origin.getSquaredDistance(p)).thenComparing(p -> p));
-
-        info("План готов" + (pass > 1 ? " (проход " + pass + ")" : "") + ": сундуков в зоне "
-            + snapshots.size() + " (пустых " + emptyIndexed
-            + (unknown.isEmpty() ? "" : ", без записи " + unknown.size()) + "), к разбору " + jobs.size()
-            + (plan.claimedEmpties().isEmpty() ? "" : ", занято новых сундуков " + plan.claimedEmpties().size()) + ".");
-
-        state = depositInventoryFirst.get() ? SortState.SELECT_DEST : SortState.SELECT_JOB;
+        StashSorterPlanning.handlePlan(this);
     }
 
     private void handleSelectJob() {
@@ -1573,7 +1469,7 @@ public class StashSorter extends Module {
         INVENTORY_FULL
     }
 
-    private enum SortState {
+    enum SortState {
         IDLE,
         PLAN,
         SELECT_JOB,
