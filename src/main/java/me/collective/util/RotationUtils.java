@@ -48,16 +48,20 @@ public class RotationUtils {
     /** Минимальный шаг угла, кратный которому уходят углы в пакеты. */
     private static final float WIRE_NUDGE = 0.01f;
 
-    private float serverYaw;
-    private float serverPitch;
+    // serverYaw/serverPitch/current*/prevCurrent* пишутся из двух потоков:
+    // onPacketReceive стреляет из netty (ClientConnection.channelRead0),
+    // тик-логика читает и пишет их на главном. 32-битные float не рвутся,
+    // но без volatile netty-запись может не стать видимой главному потоку.
+    private volatile float serverYaw;
+    private volatile float serverPitch;
 
-    private Float finalYaw;
-    private Float finalPitch;
+    private volatile Float finalYaw;
+    private volatile Float finalPitch;
 
-    private float currentYaw;
-    private float currentPitch;
-    private float prevCurrentYaw;
-    private float prevCurrentPitch;
+    private volatile float currentYaw;
+    private volatile float currentPitch;
+    private volatile float prevCurrentYaw;
+    private volatile float prevCurrentPitch;
 
     private double turnSpeed = DEFAULT_TURN_SPEED;
     private boolean syncMovement;
@@ -83,18 +87,6 @@ public class RotationUtils {
 
     private final float quantum;
     private final Random random = new Random();
-
-    /** Направления ввода: [вперёд, назад, влево, вправо]. */
-    private static final boolean[][] INPUT_DIRS = {
-        {true, false, false, false},
-        {true, false, false, true},
-        {false, false, false, true},
-        {false, true, false, true},
-        {false, true, false, false},
-        {false, true, true, false},
-        {false, false, true, false},
-        {true, false, true, false}
-    };
 
     private RotationUtils() {
         // квант зависит от «чувствительности» — как в замере у реального игрока

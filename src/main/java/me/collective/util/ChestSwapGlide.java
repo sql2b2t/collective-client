@@ -24,10 +24,8 @@ import net.minecraft.network.packet.s2c.play.EntityTrackerUpdateS2CPacket;
 import net.minecraft.network.packet.s2c.play.InventoryS2CPacket;
 import net.minecraft.network.packet.s2c.play.PlayerActionResponseS2CPacket;
 import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
-import net.minecraft.network.packet.s2c.play.PositionFlag;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
-import net.minecraft.util.math.Vec3d;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayDeque;
@@ -130,7 +128,8 @@ public class ChestSwapGlide {
     private volatile boolean holdActive;
     private volatile int lastPingId = NO_PING;
     private volatile int holdPingId = NO_PING;
-    private boolean clearHeld;
+    /** Пишется из netty-обработчика понга (clearHeld = true) и из тика (сбросы). */
+    private volatile boolean clearHeld;
     private boolean exposed;
     private int holdTicks;
     private int exposedTicks;
@@ -337,11 +336,6 @@ public class ChestSwapGlide {
         // ракета сгорела, а клир так и лежит — надо взорвать на первом же тике
         if (rocketGone && this.holdActive && !this.rocketBurstDue) {
             this.rocketBurstDue = true;
-
-            if (false) {
-                this.owner.info("Chest swap: a rocket burnt out with a clear held - bursting at the "
-                    + "first legal tick so Grim gets its pong.");
-            }
         }
 
         watchDurability();
@@ -371,10 +365,6 @@ public class ChestSwapGlide {
         } else if (hand == null) {
             problem("Chest swap: chest armour worn with no elytra in a hand - nothing to glide with.");
         } else if (this.outTick < 0 ? due() : this.preTick - this.outTick >= this.intervalTicks.getAsInt() + CLEAR_WAIT_TICKS) {
-            if (this.outTick >= 0 && false) {
-                this.owner.warning("Chest swap: no clear back %d ticks after a swap-out, restarting "
-                    + "the glide anyway.", this.preTick - this.outTick);
-            }
 
             burst(chest, hand, true);
         }
@@ -542,42 +532,14 @@ public class ChestSwapGlide {
             this.exposed ? ", exposed" : "", this.finishing ? ", handing back" : "");
     }
 
-    /** Разбор телепорта: сервер откатил игрока — значит увидел не то состояние. */
+    /**
+     * Разбор телепорта: сервер откатил игрока — значит увидел не то состояние.
+     * Счётчики телепортов/сетбэков доступны как индикатор проблем с glide.
+     */
     private void logTeleport(PlayerPositionLookS2CPacket packet) {
         this.teleports++;
 
-        boolean grim = packet.teleportId() < 0;
-        if (grim) this.grimSetbacks++;
-
-        if (!false || MinecraftClient.getInstance().player == null) return;
-
-        Set<PositionFlag> relatives = packet.relatives();
-        Vec3d target = packet.change().position();
-
-        double tx = relatives.contains(PositionFlag.X) ? MinecraftClient.getInstance().player.getX() + target.x : target.x;
-        double ty = relatives.contains(PositionFlag.Y) ? MinecraftClient.getInstance().player.getY() + target.y : target.y;
-        double tz = relatives.contains(PositionFlag.Z) ? MinecraftClient.getInstance().player.getZ() + target.z : target.z;
-
-        Vec3d back = MinecraftClient.getInstance().player.getEntityPos().subtract(tx, ty, tz);
-        Vec3d delta = packet.change().deltaMovement();
-
-        String velocity;
-        if (relatives.contains(PositionFlag.DELTA_X) || relatives.contains(PositionFlag.DELTA_Y)
-            || relatives.contains(PositionFlag.DELTA_Z)) {
-            velocity = "kept";
-        } else if (delta.lengthSquared() == 0.0) {
-            velocity = "zeroed";
-        } else {
-            velocity = String.format("set to %.2f b/t", delta.length());
-        }
-
-        this.owner.warning(
-            "Server teleport #%d (%s): %.1f blocks behind the client (dx %.1f, dy %.1f, dz %.1f), "
-                + "velocity %s | %s | swap: %s | last ticks (gap ms/moves): %s | ping gap max %d ms",
-            packet.teleportId(),
-            grim ? "Grim setback" : "vanilla: moved too quickly or wrongly",
-            back.length(), back.x, back.y, back.z, velocity,
-            this.flightContext.get(), swapState(), recentTicks(), this.maxPingGapMs);
+        if (packet.teleportId() < 0) this.grimSetbacks++;
     }
 
     private boolean engage() {
@@ -719,9 +681,7 @@ public class ChestSwapGlide {
         this.exposedTicks = 0;
         this.holdTicks = 0;
 
-        if (!gliderOn && !sendSwap(hand, false) && false) {
-            this.owner.warning("Chest swap: the elytra could not be swapped in ahead of a glide start.");
-        }
+        if (!gliderOn) sendSwap(hand, false);
 
         MinecraftClient.getInstance().getNetworkHandler().sendPacket(new ClientCommandC2SPacket(
             MinecraftClient.getInstance().player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
@@ -733,10 +693,6 @@ public class ChestSwapGlide {
         this.bursts++;
 
         this.rocketBurstDue = false;
-
-        if (false && held > this.intervalTicks.getAsInt()) {
-            this.owner.info("Chest swap: held the clear %d ticks before the burst.", held);
-        }
 
         this.outTick = -1;
 
@@ -752,8 +708,6 @@ public class ChestSwapGlide {
     /** Отпустить клир: серверу нельзя держать нас без элитры. */
     private void release(String why) {
         this.released++;
-
-        if (false) this.owner.warning("Chest swap: let a glide clear go - %s.", why);
 
         this.holdActive = false;
         this.holdTicks = 0;
@@ -786,23 +740,6 @@ public class ChestSwapGlide {
 
         if (this.lastDamage >= 0 && damage > this.lastDamage) {
             this.lostDurability += damage - this.lastDamage;
-
-            if (false) {
-                String why;
-                if (this.outTick >= 0) {
-                    why = "a swap-out unanswered for " + (this.preTick - this.outTick) + " ticks";
-                } else if (this.holdActive) {
-                    why = "a clear held " + this.holdTicks + " ticks";
-                } else {
-                    why = "no swap in flight";
-                }
-
-                this.owner.warning(
-                    "Chest swap: the elytra lost %d durability (%d/%d left) - %d ticks after the last "
-                        + "burst, %s.",
-                    damage - this.lastDamage, elytra.getMaxDamage() - damage, elytra.getMaxDamage(),
-                    this.preTick - this.burstTick, why);
-            }
         }
 
         this.lastDamage = damage;
@@ -833,11 +770,6 @@ public class ChestSwapGlide {
         if (this.engaged) {
             if (!clear && !this.finishing) {
                 this.groundHandBacks++;
-
-                if (false) {
-                    this.owner.info("Chest swap: ground within the server's reach (%.1f blocks of air "
-                        + "needed) - handing the glide back.", need);
-                }
             }
 
             return clear;
@@ -850,14 +782,7 @@ public class ChestSwapGlide {
             return true;
         }
 
-        if (!clear && !this.groundNoted) {
-            this.groundNoted = true;
-
-            if (false) {
-                this.owner.info("Chest swap: %.1f blocks of air below needed before the first swap - "
-                    + "gliding on the elytra until then.", need);
-            }
-        }
+        if (!clear) this.groundNoted = true;
 
         return false;
     }
@@ -956,10 +881,6 @@ public class ChestSwapGlide {
         this.outTick = -1;
         this.exposed = true;
         this.exposedTicks = 0;
-
-        if (false) {
-            this.owner.info("Chest swap: a teleport let the held clear through - restarting the glide.");
-        }
     }
 
     /** Сервер подтвердил смену слота — клир можно удерживать. */
@@ -974,11 +895,6 @@ public class ChestSwapGlide {
             swap.exposures++;
             swap.exposed = true;
             swap.exposedTicks = 0;
-
-            if (false) {
-                swap.owner.info("Chest swap: the server's clear arrived behind its own pong - "
-                    + "restarting the glide.");
-            }
         }
 
         return true;
@@ -1126,10 +1042,6 @@ public class ChestSwapGlide {
         }
 
         this.refused += undo.size();
-
-        if (false) {
-            this.owner.info("Chest swap: the server did not apply %d swap(s) - view put back.", undo.size());
-        }
     }
 
     /** Рука, в которой лежит «вторая часть» пары: элитра или нагрудник. */

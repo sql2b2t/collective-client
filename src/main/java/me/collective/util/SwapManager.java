@@ -11,6 +11,8 @@ import net.minecraft.network.packet.c2s.play.*;
 import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
 import net.minecraft.util.Hand;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * Арбитр захвата слота: один модуль держит предмет в руке сервера, остальные ждут.
  */
@@ -31,7 +33,13 @@ public class SwapManager {
     private boolean actionConflict;
     private boolean movedSinceTickEnd;
     private boolean inTickHead;
-    private int pendingTeleportConfirms;
+    /**
+     * Счётчик неподтверждённых телепортов: инкремент приходит из
+     * onPacketReceive на netty-потоке, декремент — из onPacketSend на главном.
+     * Read-modify-write из двух потоков требует атомарности, иначе апдейты
+     * теряются и swap-логика ждёт подтверждения, которое «уже съедено».
+     */
+    private final AtomicInteger pendingTeleportConfirms = new AtomicInteger();
     private boolean pendingRelease;
     private boolean bouncing;
 
@@ -222,8 +230,7 @@ public class SwapManager {
         }
 
         if (packet instanceof PlayerMoveC2SPacket) {
-            if (this.pendingTeleportConfirms > 0) {
-                this.pendingTeleportConfirms--;
+            if (this.pendingTeleportConfirms.updateAndGet(v -> v > 0 ? v - 1 : 0) > 0) {
                 return;
             }
 
@@ -243,7 +250,7 @@ public class SwapManager {
 
     @EventHandler
     public void onPacketReceive(PacketEvent.Receive event) {
-        if (event.packet instanceof PlayerPositionLookS2CPacket) this.pendingTeleportConfirms++;
+        if (event.packet instanceof PlayerPositionLookS2CPacket) this.pendingTeleportConfirms.incrementAndGet();
     }
 
     /** Полный сброс при выходе с сервера. */
@@ -252,7 +259,7 @@ public class SwapManager {
         this.actionConflict = false;
         this.movedSinceTickEnd = false;
         this.inTickHead = false;
-        this.pendingTeleportConfirms = 0;
+        this.pendingTeleportConfirms.set(0);
         this.bouncing = false;
     }
 

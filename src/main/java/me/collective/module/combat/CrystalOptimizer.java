@@ -241,7 +241,9 @@ public class CrystalOptimizer extends Module {
         float pitch = (float) -Math.toDegrees(Math.atan2(diffY, diffXZ));
 
         RotationUtils.getInstance().setRotationInstant(this, 90, yaw, pitch, false);
-        RotationUtils.getInstance().flushServerRotation();
+        // flushServerRotation() здесь был вызовом осознанного no-op: досылка
+        // look-пакета перед атакой триггерит Grim PacketOrder, поэтому углы
+        // уходят со следующим movement-пакетом как обычно.
     }
 
     private boolean isCrystalHeld() {

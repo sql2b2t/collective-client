@@ -9,8 +9,12 @@ import java.awt.Color;
 import java.nio.FloatBuffer;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class BlurEngine {
     public static final BlurEngine INSTANCE = new BlurEngine();
+    private static final Logger LOG = LoggerFactory.getLogger(BlurEngine.class);
     private static final MinecraftClient mc = MinecraftClient.getInstance();
 
     private int shaderProgram = -1;
@@ -65,19 +69,26 @@ public class BlurEngine {
 
     private void init() {
         if (initialized || shaderFailed) return;
+        // Шейдерные объекты живут только до линковки программы: на любом
+        // провале (компиляция, линковка, исключение) удаляем их — раньше
+        // неудачный init утекал созданные объекты при каждом повторе.
+        int vert = -1;
+        int frag = -1;
         try {
-            int vert = GL20.glCreateShader(GL20.GL_VERTEX_SHADER);
+            vert = GL20.glCreateShader(GL20.GL_VERTEX_SHADER);
             GL20.glShaderSource(vert, VERTEX_SHADER);
             GL20.glCompileShader(vert);
             if (GL20.glGetShaderi(vert, GL20.GL_COMPILE_STATUS) == 0) {
+                LOG.warn("[Blur] Vertex shader compile failed: {}", GL20.glGetShaderInfoLog(vert));
                 shaderFailed = true;
                 return;
             }
 
-            int frag = GL20.glCreateShader(GL20.GL_FRAGMENT_SHADER);
+            frag = GL20.glCreateShader(GL20.GL_FRAGMENT_SHADER);
             GL20.glShaderSource(frag, FRAGMENT_SHADER);
             GL20.glCompileShader(frag);
             if (GL20.glGetShaderi(frag, GL20.GL_COMPILE_STATUS) == 0) {
+                LOG.warn("[Blur] Fragment shader compile failed: {}", GL20.glGetShaderInfoLog(frag));
                 shaderFailed = true;
                 return;
             }
@@ -88,9 +99,18 @@ public class BlurEngine {
             GL20.glBindAttribLocation(shaderProgram, 0, "aPos");
             GL20.glLinkProgram(shaderProgram);
             if (GL20.glGetProgrami(shaderProgram, GL20.GL_LINK_STATUS) == 0) {
+                LOG.warn("[Blur] Shader program link failed: {}", GL20.glGetProgramInfoLog(shaderProgram));
                 shaderFailed = true;
                 return;
             }
+
+            // Шейдеры больше не нужны после линковки — освобождаем немедленно.
+            GL20.glDetachShader(shaderProgram, vert);
+            GL20.glDetachShader(shaderProgram, frag);
+            GL20.glDeleteShader(vert);
+            GL20.glDeleteShader(frag);
+            vert = -1;
+            frag = -1;
 
             uDirection = GL20.glGetUniformLocation(shaderProgram, "uDirection");
             uRadius = GL20.glGetUniformLocation(shaderProgram, "uRadius");
@@ -118,7 +138,11 @@ public class BlurEngine {
 
             initialized = true;
         } catch (Throwable t) {
+            LOG.warn("[Blur] Shader init failed, blur disabled for the session", t);
             shaderFailed = true;
+        } finally {
+            if (vert != -1) GL20.glDeleteShader(vert);
+            if (frag != -1) GL20.glDeleteShader(frag);
         }
     }
 
@@ -189,6 +213,10 @@ public class BlurEngine {
         int prevActiveTex = GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE);
         boolean prevScissor = GL11.glIsEnabled(GL11.GL_SCISSOR_TEST);
         boolean prevBlend = GL11.glIsEnabled(GL11.GL_BLEND);
+        // Свой viewport обязаны вернуть: иначе весь последующий рендер кадра
+        // (включая fallback) уходит в уменьшенное разрешение блюра.
+        int[] prevViewport = new int[4];
+        GL11.glGetIntegerv(GL11.GL_VIEWPORT, prevViewport);
         boolean prevDepth = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
 
         try {
@@ -279,7 +307,21 @@ public class BlurEngine {
             GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, prevFbo);
             GL13.glActiveTexture(prevActiveTex);
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, prevTex);
+            GL11.glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
         } catch (Throwable t) {
+            LOG.warn("[Blur] Render pass failed, falling back to plain tint", t);
+            // Восстанавливаем всё захваченное до fallback: иначе упавший
+            // проход оставляет чужие FBO/program/viewport активными и
+            // fallback рисуется в них.
+            GL11.glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+            GL30.glBindVertexArray(prevVao);
+            GL20.glUseProgram(prevProgram);
+            GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, prevFbo);
+            GL13.glActiveTexture(prevActiveTex);
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, prevTex);
+            if (prevScissor) GL11.glEnable(GL11.GL_SCISSOR_TEST); else GL11.glDisable(GL11.GL_SCISSOR_TEST);
+            if (prevBlend) GL11.glEnable(GL11.GL_BLEND); else GL11.glDisable(GL11.GL_BLEND);
+            if (prevDepth) GL11.glEnable(GL11.GL_DEPTH_TEST); else GL11.glDisable(GL11.GL_DEPTH_TEST);
             renderFallback(context, regions, alpha);
         }
     }

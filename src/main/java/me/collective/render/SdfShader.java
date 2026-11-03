@@ -7,12 +7,17 @@ import org.lwjgl.opengl.*;
 import java.awt.Color;
 import java.nio.FloatBuffer;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * GPU-evaluated Signed Distance Field (SDF) renderer for smooth 2D UI primitives.
  * Renders pixel-perfect anti-aliased rounded rectangles, circles, and outlines.
  */
 public class SdfShader {
     public static final SdfShader INSTANCE = new SdfShader();
+
+    private static final Logger LOG = LoggerFactory.getLogger(SdfShader.class);
 
     private int programId = -1;
     private int uWindowSize = -1;
@@ -87,19 +92,25 @@ public class SdfShader {
 
     public void init() {
         if (initialized || failed) return;
+        // Шейдерные объекты удаляем на любом пути провала — иначе каждый
+        // повторный init до первого успеха копит утечку в драйвере.
+        int vert = -1;
+        int frag = -1;
         try {
-            int vert = GL20.glCreateShader(GL20.GL_VERTEX_SHADER);
+            vert = GL20.glCreateShader(GL20.GL_VERTEX_SHADER);
             GL20.glShaderSource(vert, VERTEX_SHADER);
             GL20.glCompileShader(vert);
             if (GL20.glGetShaderi(vert, GL20.GL_COMPILE_STATUS) == 0) {
+                LOG.warn("[Sdf] Vertex shader compile failed: {}", GL20.glGetShaderInfoLog(vert));
                 failed = true;
                 return;
             }
 
-            int frag = GL20.glCreateShader(GL20.GL_FRAGMENT_SHADER);
+            frag = GL20.glCreateShader(GL20.GL_FRAGMENT_SHADER);
             GL20.glShaderSource(frag, FRAGMENT_SHADER);
             GL20.glCompileShader(frag);
             if (GL20.glGetShaderi(frag, GL20.GL_COMPILE_STATUS) == 0) {
+                LOG.warn("[Sdf] Fragment shader compile failed: {}", GL20.glGetShaderInfoLog(frag));
                 failed = true;
                 return;
             }
@@ -111,9 +122,15 @@ public class SdfShader {
             GL20.glLinkProgram(programId);
 
             if (GL20.glGetProgrami(programId, GL20.GL_LINK_STATUS) == 0) {
+                LOG.warn("[Sdf] Shader program link failed: {}", GL20.glGetProgramInfoLog(programId));
                 failed = true;
                 return;
             }
+
+            GL20.glDetachShader(programId, vert);
+            GL20.glDetachShader(programId, frag);
+            vert = -1;
+            frag = -1;
 
             uWindowSize   = GL20.glGetUniformLocation(programId, "uWindowSize");
             uSize         = GL20.glGetUniformLocation(programId, "uSize");
@@ -128,7 +145,11 @@ public class SdfShader {
 
             initialized = true;
         } catch (Throwable t) {
+            LOG.warn("[Sdf] Init failed, SDF rendering disabled for the session", t);
             failed = true;
+        } finally {
+            if (vert != -1) GL20.glDeleteShader(vert);
+            if (frag != -1) GL20.glDeleteShader(frag);
         }
     }
 
@@ -175,6 +196,10 @@ public class SdfShader {
         return initialized && !failed;
     }
 
+    /** GL-состояние, изменённое setupDraw и восстанавливаемое в endDraw. */
+    private boolean prevBlend;
+    private boolean prevCullFace;
+
     private void setupDraw(float x, float y, float width, float height) {
         MinecraftClient mc = MinecraftClient.getInstance();
         int sw = mc.getWindow().getScaledWidth();
@@ -185,6 +210,8 @@ public class SdfShader {
         GL20.glUniform2f(uOrigin, x, y);
         GL20.glUniform2f(uSize, width, height);
 
+        prevBlend = GL11.glIsEnabled(GL11.GL_BLEND);
+        prevCullFace = GL11.glIsEnabled(GL11.GL_CULL_FACE);
         GL11.glEnable(GL11.GL_BLEND);
         GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
         GL11.glDisable(GL11.GL_CULL_FACE);
@@ -222,6 +249,10 @@ public class SdfShader {
     }
 
     private void endDraw() {
+        // Возвращаем состояние ровно к тому, что было до setupDraw: без этого
+        // cull-face оставался выключенным для всего последующего рендера.
+        if (prevCullFace) GL11.glEnable(GL11.GL_CULL_FACE); else GL11.glDisable(GL11.GL_CULL_FACE);
+        if (prevBlend) GL11.glEnable(GL11.GL_BLEND); else GL11.glDisable(GL11.GL_BLEND);
         GL20.glUseProgram(0);
     }
 }

@@ -74,5 +74,7 @@ java {
 tasks.withType(JavaCompile).configureEach {
     it.options.encoding = 'UTF-8'
     it.options.release = 21
-    it.options.compilerArgs += ['-nowarn','-Xlint:none','-Xmaxerrs','100000','-Xmaxwarns','0']
+    // -Xlint возвращён: подавленные предупреждения (deprecation, unchecked,
+    // rawtypes) скрывали реальные проблемы — теперь они видны в выводе сборки.
+    it.options.compilerArgs += ['-Xlint:deprecation,unchecked,rawtypes', '-Xmaxerrs', '100000']
 }

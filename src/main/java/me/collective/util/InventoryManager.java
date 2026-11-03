@@ -20,7 +20,12 @@ public class InventoryManager {
     private static final MinecraftClient mc = MinecraftClient.getInstance();
     private static InventoryManager INSTANCE;
 
-    private int serverSlot = -1;
+    /**
+     * Серверный слот пишется из onPacketReceive (netty-поток) и из тик-логики
+     * на главном, читается на главном: volatile гарантирует видимость записи
+     * из netty без синхронизации (int не рвётся).
+     */
+    private volatile int serverSlot = -1;
     private int lastSentSlot = -1;
     private boolean sendingPacket;
     private boolean isEating;
