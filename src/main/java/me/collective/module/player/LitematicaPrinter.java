@@ -12,7 +12,9 @@ import me.collective.setting.SettingColorSetting;
 
 import me.collective.util.SwapManager;
 import me.collective.util.RotationUtils;
-import me.collective.util.printer.AirPlaceExecutor;
+// AirPlaceExecutor единый (me.collective.util): printer-копия удалена как дубль,
+// расходившийся с оригиналом по sequence-семантике и обработке placePos.
+import me.collective.util.AirPlaceExecutor;
 import me.collective.util.printer.PlacementSolver;
 import me.collective.util.printer.PrinterRegion;
 import me.collective.util.printer.SchematicAccess;
