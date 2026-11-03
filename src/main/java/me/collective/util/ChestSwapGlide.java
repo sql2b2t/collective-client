@@ -122,7 +122,12 @@ public class ChestSwapGlide {
     private volatile boolean holdActive;
     private volatile int lastPingId = NO_PING;
     private volatile int holdPingId = NO_PING;
-    /** Пишется из netty-обработчика понга (clearHeld = true) и из тика (сбросы). */
+    /**
+     * Остаточное состояние флага «сервер подтвердил клир». Единственные
+     * писатели (onPongSent/onGlideClearApplied) относились к непоключённой
+     * ping/pong-подсистеме из BepHax и удалены; флаг навсегда false, ветки
+     * чтения оставлены до отдельной ревизии state-машины.
+     */
     private volatile boolean clearHeld;
     private boolean exposed;
     private int holdTicks;
