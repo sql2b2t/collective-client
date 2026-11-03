@@ -200,13 +200,13 @@ public class HighwayBuilderHIG extends Module {
         return inFwd || inBack || inLeft || inRight || inJump || inSneak;
     }
 
-    private HorizontalDirection dir;
+    HorizontalDirection dir;
     private HorizontalDirection leftDir;
     private HorizontalDirection rightDir;
 
     // state / blockPosProvider / suspended читает HighwayRenderer — package-private
     State state;
-    private State lastState;
+    State lastState;
     IBlockPosProvider blockPosProvider;
 
     public Vec3d start;
@@ -221,7 +221,7 @@ public class HighwayBuilderHIG extends Module {
     private int placeTimer;
     private int breakTimer;
     private int count;
-    private int containerId;
+    int containerId;
     final RestockTask restockTask = new RestockTask(this);
     private final ArrayList<EndCrystalEntity> ignoreCrystals = new ArrayList<>();
     public boolean drawingBow;
@@ -397,11 +397,11 @@ public class HighwayBuilderHIG extends Module {
         packetMining = null;
     }
 
-    private void setState(State state) {
+    void setState(State state) {
         setState(state, this.state);
     }
 
-    private void setState(State state, State lastState) {
+    void setState(State state, State lastState) {
         this.lastState = lastState;
         this.state = state;
         stopInput();
@@ -458,7 +458,7 @@ public class HighwayBuilderHIG extends Module {
         return (System.currentTimeMillis() - lastTickMs) / 1000f;
     }
 
-    private float[] lookAt(Vec3d from, Vec3d to) {
+    float[] lookAt(Vec3d from, Vec3d to) {
         double dx = to.x - from.x;
         double dy = to.y - from.y;
         double dz = to.z - from.z;
@@ -469,25 +469,25 @@ public class HighwayBuilderHIG extends Module {
         };
     }
 
-    private float[] lookAt(Entity e) {
+    float[] lookAt(Entity e) {
         return lookAt(mc.player.getEyePos(), new Vec3d(e.getX(), e.getY() + 0.5, e.getZ()));
     }
 
-    private float[] lookAt(BlockPos bp) {
+    float[] lookAt(BlockPos bp) {
         return lookAt(mc.player.getEyePos(),
             new Vec3d(bp.getX() + 0.5, bp.getY() + 0.5, bp.getZ() + 0.5));
     }
 
-    private void rotateTo(float yaw, float pitch) {
+    void rotateTo(float yaw, float pitch) {
         RotationUtils.getInstance().setRotationSilentInstant(this, 50, yaw, pitch);
     }
 
-    private void rotateTo(BlockPos bp) {
+    void rotateTo(BlockPos bp) {
         float[] yp = lookAt(bp);
         rotateTo(yp[0], yp[1]);
     }
 
-    private void rotateTo(Entity e) {
+    void rotateTo(Entity e) {
         float[] yp = lookAt(e);
         rotateTo(yp[0], yp[1]);
     }
@@ -511,7 +511,7 @@ public class HighwayBuilderHIG extends Module {
     }
 
     /** Ставит блок с опорой на соседний цельный блок. */
-    private boolean placeBlock(BlockPos pos, int hotbarSlot) {
+    boolean placeBlock(BlockPos pos, int hotbarSlot) {
         if (mc.player == null || mc.world == null || mc.interactionManager == null) return false;
         for (Direction dir : new Direction[]{Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST}) {
             BlockPos neighbor = pos.offset(dir);
@@ -544,7 +544,7 @@ public class HighwayBuilderHIG extends Module {
         return false;
     }
 
-    private boolean breakBlockAt(BlockPos bp) {
+    boolean breakBlockAt(BlockPos bp) {
         if (mc.player == null || mc.interactionManager == null) return false;
         Direction dir = getInteractDirection(bp);
         if (rotation.getValue().mine) {
@@ -725,19 +725,19 @@ public class HighwayBuilderHIG extends Module {
         return HighwayInventory.findHotbarSlot(this, replaceTools);
     }
 
-    private boolean hasItem(Predicate<ItemStack> predicate) {
+    boolean hasItem(Predicate<ItemStack> predicate) {
         return HighwayInventory.hasItem(predicate);
     }
 
-    private int countItem(Predicate<ItemStack> predicate) {
+    int countItem(Predicate<ItemStack> predicate) {
         return HighwayInventory.countItem(predicate);
     }
 
-    private int findAndMoveToHotbar(Predicate<ItemStack> predicate) {
+    int findAndMoveToHotbar(Predicate<ItemStack> predicate) {
         return HighwayInventory.findAndMoveToHotbar(this, predicate);
     }
 
-    private int findAndMoveBestToolToHotbar(BlockState blockState, boolean noSilkTouch) {
+    int findAndMoveBestToolToHotbar(BlockState blockState, boolean noSilkTouch) {
         return HighwayInventory.findAndMoveBestToolToHotbar(this, blockState, noSilkTouch);
     }
 
@@ -768,7 +768,7 @@ public class HighwayBuilderHIG extends Module {
         return slot != -1 ? slot : findBlocksToPlace();
     }
 
-    private void quickMove(int containerSlot) {
+    void quickMove(int containerSlot) {
         if (mc.player == null || mc.interactionManager == null) return;
         mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId,
             containerSlot, 0, SlotActionType.QUICK_MOVE, mc.player);
@@ -1422,305 +1422,14 @@ public class HighwayBuilderHIG extends Module {
         },
 
         Restock {
-            private final MBlockPos pos = new MBlockPos();
-            private int minimumSlots;
-            private int stopTimer;
-            private int delayTimer;
-            private boolean breakContainer;
-            private boolean indicateStopping;
-            private Predicate<ItemStack> shulkerPredicate;
-            private int slot = -1;
-
             @Override
             protected void start(HighwayBuilderHIG b) {
-                slot = -1;
-
-                if (shulkerPredicate == null) setShulkerPredicate(b);
-
-                if (b.restockTask.tasksInactive()) {
-                    b.setState(Forward);
-                    return;
-                }
-
-                if (b.lastState != Center && b.lastState != ThrowOutTrash && b.lastState != PlaceShulkerBlockade && b.lastState != this) {
-                    b.setState(Center);
-                    return;
-                } else if (b.lastState == Center) {
-                    b.setState(ThrowOutTrash);
-                    return;
-                }
-
-                if (slot == -1 && b.searchShulkers.getValue()) {
-                    slot = b.findAndMoveToHotbar(shulkerPredicate);
-
-                    if (slot != -1 && b.lastState != PlaceShulkerBlockade) {
-                        b.setState(PlaceShulkerBlockade);
-                    }
-                }
-
-                if (slot == -1 && b.searchEnderChest.getValue() && b.countItem(stack -> stack.getItem() == Items.ENDER_CHEST) > 0) {
-                    boolean stop = EChestMemory.isKnown();
-                    if (EChestMemory.isKnown()) {
-                        for (ItemStack stack : EChestMemory.ITEMS) {
-                            if (b.restockTask.materials && stack.getItem() instanceof BlockItem bi) {
-                                if (b.blocksToPlace.getValue().contains(bi.getBlock()) || (b.blocksToPlace.getValue().contains(Blocks.OBSIDIAN) && bi == Items.ENDER_CHEST)) {
-                                    stop = false;
-                                    break;
-                                }
-                            }
-                            if (b.restockTask.pickaxes && stack.isIn(ItemTags.PICKAXES)) {
-                                stop = false;
-                                break;
-                            }
-                            if (b.restockTask.food && stack.get(DataComponentTypes.FOOD) != null) {
-                                stop = false;
-                                break;
-                            }
-
-                            if (b.searchShulkers.getValue() && shulkerPredicate.test(stack)) {
-                                stop = false;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (!stop) slot = b.findAndMoveToHotbar(stack -> stack.getItem() == Items.ENDER_CHEST);
-                }
-
-                if (slot == -1) {
-                    boolean restockOccurred = (
-                        (b.restockTask.materials && (b.hasItem(stack -> stack.getItem() instanceof BlockItem bi && b.blocksToPlace.getValue().contains(bi.getBlock())) || b.blocksToPlace.getValue().contains(Blocks.OBSIDIAN) && b.countItem(stack -> stack.getItem() == Items.ENDER_CHEST) > b.saveEchests.getIntValue())) ||
-                            (b.restockTask.pickaxes && b.countItem(stack -> stack.isIn(ItemTags.PICKAXES)) > b.savePickaxes.getIntValue()) ||
-                            (b.restockTask.food && b.hasItem(stack -> stack.get(DataComponentTypes.FOOD) != null))
-                    );
-
-                    if (restockOccurred) {
-                        b.setState(ThrowOutTrash, Forward);
-                    } else b.error("Unable to perform restock for '" + b.restockTask.item() + "'.");
-
-                    return;
-                }
-
-                int restockSlots = -b.minEmpty.getIntValue();
-                for (int i = 0; i < 36; i++) {
-                    if (b.mc.player.getInventory().getStack(i).isEmpty()) restockSlots++;
-                }
-
-                if (restockSlots <= 0) {
-                    b.error("No empty slots for restocking items.");
-                    return;
-                }
-
-                minimumSlots = b.restockTask.materials ? restockSlots : 1;
-
-                HorizontalDirection dir = b.dir.diagonal ? b.dir.rotateLeft().rotateLeftSkipOne() : b.dir.opposite();
-                pos.set(b.mc.player).offset(dir);
-
-                breakContainer = b.mc.world.getBlockState(pos.getBlockPos()).getBlock() == Blocks.ENDER_CHEST;
-
-                indicateStopping = false;
-                delayTimer = b.inventoryDelay.getIntValue();
+                HighwayRestock.INSTANCE.start(b);
             }
 
             @Override
             protected void tick(HighwayBuilderHIG b) {
-                if (slot == -1) {
-                    b.error("Invalid restocking action.");
-                    return;
-                }
-
-                if (indicateStopping && !breakContainer) {
-                    if (stopTimer > 0) stopTimer--;
-                    else {
-                        if (b.lastState == PlaceShulkerBlockade) {
-                            b.setState(MineShulkerBlockade);
-                        } else {
-                            b.setState(ThrowOutTrash, Forward);
-                        }
-                    }
-
-                    return;
-                }
-
-                if (b.restockTask.tasksInactive()) {
-                    b.setState(Forward);
-                    return;
-                }
-
-                if (delayTimer > 0) {
-                    delayTimer--;
-                    return;
-                }
-
-                int slotsPulled = 0;
-                if (b.restockTask.materials) {
-                    slotsPulled += countSlots(stack -> stack.getItem() instanceof BlockItem bi && b.blocksToPlace.getValue().contains(bi.getBlock()));
-                    if (b.blocksToPlace.getValue().contains(Blocks.OBSIDIAN))
-                        slotsPulled += ((b.countItem(stack -> stack.getItem() == Items.ENDER_CHEST) - b.saveEchests.getIntValue()) * 8) / 64;
-                }
-                if (b.restockTask.pickaxes)
-                    slotsPulled += countSlots(stack -> stack.isIn(ItemTags.PICKAXES)) - b.savePickaxes.getIntValue();
-                if (b.restockTask.food)
-                    slotsPulled += countSlots(stack -> stack.get(DataComponentTypes.FOOD) != null);
-
-                if (slotsPulled >= minimumSlots && !indicateStopping) {
-                    indicateStopping = true;
-                    breakContainer = true;
-                    stopTimer = 12;
-                    if (b.mc.currentScreen != null) b.mc.setScreen(null);
-                    return;
-                }
-
-                BlockPos blockPos = pos.getBlockPos();
-                BlockState blockState = b.mc.world.getBlockState(blockPos);
-
-                switch (blockState.getBlock()) {
-                    case ShulkerBoxBlock shulker -> {
-                        if (b.mc.currentScreen instanceof ShulkerBoxScreen screen) {
-                            if (screen.getScreenHandler().syncId != b.containerId) return;
-
-                            if (restockItems(b, screen.getScreenHandler(), 27)) {
-                                delayTimer = b.inventoryDelay.getIntValue();
-                                return;
-                            }
-
-                            b.mc.setScreen(null);
-                            breakContainer = true;
-                        } else {
-                            if (!b.searchShulkers.getValue()) breakContainer = true;
-                            handleContainerBlock(b, blockPos);
-                        }
-                    }
-
-                    case EnderChestBlock echest -> {
-                        if (b.mc.currentScreen instanceof GenericContainerScreen screen) {
-                            if (screen.getScreenHandler().syncId != b.containerId) return;
-
-                            EChestMemory.updateFrom(screen.getScreenHandler());
-
-                            if (restockItems(b, screen.getScreenHandler(), screen.getScreenHandler() instanceof GenericContainerScreenHandler handler ? handler.getRows() * 9 : 27)) {
-                                delayTimer = b.inventoryDelay.getIntValue();
-                                return;
-                            }
-
-                            if (b.searchShulkers.getValue()) {
-                                ScreenHandler menu = screen.getScreenHandler();
-                                for (int i = 0; i < 27 && i < menu.slots.size(); i++) {
-                                    if (shulkerPredicate.test(menu.slots.get(i).getStack())) {
-                                        b.quickMove(i);
-                                        delayTimer = b.inventoryDelay.getIntValue();
-                                        break;
-                                    }
-                                }
-                            }
-
-                            b.mc.setScreen(null);
-                            breakContainer = true;
-                        } else {
-                            if (!b.searchEnderChest.getValue()) breakContainer = true;
-                            handleContainerBlock(b, blockPos);
-                        }
-                    }
-
-                    case AirBlock air -> {
-                        if (breakContainer) {
-                            breakContainer = false;
-
-                            if (indicateStopping) b.restockTask.complete();
-                            else start(b);
-
-                            return;
-                        }
-
-                        b.placeBlock(blockPos, slot);
-                    }
-
-                    default -> b.error("Invalid block at container restocking position?");
-                }
-            }
-
-            private boolean restockItems(HighwayBuilderHIG b, ScreenHandler menu, int containerSize) {
-                if (b.restockTask.materials) {
-                    if (grabFromInventory(b, menu, containerSize, stack -> stack.getItem() instanceof BlockItem bi && b.blocksToPlace.getValue().contains(bi.getBlock())))
-                        return true;
-
-                    if (b.blocksToPlace.getValue().contains(Blocks.OBSIDIAN)) {
-                        if (grabFromInventory(b, menu, containerSize, stack -> stack.getItem() == Items.ENDER_CHEST)) return true;
-                    }
-                }
-                if (b.restockTask.pickaxes) {
-                    if (grabFromInventory(b, menu, containerSize, stack -> stack.isIn(ItemTags.PICKAXES))) return true;
-                }
-                if (b.restockTask.food) {
-                    return grabFromInventory(b, menu, containerSize, stack -> stack.get(DataComponentTypes.FOOD) != null);
-                }
-
-                return false;
-            }
-
-            private boolean grabFromInventory(HighwayBuilderHIG b, ScreenHandler menu, int containerSize, Predicate<ItemStack> filterItem) {
-                for (int i = 0; i < containerSize && i < menu.slots.size(); i++) {
-                    if (filterItem.test(menu.slots.get(i).getStack())) {
-                        b.quickMove(i);
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            private void setShulkerPredicate(HighwayBuilderHIG b) {
-                shulkerPredicate = itemStack -> {
-                    if (!HighwayInventory.isShulker(itemStack.getItem())) return false;
-                    List<ItemStack> contents = ShulkerDataParser.parseShulkerContentsAsList(itemStack);
-
-                    for (ItemStack stack : contents) {
-                        if (b.restockTask.materials && stack.getItem() instanceof BlockItem bi) {
-                            if (b.blocksToPlace.getValue().contains(bi.getBlock()) || (b.blocksToPlace.getValue().contains(Blocks.OBSIDIAN) && bi == Items.ENDER_CHEST))
-                                return true;
-                        }
-                        if (b.restockTask.pickaxes && stack.isIn(ItemTags.PICKAXES)) return true;
-                        if (b.restockTask.food && stack.get(DataComponentTypes.FOOD) != null) return true;
-                    }
-
-                    return false;
-                };
-            }
-
-            private void handleContainerBlock(HighwayBuilderHIG b, BlockPos bp) {
-                if (breakContainer) {
-                    BlockState state = b.mc.world.getBlockState(bp);
-                    int toolSlot = b.findAndMoveBestToolToHotbar(state, false);
-                    InventoryUtil.swap(toolSlot);
-
-                    if (b.rotation.getValue().mine) {
-                        float[] yp = b.lookAt(bp);
-                        b.rotateTo(yp[0], yp[1]);
-                    }
-                    b.breakBlockAt(bp);
-                    Direction dir = getInteractDirection(bp);
-                    Vec3d hitVec = new Vec3d(bp.getX() + 0.5 + dir.getOffsetX() * 0.45,
-                        bp.getY() + 0.5 + dir.getOffsetY() * 0.45,
-                        bp.getZ() + 0.5 + dir.getOffsetZ() * 0.45);
-                    InventoryUtil.swap(slot);
-                    if (b.rotation.getValue().place) {
-                        float[] yp = b.lookAt(b.mc.player.getEyePos(), hitVec);
-                        b.rotateTo(yp[0], yp[1]);
-                    }
-                    b.mc.interactionManager.interactBlock(b.mc.player, Hand.MAIN_HAND,
-                        new BlockHitResult(hitVec, dir, bp, false));
-                    b.mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
-                    delayTimer = b.inventoryDelay.getIntValue();
-                }
-            }
-
-            private int countSlots(Predicate<ItemStack> predicate) {
-                int count = 0;
-                for (int i = 0; i < 36; i++) {
-                    if (predicate.test(mc.player.getInventory().getStack(i))) count++;
-                }
-
-                return count;
+                HighwayRestock.INSTANCE.tick(b);
             }
         },
 
@@ -2634,7 +2343,7 @@ public class HighwayBuilderHIG extends Module {
         }
     }
 
-    private static class EChestMemory {
+    static class EChestMemory {
         static final ItemStack[] ITEMS = new ItemStack[27];
         private static boolean known = false;
 
