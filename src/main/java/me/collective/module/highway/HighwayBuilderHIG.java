@@ -774,7 +774,7 @@ public class HighwayBuilderHIG extends Module {
             containerSlot, 0, SlotActionType.QUICK_MOVE, mc.player);
     }
 
-    private void dropSlot(int invSlot) {
+    void dropSlot(int invSlot) {
         if (mc.player == null || mc.interactionManager == null) return;
         int slot = invSlot < 9 ? 36 + invSlot : invSlot;
         int syncId = mc.player.currentScreenHandler.syncId;
@@ -782,7 +782,7 @@ public class HighwayBuilderHIG extends Module {
         mc.interactionManager.clickSlot(syncId, -999, 0, SlotActionType.PICKUP, mc.player);
     }
 
-    private void dropCursor() {
+    void dropCursor() {
         if (mc.player == null || mc.interactionManager == null) return;
         if (mc.player.currentScreenHandler.getCursorStack().isEmpty()) return;
         mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId,
@@ -1132,93 +1132,14 @@ public class HighwayBuilderHIG extends Module {
         },
 
         ThrowOutTrash {
-            private int skipSlot;
-            private boolean timerEnabled;
-            private boolean firstTick;
-            private boolean threwItems;
-            private int timer;
-
             @Override
             protected void start(HighwayBuilderHIG b) {
-                int biggestCount = 0;
-
-                for (int i = 0; i < 36; i++) {
-                    ItemStack itemStack = b.mc.player.getInventory().getStack(i);
-
-                    if (itemStack.getItem() instanceof BlockItem && b.trashItems.getValue().contains(itemStack.getItem()) && itemStack.getCount() > biggestCount) {
-                        biggestCount = itemStack.getCount();
-                        skipSlot = i;
-
-                        if (biggestCount >= 64) break;
-                    }
-                }
-
-                if (biggestCount == 0) skipSlot = -1;
-                timerEnabled = false;
-                firstTick = true;
-                threwItems = false;
+                HighwayThrowOutTrash.INSTANCE.start(b);
             }
 
             @Override
             protected void tick(HighwayBuilderHIG b) {
-                if (timerEnabled) {
-                    if (timer > 0) timer--;
-                    else b.setState(b.lastState);
-
-                    return;
-                }
-
-                b.rotateTo(b.dir.yaw, -25);
-
-                if (firstTick) {
-                    firstTick = false;
-                    return;
-                }
-
-                if (!b.mc.player.currentScreenHandler.getCursorStack().isEmpty()) {
-                    b.dropCursor();
-                    return;
-                }
-
-                for (int i = 0; i < 36; i++) {
-                    if (i == skipSlot) continue;
-
-                    ItemStack itemStack = b.mc.player.getInventory().getStack(i);
-
-                    if (b.trashItems.getValue().contains(itemStack.getItem())) {
-                        b.dropSlot(i);
-                        threwItems = true;
-                        return;
-                    }
-
-                    if (b.ejectUselessShulkers.getValue() && HighwayInventory.isShulker(itemStack.getItem())) {
-                        List<ItemStack> contents = ShulkerDataParser.parseShulkerContentsAsList(itemStack);
-                        boolean eject = true;
-                        for (ItemStack stack : contents) {
-                            if (stack.getItem() instanceof BlockItem bi && (b.blocksToPlace.getValue().contains(bi.getBlock()) || (b.blocksToPlace.getValue().contains(Blocks.OBSIDIAN) && bi == Items.ENDER_CHEST))) {
-                                eject = false;
-                                break;
-                            }
-                            if (stack.isIn(ItemTags.PICKAXES)) {
-                                eject = false;
-                                break;
-                            }
-                            if (stack.get(DataComponentTypes.FOOD) != null) {
-                                eject = false;
-                                break;
-                            }
-                        }
-
-                        if (eject) {
-                            b.dropSlot(i);
-                            threwItems = true;
-                            return;
-                        }
-                    }
-                }
-
-                timerEnabled = true;
-                timer = threwItems ? 10 : 1;
+                HighwayThrowOutTrash.INSTANCE.tick(b);
             }
         },
 
