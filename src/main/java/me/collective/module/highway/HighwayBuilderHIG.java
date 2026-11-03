@@ -721,14 +721,6 @@ public class HighwayBuilderHIG extends Module {
         if (finishedPlacing || !placed) b.setState(nextState);
     }
 
-    private int findSlot(Predicate<ItemStack> predicate, boolean hotbar) {
-        for (int i = hotbar ? 0 : 9; i < (hotbar ? 9 : 36); i++) {
-            if (predicate.test(mc.player.getInventory().getStack(i))) return i;
-        }
-
-        return -1;
-    }
-
     private int findHotbarSlot(boolean replaceTools) {
         int thrashSlot = -1;
         int slotsWithBlocks = 0;
@@ -740,7 +732,7 @@ public class HighwayBuilderHIG extends Module {
 
             if (itemStack.isEmpty()) return i;
 
-            if (replaceTools && isToolLike(itemStack)) return i;
+            if (replaceTools && HighwayInventory.isToolLike(itemStack)) return i;
 
             if (trashItems.getValue().contains(itemStack.getItem())) thrashSlot = i;
 
@@ -763,31 +755,21 @@ public class HighwayBuilderHIG extends Module {
     }
 
     private boolean hasItem(Predicate<ItemStack> predicate) {
-        for (int i = 0; i < 36; i++) {
-            if (predicate.test(mc.player.getInventory().getStack(i))) return true;
-        }
-
-        return false;
+        return HighwayInventory.hasItem(predicate);
     }
 
     private int countItem(Predicate<ItemStack> predicate) {
-        int count = 0;
-        for (int i = 0; i < 36; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
-            if (predicate.test(stack)) count += stack.getCount();
-        }
-
-        return count;
+        return HighwayInventory.countItem(predicate);
     }
 
     private int findAndMoveToHotbar(Predicate<ItemStack> predicate) {
-        int slot = findSlot(predicate, true);
+        int slot = HighwayInventory.findSlot(predicate, true);
         if (slot != -1) return slot;
 
         int hotbarSlot = findHotbarSlot(false);
         if (hotbarSlot == -1) return -1;
 
-        slot = findSlot(predicate, false);
+        slot = HighwayInventory.findSlot(predicate, false);
         if (slot == -1) return -1;
 
         movePairToHotbar(slot, hotbarSlot);
@@ -803,7 +785,7 @@ public class HighwayBuilderHIG extends Module {
 
         for (int i = 0; i < 36; i++) {
             ItemStack stack = mc.player.getInventory().getStack(i);
-            double score = toolScore(stack, blockState, noSilkTouch);
+            double score = HighwayInventory.toolScore(this, stack, blockState, noSilkTouch);
             if (score > bestScore) {
                 bestScore = score;
                 bestSlot = i;
@@ -835,48 +817,6 @@ public class HighwayBuilderHIG extends Module {
         movePairToHotbar(bestSlot, hotbarSlot);
 
         return hotbarSlot;
-    }
-
-    private double toolScore(ItemStack stack, BlockState state, boolean noSilkTouch) {
-        if (stack.isEmpty() || !stack.isDamageable()) return -1;
-        if (noSilkTouch && hasEnchantment(stack, Enchantments.SILK_TOUCH)) return -1;
-        if (dontBreakTools.getValue()
-            && stack.getMaxDamage() - stack.getDamage() <= stack.getMaxDamage() * (breakDurability.getValue() / 100.0)) {
-            return -1;
-        }
-        double score = 0;
-        if (stack.isSuitableFor(state)) score += 100;
-        score += effLevel(stack) * 10;
-        score += stack.getMaxDamage() / 128.0;
-        return score;
-    }
-
-    private boolean hasEnchantment(ItemStack stack, net.minecraft.registry.RegistryKey<net.minecraft.enchantment.Enchantment> key) {
-        try {
-            RegistryEntry<net.minecraft.enchantment.Enchantment> entry = mc.world.getRegistryManager()
-                .getOrThrow(RegistryKeys.ENCHANTMENT).getOrThrow(key);
-            return stack.getEnchantments().getEnchantments().stream().anyMatch(e -> e.equals(entry));
-        } catch (Exception ignored) {
-            return false;
-        }
-    }
-
-    private int effLevel(ItemStack stack) {
-        try {
-            RegistryEntry<net.minecraft.enchantment.Enchantment> entry = mc.world.getRegistryManager()
-                .getOrThrow(RegistryKeys.ENCHANTMENT).getOrThrow(Enchantments.EFFICIENCY);
-            return stack.getEnchantments().getLevel(entry);
-        } catch (Exception ignored) {
-            return 0;
-        }
-    }
-
-    private static boolean isShulker(Item item) {
-        return item instanceof BlockItem bi && bi.getBlock() instanceof ShulkerBoxBlock;
-    }
-
-    private static boolean isToolLike(ItemStack stack) {
-        return !stack.isEmpty() && stack.isDamageable() && !(stack.getItem() instanceof BlockItem);
     }
 
     private int findBlocksToPlace() {
@@ -1161,7 +1101,7 @@ public class HighwayBuilderHIG extends Module {
 
                 return slot != -1 ? slot : b.findAndMoveToHotbar(stack -> {
                     if (!(stack.getItem() instanceof BlockItem bi)) return false;
-                    if (isShulker(stack.getItem())) return false;
+                    if (HighwayInventory.isShulker(stack.getItem())) return false;
                     Block block = bi.getBlock();
 
                     if (!block.getDefaultState().isSolidBlock(b.mc.world, pos)) return false;
@@ -1343,7 +1283,7 @@ public class HighwayBuilderHIG extends Module {
                         return;
                     }
 
-                    if (b.ejectUselessShulkers.getValue() && isShulker(itemStack.getItem())) {
+                    if (b.ejectUselessShulkers.getValue() && HighwayInventory.isShulker(itemStack.getItem())) {
                         List<ItemStack> contents = ShulkerDataParser.parseShulkerContentsAsList(itemStack);
                         boolean eject = true;
                         for (ItemStack stack : contents) {
@@ -1823,7 +1763,7 @@ public class HighwayBuilderHIG extends Module {
 
             private void setShulkerPredicate(HighwayBuilderHIG b) {
                 shulkerPredicate = itemStack -> {
-                    if (!isShulker(itemStack.getItem())) return false;
+                    if (!HighwayInventory.isShulker(itemStack.getItem())) return false;
                     List<ItemStack> contents = ShulkerDataParser.parseShulkerContentsAsList(itemStack);
 
                     for (ItemStack stack : contents) {
