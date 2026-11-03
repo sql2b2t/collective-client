@@ -56,12 +56,21 @@ public final class Utils {
         return perp.length();
     }
 
+    /**
+     * Маркер возврата {@link #firework}: ракета использована, элитра уже
+     * надета — свапать нагрудник не нужно. Значение историческое (200),
+     * вызывающие сравнивают именно с константой, а не с литералом.
+     */
+    public static final int FIREWORK_NO_ELYTRA_SWAP = 200;
+
     public static int firework(net.minecraft.client.MinecraftClient mc, boolean elytraRequired) {
         if (mc.player == null || mc.interactionManager == null) return -1;
 
         int elytraSwapSlot = -1;
 
-        if (elytraRequired && !mc.player.getInventory().getStack(38).isOf(net.minecraft.item.Items.ELYTRA)) {
+        // Слот 38 — нагрудник: читаем через экипировку, а не магическим индексом.
+        if (elytraRequired && !mc.player.getEquippedStack(net.minecraft.entity.EquipmentSlot.CHEST)
+                .isOf(net.minecraft.item.Items.ELYTRA)) {
             FindItemResult elytra = InventoryUtil.findInHotbar(net.minecraft.item.Items.ELYTRA);
             if (!elytra.found()) return -1;
 
@@ -88,7 +97,7 @@ public final class Utils {
                 InventoryUtil.swapBack();
             }
 
-            return elytraSwapSlot != -1 ? elytraSwapSlot : 200;
+            return elytraSwapSlot != -1 ? elytraSwapSlot : FIREWORK_NO_ELYTRA_SWAP;
         }
 
         int movedSlot = -1;
@@ -110,7 +119,7 @@ public final class Utils {
 
             InventoryUtil.move().from(mc.player.getInventory().selectedSlot).to(movedSlot);
 
-            return elytraSwapSlot != -1 ? elytraSwapSlot : 200;
+            return elytraSwapSlot != -1 ? elytraSwapSlot : FIREWORK_NO_ELYTRA_SWAP;
         }
 
         return -1;

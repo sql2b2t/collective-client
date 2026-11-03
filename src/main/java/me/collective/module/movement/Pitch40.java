@@ -180,7 +180,7 @@ public class Pitch40 extends Module {
                         int launchStatus = Utils.firework(mc, false);
                         if (launchStatus >= 0) {
                             this.fireworkCooldown = this.fireworkCooldownTicks.getIntValue();
-                            if (launchStatus != 200) {
+                            if (launchStatus != Utils.FIREWORK_NO_ELYTRA_SWAP) {
                                 this.elytraSwapSlot = launchStatus;
                             }
                             this.peakY = playerY;
