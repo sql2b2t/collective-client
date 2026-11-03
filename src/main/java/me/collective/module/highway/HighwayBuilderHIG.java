@@ -223,7 +223,7 @@ public class HighwayBuilderHIG extends Module {
     private int count;
     int containerId;
     final RestockTask restockTask = new RestockTask(this);
-    private final ArrayList<EndCrystalEntity> ignoreCrystals = new ArrayList<>();
+    final ArrayList<EndCrystalEntity> ignoreCrystals = new ArrayList<>();
     public boolean drawingBow;
     public DoubleMineBlock normalMining;
     public DoubleMineBlock packetMining;
@@ -789,7 +789,7 @@ public class HighwayBuilderHIG extends Module {
             -999, 0, SlotActionType.PICKUP, mc.player);
     }
 
-    private EndCrystalEntity nearestCrystal() {
+    EndCrystalEntity nearestCrystal() {
         if (mc.player == null || mc.world == null) return null;
         EndCrystalEntity best = null;
         double bestDist = Double.MAX_VALUE;
@@ -1456,103 +1456,14 @@ public class HighwayBuilderHIG extends Module {
         },
 
         DefuseCrystalTraps {
-            private int cooldown;
-            private int shots;
-            private EndCrystalEntity target;
-            private long drawStartMs;
-
             @Override
             protected void start(HighwayBuilderHIG b) {
-                if (!InventoryUtil.find(Items.BOW).found()
-                    || (!InventoryUtil.find(stack -> stack.getItem() instanceof ArrowItem).found() && !b.mc.player.isCreative())) {
-                    b.destroyCrystalTraps.setValue(false);
-                    b.warning("No bow found to destroy crystal traps with. Toggling the setting off.");
-                    b.setState(Forward);
-                }
-
-                shots = cooldown = 0;
-                target = null;
-                drawStartMs = 0L;
+                HighwayCrystalDefuse.INSTANCE.start(b);
             }
 
             @Override
             protected void tick(HighwayBuilderHIG b) {
-                if (cooldown > 0) {
-                    cooldown--;
-                    return;
-                }
-
-                if (!InventoryUtil.testInMainHand(stack -> stack.isOf(Items.BOW))) {
-                    int slot = b.findAndMoveToHotbar(stack -> stack.getItem() instanceof BowItem);
-                    if (slot == -1) {
-                        b.destroyCrystalTraps.setValue(false);
-                        b.warning("No bow found to destroy crystal traps with. Toggling the setting off.");
-                        b.setState(Forward);
-                        b.mc.player.stopUsingItem();
-                        b.drawingBow = false;
-                        drawStartMs = 0L;
-                        return;
-                    }
-
-                    InventoryUtil.swap(slot);
-                }
-
-                EndCrystalEntity potentialTarget = b.nearestCrystal();
-                if (target == null || target.isRemoved()) {
-                    if (potentialTarget == null) {
-                        b.setState(Forward);
-                        b.mc.player.stopUsingItem();
-                        b.drawingBow = false;
-                        drawStartMs = 0L;
-                        return;
-                    } else {
-                        target = potentialTarget;
-                        shots = 0;
-                    }
-                }
-
-                if (shots >= 3) {
-                    b.ignoreCrystals.add(target);
-                    b.warning("Detected potential hangup on a crystal. Adding it to ignore list and continuing forward.");
-                    b.setState(Forward);
-                    b.mc.player.stopUsingItem();
-                    b.drawingBow = false;
-                    drawStartMs = 0L;
-                    return;
-                }
-
-                float[] yp = b.lookAt(target);
-                b.rotateTo(yp[0], yp[1]);
-
-                int powerTicks = drawStartMs == 0L ? 0 : (int) ((System.currentTimeMillis() - drawStartMs) / 50L);
-                if (BowItem.getPullProgress(powerTicks) >= 1.0f) {
-                    b.mc.player.stopUsingItem();
-                    b.drawingBow = false;
-                    drawStartMs = 0L;
-                    cooldown = 20;
-                    shots++;
-                } else {
-                    if (!b.drawingBow) drawStartMs = System.currentTimeMillis();
-                    b.drawingBow = true;
-                    b.mc.interactionManager.interactItem(b.mc.player, Hand.MAIN_HAND);
-                }
-            }
-
-            private float aim(HighwayBuilderHIG b, Entity target) {
-                float velocity = BowItem.getPullProgress(drawStartMs == 0L ? 0 : (int) ((System.currentTimeMillis() - drawStartMs) / 50L));
-
-                Vec3d pos = target.getEntityPos();
-
-                double relativeX = pos.x - b.mc.player.getX();
-                double relativeY = pos.y + 0.5 - b.mc.player.getEyePos().y;
-                double relativeZ = pos.z - b.mc.player.getZ();
-
-                double hDistance = Math.sqrt(relativeX * relativeX + relativeZ * relativeZ);
-                double hDistanceSq = hDistance * hDistance;
-                float g = 0.006f;
-                float velocitySq = velocity * velocity;
-
-                return (float) -Math.toDegrees(Math.atan((velocitySq - Math.sqrt(velocitySq * velocitySq - g * (g * hDistanceSq + 2 * relativeY * velocitySq))) / (g * hDistance)));
+                HighwayCrystalDefuse.INSTANCE.tick(b);
             }
         };
 
