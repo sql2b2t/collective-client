@@ -587,7 +587,7 @@ public class HighwayBuilderHIG extends Module {
         }
     }
 
-    private void mine(HighwayBuilderHIG b, MBPIterator it, boolean mineBlocksToPlace, State nextState, State lastState) {
+    void mine(HighwayBuilderHIG b, MBPIterator it, boolean mineBlocksToPlace, State nextState, State lastState) {
         boolean breaking = false;
         boolean finishedBreaking = false;
 
@@ -1444,28 +1444,14 @@ public class HighwayBuilderHIG extends Module {
         },
 
         MineShulkerBlockade {
-            private boolean stopTimerEnabled;
-            private int stopTimer;
-
             @Override
             protected void start(HighwayBuilderHIG b) {
-                stopTimerEnabled = false;
-                if (b.lastState == this) {
-                    stopTimerEnabled = true;
-                    stopTimer = 12;
-                }
+                HighwayMineShulkerBlockade.INSTANCE.start(b);
             }
 
             @Override
             protected void tick(HighwayBuilderHIG b) {
-                if (!stopTimerEnabled) {
-                    b.mine(b, b.blockPosProvider.getBlockade(true, b.blockadeType.getValue()), true, this, this);
-                } else {
-                    stopTimer--;
-                    if (stopTimer <= 0) {
-                        b.setState(ThrowOutTrash, Forward);
-                    }
-                }
+                HighwayMineShulkerBlockade.INSTANCE.tick(b);
             }
         },
 
