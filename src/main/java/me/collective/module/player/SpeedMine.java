@@ -68,7 +68,7 @@ public class SpeedMine extends Module {
     private final SettingGroup sgAutoMine = this.settings.createGroup("Авто-майнинг");
     private final SettingGroup sgRender = this.settings.createGroup("Отображение");
 
-    private final Setting<SpeedmineMode> modeConfig = this.sgGeneral.add(new EnumSetting.Builder<SpeedmineMode>()
+    final Setting<SpeedmineMode> modeConfig = this.sgGeneral.add(new EnumSetting.Builder<SpeedmineMode>()
         .name("режим")
         .description("Режим майнинга.")
         .defaultValue(SpeedmineMode.PACKET)
@@ -263,29 +263,29 @@ public class SpeedMine extends Module {
         .visible(this.autoMine::get)
         .build());
 
-    private final Setting<Boolean> render = this.sgRender.add(new BoolSetting.Builder()
+    final Setting<Boolean> render = this.sgRender.add(new BoolSetting.Builder()
         .name("отрисовка")
         .description("Отрисовывать ли блок, который копается.")
         .defaultValue(true)
         .build());
-    private final Setting<ShapeMode> shapeMode = this.sgRender.add(new EnumSetting.Builder<ShapeMode>()
+    final Setting<ShapeMode> shapeMode = this.sgRender.add(new EnumSetting.Builder<ShapeMode>()
         .name("режим-фигуры")
         .description("Как отрисовываются фигуры.")
         .defaultValue(ShapeMode.Both)
         .build());
-    private final Setting<SettingColor> colorConfig = this.sgRender.add(new ColorSetting.Builder()
+    final Setting<SettingColor> colorConfig = this.sgRender.add(new ColorSetting.Builder()
         .name("цвет-майна")
         .description("Цвет отрисовки майнинга.")
         .defaultValue(new SettingColor(Color.BLUE))
         .visible(() -> this.modeConfig.get() == SpeedmineMode.PACKET)
         .build());
-    private final Setting<SettingColor> colorDoneConfig = this.sgRender.add(new ColorSetting.Builder()
+    final Setting<SettingColor> colorDoneConfig = this.sgRender.add(new ColorSetting.Builder()
         .name("цвет-готово")
         .description("Цвет отрисовки завершённого блока.")
         .defaultValue(new SettingColor(Color.CYAN))
         .visible(() -> this.modeConfig.get() == SpeedmineMode.PACKET)
         .build());
-    private final Setting<Integer> fadeTimeConfig = this.sgRender.add(new IntSetting.Builder()
+    final Setting<Integer> fadeTimeConfig = this.sgRender.add(new IntSetting.Builder()
         .name("время-затухания")
         .description("Время затухания.")
         .defaultValue(250)
@@ -294,9 +294,9 @@ public class SpeedMine extends Module {
         .visible(() -> false)
         .build());
 
-    private final Map<BlockPos, FadeEntry> fadeList = new HashMap<>();
-    private final SettingColor renderBoxColor = new SettingColor();
-    private final SettingColor renderLineColor = new SettingColor();
+
+    final SettingColor renderBoxColor = new SettingColor();
+    final SettingColor renderLineColor = new SettingColor();
 
     private static final int ALIGN_TIMEOUT_TICKS = 10;
     private static final int MAX_DIG_PACKETS_PER_SECOND = 300;
@@ -313,9 +313,9 @@ public class SpeedMine extends Module {
     private static final int BYPASS_Y_MAX = 2000;
     private static final int MAX_BYPASS_DIGS_PER_SECOND = 40;
 
-    private MiningData activeMine;
-    private MiningData secondaryMine;
-    private final ArrayDeque<MiningData> pending = new ArrayDeque<>();
+    MiningData activeMine;
+    MiningData secondaryMine;
+    final ArrayDeque<MiningData> pending = new ArrayDeque<>();
     private int destroyDelayTicks;
     private BlockPos lastStartPos;
     private long lastFinishMs;
@@ -431,7 +431,7 @@ public class SpeedMine extends Module {
         this.activeMine = null;
         this.secondaryMine = null;
         this.pending.clear();
-        this.fadeList.clear();
+        this.renderer.clear();
         this.destroyDelayTicks = 0;
         this.instaGracePos = null;
         this.instaGraceTicks = 0;
@@ -1135,69 +1135,10 @@ public class SpeedMine extends Module {
 
     @EventHandler
     public void onRenderWorld(Render3DEvent event) {
-        if (this.mc.player != null && this.mc.world != null) {
-            if (!this.mc.player.isCreative() && this.modeConfig.get() == SpeedmineMode.PACKET && this.render.get()) {
-                this.trackFade(this.activeMine);
-                this.trackFade(this.secondaryMine);
-
-                for (MiningData data : this.pending) {
-                    this.trackFade(data);
-                }
-
-                float total = this.getEffectiveThreshold();
-                double fadeSeconds = this.fadeTimeConfig.get().intValue() / 1000.0;
-                SettingColor mineColor = this.colorConfig.get();
-                SettingColor doneColor = this.colorDoneConfig.get();
-                Iterator<FadeEntry> it = this.fadeList.values().iterator();
-
-                while (it.hasNext()) {
-                    FadeEntry entry = it.next();
-                    MiningData data = entry.data;
-                    BlockState state = data.getState();
-                    boolean air = state.isAir();
-                    boolean primary = data == this.activeMine || data == this.secondaryMine;
-                    boolean queued = !primary && this.pending.contains(data);
-                    boolean visible = (primary || queued) && !air;
-                    entry.fade.update(visible, fadeSeconds, true);
-                    if (!visible && !entry.fade.rendering()) {
-                        it.remove();
-                    } else {
-                        float factor = entry.fade.alpha();
-                        int boxAlpha = (int) ((queued ? 20 : 40) * factor);
-                        int lineAlpha = (int) ((queued ? 60 : 100) * factor);
-                        boolean done = !queued && (data.damage >= total || air);
-                        SettingColor base = done ? doneColor : mineColor;
-                        this.renderBoxColor.set(base.r, base.g, base.b, boxAlpha);
-                        this.renderLineColor.set(base.r, base.g, base.b, lineAlpha);
-                        BlockPos mining = data.pos;
-                        VoxelShape outlineShape = state.getOutlineShape(this.mc.world, mining);
-                        Box bounds = (outlineShape.isEmpty() ? VoxelShapes.fullCube() : outlineShape).getBoundingBox();
-                        float scale = !queued && !air
-                            ? MathHelper.clamp((data.damage + (data.damage - data.lastDamage) * event.tickDelta) / total, 0.0F, 1.0F)
-                            : 1.0F;
-                        double cx = mining.getX() + (bounds.minX + bounds.maxX) / 2.0;
-                        double cy = mining.getY() + (bounds.minY + bounds.maxY) / 2.0;
-                        double cz = mining.getZ() + (bounds.minZ + bounds.maxZ) / 2.0;
-                        double hx = (bounds.maxX - bounds.minX) / 2.0 * scale;
-                        double hy = (bounds.maxY - bounds.minY) / 2.0 * scale;
-                        double hz = (bounds.maxZ - bounds.minZ) / 2.0 * scale;
-                        event.renderer.box(cx - hx, cy - hy, cz - hz, cx + hx, cy + hy, cz + hz, this.renderBoxColor, this.renderLineColor, this.shapeMode.get(), 0);
-                    }
-                }
-            }
-        }
+        renderer.onRenderWorld(this, event);
     }
 
-    private void trackFade(MiningData data) {
-        if (data != null && !data.getState().isAir()) {
-            FadeEntry existing = this.fadeList.get(data.pos);
-            if (existing == null) {
-                this.fadeList.put(data.pos, new FadeEntry(data));
-            } else {
-                existing.data = data;
-            }
-        }
-    }
+    private final SpeedMineRenderer renderer = new SpeedMineRenderer();
 
     public boolean canDelegateMining() {
         return this.isActive() && this.modeConfig.get() == SpeedmineMode.PACKET;
@@ -1610,15 +1551,6 @@ public class SpeedMine extends Module {
         return bestDir;
     }
 
-    private static final class FadeEntry {
-        private MiningData data;
-        private final FadeAnimator fade = new FadeAnimator();
-
-        private FadeEntry(MiningData data) {
-            this.data = data;
-        }
-    }
-
     public enum GrimBypass {
         AUTO,
         ALWAYS,
@@ -1626,13 +1558,13 @@ public class SpeedMine extends Module {
     }
 
     public class MiningData {
-        private final BlockPos pos;
+        final BlockPos pos;
         private Direction direction;
         private final boolean autoTarget;
         private final boolean manualFace;
         private Block minedBlock;
-        private float lastDamage;
-        private float damage;
+        float lastDamage;
+        float damage;
         private boolean started;
         private int alignTicks;
         private int heldTicks;
