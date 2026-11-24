@@ -7,3 +7,10 @@ run/
 *.ipr
 /integration-dependencies/
 *.jfr
+scripts/irc-relay.py
+scripts/kotlin_migrator.py
+scripts/kotlin_migrator_app.py
+scripts/kotlin_migrator_fixer.py
+scripts/kotlin_migrator_gui.py
+scripts/module_scanner.py
+scripts/port_26_2.kt
