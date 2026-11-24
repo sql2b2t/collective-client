@@ -426,7 +426,7 @@ class BounceElytraFlyHandler(module: ElytraFlyModule) : ElytraFlyModeHandler(mod
 
       @JvmStatic
       fun bindModuleReferences(registry: ModuleRegistry) {
-         obstaclePasserModule = registry.getModule(ObstaclePasserModule::class.java) as ObstaclePasserModule
+         obstaclePasserModule = registry.getModule(ObstaclePasserModule::class.java) as? ObstaclePasserModule
       }
    }
 }

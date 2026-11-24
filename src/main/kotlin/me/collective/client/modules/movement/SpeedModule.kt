@@ -43,7 +43,7 @@ class SpeedModule : Module("Speed", "Makes you move faster.", ModuleCategory.MOV
 
       @JvmStatic
       fun bindReferencedModules(registry: ModuleRegistry) {
-         obstaclePasserModule = registry.getModule(ObstaclePasserModule::class.java) as ObstaclePasserModule
+         obstaclePasserModule = registry.getModule(ObstaclePasserModule::class.java) as? ObstaclePasserModule
          StrafeSpeedHandler.bindModules(registry)
          StrictStrafeSpeedHandler.bindModules(registry)
          GrimSpeedHandler.bindModules(registry)

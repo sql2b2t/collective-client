@@ -78,7 +78,7 @@ class ElytraFlyModule : Module("ElytraFly", "Turns you into a block game boeing.
          ) as MiddleClickModule
          obstaclePasserModule = registry.getModule(
             ObstaclePasserModule::class.java
-         ) as ObstaclePasserModule
+         ) as? ObstaclePasserModule
          noSlowModule = registry.getModule(
             NoSlowModule::class.java
          ) as NoSlowModule

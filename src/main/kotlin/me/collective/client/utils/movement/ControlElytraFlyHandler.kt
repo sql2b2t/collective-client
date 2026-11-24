@@ -371,7 +371,7 @@ class ControlElytraFlyHandler(module: ElytraFlyModule) : ElytraFlyModeHandler(mo
       if (obstaclePasserModule == null) {
          return false
       }
-      return obstaclePasserModule!!.isPathActive()
+      return obstaclePasserModule?.isPathActive() == true
    }
 
    private fun isVerticalInputRequested(): Boolean {
@@ -429,7 +429,7 @@ class ControlElytraFlyHandler(module: ElytraFlyModule) : ElytraFlyModeHandler(mo
       fun bindModuleReferences(registry: ModuleRegistry) {
          obstaclePasserModule = registry.getModule(
             ObstaclePasserModule::class.java
-         ) as ObstaclePasserModule
+         ) as? ObstaclePasserModule
          fireworksModule = registry.getModule(
             FireworksModule::class.java
          ) as FireworksModule
