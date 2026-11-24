@@ -11,3 +11,4 @@ MIGRATION.md
 server/
 scripts/
 collective-dev.jar
+versions/
