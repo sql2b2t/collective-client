@@ -1,0 +1,88 @@
+package me.collective.client.modules.combat
+
+import me.collective.client.ClientAccess
+import me.collective.client.ClientContext
+import me.collective.client.managers.ModuleRegistry
+import me.collective.client.modules.player.SpeedMineModule
+import me.collective.client.settings.Setting
+import me.collective.client.utils.entity.PlayerStateUtils
+import net.minecraft.core.BlockPos
+import net.minecraft.world.phys.AABB
+import java.util.ArrayList
+import java.util.Collections
+
+class TrapMiningSupport(private val trapModule: AutoTrapModule) {
+    private val bodyPartSettings: List<Setting<Boolean>> = listOf(
+        trapModule.headSetting,
+        trapModule.faceSetting,
+        trapModule.legsSetting,
+        trapModule.belowSetting
+    )
+
+    private fun hasEnemyBelowPosition(blockPos: BlockPos): Boolean {
+        val level = ClientAccess.collectiveMinecraft.level ?: return false
+        val localPlayer = ClientAccess.collectiveMinecraft.player ?: return false
+        val expandedBounds = AABB(blockPos).inflate(1.0)
+
+        for (player in level.players()) {
+            if (player !== localPlayer && !ClientContext.socialRegistry.isFriendPlayer(player)) {
+                if (!player.isDeadOrDying && player.isAlive) {
+                    val playerBounds = player.boundingBox
+                    if (playerBounds.intersects(expandedBounds)) {
+                        val playerPos = PlayerStateUtils.getRoundedBlockPosition(player)
+                        if (playerPos.y < blockPos.y) {
+                            return true
+                        }
+                    }
+                }
+            }
+        }
+
+        return false
+    }
+
+    fun collectMiningPositions(): List<BlockPos> {
+        val speedMine = speedMineModule
+        val miningPos = speedMine?.miningPos ?: speedMine?.rebreakPos ?: return Collections.emptyList()
+
+        val player = ClientAccess.collectiveMinecraft.player ?: return Collections.emptyList()
+        val eyeSnapshot = player.eyePosition
+        val distance = eyeSnapshot.distanceTo(miningPos.center)
+
+        if (distance > trapModule.rangeSetting.value || !hasEnemyBelowPosition(miningPos)) {
+            return Collections.emptyList()
+        }
+
+        if (trapModule.hasLogoutAbovePosition(miningPos)) {
+            return Collections.emptyList()
+        }
+        return ArrayList(listOf(miningPos))
+    }
+
+    fun shouldUseMiningSupport(): Boolean {
+        if (!trapModule.miningSupportAllowed) {
+            return false
+        }
+
+        for (setting in bodyPartSettings) {
+            if (setting.value) {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    companion object {
+        private var speedMineModule: SpeedMineModule? = null
+
+        init {
+            speedMineModule = ClientContext.getModule(SpeedMineModule::class.java) as? SpeedMineModule
+        }
+
+        @JvmStatic
+        fun bindReferencedModules(registry: ModuleRegistry) {
+            speedMineModule = registry.getModule(SpeedMineModule::class.java) as? SpeedMineModule
+        }
+    }
+}

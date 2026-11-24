@@ -1,0 +1,17 @@
+dominating_4/dominating.ogg
+dominating_4/headhunter.ogg
+dominating_4/killingspree.ogg
+doublekill_2/doublekill.ogg
+megakill_5/humiliation.ogg
+megakill_5/impressive.ogg
+megakill_5/megakill.ogg
+monsterkill_8up/godlike.ogg
+monsterkill_8up/monsterkill.ogg
+monsterkill_8up/perfect.ogg
+triplekill_3/multikill.ogg
+triplekill_3/triplekill.ogg
+unstoppable_6/rampage.ogg
+unstoppable_6/unstoppable.ogg
+wickedsick_7/ludicrouskill.ogg
+wickedsick_7/ultrakill.ogg
+wickedsick_7/wickedsick.ogg

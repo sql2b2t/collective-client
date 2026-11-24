@@ -1,50 +1,92 @@
 plugins {
-    id 'fabric-loom' version '1.17.21'
-    id 'java'
+    id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+    id 'org.jetbrains.kotlin.jvm' version '2.4.21'
+    id 'idea'
 }
 
-version = project.mod_version
-group = project.maven_group
-
-base { archivesName = project.archives_base_name }
-
-loom {
-    accessWidenerPath = file("src/main/resources/collective.accesswidener")
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+        freeCompilerArgs.add('-Xjvm-default=all')
+    }
 }
+
+base { archivesName = 'collective' }
 
 repositories {
-    maven { url = 'https://maven.fabricmc.net/' }
-    maven { url = 'https://maven.terraformersmc.com/' }
-    maven { url = 'https://api.modrinth.com/maven' }
-    maven {
-        name = 'meteor-maven-snapshots'
-        url = 'https://maven.meteordev.org/snapshots'
-    }
     mavenCentral()
+    maven { url = file('vfp-maven') } // локальный репозиторий с viafabricplus-api (см. комментарий в dependencies)
+    maven {
+        url = 'https://pkgs.dev.azure.com/djtheredstoner/DevAuth/_packaging/public/maven/v1'
+        content { includeGroup 'me.djtheredstoner' }
+    }
+    maven {
+        url = 'https://api.modrinth.com/maven'
+        content { includeGroup 'maven.modrinth' }
+    }
+    maven {
+        url = 'https://maven.dimaskama.net/releases'
+    }
+    ivy {
+        url = 'https://raw.githubusercontent.com/m1919810/SlimefunHelper/1.21.11/libs'
+        patternLayout { artifact 'baritone-meteor-[revision].jar' }
+        metadataSources { artifact() }
+        content { includeModule 'meteordevelopment', 'baritone' }
+    }
 }
 
+configurations {
+    baritoneDistribution { transitive = false }
+    viaDistribution { transitive = false }
+    entityCullingDistribution { transitive = false }
+}
+
+def baritone = providers.provider {
+    def jar = configurations.baritoneDistribution.singleFile
+    def sha256 = java.security.MessageDigest.getInstance('SHA-256').digest(jar.bytes).encodeHex().toString()
+    if (sha256 != '3e8c7ab86b7c0148f8711ca2e7cb608712dbc2a97253de0f131ec3db41a2bd3c') {
+        throw new GradleException('Baritone download does not match the pinned upstream release')
+    }
+    jar
+}
+
+def nestedLibraries = { configuration, patterns ->
+    files(providers.provider {
+        zipTree(configuration.singleFile).matching(patterns).files
+    })
+}
+
+// nested viafabricplus-api (см. libs/) подключаем через flatDir как РЕПОЗИТОРИЙ-зависимость:
+// loom ремапит только репо-зависимости в mod-конфигурациях, локальные files() — нет.
+// Это нужно, потому что: (1) в проде лоадер разворачивает nested jars сам, а loom для
+// modLocalRuntime — нет → bootstrap-миксин VFP падает с NoClassDefFoundError:
+// ViaFabricPlusBase; (2) nested jar собран в intermediary → без ремапа api падает с
+// NoClassDefFoundError: class_2561. viafabricplus-visuals не подключаем: его
+// class-tweaker в intermediary namespace отвергается dev-рантаймом (named),
+// главный мод visuals не requires.
+// ОБНОВЛЕНИЕ ВЕРСИИ VFP: перегенерируй libs/viafabricplus-api-<версия>.jar —
+// распакуй META-INF/jars/viafabricplus-api-*.jar из нового релизного jar.
 dependencies {
-    minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
 
-    modImplementation "meteordevelopment:baritone:1.21.11-SNAPSHOT"
-    implementation files("libs/nether-pathfinder-1.4.1.jar")
-
-    // MixinExtras 0.5.4 (в loader 0.19.2 у TLauncher) падает ClassCastException на @Redirect
-    // при трансформации Minecraft — фикс там появился в 0.5.5; запекаем, loader выберет новейший
-    include(implementation(annotationProcessor("io.github.llamalad7:mixinextras-fabric:0.5.5")))
+    // Fabric Language Kotlin — рантайм для Kotlin-части клиента.
+    // Версия согласована с kotlin_version (2.4.21) ниже.
+    modImplementation "net.fabricmc:fabric-language-kotlin:1.14.2+kotlin.2.4.21"
+    include "net.fabricmc:fabric-language-kotlin:1.14.2+kotlin.2.4.21"
 
     // Kotlin scripting engine for .kts scripts (JSR-223)
     // Без этого ScriptEngineManager не находит движок и падает с
     // "No script engine found for extension: .kts"
     // ВАЖНО: kotlin-main-kts НЕ добавляем — внутри него зашейден
     // org.slf4j.impl.SimpleLogger (1.7.x), который перехватывает логгер
-    // Minecraft (LoggerPrintStream -> SimpleLogger -> LoggerPrintStream)
-    // и роняет клиент в StackOverflowError на старте.
+    // Minecraft и роняет клиент в StackOverflowError на старте.
     // Для eval .kts хватает jsr223 + compiler-embeddable.
-    def kotlin_version = "2.1.20"
+    // Версия должна совпадать с kotlin в fabric-language-kotlin (FLK 1.14.2+ = 2.4.21),
+    // иначе при установленном FLK на classpath оказываются две разные stdlib.
+    def kotlin_version = "2.4.21"
     include(implementation("org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"))
     include(implementation("org.jetbrains.kotlin:kotlin-script-runtime:${kotlin_version}"))
     include(implementation("org.jetbrains.kotlin:kotlin-scripting-common:${kotlin_version}"))
@@ -59,22 +101,93 @@ dependencies {
     include(implementation("org.jetbrains.kotlin:kotlin-daemon-embeddable:${kotlin_version}"))
     include(implementation("org.jetbrains.kotlin:kotlin-reflect:${kotlin_version}"))
     include(implementation("org.jetbrains.intellij.deps:trove4j:1.0.20200330"))
-    include(implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.8.0"))
+    // 1.11.0 — версия из FLK 1.14.2, чтобы не дублировать coroutines разными версиями.
+    include(implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0"))
     include(implementation("org.jetbrains:annotations:13.0"))
-    // SOCKS5/HTTP прокси для подключения (маленький, шейдим в мод)
-    include(implementation("io.netty:netty-handler-proxy:4.2.7.Final"))
+
+    modCompileOnly 'maven.modrinth:viafabricplus:YzQYJEjP'
+    modLocalRuntime 'maven.modrinth:viafabricplus:YzQYJEjP'
+    modCompileOnly 'maven.modrinth:lithium:Ow7wA0kG'
+    modCompileOnly 'maven.modrinth:immediatelyfast:QwkfUKSj'
+    modCompileOnly 'maven.modrinth:sodium:RB7CDjTS'
+    modCompileOnly 'maven.modrinth:xaeros-minimap:62EynHPJ'
+    modCompileOnly 'maven.modrinth:entityculling:CTabrwB1'
+    modLocalRuntime 'maven.modrinth:entityculling:CTabrwB1'
+    modCompileOnly 'maven.modrinth:zakoopt:Nxk0BrEK'
+    modLocalRuntime 'me.djtheredstoner:DevAuth-fabric:1.2.2'
+    compileOnly 'org.jetbrains:annotations:26.0.2'
+
+    baritoneDistribution 'meteordevelopment:baritone:1.21.11'
+    viaDistribution 'maven.modrinth:viafabricplus:YzQYJEjP'
+    entityCullingDistribution 'maven.modrinth:entityculling:CTabrwB1'
+
+    modCompileOnly files(baritone)
+    modLocalRuntime files(baritone)
+    implementation nestedLibraries(configurations.baritoneDistribution) {
+        include 'META-INF/jars/*.jar'
+    }
+    implementation nestedLibraries(configurations.viaDistribution) {
+        include 'META-INF/jars/*.jar'
+        // viafabricplus-api идёт ОТДЕЛЬНО (ниже): nested jar неперемаплен (intermediary),
+        // если дать его лоадеру как мод — падает class-tweaker; viafabricplus-visuals
+        // в dev не нужен вовсе (главный мод его не depends, а только предлагает).
+        exclude 'META-INF/jars/fabric-*.jar', 'META-INF/jars/gson-2*.jar',
+            'META-INF/jars/viafabricplus-*.jar'
+    }
+    // api-классы VFP нужны на classpath уже при загрузке Main (bootstrap-миксин VFP):
+    // в проде лоадер сам разворачивает nested jars, в loom dev — нет, без этого
+    // runClient падает с NoClassDefFoundError: ViaFabricPlusBase.
+    // fabric.mod.json вырезаем, чтобы лоадер не регистрировал api как мод.
+    modImplementation 'com.viaversion:viafabricplus-api:4.4.9'
+    modCompileOnly nestedLibraries(configurations.viaDistribution) {
+        include 'META-INF/jars/viafabricplus-*.jar'
+    }
+    modLocalRuntime nestedLibraries(configurations.entityCullingDistribution) {
+        include 'META-INF/jars/*.jar'
+    }
+}
+
+loom {
+    accessWidenerPath = file('src/main/resources/collective.accesswidener')
+    runs {
+        client {
+            client()
+            name = 'Collective Source'
+            runDir = 'run'
+            ideConfigGenerated = true
+        }
+    }
+}
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') { expand version: project.version }
 }
 
 java {
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
     withSourcesJar()
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
 }
 
 tasks.withType(JavaCompile).configureEach {
-    it.options.encoding = 'UTF-8'
-    it.options.release = 21
-    // -Xlint возвращён: подавленные предупреждения (deprecation, unchecked,
-    // rawtypes) скрывали реальные проблемы — теперь они видны в выводе сборки.
-    it.options.compilerArgs += ['-Xlint:deprecation,unchecked,rawtypes', '-Xmaxerrs', '100000']
+    options.release = 21
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-proc:none']
+    options.fork = true
+    options.forkOptions.memoryMaximumSize = '4g'
+}
+
+tasks.named('remapJar') {
+    def serviceOptions = tinyRemapperServiceOptions.get()
+    serviceOptions.classpath.setFrom(sourceSets.main.compileClasspath)
+    tinyRemapperServiceOptions.set(serviceOptions)
+}
+
+tasks.named('runClient') {
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+}
+
+idea.module {
+    excludeDirs += files('run', '.gradle')
+    downloadSources = true
 }
