@@ -22,7 +22,10 @@ import net.minecraft.world.entity.ai.attributes.Attributes
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.enchantment.Enchantments
+import net.minecraft.world.level.ClipContext.Block
+import net.minecraft.world.level.ClipContext.Fluid
 import net.minecraft.world.level.Explosion
+import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.HitResult.Type
 import net.minecraft.world.phys.Vec3
@@ -89,7 +92,21 @@ class DamageUtils private constructor() : ClientAccess {
             return 0.0f
          }
 
-         val exposure = getExposure(explosionPosition, target, bounds, ignoredPositions, solidPosition, ignoreLowResistance)
+         // Кэш: значение — детерминированная функция не-блочных входов (точный
+         // ключ) и чтений блоков (проверяются на каждом чтении). Epoch фиксируется
+         // ДО расчёта; запись отбрасывается, если epoch изменился.
+         val cacheKey = ExplosionDamageCache.keyOf(
+            explosionPosition, target, bounds, power, ignoreLowResistance, ignoredPositions, solidPosition
+         )
+         val cachedDamage = ExplosionDamageCache.get(cacheKey)
+         if (cachedDamage != null) {
+            return cachedDamage
+         }
+         val cacheEpoch = ExplosionDamageCache.epoch()
+         val blockReads = ExplosionDamageCache.recorder()
+         blockReads.reset()
+
+         val exposure = getExposure(explosionPosition, target, bounds, ignoredPositions, solidPosition, ignoreLowResistance, blockReads)
          val impact = (1.0 - normalizedDistance) * exposure
          val quadraticImpact = impact * impact + impact
          val scaledImpact = quadraticImpact / 2.0
@@ -100,6 +117,7 @@ class DamageUtils private constructor() : ClientAccess {
          damage = applyDamageReduction(target, damage)
          damage = resolveBlockingDamage(target, explosionPosition, damage)
          damage = Math.max(damage, 0.0f)
+         ExplosionDamageCache.put(cacheKey, cacheEpoch, damage, blockReads, target)
          return damage
       }
 
@@ -116,6 +134,12 @@ class DamageUtils private constructor() : ClientAccess {
       fun getExposure(
          explosionPosition: Vec3, target: Entity, bounds: AABB, ignoredPositions: Collection<*>, solidPosition: BlockPos?, ignoreLowResistance: Boolean
       ): Float {
+         return getExposure(explosionPosition, target, bounds, ignoredPositions, solidPosition, ignoreLowResistance, null)
+      }
+
+      private fun getExposure(
+         explosionPosition: Vec3, target: Entity, bounds: AABB, ignoredPositions: Collection<*>, solidPosition: BlockPos?, ignoreLowResistance: Boolean, blockReads: BlockReadRecorder?
+      ): Float {
          val samplePosition = Vec3(0.0, 0.0, 0.0)
          val stepX = 1.0 / ((bounds.maxX - bounds.minX) * 2.0 + 1.0)
          val stepY = 1.0 / ((bounds.maxY - bounds.minY) * 2.0 + 1.0)
@@ -125,35 +149,31 @@ class DamageUtils private constructor() : ClientAccess {
          if (stepX < 0.0 || stepY < 0.0 || stepZ < 0.0) {
             return 0.0f
          }
-         val builder = BlockRaycastContext.Builder(samplePosition, explosionPosition)
-
-         builder.withEntity(target)
-         val classifierArray = arrayOfNulls<BlockRaycastClassifier>(3)
-         classifierArray[0] = BlockRaycastClassifier.ignorePositions(ignoredPositions)
-
-         classifierArray[1] = BlockRaycastClassifier.solidPosition(solidPosition)
-         classifierArray[2] = if (ignoreLowResistance)
-            BlockRaycastClassifier.IGNORE_LOW_RESISTANCE
-         else
-            BlockRaycastClassifier.NO_OVERRIDE
-         builder.withClassifiers(*classifierArray)
-         val context = builder.build()
+         // Один составной классификатор вместо трёх анонимных + firstNonNone:
+         // порядок проверок и результаты test() идентичны (NO_OVERRIDE всегда
+         // возвращает NONE, фильтр firstNonNone его только пропускал).
+         val classifier = ExposureClassifier(ignoredPositions, solidPosition, ignoreLowResistance)
+         val context = BlockRaycastContext(samplePosition, explosionPosition, Block.COLLIDER, Fluid.NONE, target, classifier, blockReads)
+         // Границы и lerp-константы инвариантны циклам: sampleX зависит только
+         // от fractionX, sampleY — от fractionY, sampleZ — от fractionZ.
+         // Значения те же (одинаковый вход lerp → одинаковый выход), счётчики
+         // и порядок обхода не меняются.
+         val minimumX = bounds.minX
+         val maximumX = bounds.maxX
+         val minimumY = bounds.minY
+         val maximumY = bounds.maxY
+         val minimumZ = bounds.minZ
+         val maximumZ = bounds.maxZ
          var visibleSamples = 0
          var totalSamples = 0
          var fractionX = 0.0
          while (fractionX <= 1.0) {
+            val sampleX = Mth.lerp(fractionX, minimumX, maximumX)
             var fractionY = 0.0
             while (fractionY <= 1.0) {
+               val sampleY = Mth.lerp(fractionY, minimumY, maximumY)
                var fractionZ = 0.0
                while (fractionZ <= 1.0) {
-                  val maximumX = bounds.maxX
-                  val minimumX = bounds.minX
-                  val sampleX = Mth.lerp(fractionX, minimumX, maximumX)
-                  val maximumY = bounds.maxY
-                  val minimumY = bounds.minY
-                  val sampleY = Mth.lerp(fractionY, minimumY, maximumY)
-                  val maximumZ = bounds.maxZ
-                  val minimumZ = bounds.minZ
                   val sampleZ = Mth.lerp(fractionZ, minimumZ, maximumZ)
                   val offsetSampleX = sampleX + offsetX
                   val shiftedZ = sampleZ + offsetZ
@@ -170,6 +190,35 @@ class DamageUtils private constructor() : ClientAccess {
             fractionX += stepX
          }
          return visibleSamples.toFloat() / totalSamples
+      }
+
+      /**
+       * Эквивалент BlockRaycastClassifier.firstNonNone(
+       *   ignorePositions(ignoredPositions), solidPosition(solidPosition),
+       *   if (ignoreLowResistance) IGNORE_LOW_RESISTANCE else NO_OVERRIDE):
+       * первая не-NONE победа в том же порядке, без аллокаций на каждый вызов.
+       */
+      private class ExposureClassifier(
+         private val ignoredPositions: Collection<*>,
+         private val solidPosition: BlockPos?,
+         private val ignoreLowResistance: Boolean
+      ) : BlockRaycastClassifier {
+         override fun test(blockPos: BlockPos, state: BlockState): BlockRaycastOverride {
+            if (ignoredPositions.isNotEmpty()) {
+               for (value in ignoredPositions) {
+                  if (blockPos == (value as BlockPos?)) {
+                     return BlockRaycastOverride.IGNORE
+                  }
+               }
+            }
+            if (solidPosition != null && blockPos == solidPosition) {
+               return BlockRaycastOverride.SOLID
+            }
+            if (ignoreLowResistance && state.block.explosionResistance < 600.0f) {
+               return BlockRaycastOverride.IGNORE
+            }
+            return BlockRaycastOverride.NONE
+         }
       }
 
       @JvmStatic

@@ -9,7 +9,6 @@ import me.collective.client.utils.entity.PlayerStateUtils
 import net.minecraft.core.BlockPos
 import net.minecraft.world.phys.AABB
 import java.util.ArrayList
-import java.util.Collections
 
 class TrapMiningSupport(private val trapModule: AutoTrapModule) {
     private val bodyPartSettings: List<Setting<Boolean>> = listOf(
@@ -41,22 +40,24 @@ class TrapMiningSupport(private val trapModule: AutoTrapModule) {
         return false
     }
 
-    fun collectMiningPositions(): List<BlockPos> {
+    fun collectMiningPositions(): MutableList<BlockPos> {
         val speedMine = speedMineModule
-        val miningPos = speedMine?.miningPos ?: speedMine?.rebreakPos ?: return Collections.emptyList()
+        val miningPos = speedMine?.miningPos ?: speedMine?.rebreakPos ?: return ArrayList()
 
-        val player = ClientAccess.collectiveMinecraft.player ?: return Collections.emptyList()
+        val player = ClientAccess.collectiveMinecraft.player ?: return ArrayList()
         val eyeSnapshot = player.eyePosition
         val distance = eyeSnapshot.distanceTo(miningPos.center)
 
         if (distance > trapModule.rangeSetting.value || !hasEnemyBelowPosition(miningPos)) {
-            return Collections.emptyList()
+            return ArrayList()
         }
 
         if (trapModule.hasLogoutAbovePosition(miningPos)) {
-            return Collections.emptyList()
+            return ArrayList()
         }
-        return ArrayList(listOf(miningPos))
+        val positions = ArrayList<BlockPos>(1)
+        positions.add(miningPos)
+        return positions
     }
 
     fun shouldUseMiningSupport(): Boolean {

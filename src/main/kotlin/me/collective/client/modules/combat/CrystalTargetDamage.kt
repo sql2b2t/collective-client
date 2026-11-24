@@ -41,6 +41,22 @@ data class CrystalTargetDamage(
 
                 val isFriend = ClientContext.socialRegistry.isFriendEntity(candidate) && candidate !== ClientAccess.collectiveMinecraft.player
 
+                // Чистые проверки без зависимости от damage выполняются ДО
+                // дорогого расчёта урона (расчёт — чистая функция, для отброшенных
+                // кандидатов его результат и так не использовался). Для друга
+                // проверка «голизны» не переносится: в friend-ветке нужен damage
+                // для решения return null (kill friend) — она остаётся ниже.
+                if (isFriend && !module.antiFriendKillSetting.value) {
+                    continue
+                }
+
+                if (!isFriend && module.ignoreNakedsSetting.value) {
+                    val holdingCrystal = candidate.isHolding(Items.END_CRYSTAL)
+                    if (!PlayerStateUtils.hasArmor(candidate) && !holdingCrystal) {
+                        continue
+                    }
+                }
+
                 val targetBounds: AABB = module.getTargetBounds(candidate)
                 val boundsCenterSnapshot = BoundingBoxUtils.getBottomCenter(targetBounds)
                 val baseCenter = Vec3.atBottomCenterOf(base)
@@ -54,17 +70,9 @@ data class CrystalTargetDamage(
                 val lethality = CrystalLethality.classifyLethality(candidate, damage)
 
                 if (isFriend) {
-                    if (!module.antiFriendKillSetting.value) {
-                        continue
-                    }
                     if (damage > EntityUtils.getHealthWithAbsorption(candidate)) {
                         return null
                     }
-                    continue
-                }
-
-                val holdingCrystal = candidate.isHolding(Items.END_CRYSTAL)
-                if (module.ignoreNakedsSetting.value && !PlayerStateUtils.hasArmor(candidate) && !holdingCrystal) {
                     continue
                 }
 

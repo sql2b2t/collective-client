@@ -42,6 +42,7 @@ import me.collective.client.utils.LockUtils
 import me.collective.client.utils.combat.BoundingBoxUtils
 import me.collective.client.utils.combat.DamageUtils
 import me.collective.client.utils.combat.EndCrystalState
+import me.collective.client.utils.combat.ExplosionDamageCache
 import me.collective.client.utils.combat.ExtraBreakTarget
 import me.collective.client.utils.entity.EntityUtils
 import me.collective.client.utils.entity.PlayerStateUtils
@@ -512,6 +513,17 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
                     }
 
                     val explosionPosition = Vec3.upFromBottomCenterOf(scanPosition, 1.0)
+
+                    val candidateTargetDamage = CrystalTargetDamage.calculateForBase(this, scanPosition, hasCrystalBase, targets)
+                    if (candidateTargetDamage == null) {
+                        offsetZ += 1.0
+                        continue
+                    }
+
+                    // selfDamage — чистая функция и нигде не влияет на проверку
+                    // candidateTargetDamage == null: считается после неё, чтобы
+                    // не платить exposure за позиции без кандидата. Значения и
+                    // порядок всех проверок не меняются.
                     val selfDamage = DamageUtils.getExplosionDamage(
                         explosionPosition,
                         selfPlayer,
@@ -521,12 +533,6 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
                         emptyIgnoredPositions,
                         scanPosition
                     )
-
-                    val candidateTargetDamage = CrystalTargetDamage.calculateForBase(this, scanPosition, hasCrystalBase, targets)
-                    if (candidateTargetDamage == null) {
-                        offsetZ += 1.0
-                        continue
-                    }
 
                     val lethality = CrystalLethality.classifyLethality(candidateTargetDamage.target, candidateTargetDamage.damage)
                     if (CrystalDamagePolicy.PLACE.shouldRejectDamage(
@@ -1203,6 +1209,10 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
                 }
             }
         }
+        // Содержимое ignoredBlocks — вход ключа кэша урона: мутация множества
+        // поднимает epoch, чтобы запись, посчитанная на смеси старого/нового
+        // множества, была отброшена.
+        ExplosionDamageCache.bump()
     }
 
     fun getTargetBounds(target: LivingEntity): AABB {
@@ -1447,7 +1457,9 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
         }
 
         val explosionPosition = Vec3.upFromBottomCenterOf(base, 1.0)
-        val damageIgnoredBlocks = if (useIgnoredBlocks) synchronized(ignoredBlocks) { ArrayList(ignoredBlocks) } else emptyList()
+        val damageIgnoredBlocks = if (useIgnoredBlocks) synchronized(ignoredBlocks) {
+            if (ignoredBlocks.isEmpty()) emptyList() else ArrayList(ignoredBlocks)
+        } else emptyList()
         val ignoredBase = if (ignoreBaseBlock) base.immutable() else null
 
         return DamageUtils.getExplosionDamage(explosionPosition, target, bounds, 6.0, true, damageIgnoredBlocks, ignoredBase).toDouble()

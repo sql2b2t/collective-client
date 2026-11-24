@@ -39,6 +39,15 @@ class RaycastUtils private constructor() : ClientAccess {
             }
 
             val shape = blockContext.getBlockShape(state, level, blockPos)
+            // Журнал блочных чтений для кэша урона взрыва (null у обычных
+            // пользователей raycast — поведение не меняется).
+            blockContext.reads?.record(blockPos, state, shape)
+            if (shape.isEmpty) {
+               // VoxelShape.clip для пустой формы возвращает null (VoxelShape.clip),
+               // а clipWithInteractionOverride при null-клипе возвращает null:
+               // пропуск строго эквивалентен полному вызову.
+               return@BiFunction null
+            }
             val blockStart = blockContext.start
             val blockEnd = blockContext.end
             level.clipWithInteractionOverride(blockStart, blockEnd, blockPos, shape, state)

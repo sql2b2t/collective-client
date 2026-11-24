@@ -34,10 +34,9 @@ import net.minecraft.world.item.Items
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import java.util.ArrayList
-import java.util.Arrays
 import java.util.Collections
 import java.util.Comparator
-import java.util.Optional
+import java.util.HashSet
 import kotlin.math.abs
 
 open class AutoTrapModule : PlacementModule {
@@ -136,10 +135,9 @@ open class AutoTrapModule : PlacementModule {
         return BoundingBoxUtils.getBottomCenter(predictedBounds)
     }
 
-    private fun getSupportSortKey(blockPos: BlockPos): Double {
-        return if (placementRaytraceSetting.value) {
-            val player = ClientAccess.collectiveMinecraft.player ?: return blockPos.y.toDouble()
-            -player.position().distanceToSqr(blockPos.center)
+    private fun getSupportSortKey(blockPos: BlockPos, raytraceEnabled: Boolean, playerPosition: Vec3?): Double {
+        return if (raytraceEnabled && playerPosition != null) {
+            -playerPosition.distanceToSqr(blockPos.center)
         } else {
             blockPos.y.toDouble()
         }
@@ -182,12 +180,23 @@ open class AutoTrapModule : PlacementModule {
         return false
     }
 
-    protected fun shouldSkipPlacement(blockPos: BlockPos): Boolean {
+    private fun collectLogoutAbovePositions(): Set<BlockPos> {
+        val level = ClientAccess.collectiveMinecraft.level ?: return emptySet()
+        val logoutPositions = HashSet<BlockPos>()
+        for (entity in level.entitiesForRendering()) {
+            if (entity is EndCrystalState && !entity.isClientAttacked()) {
+                logoutPositions.add(entity.blockPosition())
+            }
+        }
+        return logoutPositions
+    }
+
+    protected fun shouldSkipPlacement(blockPos: BlockPos, logoutAbovePositions: Set<BlockPos>): Boolean {
         val target = targetPlayer ?: return true
         val player = ClientAccess.collectiveMinecraft.player ?: return true
 
         if (this !is SelfTrapModule) {
-            if (hasLogoutAbovePosition(blockPos)) {
+            if (logoutAbovePositions.contains(blockPos.above())) {
                 return true
             }
         }
@@ -260,29 +269,55 @@ open class AutoTrapModule : PlacementModule {
 
     protected open fun isHeadOnly(): Boolean = headSetting.value && !faceSetting.value
 
-    private fun findSupportNeighbor(blockPos: BlockPos, plannedPositions: List<BlockPos>): BlockPos? {
-        val directions = Direction.values()
-        return Arrays.stream(directions)
-            .map(blockPos::relative)
-            .sorted(Comparator.comparingDouble(this::getSupportSortKey))
-            .filter { neighborPos ->
-                if (findSupportDirection(neighborPos, BlockInteractionUtils.isStrictDirectionEnabled(), plannedPositions) != null) {
-                    if (BlockInteractionUtils.canPlaceAt(neighborPos, true, placementAttackSetting.value)) {
-                        return@filter true
-                    }
-                }
-                false
+    private fun findSupportNeighbor(blockPos: BlockPos, plannedPositions: Set<BlockPos>): BlockPos? {
+        val directions = supportDirections
+        val strictDirectionSnapshot = BlockInteractionUtils.isStrictDirectionEnabled()
+        val raytraceSortEnabled = placementRaytraceSetting.value
+        val sortPlayerPosition = if (raytraceSortEnabled) ClientAccess.collectiveMinecraft.player?.position() else null
+        val allowAttackSnapshot = placementAttackSetting.value
+
+        val neighborPositions = arrayOfNulls<BlockPos>(directions.size)
+        val sortKeys = DoubleArray(directions.size)
+        val sortedIndices = IntArray(directions.size)
+        for (directionIndex in directions.indices) {
+            val neighborPos = blockPos.relative(directions[directionIndex])
+            neighborPositions[directionIndex] = neighborPos
+            sortKeys[directionIndex] = getSupportSortKey(neighborPos, raytraceSortEnabled, sortPlayerPosition)
+            sortedIndices[directionIndex] = directionIndex
+        }
+
+        // Стабильная сортировка вставками по ключу: равные ключи сохраняют порядок Direction,
+        // как и предыдущий Stream.sorted. Double.compare — тот же тотальный порядок, что у comparingDouble.
+        // Фильтр применяется в отсортированном порядке до первого совпадения.
+        for (index in 1 until sortedIndices.size) {
+            val currentIndex = sortedIndices[index]
+            val currentKey = sortKeys[currentIndex]
+            var shiftIndex = index - 1
+            while (shiftIndex >= 0 && java.lang.Double.compare(sortKeys[sortedIndices[shiftIndex]], currentKey) > 0) {
+                sortedIndices[shiftIndex + 1] = sortedIndices[shiftIndex]
+                shiftIndex--
             }
-            .findFirst()
-            .orElse(null)
+            sortedIndices[shiftIndex + 1] = currentIndex
+        }
+
+        for (sortedIndex in sortedIndices) {
+            val neighborPos = neighborPositions[sortedIndex]!!
+            if (findSupportDirection(neighborPos, strictDirectionSnapshot, plannedPositions) != null) {
+                if (BlockInteractionUtils.canPlaceAt(neighborPos, true, allowAttackSnapshot)) {
+                    return neighborPos
+                }
+            }
+        }
+        return null
     }
 
     open protected fun collectTargetOffsets(targetPos: BlockPos, baseYOffset: Int, targetHeight: Float): List<Vec3> {
         val offsets = ArrayList<Vec3>()
+        val baseOffsets = collectBaseOffsets(baseYOffset, targetHeight)
 
         if (isHeadOnly()) {
             offsets.add(Vec3(0.0, getHeadOnlyOffsetY(baseYOffset, targetHeight), 0.0))
-            val headOffsetIterator = collectBaseOffsets(baseYOffset, targetHeight).iterator()
+            val headOffsetIterator = baseOffsets.iterator()
             if (headOffsetIterator.hasNext()) {
                 val headOffset = headOffsetIterator.next()
                 if (!placementAirPlaceSetting.value) {
@@ -306,7 +341,7 @@ open class AutoTrapModule : PlacementModule {
             }
         }
 
-        for (sideOffset in collectBaseOffsets(baseYOffset, targetHeight)) {
+        for (sideOffset in baseOffsets) {
             if (sideOffset.y <= targetHeight) {
                 if (!faceSetting.value && sideOffset.y > baseYOffset) {
                     continue
@@ -343,38 +378,37 @@ open class AutoTrapModule : PlacementModule {
         )
     }
 
-    private fun collectTrapPositions(visitedHashes: MutableList<Int>, plannedPositions: MutableList<BlockPos>, origin: BlockPos, baseYOffset: Int): MutableList<BlockPos> {
+    private fun collectTrapPositions(visitedHashes: MutableSet<Int>, plannedPositions: MutableSet<BlockPos>, origin: BlockPos, baseYOffset: Int): MutableList<BlockPos> {
         val positions = ArrayList<BlockPos>()
         val originHash = origin.hashCode()
         visitedHashes.add(originHash)
 
         val target = targetPlayer ?: return positions
         val targetHeight = target.bbHeight
+        val targetBoundsSnapshot = target.boundingBox
+        val level = ClientAccess.collectiveMinecraft.level ?: return positions
+        val strictDirectionSnapshot = BlockInteractionUtils.isStrictDirectionEnabled()
 
         for (offset in collectTargetOffsets(origin, baseYOffset, targetHeight)) {
             val candidatePos = origin.offset(offset.x.toInt(), offset.y.toInt(), offset.z.toInt())
+            val candidateBounds = AABB(candidatePos)
             if (WorldUtils.isPlacementOccupied(candidatePos)) {
-                val targetBoundsSnapshot = target.boundingBox
-                val candidateBounds = AABB(candidatePos)
                 if (!BoundingBoxUtils.hasVolumeOverlap(targetBoundsSnapshot, candidateBounds) || offset.y != 0.0) {
                     continue
                 }
             }
 
             if (!shouldSkipAirPlacement(candidatePos, offset)) {
-                val level = ClientAccess.collectiveMinecraft.level ?: continue
-                val collisionBounds = AABB(candidatePos)
-                if (level.getEntitiesOfClass(Player::class.java, collisionBounds) { true }.isNotEmpty()) {
-                    val candidateHash = candidatePos.hashCode()
-                    if (!visitedHashes.contains(candidateHash) && offset.y == 0.0) {
-                        val nestedPositions = collectTrapPositions(visitedHashes, plannedPositions, candidatePos, baseYOffset)
-                        positions.addAll(nestedPositions)
-                        plannedPositions.addAll(nestedPositions)
-                        continue
-                    }
+                if (offset.y == 0.0 && !visitedHashes.contains(candidatePos.hashCode()) &&
+                    level.getEntitiesOfClass(Player::class.java, candidateBounds) { true }.isNotEmpty()
+                ) {
+                    val nestedPositions = collectTrapPositions(visitedHashes, plannedPositions, candidatePos, baseYOffset)
+                    positions.addAll(nestedPositions)
+                    plannedPositions.addAll(nestedPositions)
+                    continue
                 }
 
-                if (findSupportDirection(candidatePos, BlockInteractionUtils.isStrictDirectionEnabled(), plannedPositions) == null) {
+                if (findSupportDirection(candidatePos, strictDirectionSnapshot, plannedPositions) == null) {
                     if (!placementAirPlaceSetting.value) {
                         val supportNeighbor = findSupportNeighbor(candidatePos, plannedPositions)
                         if (supportNeighbor != null) {
@@ -391,7 +425,7 @@ open class AutoTrapModule : PlacementModule {
 
         if (!isHeadOnly()) {
             if (!legsSetting.value) {
-                if (target.bbHeight > 1.0f) {
+                if (targetHeight > 1.0f) {
                     positions.removeIf { plannedPos -> plannedPos.y.toDouble() == target.y }
                 }
             }
@@ -402,9 +436,9 @@ open class AutoTrapModule : PlacementModule {
     }
 
     private fun findSupportDirection(
-        blockPos: BlockPos, strictDirection: Boolean, plannedPositions: List<BlockPos>
+        blockPos: BlockPos, strictDirection: Boolean, plannedPositions: Set<BlockPos>
     ): Direction? {
-        for (direction in Direction.values()) {
+        for (direction in supportDirections) {
             val neighborPos = blockPos.relative(direction)
             if ((WorldUtils.isPlacementOccupied(neighborPos) || plannedPositions.contains(neighborPos)) &&
                 (!strictDirection || isStrictSupport(neighborPos, direction))
@@ -429,6 +463,17 @@ open class AutoTrapModule : PlacementModule {
         sequentialHandled = false
     }
 
+    private fun sortByPrecomputedKeys(positions: MutableList<BlockPos>, keyFunction: (BlockPos) -> Double) {
+        if (positions.size < 2) {
+            return
+        }
+        val sortKeys = HashMap<BlockPos, Double>(positions.size * 2)
+        for (sortPos in positions) {
+            sortKeys[sortPos] = keyFunction(sortPos)
+        }
+        positions.sortWith(Comparator.comparingDouble { sortPos -> sortKeys.getValue(sortPos) })
+    }
+
     override fun sortPlacementPositions(positions: MutableList<BlockPos>) {
         val target = targetPlayer
         if (RotationManager.isMovementSyncEnabled() && target != null) {
@@ -437,14 +482,14 @@ open class AutoTrapModule : PlacementModule {
                 val movement = Vec3(target.x - target.xo, target.y - target.yo, target.z - target.zo)
                 val movementDirection = movement.normalize()
                 val predictedPosition = target.position().add(movementDirection.scale(8.0))
-                positions.sortWith(Comparator.comparingDouble { sortPosition ->
+                sortByPrecomputedKeys(positions) { sortPosition ->
                     sortPosition.distToCenterSqr(predictedPosition)
-                })
+                }
             } else {
-                positions.sortWith(Comparator.comparingDouble { sortPosition ->
+                sortByPrecomputedKeys(positions) { sortPosition ->
                     val angleYaw = RotationManager.getRotationsToPosition(sortPosition.center)[0]
                     Mth.degreesDifferenceAbs(targetYaw, angleYaw).toDouble()
-                })
+                }
             }
         } else {
             positions.sortWith(Comparator.comparingInt { sortPos -> -sortPos.y })
@@ -452,9 +497,9 @@ open class AutoTrapModule : PlacementModule {
                 val player = ClientAccess.collectiveMinecraft.player
                 if (player != null) {
                     val playerPos = player.position()
-                    positions.sortWith(Comparator.comparingDouble { sortPos ->
+                    sortByPrecomputedKeys(positions) { sortPos ->
                         -playerPos.distanceTo(sortPos.center)
-                    })
+                    }
                 }
             }
         }
@@ -472,13 +517,20 @@ open class AutoTrapModule : PlacementModule {
 
         val player = ClientAccess.collectiveMinecraft.player ?: return null
         val yawSnapshot = player.yRot
-        return players.stream()
-            .filter { isValidTarget(it) }
-            .min(Comparator.comparingDouble { candidate ->
-                val targetYaw = RotationManager.getRotationsToEntity(candidate)[0]
-                Mth.degreesDifferenceAbs(yawSnapshot, targetYaw).toDouble()
-            })
-            .orElse(null)
+        var selectedTarget: Player? = null
+        var selectedYawDifference = 0.0
+        for (candidate in players) {
+            if (!isValidTarget(candidate)) {
+                continue
+            }
+            val targetYaw = RotationManager.getRotationsToEntity(candidate)[0]
+            val yawDifference = Mth.degreesDifferenceAbs(yawSnapshot, targetYaw).toDouble()
+            if (selectedTarget == null || java.lang.Double.compare(yawDifference, selectedYawDifference) < 0) {
+                selectedTarget = candidate
+                selectedYawDifference = yawDifference
+            }
+        }
+        return selectedTarget
     }
 
     private val worldPlayers: List<Player>
@@ -504,7 +556,7 @@ open class AutoTrapModule : PlacementModule {
 
     override fun getPlacementPositions(): MutableList<BlockPos> {
         if (miningSupportMode) {
-            return miningSupport.collectMiningPositions().toMutableList()
+            return miningSupport.collectMiningPositions()
         }
 
         targetPlayer = selectTarget()
@@ -512,16 +564,19 @@ open class AutoTrapModule : PlacementModule {
         val targetPosition = getTargetPosition(target)
 
         val positions: MutableList<BlockPos> = try {
-            collectTrapPositions(ArrayList(), ArrayList(), BlockPos.containing(targetPosition), 0)
+            collectTrapPositions(HashSet(), HashSet(), BlockPos.containing(targetPosition), 0)
         } catch (failure: Throwable) {
             return Collections.emptyList()
         }
 
-        positions.removeIf { shouldSkipPlacement(it) }
-        val priorityPos = positions.stream()
-            .filter { isInsideTargetTopBounds(it) }
-            .findFirst()
-            .orElse(null)
+        val logoutAbovePositions = if (positions.isNotEmpty() && this !is SelfTrapModule) {
+            collectLogoutAbovePositions()
+        } else {
+            emptySet()
+        }
+        positions.removeIf { shouldSkipPlacement(it, logoutAbovePositions) }
+        val priorityBounds = getTargetTopBounds(target)
+        val priorityPos = positions.firstOrNull { priorityBounds.contains(it.center) }
 
         if (priorityPos != null) {
             positions.remove(priorityPos)
@@ -548,6 +603,8 @@ open class AutoTrapModule : PlacementModule {
     }
 
     companion object {
+        private val supportDirections = Direction.values()
+
         private var logoutSpotsModule: LogoutSpotsModule? = null
 
         init {

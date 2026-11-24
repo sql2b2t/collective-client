@@ -719,8 +719,9 @@ class BlockInteractionUtils private constructor() : ClientAccess {
       fun getStrictDirections(position: BlockPos): List<Direction> {
          val player = ClientAccess.collectiveMinecraft.player ?: return emptyList()
          val directionOrder = placementDirections
-         val directions = ArrayList(directionOrder.toList())
-         if (antiCheat!!.strictDirectionSetting.getValue() == AntiCheatStrictDirectionChoice.NCP) {
+         val directions = directionOrder.toMutableList()
+         val strictDirectionMode = antiCheat!!.strictDirectionSetting.getValue()
+         if (strictDirectionMode == AntiCheatStrictDirectionChoice.NCP) {
             for (direction in placementDirections) {
                val neighbor = position.relative(direction)
                val level = ClientAccess.collectiveMinecraft.level ?: continue
@@ -737,8 +738,10 @@ class BlockInteractionUtils private constructor() : ClientAccess {
             directions.remove(Direction.UP)
          }
 
-         val deltaX = player.getEyePosition().x - position.center.x
-         val deltaZ = player.getEyePosition().z - position.center.z
+         val eyePosition = player.getEyePosition()
+         val blockCenter = position.center
+         val deltaX = eyePosition.x - blockCenter.x
+         val deltaZ = eyePosition.z - blockCenter.z
          if (deltaX > MathConstants.HALF) {
             directions.remove(Direction.WEST)
          } else if (deltaX < -MathConstants.HALF) {
@@ -757,12 +760,13 @@ class BlockInteractionUtils private constructor() : ClientAccess {
             directions.remove(Direction.SOUTH)
          }
 
-         if (antiCheat!!.strictDirectionSetting.getValue() == AntiCheatStrictDirectionChoice.GRIM) {
-            val sampleAbove = PlayerStateUtils.streamBodySamplePositions().noneMatch { bodySample ->
+         if (strictDirectionMode == AntiCheatStrictDirectionChoice.GRIM) {
+            val bodySamples = PlayerStateUtils.streamBodySamplePositions().toList()
+            val sampleAbove = bodySamples.none { bodySample ->
                bodySample.y > position.y + 1
             }
 
-            val sampleBelow = PlayerStateUtils.streamBodySamplePositions().noneMatch { bodySample ->
+            val sampleBelow = bodySamples.none { bodySample ->
                bodySample.y < position.y
             }
             if (sampleAbove) {
@@ -773,11 +777,11 @@ class BlockInteractionUtils private constructor() : ClientAccess {
                directions.remove(Direction.DOWN)
             }
          } else {
-            if (player.getEyePosition().y < position.y) {
+            if (eyePosition.y < position.y) {
                directions.remove(Direction.UP)
             }
 
-            if (player.getEyePosition().y > position.y) {
+            if (eyePosition.y > position.y) {
                directions.remove(Direction.DOWN)
             }
          }

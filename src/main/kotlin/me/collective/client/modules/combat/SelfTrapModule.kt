@@ -9,6 +9,7 @@ import me.collective.client.settings.Setting
 import me.collective.client.utils.entity.PlayerStateUtils
 import me.collective.client.utils.world.BlockInteractionUtils
 import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.player.Player
 
@@ -77,7 +78,7 @@ class SelfTrapModule : AutoTrapModule("SelfTrap", "Covers you with blocks.", Mod
             .minByOrNull { player.distanceToSqr(it) }
     }
 
-    private fun shouldSkipUnsupportedPlacement(blockPos: BlockPos): Boolean {
+    private fun shouldSkipUnsupportedPlacement(blockPos: BlockPos, plannedPositions: Set<BlockPos>): Boolean {
         val attackCheckFlag = true
         if (!BlockInteractionUtils.canPlaceAt(blockPos, true, attackCheckFlag)) {
             return true
@@ -91,7 +92,41 @@ class SelfTrapModule : AutoTrapModule("SelfTrap", "Covers you with blocks.", Mod
         val strictDirectionSnapshot = BlockInteractionUtils.isStrictDirectionEnabled()
         val raytraceSettingRef = this.placementRaytraceSetting
         val raytrace = raytraceSettingRef.value
-        return BlockInteractionUtils.findSupportDirection(blockPos, strictDirectionSnapshot, raytrace) == null
+        if (BlockInteractionUtils.findSupportDirection(blockPos, strictDirectionSnapshot, raytrace) != null) {
+            return false
+        }
+
+        // Опора может ставиться в этом же цикле: не выбрасываем позицию,
+        // если рядом запланирован блок-опора (иначе позиция теряется до следующего тика).
+        return !this.hasPlannedSupport(blockPos, plannedPositions)
+    }
+
+    private fun hasPlannedSupport(blockPos: BlockPos, plannedPositions: Set<BlockPos>): Boolean {
+        for (direction in Direction.values()) {
+            if (plannedPositions.contains(blockPos.relative(direction))) {
+                return true
+            }
+        }
+        return false
+    }
+
+    override fun sortPlacementPositions(positions: MutableList<BlockPos>) {
+        if (positions.size < 2) {
+            return
+        }
+
+        val airPlaceSnapshot = this.placementAirPlaceSetting.value
+        val strictDirectionSnapshot = BlockInteractionUtils.isStrictDirectionEnabled()
+        val raytraceSnapshot = this.placementRaytraceSetting.value
+        val sortKeys = HashMap<BlockPos, Int>(positions.size * 2)
+        for (sortPos in positions) {
+            val supportedNow = airPlaceSnapshot ||
+                BlockInteractionUtils.findSupportDirection(sortPos, strictDirectionSnapshot, raytraceSnapshot) != null
+            // Поддерживаемые сейчас — первыми, критичные (выше) раньше: над головой/корпус — в приоритете.
+            // Неподдерживаемые — после, по возрастанию Y: сначала опора, потом зависимый блок.
+            sortKeys[sortPos] = if (supportedNow) (-100000 - sortPos.y) else (100000 + sortPos.y)
+        }
+        positions.sortWith(Comparator.comparingInt { sortPos: BlockPos -> sortKeys.getValue(sortPos) })
     }
 
     override fun selectTarget(): Player? {
@@ -100,9 +135,6 @@ class SelfTrapModule : AutoTrapModule("SelfTrap", "Covers you with blocks.", Mod
 
     @Suppress("UNCHECKED_CAST")
     override fun getPlacementPositions(): MutableList<BlockPos> {
-        val placements = (super.getPlacementPositions() as MutableList<BlockPos>)
-        placements.removeIf { this.shouldSkipUnsupportedPlacement(it) }
-
         if (this.onlyStandingSetting.value && PlayerStateUtils.isLocalHeightBelowOne()) {
             return mutableListOf()
         }
@@ -116,6 +148,10 @@ class SelfTrapModule : AutoTrapModule("SelfTrap", "Covers you with blocks.", Mod
                 return mutableListOf()
             }
         }
+
+        val placements = (super.getPlacementPositions() as MutableList<BlockPos>)
+        val plannedPositions: Set<BlockPos> = HashSet(placements)
+        placements.removeIf { this.shouldSkipUnsupportedPlacement(it, plannedPositions) }
         return placements
     }
 }

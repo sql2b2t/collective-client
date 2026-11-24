@@ -19,7 +19,8 @@ class BlockRaycastContext(
    blockSelectionMode: Block,
    fluidSelectionMode: Fluid,
    collisionEntity: Entity?,
-   overrideClassifier: BlockRaycastClassifier
+   overrideClassifier: BlockRaycastClassifier,
+   val reads: BlockReadRecorder? = null
 ) {
    val start: Vec3 = rayStart
    val end: Vec3 = rayEnd
