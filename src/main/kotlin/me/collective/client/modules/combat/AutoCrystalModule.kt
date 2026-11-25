@@ -109,6 +109,8 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
     @JvmField
     val placeDelaySetting: Setting<Int> = add(NumberSetting("Delay", 0, 0, 1000).withUnit("ms").dependsOn(placeSetting))
     @JvmField
+    val placesPerTickSetting: Setting<Int> = add(NumberSetting("PlacesPerTick", 1, 1, 3).dependsOn(placeSetting))
+    @JvmField
     val placeRangeSetting: Setting<Float> = add(NumberSetting("Range", 6.0f, 0.0f, 6.0f).withUnit("m").dependsOn(placeSetting))
     @JvmField
     val placeWallRangeSetting: Setting<Float> = add(NumberSetting("WallRange", 6.0f, 0.0f, 6.0f).withUnit("m").dependsOn(placeSetting))
@@ -136,6 +138,8 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
     val breakSetting: Setting<Boolean> = add(BooleanSetting("Break", true).markVisibilityDependency())
     @JvmField
     val breakDelaySetting: Setting<Int> = add(NumberSetting("Delay", 0, 0, 1000).withUnit("ms").dependsOn(breakSetting))
+    @JvmField
+    val breaksPerTickSetting: Setting<Int> = add(NumberSetting("BreaksPerTick", 1, 1, 5).dependsOn(breakSetting))
     @JvmField
     val attackFactorSetting: Setting<Int> = add(NumberSetting("Factor", 1, 1, 5).dependsOn(breakSetting))
     @JvmField
@@ -250,6 +254,8 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
     val swapPenaltySetting: Setting<Float> = add(NumberSetting("SwapPenalty", 0.0f, 0.0f, 10.0f).dependsOn(miscSetting))
     @JvmField
     val multipointSetting: Setting<Boolean> = add(BooleanSetting("Multipoint", false).dependsOn(miscSetting))
+    @JvmField
+    val fastChainSetting: Setting<Boolean> = add(BooleanSetting("FastChain", false).dependsOn(miscSetting))
 
     private val targeting = AutoCrystalTargeting(this)
     private val damageRenderer = CrystalDamageRenderer(this)
@@ -257,6 +263,10 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
 
     @JvmField
     val placementData = AtomicReference<CrystalPlacementResult?>()
+
+    @JvmField
+    val placementCandidates = AtomicReference<List<CrystalPlacementResult>>(emptyList())
+    private var appliedPlacementCandidates: List<CrystalPlacementResult> = emptyList()
 
     @JvmField
     val rotationTarget = AtomicReference<Vec3?>()
@@ -402,6 +412,8 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
         restoreSelectedSlot()
         calculationEpoch.incrementAndGet()
         placementData.set(null)
+        placementCandidates.set(emptyList())
+        appliedPlacementCandidates = emptyList()
         placementGate.set(false)
         calculationFuture?.complete(null)
     }
@@ -433,6 +445,8 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
         val currentPlacement = placementData.get()
         var currentTargetDamage: CrystalTargetDamage? = null
         var bestPlacement: CrystalPlacementResult? = null
+        val collectMultiPlace = placesPerTickSetting.value > 1
+        val multiCandidates: MutableList<CrystalPlacementResult>? = if (collectMultiPlace) ArrayList() else null
 
         val basePlaceCanRetry = basePlaceSetting.value && canRetryBasePlacement()
         val configuredValidator = CrystalPlacementValidator()
@@ -588,6 +602,7 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
                         scanPosition.immutable(), candidateTargetDamage.target, candidateTargetDamage.damage, placementKind
                     )
                     bestPlacement = newPlacement.selectBetterPlacement(bestPlacement)
+                    multiCandidates?.add(newPlacement)
 
                     offsetZ += 1.0
                 }
@@ -596,6 +611,7 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
             offsetX += 1.0
         }
 
+        placementCandidates.set(if (multiCandidates != null) rankPlacementCandidates(multiCandidates) else emptyList())
         return bestPlacement
     }
 
@@ -613,6 +629,49 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
         @Suppress("UNCHECKED_CAST")
         val placementVisibilitySamples = BlockSampleMode.X8.sampleFace(base, direction) as List<Vec3>
         return WorldUtils.canSeeAny(placementVisibilitySamples)
+    }
+
+    private fun rankPlacementCandidates(candidates: List<CrystalPlacementResult>): List<CrystalPlacementResult> {
+        return candidates
+            .sortedWith(compareBy({ it.kind.ordinal }, { -it.damage }))
+            .distinctBy { it.base }
+            .take(3)
+    }
+
+    private fun placeAdditionalCrystals(currentTarget: LivingEntity, primaryBase: BlockPos) {
+        val perTick = placesPerTickSetting.value
+        if (perTick <= 1) return
+        val candidates = appliedPlacementCandidates
+        if (candidates.isEmpty()) return
+
+        val player = ClientAccess.collectiveMinecraft.player ?: return
+        val eye = player.eyePosition
+        val minimumDamage = CrystalDamagePolicy.PLACE.getMinimumDamage(currentTarget)
+        var placed = 1
+
+        for (candidate in candidates) {
+            if (placed >= perTick) break
+            val extraBase = candidate.base
+            if (extraBase == primaryBase) continue
+            if (!WorldUtils.isBedrockOrObsidian(extraBase)) continue
+            if (eye.distanceTo(extraBase.center) > placeRangeSetting.value) continue
+            if (!BlockInteractionUtils.canPlaceCrystal(extraBase, requireUpperAirSetting.value, true, false, true, lowerHitBoxSetting.value, true)) continue
+
+            val holdingCrystal = player.isHolding(Items.END_CRYSTAL)
+            val crystalInOffhand = player.offhandItem.item == Items.END_CRYSTAL
+            if (!holdingCrystal && !crystalInOffhand) {
+                val crystalSlot = InventoryUtils.findHotbarSlot(Items.END_CRYSTAL)
+                if (crystalSlot == -1) break
+                InventoryUtils.selectHotbarSlotForPlacement(crystalSlot)
+            }
+
+            val predictedBounds = getTargetBounds(currentTarget)
+            val targetDamage = calculateExplosionDamage(extraBase, currentTarget, predictedBounds, true)
+            if (targetDamage < minimumDamage) continue
+
+            placeCrystal(extraBase, player.offhandItem.item == Items.END_CRYSTAL, targetDamage)
+            placed++
+        }
     }
 
     private fun runPlacementCycle() {
@@ -743,6 +802,7 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
             }
 
             placeCrystal(base, crystalInOffhand, targetDamage)
+            placeAdditionalCrystals(currentTarget, base)
             if (!isSilentSwap() && !alternativeSlotSearch) {
                 return
             }
@@ -886,16 +946,20 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
         if (isSwapPenaltyActive()) return
         if (isPlayerInvulnerable(target)) return
 
-        val awaitDelayMillis = ClientContext.serverStateManager.latencyMillis
-        if (!sequentialPlacementTimer.hasElapsed(awaitDelayMillis.toLong())) {
-            if (instantSetting.value != AutoCrystalInstantChoice.NONE && isAwaitEnabled()) {
-                return
+        if (!fastChainSetting.value) {
+            val awaitDelayMillis = ClientContext.serverStateManager.latencyMillis
+            if (!sequentialPlacementTimer.hasElapsed(awaitDelayMillis.toLong())) {
+                if (instantSetting.value != AutoCrystalInstantChoice.NONE && isAwaitEnabled()) {
+                    return
+                }
             }
         }
 
         val registeredSpeedMine = ClientContext.moduleRegistry.getModule(SpeedMineModule::class.java) as? SpeedMineModule
         var bestCrystal: Entity? = null
         var bestDamage = -1337.0
+        val multiBreak = breaksPerTickSetting.value > 1
+        val breakCandidates = ArrayList<Pair<EndCrystal, Double>>()
         var ignoreMiningBlock = shouldIgnoreMiningBlock()
 
         val speedMineRef = speedMine
@@ -928,7 +992,7 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
             if (lastBase != null && entity.blockPosition() != lastBase.above()) {
                 val entityBounds = entity.boundingBox
                 val placementIntersectionBox = AABB(lastBase.above()).expandTowards(0.0, 1.0, 0.0)
-                if (entityBounds.intersects(placementIntersectionBox) && !placeTimer.hasElapsed(200L)) {
+                if (entityBounds.intersects(placementIntersectionBox) && !placeTimer.hasElapsed(if (fastChainSetting.value) 50L else 200L)) {
                     recentPlacementIntersectionFlag = true
                 }
             }
@@ -946,6 +1010,9 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
             }
 
             if (!CrystalDamagePolicy.HIT.shouldRejectDamage(currentTarget, selfDamage, targetDamage, lethality)) {
+                if (multiBreak) {
+                    breakCandidates.add(entity to targetDamage)
+                }
                 if (recentPlacementIntersectionFlag && bestCrystal == null && (!ignoreMiningBlock || miningBlock == null)) {
                     bestCrystal = entity
                 }
@@ -959,6 +1026,19 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
 
         if (bestCrystal is EndCrystal) {
             attackCrystal(bestCrystal)
+            if (multiBreak) {
+                val perTick = breaksPerTickSetting.value
+                var broken = 1
+                val ordered = breakCandidates.sortedByDescending { it.second }
+                for ((candidate, _) in ordered) {
+                    if (broken >= perTick) break
+                    if (candidate === bestCrystal) continue
+                    if (!candidate.isAlive || candidate.isRemoved) continue
+                    if (!canAttackCrystal(candidate)) continue
+                    attackCrystal(candidate)
+                    broken++
+                }
+            }
         }
     }
 
@@ -1397,7 +1477,7 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
     }
 
     private fun attackCrystal(crystal: EndCrystal) {
-        if (crystal.id == lastAttackedCrystalId && attackRetryTimer.hasElapsed(500L) && crystal.isAlive && !crystal.isRemoved) {
+        if (crystal.id == lastAttackedCrystalId && attackRetryTimer.hasElapsed(if (fastChainSetting.value) 150L else 500L) && crystal.isAlive && !crystal.isRemoved) {
             attackRetries++
         } else {
             attackRetries = 0
@@ -1579,9 +1659,11 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
                     calculationFuture = null
                 } else if (calculatedPlacement == null) {
                     placementData.set(null)
+                    appliedPlacementCandidates = emptyList()
                     selectedDamage = 0.0f
                 } else {
                     placementData.set(calculatedPlacement)
+                    appliedPlacementCandidates = placementCandidates.get()
                     selectedDamage = calculatedPlacement.damage.toFloat()
                     target = calculatedPlacement.target
                 }
@@ -1622,7 +1704,8 @@ class AutoCrystalModule : Module("AutoCrystal", "Kills people with end crystals 
             return true
         }
         val scaledMillis = (retryMillis.toFloat() / serverState.tickRateScale).toLong()
-        return !attackRetryTimer.hasElapsed(scaledMillis)
+        val effectiveMillis = if (fastChainSetting.value) minOf(scaledMillis, getTickDurationMillis()) else scaledMillis
+        return !attackRetryTimer.hasElapsed(effectiveMillis)
     }
 
     @EventHandler
