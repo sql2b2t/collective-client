@@ -12,3 +12,4 @@ server/
 scripts/
 collective-dev.jar
 versions/
+.kotlin/
