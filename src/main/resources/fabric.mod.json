@@ -1,28 +1,41 @@
 {
   "schemaVersion": 1,
   "id": "collective",
-  "version": "1.3.9",
+  "version": "${version}",
   "name": "Collective Client",
-  "description": "Collective Client for Minecraft 1.21.11",
   "authors": [
     "sql"
   ],
+  "description": "Collective Client for Minecraft 1.21.4",
   "environment": "client",
+  "icon": "assets/collective/textures/collective.png",
+  "accessWidener": "collective.accesswidener",
   "entrypoints": {
+    "main": [
+      "me.collective.client.CollectiveClient"
+    ],
     "client": [
-      "me.collective.CollectiveClient"
+      "me.collective.client.CollectiveClient"
     ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "1.21.4",
+    "java": ">=21",
+    "fabric-api": "*",
+    "fabric-language-kotlin": "*"
+  },
+  "suggests": {
+    "baritone-meteor": "*",
+    "viafabricplus": "*",
+    "entityculling": "*",
+    "sodium": "*",
+    "lithium": "*",
+    "immediatelyfast": "*",
+    "xaerominimap": "*",
+    "zakoopt": "*"
   },
   "mixins": [
     "collective.mixins.json"
-  ],
-  "depends": {
-    "minecraft": "1.21.11",
-    "fabric-api": "*",
-    "fabricloader": ">=0.16"
-  },
-  "suggests": {
-    "baritone": "*"
-  },
-  "accessWidener": "collective.accesswidener"
+  ]
 }

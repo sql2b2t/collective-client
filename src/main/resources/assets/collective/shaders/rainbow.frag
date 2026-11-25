@@ -10,26 +10,19 @@ uniform bool u_Image;
 uniform sampler2D u_Overlay;
 uniform float u_OverlayAlpha;
 uniform vec4 u_Fill;
-uniform float u_Fill_Offset;
-uniform float u_Fill_Strength;
+uniform float u_Offset;
+uniform float u_Strength;
+uniform float u_StrengthLine;
 uniform vec4 u_Outline;
-uniform float u_Outline_Offset;
-uniform float u_Outline_Strength;
-uniform int u_Radius;
-uniform float u_GlowMultiplier;
+uniform int u_Width;
+uniform bool u_GlowInner;
+uniform int u_GlowQuality;
 uniform bool u_FastLines;
 uniform int u_Dots;
 uniform int u_DotsRadius;
 uniform float u_DotsAlpha;
-
-bool decorator() {
-    if (u_Dots == 0) return false;
-    if (u_Fill.a == 0) return false;
-    if (u_Dots == 1)
-    return int(gl_FragCoord.x) - (u_DotsRadius * int(gl_FragCoord.x / u_DotsRadius)) == 0
-        && int(gl_FragCoord.y) - (u_DotsRadius * int(gl_FragCoord.y / u_DotsRadius)) == 0;
-    return int(gl_FragCoord.x) % u_DotsRadius == 0 || int(gl_FragCoord.y) % u_DotsRadius == 0;
-}
+uniform float u_Glow;
+uniform bool u_Fade;
 
 vec3 calculate(vec3 c, float hue){
     vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
@@ -43,77 +36,68 @@ vec3 calculate(vec3 c, float hue){
     return f.z * mix(L.xxx, clamp(r - L.xxx, 0.0, 1.0), f.y);
 }
 
-void main() {
-    vec4 s = texture(u_Texture, v_TexCoord);
-    vec4 overlay = texture(u_Overlay, v_TexCoord * vec2(1.0, -1.0));
+float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
 
-    if (s.a == 1.0) {
-        if (u_Fill.a == 0.0 || (u_Image && overlay.a == 0.0)) discard;
+void main() {
+    vec4 cetner = texture(u_Texture, v_TexCoord);
+
+    vec4 outline = u_Outline;
+    if (u_Offset != 0.0 && u_StrengthLine != 0) {
+        vec2 strength = (v_TexCoord * 3.0 * vec2(-u_StrengthLine, u_StrengthLine));
+        float hue = float(mod (((strength.x + strength.y) + u_Offset), 1.0));
+        outline = vec4(calculate(u_Outline.rgb, hue), u_Outline.w);
+    }
+
+    if (cetner.a != 0.0) {
+        float a = cetner.a;
         vec4 fillColor = u_Fill;
-        if (u_Fill_Offset != 0.0) {
-            vec2 strength = (v_TexCoord * 3.0 * vec2(-u_Fill_Strength, u_Fill_Strength));
-            float hue = float(mod (((strength.x + strength.y) + u_Fill_Offset), 1.0));
+        if (u_Offset != 0.0 && u_Strength != 0) {
+            vec2 strength = (v_TexCoord * 3.0 * vec2(-u_Strength, u_Strength));
+            float hue = float(mod (((strength.x + strength.y) + u_Offset), 1.0));
             fillColor = vec4(calculate(u_Fill.rgb, hue), u_Fill.w);
         }
-        color = fillColor;
 
-        if (decorator()) {
-            color = vec4(fillColor.rgb, u_DotsAlpha);
+        if (decorator(u_Dots, u_DotsRadius)) {
+            cetner = vec4(fillColor.rgb, u_DotsAlpha);
         } else if (u_Image) {
-            color.rgb = mix(overlay.rgb, fillColor.rgb, fillColor.a);
-            color.a = u_OverlayAlpha;
+            vec4 overlay = texture(u_Overlay, v_TexCoord * vec2(1.0, -1.0));
+            if (overlay.a == 0.0) discard;
+            cetner.rgb = mix(overlay.rgb, fillColor.rgb, fillColor.a);
+            cetner.a = u_OverlayAlpha;
         } else {
-            color = fillColor;
+            cetner = fillColor;
         }
-    } else if (u_Radius > 0) {
-        float dist = u_Radius * u_Radius + 1.0;
 
-        if (u_FastLines && u_Radius > 2) {
-            bool present = false;
+        if (u_Width != 0 && u_GlowInner) {
+            cetner = blending(cetner, bloom(outline, u_Glow), blurFactor(false, u_Width, u_GlowQuality, u_FastLines, u_Fade));
+        }
+        cetner.a *= a;
+    } else if (u_Width > 0) {
+        float blurFactor = blurFactor(true, u_Width, u_GlowQuality, u_FastLines, u_Fade) * u_Glow;
+        if (blurFactor == 0.0) discard;
 
-            for (int x = -u_Radius; x <= u_Radius; x += u_Radius) {
-                for (int y = -u_Radius; y <= u_Radius; y += u_Radius) {
-                    vec4 offset = texture(u_Texture, v_TexCoord + v_OneTexel * vec2(x, y));
-                    if (offset.a != 0.0) {
-                        present = true;
+        if (u_GlowQuality * u_Width > 1) {
+            for (int x = -1; x <= 1; x++) {
+                for (int y = -1; y <= 1; y++) {
+                    if (x == 0 && y == 0)
+                        continue;
+
+                    vec4 tex = texture(u_Texture, v_TexCoord + v_OneTexel * vec2(x, y));
+                    if (tex.a > 0.0) {
+                        cetner.rgb = outline.rgb;
+                        cetner.a = tex.a;
                         break;
                     }
                 }
             }
-
-            if (!present) discard;
         }
 
-        for (int x = -u_Radius; x <= u_Radius; x++) {
-            for (int y = -u_Radius; y <= u_Radius; y++) {
-                vec4 offset = texture(u_Texture, v_TexCoord + v_OneTexel * vec2(x, y));
-
-                if (offset.a == 1.0) {
-                    dist = min(x * x + y * y - 1.0, dist);
-                }
-            }
+        if (cetner.a == 0.0) {
+            cetner = outline;
+            cetner.a *= blurFactor;
         }
-
-        float limit = u_Radius * u_Radius;
-
-        if (dist <= limit) {
-            vec4 outlineColor = u_Outline;
-            if (u_Outline_Offset != 0.0) {
-                vec2 strength = (v_TexCoord * 3.0 * vec2(-u_Outline_Strength, u_Outline_Strength));
-                float hue = float(mod (((strength.x + strength.y) + u_Outline_Offset), 1.0));
-                outlineColor = vec4(calculate(u_Outline.rgb, hue), u_Outline.w);
-            }
-
-            color.rgb = outlineColor.rgb;
-            color.a = min((1.0 - (dist / limit)) * u_GlowMultiplier, 1.0);
-            if (dist <= 1.5 && u_GlowMultiplier > 0)
-                color.a = 0.8;
-        } else {
-            discard;
-        }
-    } else {
-        discard;
     }
-
-    if (color.a == 0.0) discard;
+    color = cetner;
 }

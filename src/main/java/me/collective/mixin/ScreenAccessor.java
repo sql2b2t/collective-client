@@ -1,15 +1,20 @@
 package me.collective.mixin;
 
-import net.minecraft.client.gui.Drawable;
-import net.minecraft.client.gui.Element;
-import net.minecraft.client.gui.Selectable;
-import net.minecraft.client.gui.screen.Screen;
+import java.util.List;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.Screen;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
-/** Доступ к protected addDrawableChild из миксинов экранов. */
 @Mixin(Screen.class)
 public interface ScreenAccessor {
-    @Invoker("addDrawableChild")
-    <T extends Element & Drawable & Selectable> T invokeAddDrawableChild(T element);
+   @Accessor("renderables")
+   List getDrawables();
+
+   @Accessor("renderables")
+   void setDrawables(List renderables);
+
+   @Invoker("addRenderableWidget")
+   GuiEventListener addDrawableChildHook(GuiEventListener child);
 }

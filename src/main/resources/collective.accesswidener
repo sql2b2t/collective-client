@@ -1,27 +1,39 @@
 accessWidener v2 named
-accessible field net/minecraft/client/option/KeyBinding boundKey Lnet/minecraft/client/util/InputUtil$Key;
-accessible field net/minecraft/client/gui/hud/ChatHud visibleMessages Ljava/util/List;
-accessible field net/minecraft/client/MinecraftClient itemUseCooldown I
-accessible field net/minecraft/client/network/ClientPlayerInteractionManager blockBreakingCooldown I
-accessible field net/minecraft/client/network/ClientPlayerInteractionManager currentBreakingProgress F
-accessible method net/minecraft/client/network/ClientPlayerInteractionManager syncSelectedSlot ()V
-accessible field net/minecraft/entity/player/PlayerInventory main Lnet/minecraft/util/collection/DefaultedList;
-accessible field net/minecraft/entity/player/PlayerInventory selectedSlot I
-accessible field net/minecraft/entity/projectile/FishingBobberEntity caughtFish Z
-accessible field net/minecraft/entity/projectile/FireworkRocketEntity life I
-accessible field net/minecraft/entity/projectile/FireworkRocketEntity lifeTime I
-accessible field net/minecraft/entity/projectile/FireworkRocketEntity shooter Lnet/minecraft/entity/LivingEntity;
-accessible method net/minecraft/client/world/ClientWorld getPendingUpdateManager ()Lnet/minecraft/client/network/PendingUpdateManager;
-accessible field net/minecraft/block/spawner/MobSpawnerLogic spawnDelay I
-accessible field net/minecraft/entity/Entity FLAGS Lnet/minecraft/entity/data/TrackedData;
-accessible field net/minecraft/entity/Entity POSE Lnet/minecraft/entity/data/TrackedData;
-accessible class net/minecraft/network/packet/c2s/play/PlayerInteractEntityC2SPacket$InteractType
-accessible class net/minecraft/network/packet/c2s/play/PlayerInteractEntityC2SPacket$InteractAtHandler
-accessible class net/minecraft/network/packet/c2s/play/PlayerInteractEntityC2SPacket$InteractTypeHandler
-accessible field net/minecraft/client/gui/screen/ChatInputSuggestor messages Ljava/util/List;
-accessible field net/minecraft/client/gui/screen/ChatInputSuggestor x I
-accessible field net/minecraft/client/gui/screen/ChatInputSuggestor width I
-accessible class net/minecraft/world/chunk/PalettedContainer$Data
-accessible field net/minecraft/world/chunk/PalettedContainer data Lnet/minecraft/world/chunk/PalettedContainer$Data;
-accessible field net/minecraft/client/render/WorldRenderer blockBreakingInfos Lit/unimi/dsi/fastutil/ints/Int2ObjectMap;
 
+accessible class net/minecraft/client/particle/FireworkParticles$SparkParticle
+# Mixin Args wrappers access this record from outside the Minecraft package.
+accessible class net/minecraft/client/gui/components/PlayerTabOverlay$ScoreDisplayEntry
+accessible class net/minecraft/world/level/chunk/PalettedContainer$Data
+accessible field com/mojang/blaze3d/vertex/BufferBuilder buffer Lcom/mojang/blaze3d/vertex/ByteBufferBuilder;
+accessible field net/minecraft/client/Camera eyeHeight F
+accessible field net/minecraft/client/Camera eyeHeightOld F
+accessible field net/minecraft/client/KeyMapping ALL Ljava/util/Map;
+accessible field net/minecraft/client/KeyMapping key Lcom/mojang/blaze3d/platform/InputConstants$Key;
+accessible field net/minecraft/client/gui/components/ChatComponent trimmedMessages Ljava/util/List;
+accessible field net/minecraft/client/gui/screens/ChatScreen input Lnet/minecraft/client/gui/components/EditBox;
+accessible field net/minecraft/client/gui/screens/inventory/AbstractSignEditScreen line I
+accessible field net/minecraft/client/gui/screens/inventory/AbstractSignEditScreen messages [Ljava/lang/String;
+accessible field net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen selectedTab Lnet/minecraft/world/item/CreativeModeTab;
+accessible field net/minecraft/client/model/geom/ModelPart children Ljava/util/Map;
+accessible field net/minecraft/client/particle/Particle lifetime I
+accessible field net/minecraft/client/particle/Particle xd D
+accessible field net/minecraft/client/particle/Particle yd D
+accessible field net/minecraft/client/particle/Particle zd D
+accessible field net/minecraft/client/renderer/entity/EndCrystalRenderer model Lnet/minecraft/client/model/EndCrystalModel;
+accessible field net/minecraft/network/Connection channel Lio/netty/channel/Channel;
+accessible field net/minecraft/network/Connection sentPackets I
+accessible field net/minecraft/world/entity/LivingEntity attackStrengthTicker I
+accessible field net/minecraft/world/entity/WalkAnimationState position F
+accessible field net/minecraft/world/entity/WalkAnimationState speed F
+accessible field net/minecraft/world/entity/WalkAnimationState speedOld F
+accessible field net/minecraft/world/item/component/BundleContents items Ljava/util/List;
+accessible field net/minecraft/world/item/component/ItemContainerContents items Lnet/minecraft/core/NonNullList;
+accessible field net/minecraft/world/level/block/entity/BlockEntityType validBlocks Ljava/util/Set;
+accessible method com/mojang/blaze3d/platform/NativeImage writeToChannel (Ljava/nio/channels/WritableByteChannel;)Z
+accessible method net/minecraft/client/multiplayer/PlayerInfo setLatency (I)V
+accessible method net/minecraft/client/renderer/GameRenderer getFov (Lnet/minecraft/client/Camera;FZ)F
+accessible method net/minecraft/client/renderer/GameRenderer renderItemInHand (Lnet/minecraft/client/Camera;FLorg/joml/Matrix4f;)V
+accessible method net/minecraft/network/protocol/game/ServerboundInteractPacket <init> (Lnet/minecraft/network/FriendlyByteBuf;)V
+accessible method net/minecraft/network/protocol/game/ServerboundInteractPacket write (Lnet/minecraft/network/FriendlyByteBuf;)V
+accessible method net/minecraft/world/entity/Entity collectColliders (Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/level/Level;Ljava/util/List;Lnet/minecraft/world/phys/AABB;)Ljava/util/List;
+accessible method net/minecraft/world/item/CrossbowItem getShootingPower (Lnet/minecraft/world/item/component/ChargedProjectiles;)F

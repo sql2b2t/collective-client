@@ -10,106 +10,104 @@ uniform float u_OverlayAlpha;
 uniform int u_Width;
 uniform bool u_FastLines;
 uniform int u_ShapeMode;
-uniform float u_GlowMultiplier;
+uniform bool u_GlowInner;
+uniform int u_GlowQuality;
 uniform float u_Time;
+uniform bool u_Smooth;
+
 uniform vec4 u_FillColor;
 uniform vec4 u_FillColor2;
+uniform vec4 u_FillColor3;
+
 uniform vec4 u_OutlineColor;
 uniform vec4 u_OutlineColor2;
+uniform vec4 u_OutlineColor3;
+
 uniform int u_Dots;
 uniform int u_DotsRadius;
 uniform float u_DotsAlpha;
 uniform float u_Step;
+uniform float u_Glow;
+
+uniform bool u_Fade;
 
 out vec4 color;
 
-bool decorator(vec4 color) {
-    if (u_Dots == 0) return false;
-    if (color.a == 0) return false;
-    if (u_Dots == 1)
-    return int(gl_FragCoord.x) - (u_DotsRadius * int(gl_FragCoord.x / u_DotsRadius)) == 0
-        && int(gl_FragCoord.y) - (u_DotsRadius * int(gl_FragCoord.y / u_DotsRadius)) == 0;
-    return int(gl_FragCoord.x) % u_DotsRadius == 0 || int(gl_FragCoord.y) % u_DotsRadius == 0;
+float wave(float x) {
+    return abs(fract(x / 1.0) * 2.0 - 1.0); // triangle pattern between 0 and 1
 }
 
-vec4 gradient(vec4 rgb, vec4 rgb2, float step, float time) {
+float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+vec4 gradient(vec4 rgb1, vec4 rgb2, vec4 rgb3, float step, float time) {
     vec2 frag = vec2(gl_FragCoord.xy);
-    float distance = sqrt(frag.x * frag.x + frag.y * frag.y);
+    float distance = frag.x + frag.y;
 
     distance = distance / step;
+    distance = wave((frag.x + frag.y) / step + time);
+    if (!u_Smooth) {
+        return mix(rgb1, rgb3, distance);
+    }
 
-    distance = ((sin(distance + time) + 1.0) / 2.0);
-
-    float distanceInv = 1. - distance;
-    float r = rgb.r * distance + rgb2.r * distanceInv;
-    float g = rgb.g * distance + rgb2.g * distanceInv;
-    float b = rgb.b * distance + rgb2.b * distanceInv;
-    float a = rgb.a * distance + rgb2.a * distanceInv;
-    return vec4(r, g, b, a);
+    if (distance < 0.5) {
+        float t = distance / 0.5;
+        return mix(rgb1, rgb2, t);
+    } else {
+        float t = (distance - 0.5) / 0.5;
+        return mix(rgb2, rgb3, t);
+    }
 }
 
 void main() {
     vec4 center = texture(u_Texture, v_TexCoord);
-    vec4 overlay = texture(u_Overlay, v_TexCoord * vec2(1.0, -1.0));
+
+    vec4 outline = gradient(u_OutlineColor, u_OutlineColor2, u_OutlineColor3, u_Step * 300., u_Time);
 
     if (center.a != 0.0) {
-        if (u_ShapeMode == 0 || (u_Image && overlay.a == 0.0)) discard;
-        vec4 fill = gradient(u_FillColor, u_FillColor2, u_Step * 300., u_Time);
-        if (decorator(fill)) {
+        float a = center.a;
+        vec4 fill = gradient(u_FillColor, u_FillColor2, u_FillColor3, u_Step * 300., u_Time);
+        if (decorator(u_Dots, u_DotsRadius)) {
             center = vec4(fill.rgb, u_DotsAlpha);
         } else if (u_Image) {
+            vec4 overlay = texture(u_Overlay, v_TexCoord * vec2(1.0, -1.0));
+            if (overlay.a == 0.0) discard;
             center.rgb = mix(overlay.rgb, fill.rgb, fill.a);
             center.a = u_OverlayAlpha;
         } else {
             center = fill;
         }
-    }
-    else {
-        if (u_ShapeMode == 1 || u_Width == 0.0) discard;
+        if (u_Width != 0 && u_GlowInner) {
+            center = blending(center, bloom(outline, u_Glow), blurFactor(false, u_Width, u_GlowQuality, u_FastLines, u_Fade));
+        }
+        center.a *= a;
 
-        float dist = u_Width * u_Width + 1.0;
+    } else if (u_Width > 0.0) {
+        float blurFactor = blurFactor(true, u_Width, u_GlowQuality, u_FastLines, u_Fade) * u_Glow;
+        if (blurFactor == 0.0) discard;
 
-        if (u_FastLines && u_Width > 2) {
-            bool present = false;
+        if (u_GlowQuality * u_Width > 1) {
+            for (int x = -1; x <= 1; x++) {
+                for (int y = -1; y <= 1; y++) {
+                    if (x == 0 && y == 0)
+                        continue;
 
-            for (int x = -u_Width; x <= u_Width; x += u_Width) {
-                for (int y = -u_Width; y <= u_Width; y += u_Width) {
-                    vec4 offset = texture(u_Texture, v_TexCoord + v_OneTexel * vec2(x, y));
-                    if (offset.a != 0.0) {
-                        present = true;
+                    vec4 tex = texture(u_Texture, v_TexCoord + v_OneTexel * vec2(x, y));
+                    if (tex.a > 0.0) {
+                        center.rgb = outline.rgb;
+                        center.a = tex.a;
                         break;
                     }
                 }
             }
-
-            if (!present) discard;
         }
 
-
-        for (int x = -u_Width; x <= u_Width; x++) {
-            for (int y = -u_Width; y <= u_Width; y++) {
-                vec4 offset = texture(u_Texture, v_TexCoord + v_OneTexel * vec2(x, y));
-
-                if (offset.a != 0) {
-                    dist = min(x * x + y * y - 1.0, dist);
-                    center = offset;
-                }
-            }
-        }
-
-        float minDist = u_Width * u_Width;
-
-        if (dist > minDist) {
-            discard;
-        } else {
-            vec4 outline = gradient(u_OutlineColor, u_OutlineColor2, u_Step * 300., u_Time);
-            center.rgb = outline.rgb;
-            center.a = min((1.0 - (dist / minDist)) * u_GlowMultiplier, 1.0) * outline.a;
-            if (dist <= 1.5 && u_GlowMultiplier > 0)
-                center.a = 0.8;
+        if (center.a == 0.0) {
+            center = outline;
+            center.a *= blurFactor;
         }
     }
 
-    if (center.a == 0.0) discard;
     color = center;
 }
