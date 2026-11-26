@@ -243,7 +243,7 @@ class SkyboxModule : Module("Skybox", "Changes vanilla sky rendering.", ModuleCa
 
    companion object {
       private fun skyFogBufferUsage(): Int {
-         return GpuBuffer.USAGE_UNIFORM or GpuBuffer.USAGE_MAP_WRITE
+         return GpuBuffer.USAGE_UNIFORM or GpuBuffer.USAGE_MAP_WRITE or GpuBuffer.USAGE_COPY_DST
       }
    }
 }
