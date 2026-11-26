@@ -54,7 +54,12 @@ object ScissorStack : ClientAccess {
 
     @JvmStatic
     fun enableFramebufferScissor(x: Int, y: Int, width: Int, height: Int) {
-        getScissorState().enable(x, y, max(width, 0), max(height, 0))
+        val target = ClientAccess.collectiveMinecraft.gameRenderer.mainRenderTarget()
+        val x0 = max(0, x)
+        val y0 = max(0, y)
+        val x1 = minOf(target.width, x + max(width, 0))
+        val y1 = minOf(target.height, y + max(height, 0))
+        getScissorState().enable(x0, y0, max(0, x1 - x0), max(0, y1 - y0))
     }
 
     @JvmRecord
