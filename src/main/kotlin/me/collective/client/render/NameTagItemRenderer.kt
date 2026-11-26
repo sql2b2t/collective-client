@@ -20,8 +20,18 @@ object NameTagItemRenderer {
 
     @JvmStatic
     fun flush() {
-        featureDispatcher.renderAllFeatures(submitNodes)
-        buffers.endBatch()
+        val target = ClientAccess.collectiveMinecraft.gameRenderer.mainRenderTarget()
+        val prevColor = com.mojang.blaze3d.systems.RenderSystem.outputColorTextureOverride
+        val prevDepth = com.mojang.blaze3d.systems.RenderSystem.outputDepthTextureOverride
+        com.mojang.blaze3d.systems.RenderSystem.outputColorTextureOverride = target.colorTextureView
+        com.mojang.blaze3d.systems.RenderSystem.outputDepthTextureOverride = if (target.useDepth) target.depthTextureView else null
+        try {
+            featureDispatcher.renderAllFeatures(submitNodes)
+            buffers.endBatch()
+        } finally {
+            com.mojang.blaze3d.systems.RenderSystem.outputColorTextureOverride = prevColor
+            com.mojang.blaze3d.systems.RenderSystem.outputDepthTextureOverride = prevDepth
+        }
     }
 
     private class NameTagBufferSource : BufferSource(

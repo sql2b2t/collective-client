@@ -1,6 +1,8 @@
 package me.collective.client.render
 
 import com.mojang.blaze3d.pipeline.RenderTarget
+import com.mojang.blaze3d.systems.RenderSystem
+import com.mojang.blaze3d.textures.GpuTextureView
 import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.util.ArrayDeque
@@ -10,7 +12,10 @@ import me.collective.mixin.MinecraftAccessor
 import org.apache.commons.io.IOUtils
 
 object RenderTargetUtils : ClientAccess {
+    private data class TextureOverridePair(val color: GpuTextureView?, val depth: GpuTextureView?)
+
     private val savedMainRenderTargets: Deque<RenderTarget> = ArrayDeque()
+    private val savedTextureOverrides: Deque<TextureOverridePair> = ArrayDeque()
 
     @JvmStatic
     fun popFramebuffer() {
@@ -25,6 +30,11 @@ object RenderTargetUtils : ClientAccess {
 
         popFramebuffer()
         setMainRenderTarget(savedMainRenderTargets.pop())
+        if (!savedTextureOverrides.isEmpty()) {
+            val prev = savedTextureOverrides.pop()
+            RenderSystem.outputColorTextureOverride = prev.color
+            RenderSystem.outputDepthTextureOverride = prev.depth
+        }
     }
 
     @JvmStatic
@@ -41,8 +51,13 @@ object RenderTargetUtils : ClientAccess {
             return
         }
         savedMainRenderTargets.push(ClientAccess.collectiveMinecraft.gameRenderer.mainRenderTarget())
+        savedTextureOverrides.push(
+            TextureOverridePair(RenderSystem.outputColorTextureOverride, RenderSystem.outputDepthTextureOverride)
+        )
         pushFramebuffer(target)
         setMainRenderTarget(target)
+        RenderSystem.outputColorTextureOverride = target.colorTextureView
+        RenderSystem.outputDepthTextureOverride = if (target.useDepth) target.depthTextureView else null
     }
 
     @JvmStatic
