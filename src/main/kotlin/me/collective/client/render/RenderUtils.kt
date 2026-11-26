@@ -394,7 +394,7 @@ class RenderUtils private constructor() : ClientAccess {
 
         @JvmStatic
         fun clearDepth(target: RenderTarget) {
-            RenderSystem.getDevice().createCommandEncoder().clearDepthTexture(target.depthTexture!!, 1.0)
+            RenderSystem.getDevice().createCommandEncoder().clearDepthTexture(target.depthTexture!!, 0.0)
         }
 
         @JvmStatic

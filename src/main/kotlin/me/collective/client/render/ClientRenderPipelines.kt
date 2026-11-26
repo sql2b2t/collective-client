@@ -13,11 +13,11 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import net.minecraft.client.renderer.RenderPipelines
 
 object ClientRenderPipelines {
-    private val DEPTH_LEQUAL_WRITE = DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, true)
+    private val DEPTH_LEQUAL_WRITE = DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, true)
     private val DEPTH_ALWAYS_WRITE = DepthStencilState(CompareOp.ALWAYS_PASS, true)
     private val DEPTH_ALWAYS_NOWRITE = DepthStencilState(CompareOp.ALWAYS_PASS, false)
-    private val DEPTH_NAMETAG_EQUAL = DepthStencilState(CompareOp.EQUAL, false, 1.0f, -500000.0f)
-    private val DEPTH_NAMETAG_LEQUAL = DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, true, 1.0f, -500000.0f)
+    private val DEPTH_NAMETAG_EQUAL = DepthStencilState(CompareOp.EQUAL, false, -1.0f, 500000.0f)
+    private val DEPTH_NAMETAG_LEQUAL = DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, true, -1.0f, 500000.0f)
 
     private val LAYOUT_SAMPLER0 = BindGroupLayout.builder().withSampler("Sampler0").build()
     private val LAYOUT_SAMPLER1 = BindGroupLayout.builder().withSampler("Sampler1").build()
