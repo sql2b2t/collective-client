@@ -1,0 +1,16 @@
+.gradle/
+build/
+run/
+.idea/
+*.iml
+*.iws
+*.ipr
+/integration-dependencies/
+*.jfr
+MIGRATION.md
+server/
+scripts/
+collective-dev.jar
+versions/
+.kotlin/
+.compile_errors.log

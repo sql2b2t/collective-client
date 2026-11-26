@@ -1,0 +1,188 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+    id 'org.jetbrains.kotlin.jvm' version '2.4.21'
+    id 'idea'
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_25
+        freeCompilerArgs.add('-Xjvm-default=all')
+    }
+}
+
+base { archivesName = 'collective' }
+
+repositories {
+    mavenCentral()
+    maven { url = file('vfp-maven') } // локальный репозиторий с viafabricplus-api (см. комментарий в dependencies)
+    maven {
+        url = 'https://pkgs.dev.azure.com/djtheredstoner/DevAuth/_packaging/public/maven/v1'
+        content { includeGroup 'me.djtheredstoner' }
+    }
+    maven {
+        url = 'https://api.modrinth.com/maven'
+        content { includeGroup 'maven.modrinth' }
+    }
+    maven {
+        url = 'https://maven.dimaskama.net/releases'
+    }
+    ivy {
+        url = 'https://github.com/cabaletta/baritone/releases/download'
+        patternLayout { artifact 'v[revision]/baritone-api-fabric-[revision].jar' }
+        metadataSources { artifact() }
+        content { includeModule 'cabaletta', 'baritone' }
+    }
+}
+
+configurations {
+    baritoneDistribution { transitive = false }
+    viaDistribution { transitive = false }
+    entityCullingDistribution { transitive = false }
+}
+
+def baritone = providers.provider {
+    def jar = configurations.baritoneDistribution.singleFile
+    def sha256 = java.security.MessageDigest.getInstance('SHA-256').digest(jar.bytes).encodeHex().toString()
+    if (sha256 != 'eca6e2fdf43c6657fe9fea10a8f9a7572d78dc91ad389b998b808bd28fa5b5d1') {
+        throw new GradleException('Baritone download does not match the pinned upstream release')
+    }
+    jar
+}
+
+def nestedLibraries = { configuration, patterns ->
+    files(providers.provider {
+        zipTree(configuration.singleFile).matching(patterns).files
+    })
+}
+
+// nested viafabricplus-api (см. libs/) подключаем через flatDir как РЕПОЗИТОРИЙ-зависимость:
+// loom ремапит только репо-зависимости в mod-конфигурациях, локальные files() — нет.
+// Это нужно, потому что: (1) в проде лоадер разворачивает nested jars сам, а loom для
+// localRuntime — нет → bootstrap-миксин VFP падает с NoClassDefFoundError:
+// ViaFabricPlusBase; (2) nested jar собран в intermediary → без ремапа api падает с
+// NoClassDefFoundError: class_2561. viafabricplus-visuals не подключаем: его
+// class-tweaker в intermediary namespace отвергается dev-рантаймом (named),
+// главный мод visuals не requires.
+// ОБНОВЛЕНИЕ ВЕРСИИ VFP: перегенерируй libs/viafabricplus-api-<версия>.jar —
+// распакуй META-INF/jars/viafabricplus-api-*.jar из нового релизного jar.
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    // unobfuscated 26.2: mojmap is default in net.fabricmc.fabric-loom
+    implementation "net.fabricmc:fabric-loader:${loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+
+    // Fabric Language Kotlin — рантайм для Kotlin-части клиента.
+    // Версия согласована с kotlin_version (2.4.21) ниже.
+    implementation "net.fabricmc:fabric-language-kotlin:1.14.2+kotlin.2.4.21"
+    include "net.fabricmc:fabric-language-kotlin:1.14.2+kotlin.2.4.21"
+
+    // Kotlin scripting engine for .kts scripts (JSR-223)
+    // Без этого ScriptEngineManager не находит движок и падает с
+    // "No script engine found for extension: .kts"
+    // ВАЖНО: kotlin-main-kts НЕ добавляем — внутри него зашейден
+    // org.slf4j.impl.SimpleLogger (1.7.x), который перехватывает логгер
+    // Minecraft и роняет клиент в StackOverflowError на старте.
+    // Для eval .kts хватает jsr223 + compiler-embeddable.
+    // Версия должна совпадать с kotlin в fabric-language-kotlin (FLK 1.14.2+ = 2.4.21),
+    // иначе при установленном FLK на classpath оказываются две разные stdlib.
+    def kotlin_version = "2.4.21"
+    include(implementation("org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"))
+    include(implementation("org.jetbrains.kotlin:kotlin-script-runtime:${kotlin_version}"))
+    include(implementation("org.jetbrains.kotlin:kotlin-scripting-common:${kotlin_version}"))
+    include(implementation("org.jetbrains.kotlin:kotlin-scripting-jvm:${kotlin_version}"))
+    include(implementation("org.jetbrains.kotlin:kotlin-scripting-jsr223:${kotlin_version}"))
+    include(implementation("org.jetbrains.kotlin:kotlin-scripting-compiler-embeddable:${kotlin_version}"))
+    // Транзитивные зависимости движка — Loom НЕ пакует их автоматически,
+    // без них .kts упадёт с NoClassDefFoundError уже после нахождения движка.
+    include(implementation("org.jetbrains.kotlin:kotlin-scripting-jvm-host:${kotlin_version}"))
+    include(implementation("org.jetbrains.kotlin:kotlin-scripting-compiler-impl-embeddable:${kotlin_version}"))
+    include(implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:${kotlin_version}"))
+    include(implementation("org.jetbrains.kotlin:kotlin-daemon-embeddable:${kotlin_version}"))
+    include(implementation("org.jetbrains.kotlin:kotlin-reflect:${kotlin_version}"))
+    include(implementation("org.jetbrains.intellij.deps:trove4j:1.0.20200330"))
+    // 1.11.0 — версия из FLK 1.14.2, чтобы не дублировать coroutines разными версиями.
+    include(implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0"))
+    include(implementation("org.jetbrains:annotations:13.0"))
+
+    compileOnly 'maven.modrinth:viafabricplus:wvLPUTIv'
+    localRuntime 'maven.modrinth:viafabricplus:wvLPUTIv'
+    compileOnly 'maven.modrinth:lithium:f7vZ0VWU'
+    compileOnly 'maven.modrinth:immediatelyfast:pMWERcSu'
+    compileOnly 'maven.modrinth:sodium:Ql1mFeyg'
+    compileOnly 'maven.modrinth:xaeros-minimap:kYWdcLLn'
+    compileOnly 'maven.modrinth:entityculling:M8qoBSI5'
+    localRuntime 'maven.modrinth:entityculling:M8qoBSI5'
+    compileOnly 'maven.modrinth:zakoopt:i1bvkkmG'
+    localRuntime 'me.djtheredstoner:DevAuth-fabric:1.2.2'
+    compileOnly 'org.jetbrains:annotations:26.0.2'
+
+    baritoneDistribution 'cabaletta:baritone:1.19.0'
+    viaDistribution 'maven.modrinth:viafabricplus:wvLPUTIv'
+    entityCullingDistribution 'maven.modrinth:entityculling:M8qoBSI5'
+
+    compileOnly files(baritone)
+    localRuntime files(baritone)
+    implementation nestedLibraries(configurations.baritoneDistribution) {
+        include 'META-INF/jars/*.jar'
+    }
+    implementation nestedLibraries(configurations.viaDistribution) {
+        include 'META-INF/jars/*.jar'
+        // viafabricplus-api идёт ОТДЕЛЬНО (ниже): nested jar неперемаплен (intermediary),
+        // если дать его лоадеру как мод — падает class-tweaker; viafabricplus-visuals
+        // в dev не нужен вовсе (главный мод его не depends, а только предлагает).
+        exclude 'META-INF/jars/fabric-*.jar', 'META-INF/jars/gson-2*.jar',
+            'META-INF/jars/viafabricplus-*.jar'
+    }
+    // api-классы VFP нужны на classpath уже при загрузке Main (bootstrap-миксин VFP):
+    // в проде лоадер сам разворачивает nested jars, в loom dev — нет, без этого
+    // runClient падает с NoClassDefFoundError: ViaFabricPlusBase.
+    // fabric.mod.json вырезаем, чтобы лоадер не регистрировал api как мод.
+    implementation 'com.viaversion:viafabricplus-api:5.0.3'
+    compileOnly nestedLibraries(configurations.viaDistribution) {
+        include 'META-INF/jars/viafabricplus-*.jar'
+    }
+    localRuntime nestedLibraries(configurations.entityCullingDistribution) {
+        include 'META-INF/jars/*.jar'
+    }
+}
+
+loom {
+    accessWidenerPath = file('src/main/resources/collective.accesswidener')
+    runs {
+        client {
+            client()
+            name = 'Collective Source'
+            runDir = 'run'
+            ideConfigGenerated = true
+        }
+    }
+}
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') { expand version: project.version }
+}
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(25) }
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-proc:none']
+    options.fork = true
+    options.forkOptions.memoryMaximumSize = '4g'
+}
+
+
+tasks.named('runClient') {
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
+}
+
+idea.module {
+    excludeDirs += files('run', '.gradle')
+    downloadSources = true
+}
